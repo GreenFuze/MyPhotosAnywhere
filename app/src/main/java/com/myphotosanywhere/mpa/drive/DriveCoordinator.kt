@@ -24,15 +24,17 @@ class DriveCoordinator(private val context: Context, private val database: Photo
             active.email, requireNotNull(active.folderId), active.mode)
         database.drive().insertBackup(task)
         val saved = database.drive().backup(task.id) ?: return
-        if (saved.state != "COMPLETE") schedule(saved, active.unmeteredOnly)
+        if (saved.state !in listOf("COMPLETE", "FAILED", "AUTH_REQUIRED")) schedule(saved, active.unmeteredOnly)
     }
 
-    suspend fun resume(replace: Boolean = false) {
+    suspend fun resume(replace: Boolean = false, retryFailures: Boolean = false) {
         val active = database.drive().connection() ?: return
         if (!active.backupEnabled) return
         val binding = active.binding() ?: return
         database.photos().all().forEach { enqueue(it) }
-        database.drive().backups(binding.key).filter { it.state != "COMPLETE" }.forEach {
+        database.drive().backups(binding.key).filter {
+            it.state != "COMPLETE" && (retryFailures || it.state !in listOf("FAILED", "AUTH_REQUIRED"))
+        }.forEach {
             schedule(it, active.unmeteredOnly, replace)
         }
     }

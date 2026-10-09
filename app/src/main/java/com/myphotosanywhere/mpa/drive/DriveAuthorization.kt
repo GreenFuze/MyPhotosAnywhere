@@ -12,7 +12,7 @@ import kotlinx.coroutines.tasks.await
 class DriveAuthorization(private val context: Context) {
     suspend fun request(email: String, mode: DriveMode): AuthorizationResult = Identity.getAuthorizationClient(context)
         .authorize(AuthorizationRequest.builder().setAccount(Account(email, "com.google"))
-            .setRequestedScopes(listOf(Scope(mode.scope))).build()).await()
+            .setRequestedScopes(listOf(Scope(mode.scope))).setOptOutIncludingGrantedScopes(true).build()).await()
 
     suspend fun token(email: String, mode: DriveMode): String {
         val result = request(email, mode)

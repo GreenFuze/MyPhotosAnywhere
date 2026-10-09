@@ -21,6 +21,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
+      - run: ./gradlew signingReport --console=plain > app/build/reports/signing-report.txt
       - uses: actions/upload-artifact@v4
         with:
           name: MPA-debug
@@ -32,4 +33,5 @@ jobs:
           path: |
             app/build/test-results/testDebugUnitTest/
             app/build/reports/lint-results-debug.*
+            app/build/reports/signing-report.txt
             app/schemas/

@@ -25,7 +25,8 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
     val photos = dao.observeAll()
     val handoffs = dao.observeHandoffs()
 
-    suspend fun importPhoto(uri: Uri, handoff: Handoff? = null, nameOverride: String? = null, mimeOverride: String? = null): Photo = withContext(Dispatchers.IO) {
+    suspend fun importPhoto(uri: Uri, handoff: Handoff? = null, nameOverride: String? = null,
+        mimeOverride: String? = null, onSaved: suspend (Photo) -> Unit = {}): Photo = withContext(Dispatchers.IO) {
         importLock.withLock {
             if (handoff != null) check(dao.find(handoff.photoId) != null) { "The original photo is missing." }
             val resolver = context.contentResolver
@@ -74,6 +75,7 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
                 database.withTransaction {
                     dao.insert(photo)
                     if (handoff != null) dao.deleteHandoff(handoff.id)
+                    onSaved(photo)
                 }
                 photo
             } catch (failure: Exception) {

@@ -13,7 +13,7 @@ MPA 0.2 uses Google Identity Services authorization on Android and the Drive v3 
 5. For a local debug build, run `./gradlew signingReport` (`gradlew.bat signingReport` on Windows) and use the debug variant's SHA-1. The actual keystore stays on your computer.
 6. Build and install that APK. No Android client ID or client secret needs to be pasted into the app or this chat for this on-device authorization flow.
 
-GitHub's debug APK normally uses a generated signing key that can differ between runners. Register the certificate of the exact APK you install, or use a locally built APK with your stable local debug certificate. Use the Play app-signing certificate for a future production build. Never commit a signing keystore or password.
+GitHub's debug APK normally uses a generated signing key that can differ between runners. The successful workflow's **MPA-checks** artifact includes `signing-report.txt`; register that APK's debug SHA-1, or use a locally built APK with your stable local debug certificate. Use the Play app-signing certificate for a future production build. Never commit a signing keystore or password.
 
 Google's broad `drive` scope is restricted. Production publication may require Google's OAuth verification and other requirements depending on the deployment. Test users and testing mode are for development, not a substitute for production review. The `drive.file` scope does not grant automatic access to every file inside an existing selected folder; the app's new-folder mode intentionally shows only app-accessible folders/files.
 
