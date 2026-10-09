@@ -11,6 +11,8 @@
 
 ## Milestones and acceptance criteria
 
+Progress: the 0.1 offline/handoff implementation passed unit tests, lint, and APK assembly. The 0.2 implementation adds account authorization, paginated My Drive folder browsing/creation, immutable account/folder task binding, resumable background upload with verified checksums, and direct-child image downloads. Database upgrade and network-boundary tests are included. Google-project setup and live-account/device tests remain necessary. Initial uploads are stored directly in the selected folder; owned subfolder organization, recursive discovery, Drive changes tokens, thumbnail indexing, and cache-budget enforcement are still outstanding milestone 2/3 work.
+
 ### 1. Offline gallery and AI round trip (first implementation)
 
 - System photo picker imports selected images to durable private storage.

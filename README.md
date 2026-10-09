@@ -6,7 +6,9 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
-The initial native gallery, durable local import, thumbnails, AI handoff, and linked-copy result import compile and pass unit tests and Android lint. Real-device testing is still needed. Google Drive synchronization, conventional editing, face recognition, and map browsing are planned milestones, not finished features. See [the implementation plan](docs/PLAN.md) and [validation evidence](docs/VALIDATION.md).
+MPA includes a native offline gallery, photo import, thumbnails, AI handoff, and linked-copy result import. The 0.2 implementation adds Google authorization, Drive folder selection/creation, resumable background backup, and explicit verified downloads for offline browsing. It preserves original files and stores a persistent transfer queue. Configure [Google Drive OAuth](docs/GOOGLE_DRIVE_SETUP.md) before a live test.
+
+Automatic Drive change reconciliation, recursive discovery, remote thumbnails and cache-budget eviction, conventional editing, face recognition, albums, and map browsing remain planned. See [the implementation plan](docs/PLAN.md) and [validation evidence](docs/VALIDATION.md). Automated checks do not replace a real-device and Google-account test.
 
 ## Development
 
@@ -20,7 +22,7 @@ Build and test using the included Gradle 8.11.1 wrapper (on Windows, use `gradle
 ./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
-GitHub Actions installs the specified Gradle version and builds an installable debug APK. Signing credentials, Google OAuth credentials, user photos, and local SDK paths must never be committed.
+GitHub Actions uses the pinned wrapper and builds an installable debug APK. Signing credentials, OAuth tokens, user photos, and local SDK paths must never be committed. A Google Android OAuth client is configured by package/signing-certificate association, without an AI API key or Android client secret.
 
 ## First milestone workflow
 
@@ -30,8 +32,8 @@ GitHub Actions installs the specified Gradle version and builds an installable d
 
 Sharing does not automatically attach a result to MPA, start a paid operation, or guarantee that a provider accepts the prompt text. Provider app capabilities and subscriptions control what edits are available. Claude may help with instructions and analysis without generating an edited image.
 
-Imported originals and edited outputs are never treated as disposable cache. Until Drive synchronization is implemented and confirms uploads, the private app files may be the only MPA copies. Uninstalling MPA or clearing Android app data deletes those copies; keep the source photos. Android cloud backup is disabled for the photo library.
+Imported originals and edited outputs are never treated as disposable cache. Enable backup in Storage to queue them to your selected Drive folder; a photo is only marked backed up after remote size/checksum verification. This version keeps all local originals. Uninstalling MPA or clearing Android app data deletes those device copies; keep your source photos. Android cloud backup is disabled for the photo library.
 
 ## Privacy
 
-The initial app requests no broad gallery, location, or network permissions. Only explicitly selected images are imported. AI handoff is user-initiated and exports one selected image at a time. GPS metadata remains local; the handoff image has no EXIF metadata, although the visible picture can still reveal location or identity. The prompt is explicitly copied to Android's clipboard when handing off.
+The app requests no broad gallery or location permission. Drive access is requested when connecting your account; the existing-library mode requests a broader Drive scope and explains it before consent. MPA accesses photo contents inside the selected folder and uploads after backup is enabled. Explicit offline downloads and the system photo picker import selected images. AI handoff exports one chosen preview at a time, without EXIF metadata, although the visible picture can still reveal location or identity. The prompt is explicitly copied to Android's clipboard when handing off. Drive originals retain their source EXIF, including embedded GPS; only handoff previews strip it.

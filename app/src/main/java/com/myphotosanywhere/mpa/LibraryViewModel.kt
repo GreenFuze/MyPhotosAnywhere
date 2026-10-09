@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as MpaApplication).repository
+    private val drive = (application as MpaApplication).drive
     val photos = repository.photos.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val handoffs = repository.handoffs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     private val _busy = MutableStateFlow(false)
@@ -26,6 +27,14 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val _message = MutableStateFlow<String?>(null)
     val message = _message.asStateFlow()
     fun clearMessage() { _message.value = null }
+
+    init {
+        viewModelScope.launch {
+            try { drive.resume() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { _message.value = "Local photos are available. Open Storage to resume Drive backup." }
+        }
+    }
 
     fun importPhotos(uris: List<Uri>, handoff: Handoff? = null) {
         if (uris.isEmpty() || _busy.value) return
@@ -37,12 +46,14 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             try {
                 for (uri in uris) {
                     try {
-                        repository.importPhoto(uri, handoff)
+                        val photo = repository.importPhoto(uri, handoff)
                         imported++
+                        try { drive.enqueue(photo) } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) { lastError = "Saved locally; open Storage to resume backup." }
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (error: Exception) { failed++; lastError = error.message }
                 }
-                _message.value = if (failed == 0) "$imported photo(s) saved locally." else
+                _message.value = if (failed == 0) "$imported photo(s) saved locally.${lastError?.let { " $it" } ?: ""}" else
                     "$imported saved, $failed failed: ${lastError ?: "Cannot import this image."}"
             } finally { _busy.value = false }
         }
@@ -72,7 +83,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             try {
                 // Read persisted state directly: reactive lists may not have loaded after process recreation.
                 val handoff = repository.findHandoff(handoffId) ?: error("This handoff is no longer pending.")
-                repository.importPhoto(uri, handoff)
+                val photo = repository.importPhoto(uri, handoff)
+                try { drive.enqueue(photo) } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { /* Startup/retry queues any saved photo not yet backed up. */ }
                 _message.value = "Edited copy saved. The original is preserved."
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) { _message.value = error.message ?: "Could not import the result." }

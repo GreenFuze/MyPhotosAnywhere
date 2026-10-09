@@ -10,6 +10,9 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
 import kotlinx.coroutines.flow.Flow
+import com.myphotosanywhere.mpa.drive.DriveConnection
+import com.myphotosanywhere.mpa.drive.DriveBackup
+import com.myphotosanywhere.mpa.drive.DriveDao
 
 @Entity(tableName = "photos", indices = [Index("sha256"), Index("parentId")])
 data class Photo(
@@ -45,6 +48,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE id = :id")
     suspend fun find(id: String): Photo?
 
+    @Query("SELECT * FROM photos ORDER BY importedAt")
+    suspend fun all(): List<Photo>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(photo: Photo)
 
@@ -61,7 +67,8 @@ interface PhotoDao {
     suspend fun deleteHandoff(id: String)
 }
 
-@Database(entities = [Photo::class, Handoff::class], version = 1, exportSchema = true)
+@Database(entities = [Photo::class, Handoff::class, DriveConnection::class, DriveBackup::class], version = 2, exportSchema = true)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photos(): PhotoDao
+    abstract fun drive(): DriveDao
 }

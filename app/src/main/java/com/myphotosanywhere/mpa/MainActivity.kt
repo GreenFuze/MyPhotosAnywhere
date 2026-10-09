@@ -70,6 +70,7 @@ import coil.compose.AsyncImage
 import com.myphotosanywhere.mpa.core.AiProvider
 import com.myphotosanywhere.mpa.data.Handoff
 import com.myphotosanywhere.mpa.data.Photo
+import com.myphotosanywhere.mpa.drive.DriveStorageScreen
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -153,7 +154,7 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel()) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Text("A home for your memories", style = MaterialTheme.typography.headlineSmall)
                                 Text("Add a few photos to start. They stay available offline, and you can send selected photos to your AI app for editing.")
-                                Text("Drive backup is coming in the next milestone. Keep your source copies.", style = MaterialTheme.typography.bodySmall)
+                                Text("Connect your Google Drive folder in Storage to enable backup.", style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     } else {
@@ -198,7 +199,7 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel()) {
                         }
                     }
                 }
-                2 -> StorageScreen(photos)
+                2 -> DriveStorageScreen(photos)
             }
         }
     }
@@ -258,28 +259,6 @@ private fun ShareDialog(busy: Boolean, onDismiss: () -> Unit, onShare: (AiProvid
                 if (busy) CircularProgressIndicator(Modifier.size(20.dp)) else Text("Continue to share sheet")
             }
         }, dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("Cancel") } })
-}
-
-@Composable
-private fun StorageScreen(photos: List<Photo>) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Storage", style = MaterialTheme.typography.headlineSmall)
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(formatBytes(photos.sumOf { it.bytes }), style = MaterialTheme.typography.headlineMedium)
-                Text("${photos.size} original files and edited copies on this device")
-                Text("Pending Drive backup", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-            }
-        }
-        Text("Local-first browsing", style = MaterialTheme.typography.titleMedium)
-        Text("Small thumbnails keep your gallery responsive. Imported photos and pending edits are protected files, separate from temporary AI exports.")
-        Text("Google Drive · next milestone", style = MaterialTheme.typography.titleMedium)
-        Text("Choose your Drive folder, back up in the background, and set a budget for downloaded originals. MPA will only evict files with a verified remote copy.")
-        Text("Keep your source photos. Uninstalling the app or clearing its data removes this local library.", style = MaterialTheme.typography.bodySmall)
-        Spacer(Modifier.height(8.dp))
-        Text("MyPhotosAnywhere · MPA 0.1", style = MaterialTheme.typography.labelMedium)
-    }
 }
 
 private fun formatBytes(bytes: Long): String = when {

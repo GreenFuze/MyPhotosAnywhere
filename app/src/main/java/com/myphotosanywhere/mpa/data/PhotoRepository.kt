@@ -25,7 +25,7 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
     val photos = dao.observeAll()
     val handoffs = dao.observeHandoffs()
 
-    suspend fun importPhoto(uri: Uri, handoff: Handoff? = null): Photo = withContext(Dispatchers.IO) {
+    suspend fun importPhoto(uri: Uri, handoff: Handoff? = null, nameOverride: String? = null, mimeOverride: String? = null): Photo = withContext(Dispatchers.IO) {
         importLock.withLock {
             if (handoff != null) check(dao.find(handoff.photoId) != null) { "The original photo is missing." }
             val resolver = context.contentResolver
@@ -34,7 +34,7 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
             val staged = File(dir, "$id.part")
             val original = File(dir, id)
             val thumb = File(context.filesDir, "thumbnails/$id.jpg")
-            val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+            val name = nameOverride ?: resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
                 if (it.moveToFirst()) it.getString(0) else null
             } ?: "Photo"
             try {
@@ -65,7 +65,7 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
                 val gps = runCatching { ExifInterface(original).latLong }.getOrNull()
                 val photo = Photo(
                     id = id, displayName = name, originalPath = original.absolutePath,
-                    thumbnailPath = thumb.absolutePath, mimeType = resolver.getType(uri) ?: "image/*",
+                    thumbnailPath = thumb.absolutePath, mimeType = mimeOverride ?: resolver.getType(uri) ?: "image/*",
                     bytes = total, importedAt = System.currentTimeMillis(),
                     sha256 = digest.digest().joinToString("") { "%02x".format(it) },
                     latitude = gps?.get(0), longitude = gps?.get(1), parentId = handoff?.photoId,

@@ -18,6 +18,8 @@ Run `./gradlew testDebugUnitTest lintDebug assembleDebug` with SDK 35 (on Window
 - `EditPromptTest`: instructions are preserved, providers without generation get a fallback, and empty/oversized prompts are rejected.
 - Lint and APK assembly must check Android API compatibility, Room/KSP generation, Compose compilation, and resource/manifest consistency.
 
+The 0.2 changes add `DriveGatewayTest` for pagination/query escaping, reserved-ID uploads, acknowledged offsets, session-host validation, rate-limit handling, and download limits; `DriveBindingTest` for account/folder separation and range checks; and `DrivePersistenceTest` for the v1-to-v2 upgrade, original/handoff retention, upload checkpoints, and destination changes. Their new CI result will be recorded after validation. Live Drive/OAuth checks are in [GOOGLE_DRIVE_SETUP.md](GOOGLE_DRIVE_SETUP.md).
+
 The cache policy's unit tests passed. It is a standalone component awaiting integration with verified Drive downloads. There is no original-file eviction in milestone 1.
 
 ## Real-device acceptance checklist
