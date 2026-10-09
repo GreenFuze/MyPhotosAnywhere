@@ -1,0 +1,86 @@
+name: Publish Android prerelease
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release.yml'
+      - 'docs/releases/v0.2.0.md'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: android-prerelease-v0.2.0
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: v0.2.0
+      BUILD_RUN_ID: '37954645025'
+      SOURCE_SHA: cc8e56aee0a99b0b7311b85917c45e6e34a1d6f4
+      APK_SHA256: f2ecf86eea7a177cbff9fd4f526f49cf216ca49f859037ce760799195fe174e4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the successful source build
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN_ID" > build-run.json
+          python3 - <<'PY'
+          import json, os
+          with open('build-run.json') as stream:
+              run = json.load(stream)
+          assert run['conclusion'] == 'success', 'Source build did not succeed'
+          assert run['head_sha'] == os.environ['SOURCE_SHA'], 'Source commit mismatch'
+          PY
+      - name: Download and verify the tested APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$BUILD_RUN_ID" --name MPA-debug --dir apk
+          gh run download "$BUILD_RUN_ID" --name MPA-checks --dir checks
+          mkdir assets
+          cp apk/app-debug.apk assets/MPA-0.2-debug.apk
+          cp checks/build/reports/signing-report.txt assets/MPA-0.2-signing-report.txt
+          cp docs/GOOGLE_DRIVE_SETUP.md assets/GOOGLE_DRIVE_SETUP.md
+          printf '%s  assets/MPA-0.2-debug.apk\n' "$APK_SHA256" | sha256sum --check
+          (cd assets && sha256sum MPA-0.2-debug.apk > SHA256SUMS.txt)
+      - name: Publish the prerelease without replacing existing assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/releases?per_page=100" > releases.json
+          EXISTS=$(python3 - <<'PY'
+          import json, os
+          with open('releases.json') as stream:
+              releases = json.load(stream)
+          print('yes' if any(r['tag_name'] == os.environ['RELEASE_TAG'] for r in releases) else 'no')
+          PY
+          )
+          if [ "$EXISTS" = yes ]; then
+            gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" > tag.json
+            python3 - <<'PY'
+          import json, os
+          with open('tag.json') as stream:
+              tag = json.load(stream)
+          assert tag['object']['sha'] == os.environ['SOURCE_SHA'], 'Existing tag points to another commit'
+          PY
+            gh release download "$RELEASE_TAG" --pattern MPA-0.2-debug.apk --dir existing
+            printf '%s  existing/MPA-0.2-debug.apk\n' "$APK_SHA256" | sha256sum --check
+            echo 'The same APK is already published; existing release preserved.'
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" assets/* \
+            --target "$SOURCE_SHA" \
+            --title 'MyPhotosAnywhere 0.2.0 — Android test build' \
+            --prerelease \
+            --notes-file docs/releases/v0.2.0.md
