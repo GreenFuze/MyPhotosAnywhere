@@ -11,7 +11,7 @@ The project uses pinned, established Android dependency versions for its initial
 
 ## Meaningful automated checks
 
-Run `gradle testDebugUnitTest lintDebug assembleDebug` with Gradle 8.11.1 and SDK 35.
+Run `./gradlew testDebugUnitTest lintDebug assembleDebug` with SDK 35 (on Windows, use `gradlew.bat`).
 
 - `CachePolicyTest`: unbacked-up, pending, pinned, and actively-read files cannot be eviction candidates; least-recently-used downloads are selected until budget is met; unsafe input is rejected.
 - `EditPromptTest`: instructions are preserved, providers without generation get a fallback, and empty/oversized prompts are rejected.

@@ -12,10 +12,10 @@ Milestone 1 is under development: native gallery, durable local import, thumbnai
 
 Open this folder in Android Studio with JDK 17 or newer and Android SDK 35 installed. The project uses Kotlin, Jetpack Compose, Room, Coil, and coroutines. Android 8.0 (API 26) is the minimum supported version.
 
-Build and test using Gradle 8.11.1:
+Build and test using the included Gradle 8.11.1 wrapper (on Windows, use `gradlew.bat`):
 
 ```sh
-gradle testDebugUnitTest lintDebug assembleDebug
+./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
 GitHub Actions installs the specified Gradle version and builds an installable debug APK. Signing credentials, Google OAuth credentials, user photos, and local SDK paths must never be committed.
