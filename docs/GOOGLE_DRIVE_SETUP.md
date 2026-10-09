@@ -15,6 +15,8 @@ MPA 0.2 uses Google Identity Services authorization on Android and the Drive v3 
 
 GitHub's debug APK normally uses a generated signing key that can differ between runners. The successful workflow's **MPA-checks** artifact includes `signing-report.txt`; register that APK's debug SHA-1, or use a locally built APK with your stable local debug certificate. Use the Play app-signing certificate for a future production build. Never commit a signing keystore or password.
 
+To upgrade an existing installation while keeping its private library, sign the new build with the same certificate as the installed version. A differently signed debug APK cannot update it. Keep the original source copies and a verified backup; uninstalling removes the private library.
+
 Google's broad `drive` scope is restricted. Production publication may require Google's OAuth verification and other requirements depending on the deployment. Test users and testing mode are for development, not a substitute for production review. The `drive.file` scope does not grant automatic access to every file inside an existing selected folder; the app's new-folder mode intentionally shows only app-accessible folders/files.
 
 Official references:

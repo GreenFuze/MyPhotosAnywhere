@@ -8,6 +8,8 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 MPA includes a native offline gallery, photo import, thumbnails, AI handoff, and linked-copy result import. The 0.2 implementation adds Google authorization, Drive folder selection/creation, resumable background backup, and explicit verified downloads for offline browsing. It preserves original files and stores a persistent transfer queue. Configure [Google Drive OAuth](docs/GOOGLE_DRIVE_SETUP.md) before a live test.
 
+Version 0.2 passes 21 unit/integration tests, Android lint, and APK assembly. [Download the debug APK and checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/37954645025) from the workflow artifacts. A configured Google project and live-account/device validation are still needed.
+
 Automatic Drive change reconciliation, recursive discovery, remote thumbnails and cache-budget eviction, conventional editing, face recognition, albums, and map browsing remain planned. See [the implementation plan](docs/PLAN.md) and [validation evidence](docs/VALIDATION.md). Automated checks do not replace a real-device and Google-account test.
 
 ## Development

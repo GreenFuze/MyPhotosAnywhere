@@ -2,6 +2,8 @@
 
 ## Current evidence
 
+- MPA 0.2: **21 tests passed, 0 failures/errors/skipped**, Android lint reported no errors, and APK assembly passed for source commit `cc8e56aee0a99b0b7311b85917c45e6e34a1d6f4`. [Successful build and APK/checks artifacts](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/37954645025). `MPA-checks` includes the JUnit XML, lint reports, Room v2 schema, and signing-certificate report. This is automated evidence; no live Google account or phone has been exercised.
+
 - Source-level review completed for the first gallery/handoff implementation.
 - Android manifest and resource XML parse successfully.
 - GitHub Actions successfully ran `testDebugUnitTest`, `lintDebug`, and `assembleDebug` for source commit `7888e298dea92457968bda42d7b0f66c9d7297a8`. [Build and APK artifact](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/37950038970). The uploaded artifact is named **MPA-debug**.
@@ -18,7 +20,7 @@ Run `./gradlew testDebugUnitTest lintDebug assembleDebug` with SDK 35 (on Window
 - `EditPromptTest`: instructions are preserved, providers without generation get a fallback, and empty/oversized prompts are rejected.
 - Lint and APK assembly must check Android API compatibility, Room/KSP generation, Compose compilation, and resource/manifest consistency.
 
-The 0.2 changes add `DriveGatewayTest` for pagination/query escaping, reserved-ID uploads, acknowledged offsets, session-host validation, rate-limit handling, and download limits; `DriveBindingTest` for account/folder separation and range checks; and `DrivePersistenceTest` for the v1-to-v2 upgrade, original/handoff retention, upload checkpoints, and destination changes. Their new CI result will be recorded after validation. Live Drive/OAuth checks are in [GOOGLE_DRIVE_SETUP.md](GOOGLE_DRIVE_SETUP.md).
+The 0.2 checks passed: `DriveGatewayTest` covers pagination/query escaping, reserved-ID uploads, acknowledged offsets, session-host validation, rate-limit handling, and download limits; `DriveBindingTest` covers account/folder separation and range checks; and `DrivePersistenceTest` covers the v1-to-v2 upgrade, original/handoff retention, upload checkpoints, destination changes, and atomic rollback of imported photos/links/files. Live Drive/OAuth checks are in [GOOGLE_DRIVE_SETUP.md](GOOGLE_DRIVE_SETUP.md).
 
 The cache policy's unit tests passed. It is a standalone component awaiting integration with verified Drive downloads. There is no original-file eviction in milestone 1.
 
