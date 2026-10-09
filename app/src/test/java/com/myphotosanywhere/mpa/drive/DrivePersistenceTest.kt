@@ -1,11 +1,15 @@
 package com.myphotosanywhere.mpa.drive
 
 import android.app.Application
+import android.net.Uri
 import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import com.myphotosanywhere.mpa.data.PhotoDatabase
+import com.myphotosanywhere.mpa.data.PhotoRepository
+import java.io.File
+import java.util.Base64
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -90,5 +94,34 @@ class DrivePersistenceTest {
         db.drive().disconnect()
         assertEquals("reserved-id", db.drive().backup(task.id)?.remoteId)
         assertEquals("family.jpg", db.photos().find("original")?.displayName)
+    }
+
+    @Test
+    @Config(sdk = [26], application = Application::class)
+    fun failedDriveLinkRollsBackThePhotoAndItsFilesTogether() = runBlocking {
+        val db = open()
+        val context = RuntimeEnvironment.getApplication()
+        val source = File.createTempFile("mpa-fixture", ".png", context.cacheDir)
+        // A generated 1x1 red PNG, rather than user photo data.
+        source.writeBytes(Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"))
+        var newId: String? = null
+        try {
+            try {
+                PhotoRepository(context, db).importPhoto(Uri.fromFile(source), nameOverride = "remote.png", mimeOverride = "image/png") { photo ->
+                    newId = photo.id
+                    db.drive().insertBackup(DriveBackup("link:${photo.id}", "binding", photo.id, "account", "owner@example.test",
+                        "folder", DriveMode.APP_FILES.name, remoteId = "remote-image", state = "COMPLETE"))
+                    error("Simulated failure while saving the remote link")
+                }
+                throw AssertionError("Expected the import transaction to fail")
+            } catch (error: IllegalStateException) {
+                assertEquals("Simulated failure while saving the remote link", error.message)
+            }
+            val id = requireNotNull(newId) // Ensures the real importer reached the transaction callback.
+            assertEquals(listOf("original"), db.photos().all().map { it.id })
+            assertEquals(null, db.drive().backup("link:$id"))
+            assertFalse(File(context.filesDir, "originals/$id").exists())
+            assertFalse(File(context.filesDir, "thumbnails/$id.jpg").exists())
+        } finally { source.delete() }
     }
 }
