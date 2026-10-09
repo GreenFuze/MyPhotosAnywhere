@@ -6,9 +6,11 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
-Milestone 1 is under development: native gallery, durable local import, thumbnails, AI handoff, and importing the resulting edit as a linked copy. Google Drive synchronization, conventional editing, face recognition, and map browsing are planned milestones, not finished features. See [the implementation plan](docs/PLAN.md).
+The initial native gallery, durable local import, thumbnails, AI handoff, and linked-copy result import compile and pass unit tests and Android lint. Real-device testing is still needed. Google Drive synchronization, conventional editing, face recognition, and map browsing are planned milestones, not finished features. See [the implementation plan](docs/PLAN.md) and [validation evidence](docs/VALIDATION.md).
 
 ## Development
+
+To choose a clone directory and continue in a local Codex session, follow [the local setup guide](docs/LOCAL_DEVELOPMENT.md).
 
 Open this folder in Android Studio with JDK 17 or newer and Android SDK 35 installed. The project uses Kotlin, Jetpack Compose, Room, Coil, and coroutines. Android 8.0 (API 26) is the minimum supported version.
 

@@ -4,8 +4,9 @@
 
 - Source-level review completed for the first gallery/handoff implementation.
 - Android manifest and resource XML parse successfully.
-- Gradle unit tests, Android lint, APK assembly, and device checks have **not yet run** in this workspace: Gradle and the Android SDK are not installed, and the tool download was interrupted.
-- CI is configured to run the required build checks on GitHub. A passing workflow and a real-device check are still required before declaring milestone 1 verified.
+- GitHub Actions successfully ran `testDebugUnitTest`, `lintDebug`, and `assembleDebug` for source commit `7888e298dea92457968bda42d7b0f66c9d7297a8`. [Build and APK artifact](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/37950038970). The uploaded artifact is named **MPA-debug**.
+- The cloud workspace itself has no installed Android SDK/Gradle distribution; compilation was performed by GitHub Actions with the committed wrapper.
+- Real-device checks have **not yet run**. Automated build checks passed, but a phone/emulator test is still required before declaring the gallery and provider round trip fully verified.
 
 The project uses pinned, established Android dependency versions for its initial scaffold. Before Play Store release, revisit the then-current target SDK requirement and upgrade/test the toolchain as needed.
 
@@ -17,7 +18,7 @@ Run `./gradlew testDebugUnitTest lintDebug assembleDebug` with SDK 35 (on Window
 - `EditPromptTest`: instructions are preserved, providers without generation get a fallback, and empty/oversized prompts are rejected.
 - Lint and APK assembly must check Android API compatibility, Room/KSP generation, Compose compilation, and resource/manifest consistency.
 
-The cache policy is a tested-design component awaiting test execution and integration with verified Drive downloads. There is no original-file eviction in milestone 1.
+The cache policy's unit tests passed. It is a standalone component awaiting integration with verified Drive downloads. There is no original-file eviction in milestone 1.
 
 ## Real-device acceptance checklist
 
