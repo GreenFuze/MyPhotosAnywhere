@@ -37,7 +37,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             try {
                 for (uri in uris) {
                     try {
-                        repository.import(uri, handoff)
+                        repository.importPhoto(uri, handoff)
                         imported++
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (error: Exception) { failed++; lastError = error.message }
@@ -72,7 +72,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             try {
                 // Read persisted state directly: reactive lists may not have loaded after process recreation.
                 val handoff = repository.findHandoff(handoffId) ?: error("This handoff is no longer pending.")
-                repository.import(uri, handoff)
+                repository.importPhoto(uri, handoff)
                 _message.value = "Edited copy saved. The original is preserved."
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) { _message.value = error.message ?: "Could not import the result." }

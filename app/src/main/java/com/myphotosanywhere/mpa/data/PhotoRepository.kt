@@ -25,7 +25,7 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
     val photos = dao.observeAll()
     val handoffs = dao.observeHandoffs()
 
-    suspend fun import(uri: Uri, handoff: Handoff? = null): Photo = withContext(Dispatchers.IO) {
+    suspend fun importPhoto(uri: Uri, handoff: Handoff? = null): Photo = withContext(Dispatchers.IO) {
         importLock.withLock {
             if (handoff != null) check(dao.find(handoff.photoId) != null) { "The original photo is missing." }
             val resolver = context.contentResolver
