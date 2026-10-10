@@ -1,5 +1,73 @@
 # Validation status and device checklist
 
+## Unreleased local Drive discovery increment — 2026-10-11
+
+Based on main `15589ca`, branch `feature/durable-drive-discovery`, this increment passed
+**110 unit/integration tests**, Android lint with **zero errors** (29 warnings,
+3 informational findings) and debug APK assembly. Unit tests had zero
+failures, errors or skipped cases. **Device tests remain unverified locally**: the isolated
+Android 15 (API 35) emulator dropped its ADB transport during installation, before app
+tests ran. These are local results;
+there is no new published release or CI result for this increment. Room v6's generated
+schema is included; published 0.4.3 remains Room v5 / version code 9.
+
+New regressions use actual disk-backed Room and mocked Drive HTTP responses to verify
+page/cursor/child-folder transaction atomicity, restart with saved continuation tokens,
+2,000 nested media items across bounded passes, incomplete results, access errors,
+cursor rejection, folder-change rescans, duplicate/cyclic folders, change-feed replay,
+non-media exclusion and elapsed-time budgets. Released-schema v5 migration preserves
+photos, portable identity, reviewed faces, upload sessions/offsets, destination and
+change checkpoints. Changed-byte coverage preserves old snapshots/corrections while
+invalidating stale thumbnails. The new native UI test asserts saved discovery state
+and Refresh near the top of Storage. It joins the existing nine native checks, including
+offline model execution, original-byte preservation and XMP recovery. All ten remain
+required in CI; this local attempt does not establish their result for the new source.
+
+Local tooling: portable JDK 17, Gradle 8.11.1 wrapper, existing SDK Platform 35 / Build
+Tools 35.0.0 and Python 3.12. Builds ran from an isolated staging copy in the Codex
+task workspace; the verified source files were then copied to the source checkout.
+The unit suite ran first. Final lint and APK assembly were confirmed separately from
+the unavailable device checks, from that staging directory:
+
+```powershell
+.\gradlew.bat lintDebug assembleDebug `
+  -I '..\local-build.init.gradle' '-Pkotlin.compiler.execution.strategy=in-process' `
+  --max-workers=4 --no-daemon --console=plain
+```
+
+The local-only init script selects an isolated test key; the compiler setting avoids a
+Windows Kotlin daemon connection failure. Neither changes the repository build or CI
+configuration. Test/model caches and signing material are ignored and excluded from
+the source changes. Reports and APKs are retained under ignored `app/build/` in the
+source checkout, including `reports/local-drive-ingestion-evidence.json`.
+Use the ordinary wrapper commands in `LOCAL_DEVELOPMENT.md` from the source checkout;
+the init-script path above belongs to the task workspace's isolated signing setup.
+
+An interrupted command left an earlier Gradle invocation running; it exited before
+the focused final run. The device task failed before executing app tests when the
+emulator's automatic ADB connection went offline. Reconnecting its direct local port
+temporarily restored the guest, but installation failed again. A direct instrumentation
+attempt with a separate task-specific ADB server also failed during installation. The
+task's emulator/server were stopped without changing host virtualization settings,
+the owner's app, or other devices. Failed controller reports are retained; these
+environment failures are not counted as passing app checks.
+
+Local APK SHA-256: `64d00aed1d43d93da7dd569c23e576653f3ccf78a83b137a5a5d8ea81f355c1e`. Its debug certificate SHA-1 is
+`DC:F6:3B:F5:BA:7E:68:6D:C7:5A:53:55:78:53:27:42:D6:18:A9:21`, which differs from
+the established CI signer. It is for the isolated emulator and cannot upgrade the
+owner's published app; no phone app was uninstalled or modified. Before publication,
+run the retained CI build/CPU-model and device workflows on the final immutable source
+and use the established signer. The existing 0.4.3 publisher must not be used unchanged
+for this increment.
+
+Live Google authorization, shared-drive access, concurrent real Drive mutations and
+S23 Ultra background/thermal behavior still require the [bulk-ingestion phone
+checklist](FEATURES_0_4.md#unreleased-bulk-drive-ingestion-checklist). The separate
+Python CPU model smoke and native Android inference remain CI gates for this increment.
+Read the [concrete audit](DRIVE_INGESTION_AUDIT.md) before the next shared migration
+engine, Takeout and Picker increments. Full-library migration is not implemented here.
+
+
 ## MPA 0.4.3 face grouping and review
 
 Source `21f826723bb45a93d7a5aa80dee0d84b0ac39621` passed **95 unit/integration tests**, Android lint with zero errors, APK assembly and **nine Android 10 (API 29) emulator tests**, with zero failures, errors or skipped cases. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38073741495) · [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38073741460).

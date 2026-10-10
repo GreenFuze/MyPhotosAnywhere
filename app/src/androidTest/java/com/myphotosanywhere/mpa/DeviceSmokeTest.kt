@@ -26,6 +26,23 @@ class DeviceSmokeTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
 
+    @Test fun storageShowsSavedDriveDiscoveryAndRefreshAboveSettings() = runBlocking<Unit> {
+        val source=com.myphotosanywhere.mpa.drive.DriveSource.from(com.myphotosanywhere.mpa.drive.DriveConnection(
+            accountId="progress-device",email="progress@test",mode="EXISTING_LIBRARY",folderId="progress-folder",folderName="Progress"))
+        try {
+            app.database.drive().saveSource(source)
+            app.database.cloud().saveSync(com.myphotosanywhere.mpa.drive.SyncState(source.key,
+                scanGeneration="saved-generation",scanToken="before",scanPages=3,status="WAITING"))
+            compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+            compose.waitUntil(30000) { compose.onAllNodesWithText("3 folder pages saved; discovery will resume.").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("scan-now").assertIsDisplayed()
+            compose.onNodeWithText("Drive synchronization").assertIsDisplayed()
+            compose.onNodeWithText("Refresh Drive").assertIsDisplayed()
+            compose.onNodeWithText("3 folder pages saved; discovery will resume.").assertExists()
+            compose.onNodeWithText("No completed sync yet").assertExists()
+        } finally { app.database.drive().disconnectSource(source.key) }
+    }
+
     @Test fun galleryCombinesSourcesAndFiltersIndependentlyOfTheStorageBrowser() = runBlocking<Unit> {
         val a=com.myphotosanywhere.mpa.drive.DriveSource.from(com.myphotosanywhere.mpa.drive.DriveConnection(
             accountId="test-a",email="a@test",mode="APP_FILES",folderId="folder-a",folderName="A"))
@@ -138,7 +155,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
-        compose.onNodeWithText("MPA 0.4.3 (9)",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.4.4 (10)",substring=true).assertExists()
         val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
         assertEquals("com.myphotosanywhere.mpa",info.packageName)
         assertTrue(info.sha1.isNotEmpty())

@@ -36,7 +36,7 @@ data class DriveFile(
     val assetId: String? = null,
     val sourceAssetId: String? = null,
 )
-data class DrivePage(val files: List<DriveFile>, val nextPage: String?)
+data class DrivePage(val files: List<DriveFile>, val nextPage: String?, val incompleteSearch: Boolean = false)
 data class UploadProgress(val offset: Long, val complete: Boolean)
 
 class DriveHttpException(val status: Int, val reason: String? = null) : java.io.IOException(

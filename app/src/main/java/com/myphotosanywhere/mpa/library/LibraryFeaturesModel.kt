@@ -95,6 +95,11 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
         sources.forEach { app.sync.schedule(it.connection(),true) }
         message.value="Refresh queued for ${sources.size} Drive sources."
     }
+    fun refreshSource(binding: String) = perform {
+        val source = db.drive().source(binding) ?: error("Reconnect this Drive source first.")
+        app.sync.schedule(source.connection(), true)
+        message.value = "Refresh queued for ${source.folderName}; its network preference applies."
+    }
     fun updateSettings(value: StorageSettings) {
         app.settings.update(value); app.people.schedule()
         viewModelScope.launch { app.metadata.changed() }

@@ -1,7 +1,6 @@
 package com.myphotosanywhere.mpa.drive
 
 import android.content.Context
-import androidx.room.withTransaction
 import androidx.work.*
 import com.myphotosanywhere.mpa.MpaApplication
 import com.myphotosanywhere.mpa.data.PhotoDatabase
@@ -10,13 +9,18 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import java.util.UUID
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.util.concurrent.TimeUnit
 
 class CloudSync(private val context: Context, private val database: PhotoDatabase) {
     private val app get() = context.applicationContext as MpaApplication
     private val cloud = database.cloud()
-    private val scanLock = Mutex()
+    private val sourceLocks = ConcurrentHashMap<String, Mutex>()
+    private val networkSlots = Semaphore(2)
+    private val ingestion by lazy { DriveIngestion(database, app.cache.lock, ::save) }
     fun schedule(active: DriveConnection, now: Boolean = false) {
         val binding=active.binding() ?: return
         val constraints=Constraints.Builder().setRequiredNetworkType(
@@ -41,113 +45,50 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
         currentCoroutineContext().ensureActive()
         check(database.drive().source(binding)!=null) { "This Drive source was disconnected. Sync paused." }
     }
-    suspend fun run(active: DriveConnection) = scanLock.withLock { withContext(Dispatchers.IO) {
-        val binding=requireNotNull(active.binding()).key
-        val previous=cloud.sync(binding) ?: SyncState(binding)
-        cloud.saveSync(previous.copy(running=true,error=null))
-        try {
-            val api=api(active)
-            val root=api.file(requireNotNull(active.folderId))
-            require(!root.trashed && root.mimeType==DriveGateway.FOLDER_MIME) { "The selected Drive folder is unavailable." }
-            if(previous.changeToken==null || System.currentTimeMillis()-previous.lastScan>24*60*60*1000L) {
-                scan(api,active)
-            } else try {
-                reconcile(api,active,previous.changeToken)
-            } catch(e: DriveHttpException) { if(e.status==410) scan(api,active) else throw e }
-            ensureBinding(binding)
-            val completed=cloud.sync(binding) ?: previous
-            cloud.saveSync(completed.copy(running=false,error=null))
-        } catch(e: CancellationException) { withContext(NonCancellable) { cloud.saveSync((cloud.sync(binding) ?: previous).copy(running=false)) }; throw e }
-        catch(e: Exception) { cloud.saveSync((cloud.sync(binding) ?: previous).copy(running=false,error=e.message ?: "Drive sync failed.")); throw e }
-    }
-    }
-    private suspend fun scan(api: DriveGateway,active: DriveConnection) {
-        val binding=requireNotNull(active.binding()).key
-        val generation=UUID.randomUUID().toString()
-        val token=api.startToken() // Fetch before enumeration so concurrent modifications are replayed.
-        val root=requireNotNull(active.folderId)
-        val queue=ArrayDeque<String>(); queue.add(root)
-        val visited=mutableSetOf<String>()
-        cloud.saveFolder(CloudFolder(binding,root,null,active.folderName ?: "Photo folder",generation))
-        while(queue.isNotEmpty()) {
-            ensureBinding(binding)
-            val folder=queue.removeFirst(); if(!visited.add(folder)) continue
-            require(visited.size<=10000) { "This library has too many folders for one scan." }
-            var page: String?=null
-            do {
-                ensureBinding(binding)
-                val result=api.children(folder,page)
-                app.cache.lock.withLock { database.withTransaction {
-                    result.files.forEach { file ->
-                        if(file.mimeType==DriveGateway.FOLDER_MIME) {
-                            cloud.saveFolder(CloudFolder(binding,file.id,folder,file.name,generation)); queue.add(file.id)
-                        } else save(binding,folder,file,generation)
+    suspend fun run(active: DriveConnection): Boolean {
+        val binding = requireNotNull(active.binding()).key
+        return sourceLocks.computeIfAbsent(binding) { Mutex() }.withLock {
+            networkSlots.withPermit { withContext(Dispatchers.IO) {
+                val previous = cloud.sync(binding) ?: SyncState(binding)
+                cloud.saveSync(previous.copy(running = true, error = null, status = "DISCOVERING"))
+                try {
+                    ensureBinding(binding)
+                    val api = api(active)
+                    val root = api.file(requireNotNull(active.folderId))
+                    require(!root.trashed && root.mimeType == DriveGateway.FOLDER_MIME) { "The selected Drive folder is unavailable." }
+                    val complete = ingestion.run(api, active)
+                    ensureBinding(binding)
+                    val state = requireNotNull(cloud.sync(binding))
+                    cloud.saveSync(state.copy(running = false, error = null, status = if (complete) "IDLE" else "WAITING"))
+                    complete
+                } catch (e: CancellationException) {
+                    withContext(NonCancellable) {
+                        cloud.saveSync((cloud.sync(binding) ?: previous).copy(running = false, status = "WAITING"))
                     }
-                } }
-                page=result.nextPage
-            } while(page!=null)
-        }
-        ensureBinding(binding)
-        app.cache.lock.withLock { database.withTransaction {
-            cloud.markAbsent(binding,generation); cloud.pruneFolders(binding,generation)
-            cloud.saveSync(SyncState(binding,token,System.currentTimeMillis(),running=true))
-        } }
-        reconcile(api,active,token)
-    }
-    internal suspend fun reconcile(api: DriveGateway,active: DriveConnection,start: String) {
-        val binding=requireNotNull(active.binding()).key
-        var token=start
-        while(true) {
-            ensureBinding(binding)
-            val page=api.changes(token)
-            val folders=cloud.folders(binding).map { it.remoteId }.toSet()
-            // Folder changes require an authoritative tree scan; no recursive removal on incomplete data.
-            if(page.changes.any { change ->
-                (change.file?.mimeType==DriveGateway.FOLDER_MIME && (change.id in folders || change.file.parents.any { it in folders })) ||
-                    (change.removed && change.id in folders)
-            }) {
-                scanWithoutReplay(api,active); return
-            }
-            app.cache.lock.withLock { database.withTransaction {
-                page.changes.forEach { change ->
-                    val file=change.file
-                    if(change.removed || file==null || file.trashed || file.parents.none { it in folders }) cloud.markRemoved(binding,change.id)
-                    else if(file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/"))
-                        save(binding,file.parents.first { it in folders },file,cloud.photo("$binding:${file.id}")?.seenGeneration ?: "changes")
+                    throw e
+                } catch (e: Exception) {
+                    val auth = e is DriveAuthorizationNeeded || e is DriveHttpException && e.status == 401
+                    cloud.saveSync((cloud.sync(binding) ?: previous).copy(running = false,
+                        status = if (auth) "AUTH_REQUIRED" else "FAILED", error = e.message ?: "Drive sync failed."))
+                    throw e
                 }
-                // Transactional checkpoint: retries replay a page, never skip its rows.
-                val next=page.nextPage ?: page.newStart ?: error("Drive returned no next change token.")
-                cloud.saveSync((cloud.sync(binding) ?: SyncState(binding)).copy(changeToken=next,running=true))
             } }
-            token=page.nextPage ?: return
         }
     }
-    private suspend fun scanWithoutReplay(api: DriveGateway,active: DriveConnection) {
-        // A fresh pre-scan token catches changes during the scan on the next scheduled pass.
-        // Avoid repeatedly recursing into scans when folders are being changed continuously.
-        val binding=requireNotNull(active.binding()).key
-        val generation=UUID.randomUUID().toString(); val token=api.startToken()
-        val root=requireNotNull(active.folderId); val queue=ArrayDeque<String>(); queue.add(root)
-        val visited=mutableSetOf<String>()
-        cloud.saveFolder(CloudFolder(binding,root,null,active.folderName ?: "Photo folder",generation))
-        while(queue.isNotEmpty()) {
-            ensureBinding(binding); val parent=queue.removeFirst(); if(!visited.add(parent)) continue
-            require(visited.size<=10000)
-            var page: String?=null
-            do {
-                val result=api.children(parent,page); ensureBinding(binding)
-                app.cache.lock.withLock { database.withTransaction { result.files.forEach { f ->
-                    if(f.mimeType==DriveGateway.FOLDER_MIME) { cloud.saveFolder(CloudFolder(binding,f.id,parent,f.name,generation)); queue.add(f.id) }
-                    else save(binding,parent,f,generation)
-                } } }
-                page=result.nextPage
-            } while(page!=null)
-        }
-        ensureBinding(binding)
-        app.cache.lock.withLock { database.withTransaction {
-            cloud.markAbsent(binding,generation); cloud.pruneFolders(binding,generation)
-            cloud.saveSync(SyncState(binding,token,System.currentTimeMillis(),running=true))
-        } }
+
+    internal suspend fun reconcile(api: DriveGateway, active: DriveConnection, start: String) =
+        ingestion.reconcile(api, active, start)
+
+    fun continueScan(active: DriveConnection) {
+        val binding = requireNotNull(active.binding()).key
+        val constraints = Constraints.Builder().setRequiredNetworkType(
+            if (active.unmeteredOnly) NetworkType.UNMETERED else NetworkType.CONNECTED).build()
+        // Appending also works when this pass was periodic. A crash before enqueue is recovered
+        // by the next periodic/foreground refresh from the same durable checkpoint.
+        WorkManager.getInstance(context).enqueueUniqueWork("mpa-scan:$binding", ExistingWorkPolicy.APPEND_OR_REPLACE,
+            OneTimeWorkRequestBuilder<CloudSyncWorker>().setConstraints(constraints)
+                .setInputData(workDataOf("bindingKey" to binding)).addTag(SYNC_TAG)
+                .addTag("$SYNC_TAG:$binding").build())
     }
     internal suspend fun save(binding: String,parent: String,file: DriveFile,generation: String) {
         val old=cloud.photo("$binding:${file.id}")
@@ -161,14 +102,18 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
         val linked=linkedId?.let { database.photos().find(it) }
         if(linked!=null && linked.sourceRemoteId==file.id && linked.cachedVersion==old?.version && oldMatches)
             database.photos().update(linked.copy(cachedVersion=file.version,displayName=file.name))
+        val thumbnailPath = if (oldMatches) requireNotNull(old).thumbnailPath else {
+            val content = UUID.nameUUIDFromBytes("${file.md5}:${file.bytes}:${file.version}".toByteArray(Charsets.UTF_8))
+            File(context.filesDir,"cloud-thumbnails/$binding/${file.id}-$content.jpg").absolutePath
+        }
         cloud.savePhoto(CloudPhoto("$binding:${file.id}",binding,file.id,parent,file.name,file.mimeType,file.bytes,file.md5,
             file.version,file.modifiedTime,file.capturedAt,file.latitude,file.longitude,
-            old?.thumbnailPath ?: File(context.filesDir,"cloud-thumbnails/$binding/${file.id}.jpg").absolutePath,
-            old?.thumbnailVersion,linkedId,false,generation,file.assetId,file.sourceAssetId,old?.thumbnailUpdatedAt ?: 0))
+            thumbnailPath,if(oldMatches) old?.thumbnailVersion else null,linkedId,false,generation,file.assetId,file.sourceAssetId,
+            if(oldMatches) old?.thumbnailUpdatedAt ?: 0 else 0))
     }
     suspend fun thumbnail(api: DriveGateway,binding: String,file: DriveFile) {
         val row=cloud.photo("$binding:${file.id}") ?: return
-        if(row.thumbnailVersion==file.version && File(row.thumbnailPath).isFile) return
+        if(file.version!=null && row.thumbnailVersion==file.version && File(row.thumbnailPath).isFile) return
         val link=file.thumbnailLink ?: return
         val target=File(row.thumbnailPath); target.parentFile?.mkdirs()
         val temp=File(target.parentFile,"${file.id}.part")
@@ -210,7 +155,14 @@ class CloudSyncWorker(context: Context,params: WorkerParameters): CoroutineWorke
         val app=applicationContext as MpaApplication
         val binding=inputData.getString("bindingKey") ?: return Result.failure()
         val active=app.database.drive().source(binding)?.connection() ?: return Result.success()
-        return try { app.sync.run(active); app.cache.enforce(); Result.success() }
+        return try {
+            val complete = app.sync.run(active)
+            app.people.schedule() // Existing consent/schedule gates and bounded download queue apply.
+            if (!complete) app.database.drive().source(binding)?.let { app.sync.continueScan(it.connection()) }
+            // Downloads/indexing and explicit storage controls enforce cache budgets separately;
+            // network re-verification of cached originals must not extend this discovery pass.
+            Result.success()
+        }
         catch(e: CancellationException) { throw e }
         catch(e: DriveAuthorizationNeeded) { Result.success() }
         catch(e: DriveHttpException) { if(e.retryable) Result.retry() else Result.success() }

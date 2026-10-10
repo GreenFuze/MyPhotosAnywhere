@@ -67,7 +67,7 @@ Relevant entrypoints:
 - Portable annotations: `metadata/XmpCatalog.kt`, `MetadataDatabase.kt`, `MetadataRepository.kt`.
 - Recognition: `people/PeopleRepository.kt`, `FaceEmbedding.kt`, `FaceMatching.kt`, `FaceReview.kt`, `FaceRegions.kt`; UI `library/PeopleScreen.kt`.
 
-Paths above are under `app/src/main/java/com/myphotosanywhere/mpa/`. Audit actual code before changing contracts. Persisted bulk-scan progress and Google Photos adapters are not yet implemented; the next plan identifies their boundaries.
+Paths above are under `app/src/main/java/com/myphotosanywhere/mpa/`. Audit actual code before changing contracts. The first unreleased local increment adds `drive/DriveIngestion.kt`, durable Room v6 bulk-scan progress and primary per-source refresh/progress controls. Read `docs/DRIVE_INGESTION_AUDIT.md` and `docs/VALIDATION.md` before continuing; the new bulk-ingestion phone checklist remains a live acceptance gate. The shared migration engine and Google Photos adapters are still subsequent work. Published 0.4.3 remains Room v5.
 
 ## Local toolchain, phone signing and first work increment
 

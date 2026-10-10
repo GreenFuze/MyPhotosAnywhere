@@ -72,10 +72,10 @@ class DriveGateway(
 
     private suspend fun list(query: String, page: String?): DrivePage {
         val json = json(Request.Builder().url(url("files", "q" to query, "pageSize" to "100",
-            "fields" to "nextPageToken,files($FILE_FIELDS)", "pageToken" to page,
+            "fields" to "nextPageToken,incompleteSearch,files($FILE_FIELDS)", "pageToken" to page,
             "supportsAllDrives" to "true", "includeItemsFromAllDrives" to "true")))
         val files = json.getAsJsonArray("files")?.map { parseFile(it.asJsonObject) } ?: emptyList()
-        return DrivePage(files, json.string("nextPageToken"))
+        return DrivePage(files, json.string("nextPageToken"), json.get("incompleteSearch")?.asBoolean ?: false)
     }
 
     suspend fun file(id: String): DriveFile = parseFile(json(Request.Builder()

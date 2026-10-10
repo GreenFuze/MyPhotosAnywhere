@@ -54,6 +54,30 @@ Phone scans checkpoint each photo's checksum and model version. Each batch proce
 
 The bundled human model is unchanged from 0.3. Suggestions require confirmation. Cat/dog object labels are searchable, but **individual pet recognition, calibrated accuracy and Google Photos parity are not delivered by this release**. Representative consented photos and real phone measurements are still required before claiming that quality.
 
+## Unreleased bulk Drive ingestion checklist
+
+The first local increment is described in [the ingestion audit](DRIVE_INGESTION_AUDIT.md).
+It adds Room v6 scan checkpoints and bounded worker passes; this is not part of published 0.4.3.
+Use a test folder and keep independent copies before exercising remote changes.
+
+1. Add thousands of images/videos across nested folders externally while MPA is closed.
+   Reopen/Refresh. Watch folder-page progress in Storage and progressively browse new items.
+   With indexing disabled, confirm there are no bulk original downloads.
+2. Stop/restart MPA during discovery, then refresh. Check that saved page progress resumes,
+   old unseen gallery items remain until traversal completes, and no duplicate entries appear.
+3. Add files and nested folders during traversal. Rename, move in/out, replace and trash
+   selected items. Refresh to convergence; byte changes must not inherit reviewed faces.
+   Previously downloaded snapshots and annotations must remain recoverable.
+4. Interrupt connectivity or revoke folder access mid-scan. Confirm saved progress and
+   unrelated sources remain intact, errors/reconnect are visible, and Retry/Refresh resumes.
+   Background workers must not launch consent.
+5. Connect overlapping roots in one account and a second account. Confirm shared downloaded
+   identities where appropriate, independent cross-account copies, per-source progress and
+   network preferences. Test a shared-drive folder with the actual supported permissions.
+6. Enable bounded cloud indexing and its charging/night schedule. Newly discovered images
+   should eventually enter the existing verified-download queue; pause and heat/network
+   restrictions must still apply. JSON/XMP/ZIP files and shortcuts must not appear as media.
+
 ## Phone checklist
 
 1. Upgrade from 0.3/alpha without uninstalling; confirm local photos, names and existing Google sign-in remain. If Android reports a signer mismatch, stop and check the certificate rather than clearing data.

@@ -73,6 +73,7 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Storage & backup", style = MaterialTheme.typography.headlineSmall)
         com.myphotosanywhere.mpa.library.ScanActions(androidx.lifecycle.viewmodel.compose.viewModel())
+        com.myphotosanywhere.mpa.library.DriveSyncActions()
         Text("${photos.size} photos · %.1f MiB saved on this device".format(photos.filter { it.originalPath.isNotBlank() }.sumOf { it.bytes } / (1024.0 * 1024)))
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let {

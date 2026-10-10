@@ -187,6 +187,8 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         dao.saveConnection(active.copy(unmeteredOnly = enabled))
         if(key!=null) dao.source(key)?.let { source ->
             dao.saveSource(source.copy(unmeteredOnly=enabled))
+            // Replace queued passes with the new constraint; durable discovery progress survives.
+            app.sync.stop(key)
             app.sync.schedule(source.connection().copy(unmeteredOnly=enabled),true)
             app.downloads.retry(key)
             app.metadata.stop(key); app.metadata.schedule()

@@ -94,7 +94,8 @@ interface PhotoDao {
 
 @Database(entities = [Photo::class, Handoff::class, DriveConnection::class, DriveBackup::class,
     Album::class, AlbumPhoto::class, EditDraft::class, Person::class, FaceRecord::class, FaceScan::class,
-    CloudPhoto::class, CloudFolder::class, SyncState::class, DownloadTask::class, DriveSource::class, com.myphotosanywhere.mpa.metadata.MetadataState::class], version = 5, exportSchema = true)
+    CloudPhoto::class, CloudFolder::class, SyncState::class, DownloadTask::class, DriveSource::class,
+    com.myphotosanywhere.mpa.drive.ScanFolder::class, com.myphotosanywhere.mpa.metadata.MetadataState::class], version = 6, exportSchema = true)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photos(): PhotoDao
     abstract fun drive(): DriveDao

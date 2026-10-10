@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[28],application=Application::class)
 class SourceMigrationTest {
-    @Test fun upgradingTheReleasedSchemaPreservesDestinationMediaCorrectionsAndSyncCheckpoints() = runBlocking {
+    @Test fun upgradingV3PreservesMediaCorrectionsAndSync() = runBlocking {
         val context=RuntimeEnvironment.getApplication()
         val name="sources-migration-${UUID.randomUUID()}.db"
         val binding=DriveBinding("account","folder").key
@@ -48,7 +48,7 @@ class SourceMigrationTest {
         var db: PhotoDatabase?=null
         try {
             helper.writableDatabase; helper.close()
-            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(SOURCES_MIGRATION_3_4, com.myphotosanywhere.mpa.data.METADATA_MIGRATION_4_5)
+            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(SOURCES_MIGRATION_3_4, com.myphotosanywhere.mpa.data.METADATA_MIGRATION_4_5, com.myphotosanywhere.mpa.drive.SCAN_MIGRATION_5_6)
                 .allowMainThreadQueries().build()
             db=opened
             val source=requireNotNull(opened.drive().source(binding))

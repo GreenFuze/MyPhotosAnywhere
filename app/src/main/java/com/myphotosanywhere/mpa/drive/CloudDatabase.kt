@@ -15,7 +15,16 @@ data class CloudFolder(val bindingKey: String, val remoteId: String, val parentI
     val seenGeneration: String)
 @Entity(tableName = "sync_states")
 data class SyncState(@PrimaryKey val bindingKey: String, val changeToken: String? = null,
-    val lastScan: Long = 0, val error: String? = null, val running: Boolean = false)
+    val lastScan: Long = 0, val error: String? = null, val running: Boolean = false,
+    val scanGeneration: String? = null, val scanToken: String? = null,
+    @ColumnInfo(defaultValue = "0") val scanPages: Int = 0,
+    @ColumnInfo(defaultValue = "0") val lastSuccess: Long = 0,
+    @ColumnInfo(defaultValue = "'WAITING'") val status: String = "WAITING")
+
+/** Completed entries remain until the generation finishes, preventing duplicate traversal/cycles. */
+@Entity(tableName = "scan_folders", primaryKeys = ["bindingKey", "remoteId"])
+data class ScanFolder(val bindingKey: String, val remoteId: String,
+    val pageToken: String? = null, val complete: Boolean = false)
 @Entity(tableName = "downloads", indices = [Index("bindingKey")])
 data class DownloadTask(@PrimaryKey val key: String, val bindingKey: String, val remoteId: String,
     val pinned: Boolean = false, val state: String = "PENDING", val error: String? = null)
@@ -40,6 +49,12 @@ interface CloudDao {
     @Query("UPDATE cloud_photos SET removed = 1 WHERE bindingKey = :binding AND remoteId = :remote") suspend fun markRemoved(binding: String, remote: String)
     @Query("SELECT * FROM sync_states WHERE bindingKey = :binding") suspend fun sync(binding: String): SyncState?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun saveSync(sync: SyncState)
+    @Query("SELECT * FROM scan_folders WHERE bindingKey = :binding AND complete = 0 ORDER BY remoteId LIMIT 1")
+    suspend fun nextScanFolder(binding: String): ScanFolder?
+    @Query("SELECT COUNT(*) FROM scan_folders WHERE bindingKey = :binding") suspend fun scanFolderCount(binding: String): Int
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun enqueueScanFolder(folder: ScanFolder)
+    @Update suspend fun updateScanFolder(folder: ScanFolder)
+    @Query("DELETE FROM scan_folders WHERE bindingKey = :binding") suspend fun clearScanFolders(binding: String)
     @Query("SELECT * FROM downloads WHERE key = :key") suspend fun download(key: String): DownloadTask?
     @Query("SELECT * FROM downloads WHERE bindingKey = :binding AND state NOT IN ('COMPLETE','FAILED','AUTH_REQUIRED')") suspend fun pendingDownloads(binding: String): List<DownloadTask>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun saveDownload(task: DownloadTask)

@@ -64,7 +64,32 @@ class LibraryPersistenceTest {
             db.cloud().savePhoto(CloudPhoto("binding:remote","binding","remote","folder","photo.jpg","image/jpeg",8,"first","1",null,null,null,null,photoId="local"))
             CloudSync(context,db).save("binding","folder",DriveFile("remote","new.jpg","image/jpeg",9,"second","2",listOf("folder")),"scan")
             assertNull(db.cloud().photo("binding:remote")?.photoId)
+            assertNotEquals("", db.cloud().photo("binding:remote")?.thumbnailPath)
             assertEquals(photo,db.photos().find("local"))
+        } finally { db.close() }
+    }
+
+    @Test fun byteReplacementUsesANewThumbnailAndPreservesReviewedSnapshotGeometry() = runBlocking<Unit> {
+        val context=RuntimeEnvironment.getApplication()
+        val db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).allowMainThreadQueries().build()
+        try {
+            val photo=Photo("snapshot","old.jpg","/original","/thumb","image/jpeg",8,1,"old-sha",
+                sourceBindingKey="binding",sourceRemoteId="remote",cachedVersion="1")
+            db.photos().insert(photo)
+            db.library().savePerson(Person("person","Sam"))
+            val face=FaceRecord("face",photo.id,"/crop",null,personId="person",corrected=true)
+            db.library().saveFace(face)
+            db.cloud().savePhoto(CloudPhoto("binding:remote","binding","remote","root","old.jpg","image/jpeg",8,
+                "old-md5","1",null,null,null,null,thumbnailPath="/old-cloud-thumb",thumbnailVersion="1",photoId=photo.id,
+                thumbnailUpdatedAt=123))
+            CloudSync(context,db).save("binding","root",DriveFile("remote","new.jpg","image/jpeg",9,"new-md5","2"),"new")
+            val row=requireNotNull(db.cloud().photo("binding:remote"))
+            assertNull(row.photoId)
+            assertNull(row.thumbnailVersion)
+            assertEquals(0L,row.thumbnailUpdatedAt)
+            assertNotEquals("/old-cloud-thumb",row.thumbnailPath)
+            assertEquals(photo,db.photos().find(photo.id))
+            assertEquals(face,db.library().face(face.id))
         } finally { db.close() }
     }
     @Test fun metadataOnlyCloudChangesKeepOfflineFileAndAdvanceVerifiedVersion() = runBlocking {

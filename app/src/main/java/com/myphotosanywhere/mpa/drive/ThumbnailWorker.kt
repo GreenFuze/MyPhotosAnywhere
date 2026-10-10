@@ -26,7 +26,7 @@ class ThumbnailWorker(context: Context,params: WorkerParameters): CoroutineWorke
     }
     companion object {
         fun request(context: Context,row: CloudPhoto,active: DriveConnection?) {
-            if(active==null || row.removed || row.bindingKey!=active.binding()?.key || (row.thumbnailVersion==row.version && File(row.thumbnailPath).isFile)) return
+            if(active==null || row.removed || row.bindingKey!=active.binding()?.key || (row.version!=null && row.thumbnailVersion==row.version && File(row.thumbnailPath).isFile)) return
             WorkManager.getInstance(context).enqueueUniqueWork("mpa-thumbnail:${row.key}",ExistingWorkPolicy.KEEP,
                 OneTimeWorkRequestBuilder<ThumbnailWorker>().setInputData(workDataOf("key" to row.key))
                     .setConstraints(Constraints.Builder().setRequiredNetworkType(
