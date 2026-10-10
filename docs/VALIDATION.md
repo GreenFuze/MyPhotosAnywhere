@@ -1,5 +1,26 @@
 # Validation status and device checklist
 
+## MPA 0.4.4 resumable Drive discovery
+
+Source `11f36d41012951858e37e00e43b671f9e07577bf` passed **110 unit/integration tests**, Android lint with zero errors,
+CPU model checks, APK assembly and **10 Android 10 (API 29) emulator tests**, with zero
+failures, errors or skipped cases. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38089106568) · [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38089106532).
+
+The CI-generated Room v6 schema matches the committed schema. The released-schema
+migration preserves photos, portable identities, reviewed faces, upload sessions,
+destination selection and Drive change checkpoints. The new native Storage test
+confirms saved discovery progress and Refresh are visible above the lengthy settings;
+all nine existing native checks also pass. The bundled model and similarity gates are
+unchanged. The established signer SHA-1 is `A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`.
+
+Publication reuses this exact passed CI APK, with its SHA-256, build/device run IDs and
+source recorded in the attached BUILD_EVIDENCE.json. Immutable run references are also
+recorded in `docs/releases/v0.4.4.json`.
+Live Google Drive, shared-drive permissions, concurrent external mutations and S23 Ultra
+background behavior remain phone acceptance checks. See [the 0.4.4 retest](releases/v0.4.4.md).
+Takeout, Picker and the shared migration engine are subsequent work.
+
+
 ## Unreleased local Drive discovery increment — 2026-10-11
 
 Based on main `15589ca`, branch `feature/durable-drive-discovery`, this increment passed

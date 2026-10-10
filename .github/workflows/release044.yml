@@ -62,7 +62,7 @@ jobs:
           files = comparison['files']
           assert len(files) < 300, 'Comparison may be truncated'
           def allowed(path):
-              return path in ['README.md','docs/VALIDATION.md','docs/FEATURES_0_4.md','.github/workflows/release044.yml'] or path.startswith('docs/releases/')
+              return path in ['README.md','.github/workflows/release044.yml'] or path.startswith('docs/releases/') or (path.startswith('docs/') and path.endswith('.md'))
           for item in files:
               assert allowed(item['filename']), f"Untested app change: {item['filename']}"
               if 'previous_filename' in item:

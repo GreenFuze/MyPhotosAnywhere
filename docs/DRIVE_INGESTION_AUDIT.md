@@ -1,6 +1,6 @@
 # Drive ingestion: first local increment
 
-The 0.4.4 release candidate follows `IMPORT_AND_DRIVE_SYNC_PLAN.md`, Stage 1. Audited baseline:
+MPA 0.4.4 follows `IMPORT_AND_DRIVE_SYNC_PLAN.md`, Stage 1. Audited baseline:
 `15589ca` (main at the Windows clone on 2026-10-10). This is not a Takeout or Picker release.
 
 ## Baseline findings
@@ -77,6 +77,6 @@ engine, then a small-album Takeout round trip, then Picker. Current 250 MiB medi
 2 MiB / 10,000-asset XMP limits remain. No full-library migration is implemented here.
 
 CI build/model and device workflows are retained. Publishing still requires their passing
-results for immutable source and the established signer; do not invoke the existing 0.4.3
-publisher for this increment. Local validation and outstanding device checks are recorded
+results for immutable source and the established signer. The separate 0.4.4 publisher
+verifies both workflows and all 110 unit / ten device tests. The immutable 0.4.3 publisher is preserved. Local validation and outstanding device checks are recorded
 in `VALIDATION.md`.

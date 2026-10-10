@@ -45,7 +45,7 @@ Official desktop/local-access guidance: https://help.openai.com/en/articles/2000
 
 ## Context for the next coding session
 
-Read [the agreed import/sync plan](IMPORT_AND_DRIVE_SYNC_PLAN.md), [the local handoff](LOCAL_CODEX_HANDOFF.md), [current behavior](FEATURES_0_4.md), [VALIDATION.md](VALIDATION.md), and the README before making changes. Published baseline is 0.4.3, version code 9, Room v5, with 95 unit/integration tests and nine Android emulator tests. The first unreleased local increment adds durable Room v6 bulk-discovery checkpoints and visible source refresh/progress; see [the audit](DRIVE_INGESTION_AUDIT.md) and its remaining live acceptance checks. Continue with the shared migration engine, bounded resumable Takeout import and official Google Photos Picker import in that order.
+Read [the agreed import/sync plan](IMPORT_AND_DRIVE_SYNC_PLAN.md), [the local handoff](LOCAL_CODEX_HANDOFF.md), [current behavior](FEATURES_0_4.md), [VALIDATION.md](VALIDATION.md), and the README before making changes. Published 0.4.4 is version code 10 / Room v6, with 110 unit/integration tests and ten Android emulator tests. The 0.4.4 increment adds durable Room v6 bulk-discovery checkpoints and visible source refresh/progress; see [the audit](DRIVE_INGESTION_AUDIT.md) and its remaining live acceptance checks. Continue with the shared migration engine, bounded resumable Takeout import and official Google Photos Picker import in that order.
 
 There are no AI API keys: users edit in their official ChatGPT, Gemini, or Claude app using their own subscription. Provider capabilities vary. The original is preserved, and the exported handoff preview is capped at 2048 pixels and strips EXIF metadata.
 

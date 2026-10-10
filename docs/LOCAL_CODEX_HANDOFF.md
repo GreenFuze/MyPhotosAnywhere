@@ -54,7 +54,12 @@ Continue implementing the agreed plan on a suitable feature branch, starting wit
 
 ## Baseline and important context
 
-Latest delivered release: [v0.4.3](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.4.3), version name 0.4.3 / code 9, Room v5. Tested source: `21f826723bb45a93d7a5aa80dee0d84b0ac39621`; release publication commit: `299e1f67ae5f2b1a58fe31c9ab5853efdd84f263`. This handoff commit is later documentation; recheck the actual remote HEAD rather than assuming those are still main.
+Latest release: [v0.4.4](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.4.4),
+version name 0.4.4 / code 10, Room v6. Tested source: `11f36d41012951858e37e00e43b671f9e07577bf`. It passed 110 unit/integration
+tests, lint/model/build checks and ten Android emulator tests. See `docs/releases/v0.4.4.md`
+and `docs/VALIDATION.md`. The historical baseline below explains the previous cloud handoff.
+
+Baseline before the local 0.4.4 increment: [v0.4.3](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.4.3), version name 0.4.3 / code 9, Room v5. Tested source: `21f826723bb45a93d7a5aa80dee0d84b0ac39621`; release publication commit: `299e1f67ae5f2b1a58fe31c9ab5853efdd84f263`. This handoff commit is later documentation; recheck the actual remote HEAD rather than assuming those are still main.
 
 Evidence: 95 unit/integration tests, zero lint errors, nine Android 10 emulator tests, no failures/errors/skips. Build run `38073741495`; device run `38073741460`. The owner tests a **Samsung S23 Ultra using Smart Launcher**. Existing-folder Google authorization now works. An earlier icon report accompanied a failed update and reinstall; do not assume an ongoing launcher defect. Old gallery/full-quality-viewer/external-deletion bugs had fixes in 0.4.1; confirm current behavior before rewriting them.
 
@@ -67,7 +72,7 @@ Relevant entrypoints:
 - Portable annotations: `metadata/XmpCatalog.kt`, `MetadataDatabase.kt`, `MetadataRepository.kt`.
 - Recognition: `people/PeopleRepository.kt`, `FaceEmbedding.kt`, `FaceMatching.kt`, `FaceReview.kt`, `FaceRegions.kt`; UI `library/PeopleScreen.kt`.
 
-Paths above are under `app/src/main/java/com/myphotosanywhere/mpa/`. Audit actual code before changing contracts. The first unreleased local increment adds `drive/DriveIngestion.kt`, durable Room v6 bulk-scan progress and primary per-source refresh/progress controls. Read `docs/DRIVE_INGESTION_AUDIT.md` and `docs/VALIDATION.md` before continuing; the new bulk-ingestion phone checklist remains a live acceptance gate. The shared migration engine and Google Photos adapters are still subsequent work. Published 0.4.3 remains Room v5.
+Paths above are under `app/src/main/java/com/myphotosanywhere/mpa/`. Audit actual code before changing contracts. The 0.4.4 Drive-ingestion increment adds `drive/DriveIngestion.kt`, durable Room v6 bulk-scan progress and primary per-source refresh/progress controls. Read `docs/DRIVE_INGESTION_AUDIT.md` and `docs/VALIDATION.md` before continuing; the new bulk-ingestion phone checklist remains a live acceptance gate. The shared migration engine and Google Photos adapters are still subsequent work. Published 0.4.4 uses Room v6; 0.4.3 used Room v5.
 
 ## Local toolchain, phone signing and first work increment
 
@@ -84,4 +89,4 @@ Run relevant tests for the first change, then the required checks once the incre
 
 Published CI APKs use SHA-1 **`A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`**. A newly generated local debug key will differ and cannot update the installed published APK. First inspect existing local signing configuration without exposing key material. Preserve any matching key already available; never regenerate it for convenience or uninstall the owner's phone app to bypass the mismatch. If the matching key is unavailable, test on a separate emulator/device or continue publishing through the established CI signer. Register the actual local certificate as an additional Android OAuth client when testing local builds. Never commit keys, passwords, tokens or exports.
 
-First deliverable: a concrete Drive-ingestion audit plus the first tested improvement for resumable bounded bulk discovery/visible sync state, preserving existing reconciliation safety. Then implement the shared migration engine and a small-album Takeout round trip; add Picker afterward. Keep proposed 0.5.0/version-code changes tied to an actual testable build, not a plan-only commit. For release work, read `.github/workflows/release04.yml`: the existing publisher still targets immutable 0.4.3 artifacts and must be deliberately updated for a new release. Do not run it expecting it to publish newly built code or replace the existing APK.
+The first deliverable shipped in 0.4.4: a concrete Drive-ingestion audit and tested resumable bounded discovery/visible sync state, preserving existing reconciliation safety. Continue with the shared migration engine and a small-album Takeout round trip; add Picker afterward. Keep proposed 0.5.0/version-code changes tied to an actual testable build. For release work, read `.github/workflows/release044.yml`: it targets the immutable 0.4.4 source and passed CI artifacts. The older `release04.yml` remains dedicated to 0.4.3. Future releases need their own deliberate version/artifact references; never replace an existing APK.

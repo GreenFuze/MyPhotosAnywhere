@@ -1,4 +1,4 @@
-# MPA 0.4.3: behavior and phone verification
+# MPA 0.4.4: behavior and phone verification
 
 This is an installable development build for testing, using the same debug signer as 0.3 and the 0.4 alphas. It is not a Google Photos quality recognition claim. Android 8+ is supported; automated device checks use Android 10. Keep independent backups of your photos.
 
@@ -54,10 +54,12 @@ Phone scans checkpoint each photo's checksum and model version. Each batch proce
 
 The bundled human model is unchanged from 0.3. Suggestions require confirmation. Cat/dog object labels are searchable, but **individual pet recognition, calibrated accuracy and Google Photos parity are not delivered by this release**. Representative consented photos and real phone measurements are still required before claiming that quality.
 
-## Unreleased bulk Drive ingestion checklist
+<a id="unreleased-bulk-drive-ingestion-checklist"></a>
 
-The first local increment is described in [the ingestion audit](DRIVE_INGESTION_AUDIT.md).
-It adds Room v6 scan checkpoints and bounded worker passes; this is not part of published 0.4.3.
+## Bulk Drive ingestion in 0.4.4
+
+The 0.4.4 increment is described in [the ingestion audit](DRIVE_INGESTION_AUDIT.md).
+It adds Room v6 scan checkpoints and bounded worker passes. Published 0.4.3 used Room v5.
 Use a test folder and keep independent copies before exercising remote changes.
 
 1. Add thousands of images/videos across nested folders externally while MPA is closed.

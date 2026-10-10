@@ -6,7 +6,7 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
-The [0.4.3 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.4.3) includes multiple Drive folders/accounts, one chosen backup destination, shared person identities, source-scoped XMP annotation backup/recovery, and bounded phone scans with pause/resume and a charging/night window. The 0.4.3 update adds face-group crop review, possible matches under named people, local matching diagnostics and a full rescan that preserves names. Google authorization error handling and installed OAuth setup details from 0.4.2 remain included. The included 0.4.1 fixes make Scan now prominent, open photos directly with original-region zoom, and hide externally deleted Drive photos from the main gallery while retaining downloaded copies. It includes the original MPA adaptive launcher icon and preserves the 0.3/alpha debug signer.
+The [0.4.4 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.4.4) includes multiple Drive folders/accounts, one chosen backup destination, shared person identities, source-scoped XMP annotation backup/recovery, and bounded phone scans with pause/resume and a charging/night window. The 0.4.3 update adds face-group crop review, possible matches under named people, local matching diagnostics and a full rescan that preserves names. Google authorization error handling and installed OAuth setup details from 0.4.2 remain included. The included 0.4.1 fixes make Scan now prominent, open photos directly with original-region zoom, and hide externally deleted Drive photos from the main gallery while retaining downloaded copies. It includes the original MPA adaptive launcher icon and preserves the 0.3/alpha debug signer.
 
 Editing includes crop/rotate/straighten, adjustments, filters, markup, saved drafts and undo/redo. The library includes albums/favorites/archive, videos, object labels, places/maps, recursive Drive discovery, verified downloads and cache budgets. AI edits use a share-sheet handoff to the user's official provider app and subscription.
 
@@ -22,7 +22,7 @@ To choose a clone directory and continue in a local Codex session, follow [the l
 
 The next agreed milestone is reliable bulk Drive ingestion plus Google Photos Takeout and Picker imports. See [the implementation plan](docs/IMPORT_AND_DRIVE_SYNC_PLAN.md) and [the Windows Codex handoff](docs/LOCAL_CODEX_HANDOFF.md), starting with a clone into `C:\src\github.com\GreenFuze\MyPhotosAnywhere`.
 
-The first unreleased local increment adds durable, bounded Drive discovery and per-source progress. Read the [ingestion audit](docs/DRIVE_INGESTION_AUDIT.md) and [validation evidence](docs/VALIDATION.md) for its tested boundaries and remaining phone checks. Takeout and Picker remain subsequent stages.
+The 0.4.4 increment adds durable, bounded Drive discovery and per-source progress. Read the [ingestion audit](docs/DRIVE_INGESTION_AUDIT.md) and [validation evidence](docs/VALIDATION.md) for its tested boundaries and remaining phone checks. Takeout and Picker remain subsequent stages.
 
 Open this folder in Android Studio with JDK 17, Android SDK 35, and Python 3 installed. Gradle fetches and verifies the licensed, pinned face model automatically (set `MPA_PYTHON` to your Python executable if `python3` is unavailable). The project uses Kotlin, Jetpack Compose, Room, Coil, and coroutines. Android 8.0 (API 26) is the minimum supported version.
 
