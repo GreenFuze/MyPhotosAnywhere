@@ -47,6 +47,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 for (uri in uris) {
                     try {
                         val photo = repository.importPhoto(uri, handoff)
+                        (getApplication<Application>() as MpaApplication).people.schedule()
                         imported++
                         try { drive.enqueue(photo) } catch (cancelled: CancellationException) { throw cancelled }
                         catch (_: Exception) { lastError = "Saved locally; open Storage to resume backup." }
@@ -65,7 +66,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try {
                 EditPrompt.build(instructions)
-                val intent = AiHandoff.prepare(getApplication(), photo, provider, instructions)
+                val intent = (getApplication<Application>() as MpaApplication).cache.withOriginal(photo.id) { fresh, _ ->
+                    AiHandoff.prepare(getApplication(), fresh, provider, instructions)
+                }
                 val handoff = repository.recordHandoff(photo, provider.name, instructions)
                 try { launch(intent) }
                 catch (error: Exception) { repository.dismissHandoff(handoff.id); throw error }
@@ -86,6 +89,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 val photo = repository.importPhoto(uri, handoff)
                 try { drive.enqueue(photo) } catch (cancelled: CancellationException) { throw cancelled }
                 catch (_: Exception) { /* Startup/retry queues any saved photo not yet backed up. */ }
+                (getApplication<Application>() as MpaApplication).people.schedule()
                 _message.value = "Edited copy saved. The original is preserved."
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) { _message.value = error.message ?: "Could not import the result." }

@@ -9,3 +9,7 @@ local.properties
 .env.*
 *.apk
 .DS_Store
+
+# Licensed, checksum-pinned face model is fetched by Gradle (scripts/fetch_face_model.py).
+app/src/main/assets/mobile_facenet.tflite
+app/src/main/assets/mobile_facenet.part

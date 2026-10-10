@@ -58,7 +58,9 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
                 require(total > 0) { "The selected file is empty." }
                 check(staged.renameTo(original)) { "Could not store the photo." }
                 // Validate and render all supported formats through Android's decoder. It handles EXIF rotation.
-                val bitmap = preview(original, 480)
+                val mime = mimeOverride ?: resolver.getType(uri) ?: "image/*"
+                require(mime.startsWith("image/") || mime.startsWith("video/")) { "Choose a photo or video." }
+                val bitmap = mediaPreview(original, mime, 480)
                 try {
                     thumb.parentFile?.mkdirs()
                     thumb.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it)) }
@@ -66,11 +68,12 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
                 val gps = runCatching { ExifInterface(original).latLong }.getOrNull()
                 val photo = Photo(
                     id = id, displayName = name, originalPath = original.absolutePath,
-                    thumbnailPath = thumb.absolutePath, mimeType = mimeOverride ?: resolver.getType(uri) ?: "image/*",
+                    thumbnailPath = thumb.absolutePath, mimeType = mime,
                     bytes = total, importedAt = System.currentTimeMillis(),
                     sha256 = digest.digest().joinToString("") { "%02x".format(it) },
                     latitude = gps?.get(0), longitude = gps?.get(1), parentId = handoff?.photoId,
                     editProvider = handoff?.provider, editInstructions = handoff?.instructions,
+                    capturedAt = captureTime(original), lastAccess = System.currentTimeMillis(),
                 )
                 database.withTransaction {
                     dao.insert(photo)
@@ -99,6 +102,36 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
 
     companion object {
         const val MAX_IMPORT_BYTES = 250L * 1024 * 1024
+
+        fun captureTime(file: File): Long? = runCatching {
+            val exif = ExifInterface(file)
+            val date = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) ?: return@runCatching null
+            val format = java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss", java.util.Locale.US).apply { isLenient=false }
+            val offset = exif.getAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL)
+            if(offset!=null) format.timeZone=java.util.TimeZone.getTimeZone("GMT$offset")
+            format.parse(date)?.time
+        }.getOrNull()
+
+        fun mediaPreview(file: File, mime: String, maximum: Int): Bitmap {
+            if(!mime.startsWith("video/")) return preview(file,maximum)
+            val retriever=android.media.MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(file.absolutePath)
+                return if(Build.VERSION.SDK_INT >= 27) {
+                    val width=retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: maximum
+                    val height=retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: maximum
+                    val scale=minOf(1.0,maximum.toDouble()/maxOf(width,height))
+                    retriever.getScaledFrameAtTime(0,android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                        maxOf(1,(width*scale).toInt()),maxOf(1,(height*scale).toInt())) ?: error("No video preview.")
+                } else {
+                    val image=retriever.getFrameAtTime(0) ?: error("No video preview.")
+                    val scale=minOf(1.0,maximum.toDouble()/maxOf(image.width,image.height))
+                    val small=Bitmap.createScaledBitmap(image,maxOf(1,(image.width*scale).toInt()),maxOf(1,(image.height*scale).toInt()),true)
+                    if(image!==small) image.recycle()
+                    small
+                }
+            } finally { retriever.release() }
+        }
 
         fun preview(file: File, maxDimension: Int): Bitmap {
             require(maxDimension > 0)

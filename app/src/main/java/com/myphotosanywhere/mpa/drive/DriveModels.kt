@@ -27,6 +27,14 @@ data class DriveFile(
     val version: String? = null,
     val parents: List<String> = emptyList(),
     val canAddChildren: Boolean = false,
+    val modifiedTime: String? = null,
+    val capturedAt: Long? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val thumbnailLink: String? = null,
+    val trashed: Boolean = false,
+    val assetId: String? = null,
+    val sourceAssetId: String? = null,
 )
 data class DrivePage(val files: List<DriveFile>, val nextPage: String?)
 data class UploadProgress(val offset: Long, val complete: Boolean)
@@ -56,3 +64,6 @@ object UploadRanges {
         return Math.addExact(last, 1)
     }
 }
+
+data class DriveChange(val id: String, val removed: Boolean, val file: DriveFile?)
+data class ChangesPage(val changes: List<DriveChange>, val nextPage: String?, val newStart: String?)

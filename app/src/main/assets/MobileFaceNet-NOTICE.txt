@@ -1,0 +1,13 @@
+MyPhotosAnywhere uses MobileFaceNet weights supplied by Qualcomm AI Hub.
+Original model implementation and weights: Liu Jian (foamliu/MobileFaceNet), Apache-2.0.
+Model publisher and exporter: Qualcomm Technologies, Inc. and/or its subsidiaries.
+Publisher model card: https://huggingface.co/qualcomm/MobileFaceNet (Apache-2.0).
+Pinned asset: mobile_facenet/releases/v0.64.0/mobile_facenet-tflite-float.zip
+Archive SHA-256: 92dc09420007cd24b45d64cc0e0bf9a7aabe3b7833579ec2e417fa0ec05253d3
+Model SHA-256: 2046ab776fba2ec7e420767ffe7eb74a7402a8412d3d7ea8b9f4ca8420e5f3d7
+Input contract: two RGB float32 NCHW tensors [1,3,112,112], values [0,1].
+Output contract: embeddings [2,128], normalized by MPA before cosine comparison.
+The weights are not modified. MPA implements its own detector, landmark crop,
+matching, review, and storage. Recognition thresholds are experimental review gates;
+no identity or benchmark accuracy guarantee is made for MPA.
+See MobileFaceNet-LICENSE.txt for the full Apache-2.0 license.

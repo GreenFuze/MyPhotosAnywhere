@@ -72,7 +72,7 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
     Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Storage & backup", style = MaterialTheme.typography.headlineSmall)
-        Text("${photos.size} photos · %.1f MiB saved on this device".format(photos.sumOf { it.bytes } / (1024.0 * 1024)))
+        Text("${photos.size} photos · %.1f MiB saved on this device".format(photos.filter { it.originalPath.isNotBlank() }.sumOf { it.bytes } / (1024.0 * 1024)))
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let {
             Card(Modifier.fillMaxWidth()) {
@@ -130,11 +130,10 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
                 TextButton(enabled = !busy, onClick = model::disconnect) { Text("Disconnect") }
             }
         }
-        Text("Originals and pending edits are protected", style = MaterialTheme.typography.titleMedium)
-        Text("MPA verifies uploaded file sizes and checksums before marking them backed up. This version keeps every local original; automatic download eviction is still to come.")
+        com.myphotosanywhere.mpa.library.StorageControls(photos)
         Text("Disconnect stops MPA backup without deleting photos or revoking Google permissions. You can remove permission in your Google account settings.", style = MaterialTheme.typography.bodySmall)
         Text("Keep your source copies. Uninstalling MPA removes this device's private library.", style = MaterialTheme.typography.bodySmall)
-        Text("MyPhotosAnywhere · MPA 0.2", style = MaterialTheme.typography.labelMedium)
+        Text("MyPhotosAnywhere · MPA 0.3", style = MaterialTheme.typography.labelMedium)
     }
     val listing = browser
     if (listing != null) {

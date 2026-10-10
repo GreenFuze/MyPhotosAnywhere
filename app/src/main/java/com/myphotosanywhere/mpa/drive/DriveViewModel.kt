@@ -70,6 +70,7 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         val active = if (same) requireNotNull(previous).copy(email = user.email) else
             DriveConnection(accountId = user.id, email = user.email, mode = mode.name)
         dao.saveConnection(active)
+        if(active.folderId!=null) { app.sync.schedule(active,true); app.downloads.retry() }
         path.clear()
         _browser.value = readBrowser(api, "root", "My Drive")
         if (same && active.backupEnabled) app.drive.resume(retryFailures = true)
@@ -126,6 +127,8 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         // Folder choice pauses backup. A separate visible action opts in to uploading existing local photos.
         app.drive.pause()
         dao.saveConnection(active.copy(folderId = file.id, folderName = file.name, backupEnabled = false))
+        app.sync.stop(); app.downloads.stop()
+        app.sync.schedule(active.copy(folderId=file.id,folderName=file.name,backupEnabled=false),true)
         _browser.value = null
         _message.value = "Selected ${file.name}. Enable backup when you are ready."
     }
@@ -153,6 +156,7 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         val active = dao.connection() ?: return@perform
         dao.saveConnection(active.copy(unmeteredOnly = enabled))
         app.drive.resume(replace = true)
+        app.sync.schedule(active.copy(unmeteredOnly=enabled),true)
     }
     fun disconnect() = perform { app.drive.disconnect(); _browser.value = null; path.clear() }
 

@@ -39,6 +39,37 @@ class DriveGateway(
         "'${literal(parent)}' in parents and trashed = false and mimeType contains 'image/'", page,
     )
 
+    suspend fun children(parent: String, page: String? = null): DrivePage = list(
+        "'${literal(parent)}' in parents and trashed = false and (mimeType = '$FOLDER_MIME' or mimeType contains 'image/' or mimeType contains 'video/')", page)
+
+    suspend fun startToken(): String = json(Request.Builder().url(url("changes/startPageToken", "supportsAllDrives" to "true")))
+        .string("startPageToken") ?: error("Drive change token missing.")
+
+    suspend fun changes(page: String): ChangesPage {
+        val j=json(Request.Builder().url(url("changes", "pageToken" to page, "pageSize" to "100",
+            "supportsAllDrives" to "true", "includeItemsFromAllDrives" to "true",
+            "fields" to "nextPageToken,newStartPageToken,changes(fileId,removed,file($FILE_FIELDS))")))
+        return ChangesPage(j.getAsJsonArray("changes")?.map {
+            val c=it.asJsonObject
+            DriveChange(requireNotNull(c.string("fileId")),c.get("removed")?.asBoolean ?: false,
+                c.getAsJsonObject("file")?.let { file -> parseFile(file) })
+        } ?: emptyList(),j.string("nextPageToken"),j.string("newStartPageToken"))
+    }
+
+    suspend fun thumbnail(link: String, target: File) = execute(Request.Builder().url(link.toHttpUrl().also {
+        require(it.scheme == "https" && (it.host == "googleusercontent.com" || it.host.endsWith(".googleusercontent.com")) &&
+            it.username.isEmpty() && it.password.isEmpty()) { "Invalid Drive thumbnail host." }
+    })) { r ->
+        checkSuccess(r)
+        val body=r.body ?: error("Drive thumbnail missing.")
+        require(body.contentLength()<=2*1024*1024) { "Drive thumbnail too large." }
+        body.byteStream().use { input -> target.outputStream().use { output ->
+            val data=ByteArray(16384); var total=0
+            while(true) { val n=input.read(data); if(n<0) break; total+=n
+                require(total<=2*1024*1024); output.write(data,0,n) }
+        } }
+    }
+
     private suspend fun list(query: String, page: String?): DrivePage {
         val json = json(Request.Builder().url(url("files", "q" to query, "pageSize" to "100",
             "fields" to "nextPageToken,files($FILE_FIELDS)", "pageToken" to page,
@@ -159,7 +190,7 @@ class DriveGateway(
 
     companion object {
         const val FOLDER_MIME = "application/vnd.google-apps.folder"
-        private const val FILE_FIELDS = "id,name,mimeType,size,md5Checksum,version,parents,capabilities(canAddChildren)"
+        private const val FILE_FIELDS = "id,name,mimeType,size,md5Checksum,version,parents,capabilities(canAddChildren),modifiedTime,thumbnailLink,trashed,imageMediaMetadata(time,location(latitude,longitude)),appProperties"
         private val JSON = "application/json; charset=utf-8".toMediaType()
         fun literal(value: String) = value.replace("\\", "\\\\").replace("'", "\\'")
         private fun JsonObject.string(key: String): String? = get(key)?.takeUnless { it.isJsonNull }?.asString
@@ -169,6 +200,16 @@ class DriveGateway(
             md5 = j.string("md5Checksum"), version = j.string("version"),
             parents = j.getAsJsonArray("parents")?.map { it.asString } ?: emptyList(),
             canAddChildren = j.getAsJsonObject("capabilities")?.get("canAddChildren")?.asBoolean ?: false,
+            modifiedTime = j.string("modifiedTime"), thumbnailLink = j.string("thumbnailLink"),
+            trashed = j.get("trashed")?.asBoolean ?: false,
+            capturedAt = j.getAsJsonObject("imageMediaMetadata")?.string("time")?.let { time ->
+                runCatching { java.time.Instant.parse(time).toEpochMilli() }.getOrNull() ?:
+                runCatching { java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss", java.util.Locale.US).apply { isLenient=false }.parse(time)?.time }.getOrNull()
+            },
+            latitude = j.getAsJsonObject("imageMediaMetadata")?.getAsJsonObject("location")?.get("latitude")?.asDouble,
+            longitude = j.getAsJsonObject("imageMediaMetadata")?.getAsJsonObject("location")?.get("longitude")?.asDouble,
+            assetId = j.getAsJsonObject("appProperties")?.string("mpaAssetId"),
+            sourceAssetId = j.getAsJsonObject("appProperties")?.string("mpaParentId"),
         )
     }
 }

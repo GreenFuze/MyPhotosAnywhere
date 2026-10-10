@@ -17,6 +17,7 @@ class DriveCoordinator(private val context: Context, private val database: Photo
     val backups = database.drive().observeBackups()
 
     suspend fun enqueue(photo: Photo) {
+        if (photo.sourceRemoteId != null || photo.originalPath.isBlank()) return
         val active = database.drive().connection() ?: return
         val binding = active.binding() ?: return
         if (!active.backupEnabled) return
@@ -57,6 +58,8 @@ class DriveCoordinator(private val context: Context, private val database: Photo
     }
 
     suspend fun disconnect() {
+        (context.applicationContext as com.myphotosanywhere.mpa.MpaApplication).sync.stop()
+        (context.applicationContext as com.myphotosanywhere.mpa.MpaApplication).downloads.stop()
         database.drive().disconnect()
         WorkManager.getInstance(context).cancelAllWorkByTag(BACKUP_TAG)
     }

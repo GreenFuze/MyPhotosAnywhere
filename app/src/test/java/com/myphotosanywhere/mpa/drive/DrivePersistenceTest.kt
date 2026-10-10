@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
+import com.myphotosanywhere.mpa.data.LIBRARY_MIGRATION_2_3
 import com.myphotosanywhere.mpa.data.PhotoDatabase
 import com.myphotosanywhere.mpa.data.PhotoRepository
 import java.io.File
@@ -53,7 +54,7 @@ class DrivePersistenceTest {
     }
 
     private fun open(): PhotoDatabase = Room.databaseBuilder(RuntimeEnvironment.getApplication(), PhotoDatabase::class.java, name)
-        .addMigrations(DRIVE_MIGRATION_1_2).allowMainThreadQueries().build().also { database = it }
+        .addMigrations(DRIVE_MIGRATION_1_2, LIBRARY_MIGRATION_2_3).allowMainThreadQueries().build().also { database = it }
 
     @After fun cleanup() {
         database?.close()

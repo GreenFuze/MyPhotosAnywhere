@@ -1,5 +1,7 @@
 package com.myphotosanywhere.mpa.data
 
+import androidx.room.ColumnInfo
+import androidx.room.Update
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -13,6 +15,11 @@ import kotlinx.coroutines.flow.Flow
 import com.myphotosanywhere.mpa.drive.DriveConnection
 import com.myphotosanywhere.mpa.drive.DriveBackup
 import com.myphotosanywhere.mpa.drive.DriveDao
+import com.myphotosanywhere.mpa.drive.CloudPhoto
+import com.myphotosanywhere.mpa.drive.CloudFolder
+import com.myphotosanywhere.mpa.drive.SyncState
+import com.myphotosanywhere.mpa.drive.DownloadTask
+import com.myphotosanywhere.mpa.drive.CloudDao
 
 @Entity(tableName = "photos", indices = [Index("sha256"), Index("parentId")])
 data class Photo(
@@ -29,6 +36,16 @@ data class Photo(
     val parentId: String? = null,
     val editProvider: String? = null,
     val editInstructions: String? = null,
+    val capturedAt: Long? = null,
+    @ColumnInfo(defaultValue = "0") val favorite: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val archived: Boolean = false,
+    @ColumnInfo(defaultValue = "''") val placeLabel: String = "",
+    val sourceBindingKey: String? = null,
+    val sourceRemoteId: String? = null,
+    val cachedVersion: String? = null,
+    @ColumnInfo(defaultValue = "0") val pinned: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val lastAccess: Long = 0,
+    @ColumnInfo(defaultValue = "''") val labels: String = "",
 )
 
 @Entity(tableName = "handoffs")
@@ -45,6 +62,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos ORDER BY importedAt DESC, id DESC")
     fun observeAll(): Flow<List<Photo>>
 
+    @Update
+    suspend fun update(photo: Photo)
+
     @Query("SELECT * FROM photos WHERE id = :id")
     suspend fun find(id: String): Photo?
 
@@ -57,6 +77,9 @@ interface PhotoDao {
     @Query("SELECT * FROM handoffs ORDER BY createdAt DESC, id DESC")
     fun observeHandoffs(): Flow<List<Handoff>>
 
+    @Query("SELECT * FROM handoffs WHERE photoId = :id")
+    suspend fun findHandoffsForPhoto(id: String): List<Handoff>
+
     @Query("SELECT * FROM handoffs WHERE id = :id")
     suspend fun findHandoff(id: String): Handoff?
 
@@ -67,8 +90,12 @@ interface PhotoDao {
     suspend fun deleteHandoff(id: String)
 }
 
-@Database(entities = [Photo::class, Handoff::class, DriveConnection::class, DriveBackup::class], version = 2, exportSchema = true)
+@Database(entities = [Photo::class, Handoff::class, DriveConnection::class, DriveBackup::class,
+    Album::class, AlbumPhoto::class, EditDraft::class, Person::class, FaceRecord::class, FaceScan::class,
+    CloudPhoto::class, CloudFolder::class, SyncState::class, DownloadTask::class], version = 3, exportSchema = true)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photos(): PhotoDao
     abstract fun drive(): DriveDao
+    abstract fun library(): LibraryDao
+    abstract fun cloud(): CloudDao
 }

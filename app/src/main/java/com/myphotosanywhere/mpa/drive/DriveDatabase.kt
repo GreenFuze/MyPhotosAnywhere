@@ -26,7 +26,7 @@ data class DriveConnection(
 
 fun DriveConnection.binding(): DriveBinding? = folderId?.let { DriveBinding(accountId, it) }
 
-@Entity(tableName = "drive_backups", indices = [Index("bindingKey"), Index("photoId")])
+@Entity(tableName = "drive_backups", indices = [Index("bindingKey"), Index("photoId"), Index(value = ["bindingKey", "remoteId"])])
 data class DriveBackup(
     @PrimaryKey val id: String,
     val bindingKey: String,
@@ -56,6 +56,8 @@ interface DriveDao {
     suspend fun disconnect()
     @Query("SELECT * FROM drive_backups WHERE bindingKey = :bindingKey ORDER BY photoId")
     suspend fun backups(bindingKey: String): List<DriveBackup>
+    @Query("SELECT * FROM drive_backups WHERE bindingKey = :binding AND remoteId = :remote AND state = 'COMPLETE' LIMIT 1")
+    suspend fun backupForRemote(binding: String, remote: String): DriveBackup?
     @Query("SELECT * FROM drive_backups ORDER BY photoId")
     fun observeBackups(): Flow<List<DriveBackup>>
     @Query("SELECT * FROM drive_backups WHERE id = :id")

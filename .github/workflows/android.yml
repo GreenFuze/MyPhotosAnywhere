@@ -18,6 +18,12 @@ jobs:
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.config/.android/debug.keystore
+            ~/.android/debug.keystore
+          key: mpa-private-debug-signing-v1-${{ runner.os }}
       - uses: gradle/actions/setup-gradle@v4
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
