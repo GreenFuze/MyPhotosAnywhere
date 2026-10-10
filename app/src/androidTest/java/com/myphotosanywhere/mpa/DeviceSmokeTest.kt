@@ -26,6 +26,35 @@ class DeviceSmokeTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
 
+    @Test fun galleryCombinesSourcesAndFiltersIndependentlyOfTheStorageBrowser() = runBlocking<Unit> {
+        val a=com.myphotosanywhere.mpa.drive.DriveSource.from(com.myphotosanywhere.mpa.drive.DriveConnection(
+            accountId="test-a",email="a@test",mode="APP_FILES",folderId="folder-a",folderName="A"))
+        val b=com.myphotosanywhere.mpa.drive.DriveSource.from(com.myphotosanywhere.mpa.drive.DriveConnection(
+            accountId="test-b",email="b@test",mode="APP_FILES",folderId="folder-b",folderName="B"))
+        val ids=listOf("source-test-a","source-test-b")
+        try {
+            app.database.drive().saveSource(a); app.database.drive().saveSource(b)
+            app.database.drive().saveConnection(b.connection())
+            for((id,source) in ids.zip(listOf(a,b))) app.database.photos().insert(com.myphotosanywhere.mpa.data.Photo(
+                id,"$id.jpg","","","image/jpeg",8,1,"sha-$id",sourceBindingKey=source.key))
+            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${ids[0]}").fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodesWithTag("photo:${ids[1]}").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("A · a@test").performScrollTo().performClick()
+            compose.onNodeWithTag("photo:${ids[0]}").assertExists()
+            compose.onNodeWithTag("photo:${ids[1]}").assertDoesNotExist()
+            compose.onNodeWithText("B · b@test").performScrollTo().performClick()
+            compose.onNodeWithTag("photo:${ids[1]}").assertExists()
+            compose.onNodeWithTag("photo:${ids[0]}").assertDoesNotExist()
+            compose.onNodeWithText("All sources").performScrollTo().performClick()
+            compose.onNodeWithTag("photo:${ids[0]}").assertExists()
+            compose.onNodeWithTag("photo:${ids[1]}").assertExists()
+        } finally {
+            for(id in ids) app.database.photos().find(id)?.let { app.database.photos().update(it.copy(archived=true)) }
+            app.database.drive().disconnectSource(a.key); app.database.drive().disconnectSource(b.key)
+            app.database.drive().disconnect()
+        }
+    }
+
     @Test fun importEditSaveAndBrowseCopyWithoutChangingOriginal() = runBlocking<Unit> {
         val fixture=File.createTempFile("fixture",".png",app.cacheDir)
         val source=Bitmap.createBitmap(120,80,Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }

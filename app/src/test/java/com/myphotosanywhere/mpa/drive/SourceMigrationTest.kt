@@ -33,7 +33,8 @@ class SourceMigrationTest {
                         val table=entity.asJsonObject
                         fun sql(value: String) = value.replace("\${TABLE_NAME}",table.get("tableName").asString)
                         db.execSQL(sql(table.get("createSql").asString))
-                        for(index in table.getAsJsonArray("indices")) db.execSQL(sql(index.asJsonObject.get("createSql").asString))
+                        for(index in table.getAsJsonArray("indices") ?: com.google.gson.JsonArray())
+                            db.execSQL(sql(index.asJsonObject.get("createSql").asString))
                     }
                     db.execSQL("INSERT INTO drive_connection VALUES (1,'account','owner@example.test','APP_FILES','folder','MPA',1,0)")
                     db.execSQL("INSERT INTO photos (id,displayName,originalPath,thumbnailPath,mimeType,bytes,importedAt,sha256) VALUES ('photo','family.jpg','/original','/thumb','image/jpeg',10,1,'sha')")

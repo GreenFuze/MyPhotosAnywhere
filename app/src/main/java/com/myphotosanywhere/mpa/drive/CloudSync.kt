@@ -197,7 +197,12 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
         }
         return false
     }
-    fun stop(binding: String) { WorkManager.getInstance(context).cancelAllWorkByTag("$SYNC_TAG:$binding") }
+    fun stop(binding: String) {
+        val manager=WorkManager.getInstance(context)
+        manager.cancelAllWorkByTag("$SYNC_TAG:$binding")
+        // These names also cancel workers created by 0.3, before per-source tags existed.
+        manager.cancelUniqueWork("mpa-sync:$binding"); manager.cancelUniqueWork("mpa-scan:$binding")
+    }
     companion object { const val SYNC_TAG="mpa-cloud-sync" }
 }
 class CloudSyncWorker(context: Context,params: WorkerParameters): CoroutineWorker(context,params) {
