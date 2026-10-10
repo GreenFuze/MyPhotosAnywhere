@@ -1,6 +1,10 @@
-# MPA 0.4.1: behavior and phone verification
+# MPA 0.4.2: behavior and phone verification
 
 This is an installable development build for testing, using the same debug signer as 0.3 and the 0.4 alphas. It is not a Google Photos quality recognition claim. Android 8+ is supported; automated device checks use Android 10. Keep independent backups of your photos.
+
+## Google authorization diagnostics in 0.4.2
+
+Authorization return intents are parsed by Google's SDK even when the activity returns a canceled code, so a configuration failure is not automatically labeled as user cancellation. Missing result data and consent-launch failures have separate messages. **Storage → Google setup details** shows and copies the actual installed version, package, signing SHA-1 and requested Drive scopes; it is also available beside a connection error. Google Cloud must still grant access for the configured project/account. See [Google setup](GOOGLE_DRIVE_SETUP.md#if-authorization-closes-or-fails-after-reinstalling).
 
 ## Phone testing fixes in 0.4.1
 

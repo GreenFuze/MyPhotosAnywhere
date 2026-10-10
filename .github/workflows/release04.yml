@@ -1,17 +1,17 @@
-name: Publish MPA 0.4.1 release
+name: Publish MPA 0.4.2 release
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - '.github/workflows/release04.yml'
-      - 'docs/releases/v0.4.1.json'
-      - 'docs/releases/v0.4.1.md'
+      - 'docs/releases/v0.4.2.json'
+      - 'docs/releases/v0.4.2.md'
 permissions:
   contents: write
   actions: read
 concurrency:
-  group: android-release-v0.4.1
+  group: android-release-v0.4.2
   cancel-in-progress: false
 jobs:
   publish:
@@ -27,9 +27,9 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, os, re
-          with open('docs/releases/v0.4.1.json') as stream:
+          with open('docs/releases/v0.4.2.json') as stream:
               config = json.load(stream)
-          assert config['tag'] == 'v0.4.1'
+          assert config['tag'] == 'v0.4.2'
           assert re.fullmatch('[0-9a-f]{40}', config['source_sha'])
           assert isinstance(config['build_run_id'], int) and isinstance(config['device_run_id'], int)
           with open(os.environ['GITHUB_ENV'], 'a') as stream:
@@ -76,13 +76,13 @@ jobs:
           gh run download "$BUILD_RUN_ID" --name MPA-checks --dir checks
           gh run download "$DEVICE_RUN_ID" --name MPA-device-checks --dir device
           mkdir assets
-          cp apk/app-debug.apk assets/MPA-0.4.1-debug.apk
-          cp checks/build/reports/signing-report.txt assets/MPA-0.4.1-signing-report.txt
+          cp apk/app-debug.apk assets/MPA-0.4.2-debug.apk
+          cp checks/build/reports/signing-report.txt assets/MPA-0.4.2-signing-report.txt
           cp docs/GOOGLE_DRIVE_SETUP.md assets/GOOGLE_DRIVE_SETUP.md
           cp docs/IMPLEMENTATION_0_4.md assets/IMPLEMENTATION_0_4.md
           cp docs/FEATURES_0_4.md assets/FEATURES_0_4.md
           cp docs/branding/mpa-icon.svg assets/MPA-icon.svg
-          (cd assets && sha256sum MPA-0.4.1-debug.apk > SHA256SUMS.txt)
+          (cd assets && sha256sum MPA-0.4.2-debug.apk > SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
@@ -96,21 +96,21 @@ jobs:
               assert totals['tests'] > 0 and totals['failures'] == totals['errors'] == totals['skipped'] == 0, totals
               return totals
           evidence = {'unit_tests':results('checks/build/test-results'), 'device_tests':results('device/outputs/androidTest-results')}
-          apk = Path('assets/MPA-0.4.1-debug.apk')
+          apk = Path('assets/MPA-0.4.2-debug.apk')
           evidence['source_sha'] = os.environ['SOURCE_SHA']
           evidence['release_commit'] = os.environ['GITHUB_SHA']
           evidence['build_run_id'] = int(os.environ['BUILD_RUN_ID'])
           evidence['device_run_id'] = int(os.environ['DEVICE_RUN_ID'])
           evidence['apk_sha256'] = hashlib.sha256(apk.read_bytes()).hexdigest()
           evidence['apk_bytes'] = apk.stat().st_size
-          report = Path('assets/MPA-0.4.1-signing-report.txt').read_text()
+          report = Path('assets/MPA-0.4.2-signing-report.txt').read_text()
           certificate = re.search(r'^SHA1: ([0-9A-F:]{59})$', report, re.MULTILINE)
           assert certificate is not None, 'Missing debug signing certificate'
           evidence['android_oauth_sha1'] = certificate.group(1)
           assert evidence['android_oauth_sha1'] == 'A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD', 'Signer changed; preserve the established upgrade/OAuth certificate'
           Path('assets/BUILD_EVIDENCE.json').write_text(json.dumps(evidence,indent=2)+'\n')
           print(json.dumps(evidence))
-          notes = Path('docs/releases/v0.4.1.md').read_text()
+          notes = Path('docs/releases/v0.4.2.md').read_text()
           notes += f"\nSource: `{os.environ['SOURCE_SHA']}`. [Build](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['BUILD_RUN_ID']}) · [Device checks](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['DEVICE_RUN_ID']}).\n"
           notes += f"\nThe release tag points to publication commit `{os.environ['GITHUB_SHA']}`. Its app code is identical to the tested source; only documentation and publication metadata differ.\n"
           notes += f"\nAPK SHA-256: `{evidence['apk_sha256']}`\n"
@@ -145,11 +145,11 @@ jobs:
             TAG_SHA=$(python3 -c "import json; print(json.load(open('tag.json'))['object']['sha'])")
             gh api "repos/$GH_REPO/compare/$SOURCE_SHA...$TAG_SHA" > existing-compare.json
             python3 verify-publication.py existing-compare.json
-            gh release download "$RELEASE_TAG" --pattern MPA-0.4.1-debug.apk --dir existing
-            cmp assets/MPA-0.4.1-debug.apk existing/MPA-0.4.1-debug.apk
+            gh release download "$RELEASE_TAG" --pattern MPA-0.4.2-debug.apk --dir existing
+            cmp assets/MPA-0.4.2-debug.apk existing/MPA-0.4.2-debug.apk
             echo 'Identical APK already published; existing release preserved.'
             exit 0
           fi
           gh release create "$RELEASE_TAG" assets/* --target "$GITHUB_SHA" \
-            --title 'MyPhotosAnywhere 0.4.1 — Phone testing fixes' \
+            --title 'MyPhotosAnywhere 0.4.2 — Google authorization diagnostics' \
             --notes-file release-notes.md

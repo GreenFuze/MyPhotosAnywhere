@@ -1,5 +1,13 @@
 # Validation status and device checklist
 
+## MPA 0.4.2 Google authorization diagnostics
+
+Source `c878da08d73dc600c07d53cf77816abffa7c8e30` passed **88 unit/integration tests**, Android lint with zero errors, APK assembly and **eight Android 10 (API 29) emulator tests**, with zero failures, errors or skipped cases. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38069967248) · [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38069967298).
+
+Four new regressions cover canceled activity results containing a Google SDK error, preservation of configuration/network status codes, cancellation without data versus missing successful-result data, and intent-sender launch failure. The Android UI test opens Google setup details, verifies the installed version/package and certificate format, and confirms the copy action contains those public identifiers. Existing editing/original-detail, Drive-deletion, source/indexing, XMP and model checks remain passing. The established release signer is unchanged (`A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`); generated Room v5 schema matches the committed schema.
+
+These checks verify error handling and setup diagnostics. They do not authenticate the user's real Google account or modify its Cloud project. The reported post-reinstall authorization failure still requires a live retry with correct package/certificate registration, requested Drive scopes and test-user access. See the [Google setup and computer-agent prompt](GOOGLE_DRIVE_SETUP.md#if-authorization-closes-or-fails-after-reinstalling).
+
 ## MPA 0.4.1 phone testing fixes
 
 Source `26dd25e0bdd1d29ffe53de3d749b990990240990` passed **84 unit/integration tests**, Android lint with zero errors, APK assembly and **seven Android 10 (API 29) emulator tests**, with no failures, errors or skipped cases. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38067111244) · [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38067111071).
