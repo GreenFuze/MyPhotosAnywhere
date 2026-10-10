@@ -35,8 +35,4 @@ fun IndexingControls(model: LibraryFeaturesModel) {
         TextButton(enabled=from!=null && to!=null && from!=to,onClick={ model.updateSettings(settings.copy(nightStart=requireNotNull(from),nightEnd=requireNotNull(to))) }) { Text("Save window") }
         Text("Uses your phone’s local time. Android may delay background jobs. Scans stop between photos outside this window, when unplugged, or when the phone is hot. Scan now runs on demand outside the night window.",style=MaterialTheme.typography.bodySmall)
     }
-    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(enabled=settings.faceIndexing || settings.objectIndexing,onClick={ model.scanFaces() }) { Text(if(settings.indexingPaused) "Resume / scan now" else "Scan now") }
-        TextButton(onClick={ model.pauseIndexing() }) { Text("Pause scans") }
-    }
 }

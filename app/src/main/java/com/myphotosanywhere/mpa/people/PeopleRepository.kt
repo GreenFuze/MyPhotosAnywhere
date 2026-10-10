@@ -37,6 +37,7 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
     suspend fun scanNow() {
         settings.update(settings.state.value.copy(indexingPaused=false))
         db.library().retryScans()
+        report("Scan queued",0,0,0)
         schedule(true)
     }
     fun schedule(manual: Boolean=false) {

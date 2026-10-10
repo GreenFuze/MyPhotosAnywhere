@@ -29,6 +29,7 @@ fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<Fa
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
             Text("People",style=MaterialTheme.typography.headlineSmall)
+            ScanActions(model)
             Text("Matching runs on this phone. Face crops and embeddings stay here; names and reviewed regions can be backed up as XMP if enabled in Storage. Matches require your review.")
             Row {
                 Switch(checked=enabled,onCheckedChange={ model.updateSettings(model.settings.value.copy(faceIndexing=it)) })

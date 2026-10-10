@@ -72,6 +72,7 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
     var resultHandoffId by rememberSaveable { mutableStateOf<String?>(null) }
     var showShare by rememberSaveable { mutableStateOf(false) }
     var viewerId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingViewKey by rememberSaveable { mutableStateOf<String?>(null) }
     var editorId by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("All") }
@@ -91,6 +92,16 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
     }
     fun pickResult(handoff: Handoff) { resultHandoffId=handoff.id; importResult.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
     fun selectPhoto(id: String) { selectedId=id; showShare=false }
+    fun viewPhoto(photo: Photo) {
+        selectedId=photo.id;showShare=false
+        if(photo.originalPath.isNotBlank() && File(photo.originalPath).isFile) viewerId=photo.id
+        else cloud.find { it.photoId==photo.id && !it.removed && sources.any { source -> source.key==it.bindingKey } }?.let {
+            pendingViewKey=it.key;features.download(it)
+        }
+    }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { features.refreshCloudAutomatically() }
+    LaunchedEffect(sources.map { it.key }) { if(sources.isNotEmpty()) features.refreshCloudAutomatically() }
+    val presence=remember(cloud,sources,sourceKey) { GalleryVisibility.Index(cloud.filter { sourceKey==null || it.bindingKey==sourceKey },sources.map { it.key }.toSet()) }
     val selected=photos.find { it.id==selectedId }
     val localIds=remember(photos) { photos.map { it.id }.toSet() }
     val cloudByPhoto=remember(cloud,sources,sourceKey) {
@@ -144,6 +155,7 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
                     val local=photos.filter { photo ->
                         val names=namesByPhoto[photo.id] ?: emptyList()
                         val indexed=cloudByPhoto[photo.id]?.removed==false
+                        presence.showLocal(photo,filter,albumId!=null || personId!=null) &&
                         (photo.sourceRemoteId==null || photo.originalPath.isNotBlank() || indexed || albumId!=null || filter=="Favorites" || filter=="Archive") &&
                         (sourceKey==null || photo.sourceBindingKey==sourceKey || photo.id in sourcePhotoIds) &&
                         LibrarySearch.matches(photo,query,names) && (if(filter=="Archive") photo.archived else !photo.archived) &&
@@ -166,13 +178,13 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
                         items(local,key={ it.id }) { photo ->
                             val cloudRow=cloudByPhoto[photo.id]
                             PhotoTile(photo,features,cloudRow?.thumbnailUpdatedAt ?: 0,cloudRow,
-                                sourcesByKey[cloudRow?.bindingKey]?.connection()) { selectPhoto(photo.id) }
+                                sourcesByKey[cloudRow?.bindingKey]?.connection()) { viewPhoto(photo) }
                         }
                         items(remote,key={ "cloud:${it.key}" }) { row ->
                             LaunchedEffect(row.key,row.version,row.thumbnailUpdatedAt,sourcesByKey[row.bindingKey]) {
                                 com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(context,row,sourcesByKey[row.bindingKey]?.connection())
                             }
-                            Card(Modifier.aspectRatio(1f).clickable { features.download(row) }) {
+                            Card(Modifier.aspectRatio(1f).clickable { pendingViewKey=row.key;features.download(row) }) {
                                 Box(Modifier.fillMaxSize()) {
                                     AsyncImage(coil.request.ImageRequest.Builder(context).data(File(row.thumbnailPath))
                                         .memoryCacheKey("${row.key}:${row.thumbnailUpdatedAt}").build(),row.name,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
@@ -208,15 +220,19 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
             }
         }
     }
-    if(selected!=null && !showShare && editorId==null && viewerId==null) PhotoDetails(selected,features,albums,memberships,people,faces,
+    pendingViewKey?.let { key -> DriveOriginalDialog(cloud.find { it.key==key },features,onClose={ pendingViewKey=null;selectedId=null },onReady={
+        pendingViewKey=null;selectedId=it;viewerId=it
+    }) }
+    if(selected!=null && !showShare && editorId==null && viewerId==null && pendingViewKey==null) PhotoDetails(selected,features,albums,memberships,people,faces,
         onClose={ selectedId=null },onEdit={ editorId=selected.id },onAI={ showShare=true },onExport={
             exportId=selected.id; export.launch(selected.displayName)
         },onResult=handoffs.firstOrNull { it.photoId==selected.id }?.let { h -> { pickResult(h) } },onView={ viewerId=selected.id })
     if(selected!=null && showShare) ShareDialog(busy,onDismiss={ showShare=false }) { provider,instructions ->
         model.share(selected,provider,instructions) { intent -> context.startActivity(intent); showShare=false }
     }
-    viewerId?.let { id -> PhotoViewer(photos,id,features,onClose={ viewerId=null },onCurrent={ selectedId=it },
-        onEdit={ viewerId=null; selectedId=it; editorId=it }) }
+    viewerId?.let { id -> PhotoViewer(photos.filter { it.id==id || presence.showLocal(it,filter,albumId!=null || personId!=null) },id,features,
+        onClose={ viewerId=null;selectedId=null },onCurrent={ selectedId=it },
+        onEdit={ viewerId=null; selectedId=it; editorId=it },onDetails={ viewerId=null;selectedId=it }) }
     editorId?.let { id -> EditorScreen(id,onClose={ editorId=null },onSaved={ saved -> editorId=null; selectedId=saved }) }
 }
 

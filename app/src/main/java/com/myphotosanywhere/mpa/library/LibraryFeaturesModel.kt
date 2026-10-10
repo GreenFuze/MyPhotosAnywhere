@@ -76,8 +76,19 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
                 db.cloud().photo("${photo.sourceBindingKey}:${photo.sourceRemoteId}")?.let { app.downloads.enqueue(it) }
         }
     }
-    fun download(row: CloudPhoto,pin: Boolean = false) = perform { app.downloads.enqueue(row,pin); message.value="Download queued; unmetered network preference applies." }
+    fun download(row: CloudPhoto,pin: Boolean = false,retry: Boolean = false) = perform { app.downloads.enqueue(row,pin,retry); message.value="Download queued; unmetered network preference applies." }
     fun retryDownloads() = perform { app.downloads.retry() }
+    private var lastForegroundRefresh=0L
+    fun refreshCloudAutomatically() {
+        viewModelScope.launch {
+            val now=android.os.SystemClock.elapsedRealtime()
+            if(lastForegroundRefresh!=0L && now-lastForegroundRefresh<30_000) return@launch
+            val connected=db.drive().sources()
+            if(connected.isEmpty()) return@launch
+            lastForegroundRefresh=now
+            connected.forEach { app.sync.schedule(it.connection(),true) }
+        }
+    }
     fun refreshCloud() = perform {
         val sources=db.drive().sources()
         require(sources.isNotEmpty()) { "Connect a Drive source in Storage first." }

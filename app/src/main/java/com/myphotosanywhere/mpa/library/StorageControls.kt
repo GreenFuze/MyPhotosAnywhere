@@ -48,7 +48,7 @@ fun StorageControls(photos: List<Photo>,model: LibraryFeaturesModel = viewModel(
         Text("Cloud library",style=MaterialTheme.typography.titleLarge)
         if(states.any { it.running }) LinearProgressIndicator(Modifier.fillMaxWidth())
         states.filter { it.error!=null }.forEach { state -> Text("${sources.find { it.key==state.bindingKey }?.folderName}: ${state.error}",color=MaterialTheme.colorScheme.error) }
-        Text("Drive refresh runs approximately every 15 minutes when network constraints permit. External deletions hide cloud entries; local files are preserved.",style=MaterialTheme.typography.bodySmall)
+        Text("Drive refresh runs approximately every 15 minutes when network constraints permit. External deletions hide cloud photos and their cached copies from the main gallery. Local copies remain in Offline, favorites and albums.",style=MaterialTheme.typography.bodySmall)
         TextButton(enabled=!busy,onClick=model::refreshCloud) { Text("Refresh Drive now") }
         Text("${queued.count { it.state=="COMPLETE" }} downloads completed · ${queued.count { it.state!="COMPLETE" }} pending")
         queued.filter { it.error!=null }.take(5).forEach { Text(it.error ?: "",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error) }

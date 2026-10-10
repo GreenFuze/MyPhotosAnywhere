@@ -14,23 +14,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.myphotosanywhere.mpa.data.Photo
 import java.io.File
 
 @Composable
 fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesModel,onClose: ()->Unit,
-    onCurrent: (String)->Unit,onEdit: (String)->Unit) {
+    onCurrent: (String)->Unit,onEdit: (String)->Unit,onDetails: (String)->Unit) {
     val available=remember(photos) { photos.filter { it.originalPath.isNotBlank() && File(it.originalPath).isFile }.sortedByDescending { it.capturedAt ?: it.importedAt } }
     if(available.isEmpty()) { LaunchedEffect(Unit) { onClose() }; return }
     val pager=rememberPagerState(initialPage=available.indexOfFirst { it.id==selectedId }.coerceAtLeast(0),pageCount={ available.size })
@@ -41,6 +37,7 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Row(Modifier.fillMaxWidth().padding(8.dp),horizontalArrangement=Arrangement.SpaceBetween) {
                     TextButton(modifier=Modifier.testTag("viewer-close"),onClick=onClose) { Text("Close",color=Color.White) }
+                    TextButton(modifier=Modifier.testTag("viewer-details"),onClick={ onDetails(current.id) }) { Text("Details",color=Color.White) }
                     if(current.mimeType.startsWith("image/")) TextButton(onClick={ onEdit(current.id) }) { Text("Edit",color=Color.White) }
                 }
                 Text(current.displayName,maxLines=1,modifier=Modifier.padding(horizontal=16.dp))
@@ -49,6 +46,7 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
                     val reader by produceState<AutoCloseable?>(null,photo.id) {
                         value=model.app.cache.acquireReader(photo.id);awaitDispose { value?.close() }
                     }
+                    var quality by remember(photo.id) { mutableStateOf("Loading original…") }
                     var zoom by remember(photo.id) { mutableFloatStateOf(1f) }
                     var x by remember(photo.id) { mutableFloatStateOf(0f) }
                     var y by remember(photo.id) { mutableFloatStateOf(0f) }
@@ -70,7 +68,7 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
                                 if(event.changes.count { it.pressed }>=2) transforming=true
                                 if(transforming) {
                                     val pan=event.calculatePan();val scale=event.calculateZoom()
-                                    zoom=(zoom*scale).coerceIn(1f,6f)
+                                    zoom=(zoom*scale).coerceIn(1f,32f)
                                     x=(x+pan.x).coerceIn(-size.width*(zoom-1)/2,size.width*(zoom-1)/2)
                                     y=(y+pan.y).coerceIn(-size.height*(zoom-1)/2,size.height*(zoom-1)/2)
                                     event.changes.forEach { it.consume() }
@@ -78,8 +76,11 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
                             } while(event.changes.any { it.pressed })
                         }
                     }) {
-                        AsyncImage(ImageRequest.Builder(model.app).data(File(photo.originalPath)).size(2048).build(),photo.displayName,
-                            Modifier.fillMaxSize().graphicsLayer { scaleX=zoom;scaleY=zoom;translationX=x;translationY=y },contentScale=ContentScale.Fit)
+                        AndroidView(factory={ context -> OriginalPhotoView(context).apply {
+                            onQuality={ quality=it };load(File(photo.originalPath))
+                        } },modifier=Modifier.fillMaxSize().testTag("original-image"),update={ it.transform(zoom,x,y) },onRelease={ it.close() })
+                        Text(quality,color=Color.White,style=MaterialTheme.typography.bodySmall,
+                            modifier=Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(8.dp))
                     }
                 }
                 Text("${pager.currentPage+1} / ${available.size} · Swipe to browse · Pinch or double-tap to zoom",

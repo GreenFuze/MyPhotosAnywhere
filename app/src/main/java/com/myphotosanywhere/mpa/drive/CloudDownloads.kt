@@ -81,6 +81,7 @@ class CloudDownloadWorker(context: Context,params: WorkerParameters): CoroutineW
                 currentCoroutineContext().ensureActive()
                 require(db.drive().source(task.bindingKey)!=null) { "Drive source disconnected." }
                 val latest=dao.photo(key) ?: error("Cloud index changed.")
+                require(!latest.removed) { "This photo was removed from Drive during download." }
                 val shared=dao.sameAccountCopy(active.accountId,before.id,requireNotNull(before.md5),before.bytes)
                 val saved=(shared?.photoId ?: latest.photoId)?.let { db.photos().find(it) }
                 if(shared!=null && saved!=null && saved.originalPath.isNotBlank() && File(saved.originalPath).isFile) {

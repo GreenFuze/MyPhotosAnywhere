@@ -64,9 +64,9 @@ class DeviceSmokeTest {
             val hash=DriveBackupWorker.digest(File(photo.originalPath),"SHA-256")
             compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${photo.id}").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("photo:${photo.id}").performClick()
-            compose.onNodeWithText("View full screen").performClick()
             compose.onNodeWithTag("viewer-screen").assertIsDisplayed()
-            compose.onNodeWithTag("viewer-close").performClick()
+            compose.onNodeWithTag("original-image").assertExists()
+            compose.onNodeWithTag("viewer-details").performClick()
             compose.onNodeWithTag("photo-edit").performClick()
             compose.waitUntil(30000) {
                 compose.onAllNodes(hasTestTag("editor-save") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
@@ -131,6 +131,45 @@ class DeviceSmokeTest {
             app.database.photos().find(id)?.let { app.database.photos().update(it.copy(archived=true)) }
             app.database.drive().disconnectSource(source.key)
         }
+    }
+
+    @Test fun scanActionIsVisibleWithoutScrollingAndRequestsConsent() = runBlocking<Unit> {
+        val original=app.settings.state.value
+        try {
+            app.settings.update(original.copy(faceIndexing=false,objectIndexing=false))
+            compose.onNode(hasText("People") and hasClickAction()).performClick()
+            compose.onNodeWithTag("scan-now").assertIsDisplayed().performClick()
+            compose.onNodeWithText("Enable on-device scanning").assertIsDisplayed()
+            compose.onNodeWithText("Cancel").performClick()
+            compose.onNodeWithText("Storage").performClick()
+            compose.onNodeWithTag("scan-now").assertIsDisplayed().performClick()
+            compose.onNodeWithText("Enable on-device scanning").assertIsDisplayed()
+            compose.onNodeWithText("Cancel").performClick()
+        } finally { app.settings.update(original) }
+    }
+
+    @Test fun originalRegionsRetainSinglePixelDetailBeyondTheOld2048Limit() {
+        val file=File.createTempFile("full-resolution",".png",app.cacheDir)
+        val bitmap=Bitmap.createBitmap(4096,128,Bitmap.Config.ARGB_8888)
+        try {
+            bitmap.eraseColor(Color.WHITE)
+            for(y in 0 until 128) bitmap.setPixel(3001,y,Color.BLACK)
+            file.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it)) }
+        } finally { bitmap.recycle() }
+        try {
+            com.myphotosanywhere.mpa.library.OriginalImageSource(file).use { source ->
+                assertEquals(4096,source.width)
+                assertTrue(source.supportsRegions)
+                val rect=android.graphics.Rect(2990,0,3020,128)
+                val detail=requireNotNull(source.region(rect,1))
+                try {
+                    assertEquals(30,detail.width)
+                    assertEquals(Color.BLACK,detail.getPixel(11,64))
+                    assertEquals(Color.WHITE,detail.getPixel(10,64))
+                    assertEquals(Color.WHITE,detail.getPixel(12,64))
+                } finally { detail.recycle() }
+            }
+        } finally { file.delete() }
     }
 
     @Test fun storageExposesXmpPrivacyAndSavesMidnightScheduleWithPause() = runBlocking<Unit> {

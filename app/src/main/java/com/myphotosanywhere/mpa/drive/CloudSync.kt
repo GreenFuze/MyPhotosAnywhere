@@ -94,7 +94,7 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
         } }
         reconcile(api,active,token)
     }
-    private suspend fun reconcile(api: DriveGateway,active: DriveConnection,start: String) {
+    internal suspend fun reconcile(api: DriveGateway,active: DriveConnection,start: String) {
         val binding=requireNotNull(active.binding()).key
         var token=start
         while(true) {

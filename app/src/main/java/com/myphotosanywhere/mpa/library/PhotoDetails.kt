@@ -55,6 +55,9 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
             if(available && onView!=null) TextButton(onClick=onView) { Text("View full screen") }
             Text("${DateFormat.getDateTimeInstance().format(Date(photo.capturedAt ?: photo.importedAt))} · %.1f MiB".format(photo.bytes/(1024.0*1024)))
             Text(if(photo.parentId==null) "Original preserved" else "Edited copy · original preserved")
+            val sources by model.sources.collectAsStateWithLifecycle()
+            if(GalleryVisibility.removedFromDrive(photo,cloud,sources.map { it.key }.toSet()))
+                Text("Removed from Drive · local copy preserved",color=MaterialTheme.colorScheme.error)
             if(!available) {
                 Text("Original is stored in Drive. Download it to edit, share, or export.")
                 cloud.find { it.key=="${photo.sourceBindingKey}:${photo.sourceRemoteId}" }?.let { row ->
