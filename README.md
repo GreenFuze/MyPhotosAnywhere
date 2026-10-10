@@ -6,7 +6,7 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
-The [0.4.0 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.4.0) adds multiple Drive folders/accounts, one chosen backup destination, shared person identities, source-scoped XMP annotation backup/recovery, and bounded phone scans with pause/resume and a charging/night window. It includes the original MPA adaptive launcher icon and preserves the 0.3/alpha debug signer.
+The [0.4.1 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.4.1) adds multiple Drive folders/accounts, one chosen backup destination, shared person identities, source-scoped XMP annotation backup/recovery, and bounded phone scans with pause/resume and a charging/night window. The 0.4.1 update makes Scan now prominent, opens photos directly with original-region zoom, and hides externally deleted Drive photos from the main gallery while retaining downloaded copies. It includes the original MPA adaptive launcher icon and preserves the 0.3/alpha debug signer.
 
 Editing includes crop/rotate/straighten, adjustments, filters, markup, saved drafts and undo/redo. The library includes albums/favorites/archive, videos, object labels, places/maps, recursive Drive discovery, verified downloads and cache budgets. AI edits use a share-sheet handoff to the user's official provider app and subscription.
 

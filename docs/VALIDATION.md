@@ -1,5 +1,13 @@
 # Validation status and device checklist
 
+## MPA 0.4.1 phone testing fixes
+
+Source `26dd25e0bdd1d29ffe53de3d749b990990240990` passed **84 unit/integration tests**, Android lint with zero errors, APK assembly and **seven Android 10 (API 29) emulator tests**, with no failures, errors or skipped cases. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38067111244) · [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38067111071).
+
+New checks replay actual mocked Drive trash/removal/move change events through Room and the gallery visibility policy, verify checkpoint advancement and unchanged local bytes, preserve overlapping-source and independent-import behavior, test all eight EXIF transforms and bounded region sampling, and decode a one-pixel line at original resolution in a 4,096-pixel-wide PNG on Android. Device UI checks open the viewer directly, retain Details/Edit access, and verify Scan now is visible without scrolling in both People and Storage and requires opt-in when indexing is disabled. The existing import/edit checksum, XMP recovery, scheduling and model smoke checks also pass.
+
+The established signer SHA-1 is unchanged (`A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`); generated Room v5 schema matches the committed schema. Publication reuses this tested APK. Live Google Drive and Samsung One UI behavior, HEIC/large-camera-photo detail, HDR/color appearance, memory and thermal behavior still need the [S23 Ultra retest](releases/v0.4.1.md). The launcher-icon report remains unresolved; this patch does not claim to fix it.
+
 ## MPA 0.4.0 evidence
 
 Source `5211cb7bdbd35c120d4362500f4f920e302576c0` is the 0.4 APK source:

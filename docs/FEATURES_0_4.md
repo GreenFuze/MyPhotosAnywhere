@@ -1,6 +1,12 @@
-# MPA 0.4.0: behavior and phone verification
+# MPA 0.4.1: behavior and phone verification
 
 This is an installable development build for testing, using the same debug signer as 0.3 and the 0.4 alphas. It is not a Google Photos quality recognition claim. Android 8+ is supported; automated device checks use Android 10. Keep independent backups of your photos.
+
+## Phone testing fixes in 0.4.1
+
+**Scan now** is at the top of People and Storage, with opt-in choices when detection is disabled. Photos open full screen on tap; cloud-only items show original-download state. The viewer decodes visible original-file regions for zoom instead of enlarging a fixed 2,048-pixel image, with EXIF orientation and bounded decoded memory. Formats without region support show a preview-only label.
+
+After a successful refresh, externally deleted Drive photos and cached copies disappear from the main gallery, while downloaded originals and annotations remain available through Offline, favorites and albums. Active overlapping sources keep shared photos visible. Independent imports are retained. Returning to the app queues refreshes subject to each source's network preference. See the [0.4.1 phone retest](releases/v0.4.1.md).
 
 ## Multiple sources and one identity library
 
