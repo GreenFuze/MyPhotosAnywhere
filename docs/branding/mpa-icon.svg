@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="512" height="512" role="img" aria-label="MyPhotosAnywhere launcher icon">
+  <rect width="108" height="108" rx="24" fill="#125E53" />
+  <path d="M33,30 L64,24 Q70,23 71,29 L78,64 Q79,70 73,71 L42,77 Q36,78 35,72 L28,37 Q27,31 33,30 Z" fill="none" stroke="#B2EBDD" stroke-width="4.2" stroke-linejoin="round" stroke-linecap="round" />
+  <path d="M39,64 L49,52 Q51,50 53,52 L62,62 L66,58 Q68,56 70,58 L74,62 L74,70 Q74,75 69,75 L44,75 Q39,75 39,70 Z" fill="#65D8BA" />
+  <path d="M72,46 A4.7,4.7 0,1 1,62.6 46 A4.7,4.7 0,1 1,72 46 Z" fill="#F6B85C" />
+  <path d="M44,36 L69,36 Q77,36 77,44 L77,70 Q77,78 69,78 L44,78 Q36,78 36,70 L36,44 Q36,36 44,36 Z" fill="none" stroke="#FFF9EF" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round" />
+  <path d="M29,61 C18,70 32,82 57,77 C80,73 92,62 81,56" fill="none" stroke="#B2EBDD" stroke-width="4" stroke-linecap="round" />
+</svg>

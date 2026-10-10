@@ -5,6 +5,8 @@
     <application
         android:name=".MpaApplication"
         android:label="MyPhotosAnywhere"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:allowBackup="false"
         android:supportsRtl="true"
         android:theme="@style/Theme.MPA">
