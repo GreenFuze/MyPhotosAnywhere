@@ -20,6 +20,8 @@ The [implementation stages](docs/IMPLEMENTATION_0_4.md) and [recognition design]
 
 To choose a clone directory and continue in a local Codex session, follow [the local setup guide](docs/LOCAL_DEVELOPMENT.md).
 
+The next agreed milestone is reliable bulk Drive ingestion plus Google Photos Takeout and Picker imports. See [the implementation plan](docs/IMPORT_AND_DRIVE_SYNC_PLAN.md) and [the Windows Codex handoff](docs/LOCAL_CODEX_HANDOFF.md), starting with a clone into `C:\src\github.com\GreenFuze\MyPhotosAnywhere`.
+
 Open this folder in Android Studio with JDK 17, Android SDK 35, and Python 3 installed. Gradle fetches and verifies the licensed, pinned face model automatically (set `MPA_PYTHON` to your Python executable if `python3` is unavailable). The project uses Kotlin, Jetpack Compose, Room, Coil, and coroutines. Android 8.0 (API 26) is the minimum supported version.
 
 Build and test using the included Gradle 8.11.1 wrapper (on Windows, use `gradlew.bat`):
