@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -26,7 +27,7 @@ fun DriveSyncActions(model: LibraryFeaturesModel = viewModel()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("${source.folderName} · ${source.email}", Modifier.weight(1f))
-                    TextButton(onClick = { model.refreshSource(source.key) }) {
+                    TextButton(modifier = Modifier.testTag("drive-refresh:${source.key}"), onClick = { model.refreshSource(source.key) }) {
                         Text(if (state?.error != null) "Retry refresh" else "Refresh Drive")
                     }
                 }

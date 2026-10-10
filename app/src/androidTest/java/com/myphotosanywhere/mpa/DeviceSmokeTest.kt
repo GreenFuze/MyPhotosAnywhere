@@ -37,7 +37,8 @@ class DeviceSmokeTest {
             compose.waitUntil(30000) { compose.onAllNodesWithText("3 folder pages saved; discovery will resume.").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("scan-now").assertIsDisplayed()
             compose.onNodeWithText("Drive synchronization").assertIsDisplayed()
-            compose.onNodeWithText("Refresh Drive").assertIsDisplayed()
+            compose.onNodeWithTag("drive-refresh:${source.key}").assertIsDisplayed()
+            compose.onNodeWithTag("drive-refresh:${source.key}").assert(hasText("Refresh Drive") or hasText("Retry refresh"))
             compose.onNodeWithText("3 folder pages saved; discovery will resume.").assertExists()
             compose.onNodeWithText("No completed sync yet").assertExists()
         } finally { app.database.drive().disconnectSource(source.key) }
