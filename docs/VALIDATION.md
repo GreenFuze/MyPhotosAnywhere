@@ -2,6 +2,8 @@
 
 ## MPA 0.4 alpha evidence
 
+Alpha 2 source `34e470e477bb4a3b23dc874a12a28936bddaf55d` adds the original MPA vector launcher icon, API 26+ adaptive resources and API 33+ monochrome resources, plus application version code 5. It passed **55 unit/integration tests, lint with zero errors, APK assembly and three Android 10 emulator tests**. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38061086555) · [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38061086556). The signer matches alpha 1 and 0.3. The SVG presentation and matching color/monochrome path geometry were inspected; Android 13 launcher theme appearance still depends on the phone's launcher and theme settings. The alpha 2 release reuses that tested APK, with no changes to database schema or multi-source behavior.
+
 Source `f1520f84828777306724ed96805edc9f9ba945bf` passed:
 
 - **55 unit/integration tests, zero failures/errors/skipped**, Android lint with zero errors, model-contract checks and debug APK assembly. [Build checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38060276539). The generated Room v4 schema matches the committed schema, with existing v3 tables preserved.
