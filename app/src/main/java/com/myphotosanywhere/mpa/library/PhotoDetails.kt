@@ -24,7 +24,7 @@ import java.util.Date
 @Composable
 fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,memberships: List<AlbumPhoto>,
     people: List<Person>,faces: List<FaceRecord>,onClose: ()->Unit,onEdit: ()->Unit,onAI: ()->Unit,
-    onExport: ()->Unit,onResult: (()->Unit)? = null) {
+    onExport: ()->Unit,onResult: (()->Unit)? = null,onView: (()->Unit)? = null) {
     val context=LocalContext.current
     val reader by produceState<AutoCloseable?>(null,photo.id) {
         value=model.app.cache.acquireReader(photo.id)
@@ -52,6 +52,7 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
             },modifier=Modifier.fillMaxWidth().height(240.dp),onRelease={ it.stopPlayback() })
             else AsyncImage(if(available && reader!=null) File(photo.originalPath) else File(photo.thumbnailPath),photo.displayName,
                 modifier=Modifier.fillMaxWidth().height(240.dp),contentScale=ContentScale.Fit)
+            if(available && onView!=null) TextButton(onClick=onView) { Text("View full screen") }
             Text("${DateFormat.getDateTimeInstance().format(Date(photo.capturedAt ?: photo.importedAt))} · %.1f MiB".format(photo.bytes/(1024.0*1024)))
             Text(if(photo.parentId==null) "Original preserved" else "Edited copy · original preserved")
             if(!available) {

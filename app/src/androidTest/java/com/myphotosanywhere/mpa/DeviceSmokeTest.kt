@@ -35,6 +35,9 @@ class DeviceSmokeTest {
             val hash=DriveBackupWorker.digest(File(photo.originalPath),"SHA-256")
             compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${photo.id}").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("photo:${photo.id}").performClick()
+            compose.onNodeWithText("View full screen").performClick()
+            compose.onNodeWithTag("viewer-screen").assertIsDisplayed()
+            compose.onNodeWithTag("viewer-close").performClick()
             compose.onNodeWithTag("photo-edit").performClick()
             compose.waitUntil(30000) {
                 compose.onAllNodes(hasTestTag("editor-save") and isEnabled()).fetchSemanticsNodes().isNotEmpty()

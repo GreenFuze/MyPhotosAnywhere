@@ -71,6 +71,7 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var resultHandoffId by rememberSaveable { mutableStateOf<String?>(null) }
     var showShare by rememberSaveable { mutableStateOf(false) }
+    var viewerId by rememberSaveable { mutableStateOf<String?>(null) }
     var editorId by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("All") }
@@ -90,6 +91,14 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
     fun pickResult(handoff: Handoff) { resultHandoffId=handoff.id; importResult.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
     fun selectPhoto(id: String) { selectedId=id; showShare=false }
     val selected=photos.find { it.id==selectedId }
+    val localIds=remember(photos) { photos.map { it.id }.toSet() }
+    val cloudByPhoto=remember(cloud) { cloud.filter { it.photoId!=null }.associateBy { requireNotNull(it.photoId) } }
+    val namesByPhoto=remember(faces,people) {
+        val byId=people.associateBy { it.id }
+        faces.groupBy { it.photoId }.mapValues { (_,items) -> items.mapNotNull { byId[it.personId]?.name } }
+    }
+    val albumPhotoIds=remember(memberships,albumId) { memberships.filter { it.albumId==albumId }.map { it.photoId }.toSet() }
+    val personPhotoIds=remember(faces,personId) { faces.filter { it.personId==personId }.map { it.photoId }.toSet() }
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); model.clearMessage() } }
     LaunchedEffect(featureMessage) { featureMessage?.let { snackbar.showSnackbar(it); features.clearMessage() } }
     Scaffold(topBar={ TopAppBar(title={ Column {
@@ -121,16 +130,16 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
                     }
                     val currentKey=connection?.binding()?.key
                     val local=photos.filter { photo ->
-                        val names=faces.filter { it.photoId==photo.id }.mapNotNull { face -> people.find { it.id==face.personId }?.name }
-                        val indexed=cloud.any { it.photoId==photo.id && !it.removed }
+                        val names=namesByPhoto[photo.id] ?: emptyList()
+                        val indexed=cloudByPhoto[photo.id]?.removed==false
                         (photo.sourceRemoteId==null || photo.originalPath.isNotBlank() || indexed || albumId!=null || filter=="Favorites" || filter=="Archive") &&
                         LibrarySearch.matches(photo,query,names) && (if(filter=="Archive") photo.archived else !photo.archived) &&
                             (filter!="Favorites" || photo.favorite) && (filter!="Offline" || photo.originalPath.isNotBlank()) &&
                             (filter!="Videos" || photo.mimeType.startsWith("video/")) && (filter!="Edits" || photo.parentId!=null) &&
-                            (albumId==null || memberships.any { it.albumId==albumId && it.photoId==photo.id }) &&
-                            (personId==null || faces.any { it.personId==personId && it.photoId==photo.id })
+                            (albumId==null || photo.id in albumPhotoIds) &&
+                            (personId==null || photo.id in personPhotoIds)
                     }.sortedWith(compareByDescending<Photo> { it.capturedAt ?: it.importedAt }.thenByDescending { it.id })
-                    val remote=cloud.filter { row -> row.bindingKey==currentKey && !row.removed && row.photoId?.let { id -> photos.any { it.id==id } }!=true &&
+                    val remote=cloud.filter { row -> row.bindingKey==currentKey && !row.removed && row.photoId !in localIds &&
                         albumId==null && personId==null && filter in listOf("All","Videos") &&
                         (filter!="Videos" || row.mimeType.startsWith("video/")) && (query.isBlank() || row.name.contains(query,true) || row.mimeType.contains(query,true)) }
                     val activeSync=sync.find { it.bindingKey==currentKey }
@@ -142,7 +151,7 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
                     } else LazyVerticalGrid(columns=GridCells.Adaptive(110.dp),contentPadding=PaddingValues(8.dp),
                         horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.spacedBy(4.dp),modifier=Modifier.weight(1f)) {
                         items(local,key={ it.id }) { photo ->
-                            val cloudRow=cloud.find { it.photoId==photo.id }
+                            val cloudRow=cloudByPhoto[photo.id]
                             PhotoTile(photo,features,cloudRow?.thumbnailUpdatedAt ?: 0,cloudRow) { selectPhoto(photo.id) }
                         }
                         items(remote,key={ "cloud:${it.key}" }) { row ->
@@ -185,13 +194,15 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
             }
         }
     }
-    if(selected!=null && !showShare && editorId==null) PhotoDetails(selected,features,albums,memberships,people,faces,
+    if(selected!=null && !showShare && editorId==null && viewerId==null) PhotoDetails(selected,features,albums,memberships,people,faces,
         onClose={ selectedId=null },onEdit={ editorId=selected.id },onAI={ showShare=true },onExport={
             exportId=selected.id; export.launch(selected.displayName)
-        },onResult=handoffs.firstOrNull { it.photoId==selected.id }?.let { h -> { pickResult(h) } })
+        },onResult=handoffs.firstOrNull { it.photoId==selected.id }?.let { h -> { pickResult(h) } },onView={ viewerId=selected.id })
     if(selected!=null && showShare) ShareDialog(busy,onDismiss={ showShare=false }) { provider,instructions ->
         model.share(selected,provider,instructions) { intent -> context.startActivity(intent); showShare=false }
     }
+    viewerId?.let { id -> PhotoViewer(photos,id,features,onClose={ viewerId=null },onCurrent={ selectedId=it },
+        onEdit={ viewerId=null; selectedId=it; editorId=it }) }
     editorId?.let { id -> EditorScreen(id,onClose={ editorId=null },onSaved={ saved -> editorId=null; selectedId=saved }) }
 }
 

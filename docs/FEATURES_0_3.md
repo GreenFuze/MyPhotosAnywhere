@@ -8,7 +8,7 @@ Photo details → Edit. Crop sides, rotate, straighten, adjust exposure/contrast
 
 ## Library and places
 
-Favorite and archive items, create/rename/remove albums, and pin albums for offline use. Search file names, dates (YYYY-MM-DD), place names, confirmed people, and optional object labels. Album removal preserves files. Location labels/coordinates are local metadata and do not rewrite an original. The Places map clusters nearby coordinates and uses OpenStreetMap with visible attribution. Online tiles are off by default; enabling them sends viewed tile requests to OpenStreetMap. There is no background GPS tracking or online geocoding.
+Open full-screen viewing with swipe browsing, pinch/double-tap zoom, and video controls. Favorite and archive items, create/rename/remove albums, and pin albums for offline use. Search file names, dates (YYYY-MM-DD), place names, confirmed people, and optional object labels. Album removal preserves files. Location labels/coordinates are local metadata and do not rewrite an original. The Places map clusters nearby coordinates and uses OpenStreetMap with visible attribution. Online tiles are off by default; enabling them sends viewed tile requests to OpenStreetMap. There is no background GPS tracking or online geocoding.
 
 ## People and objects
 
