@@ -25,9 +25,9 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
         val manager=WorkManager.getInstance(context)
         manager.enqueueUniquePeriodicWork("mpa-sync:${binding.key}",ExistingPeriodicWorkPolicy.UPDATE,
             PeriodicWorkRequestBuilder<CloudSyncWorker>(15,TimeUnit.MINUTES).setConstraints(constraints)
-                .setInputData(data).addTag(SYNC_TAG).build())
+                .setInputData(data).addTag(SYNC_TAG).addTag("$SYNC_TAG:${binding.key}").build())
         if(now) manager.enqueueUniqueWork("mpa-scan:${binding.key}",ExistingWorkPolicy.KEEP,
-            OneTimeWorkRequestBuilder<CloudSyncWorker>().setConstraints(constraints).setInputData(data).addTag(SYNC_TAG).build())
+            OneTimeWorkRequestBuilder<CloudSyncWorker>().setConstraints(constraints).setInputData(data).addTag(SYNC_TAG).addTag("$SYNC_TAG:${binding.key}").build())
     }
     suspend fun api(active: DriveConnection): DriveGateway {
         val auth=DriveAuthorization(context)
@@ -39,7 +39,7 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
     }
     private suspend fun ensureBinding(binding: String) {
         currentCoroutineContext().ensureActive()
-        check(database.drive().connection()?.binding()?.key==binding) { "Selected Drive library changed. Sync paused." }
+        check(database.drive().source(binding)!=null) { "This Drive source was disconnected. Sync paused." }
     }
     suspend fun run(active: DriveConnection) = scanLock.withLock { withContext(Dispatchers.IO) {
         val binding=requireNotNull(active.binding()).key
@@ -152,11 +152,14 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
     internal suspend fun save(binding: String,parent: String,file: DriveFile,generation: String) {
         val old=cloud.photo("$binding:${file.id}")
         val backup=database.drive().backupForRemote(binding,file.id)
-        val sameContent=file.md5!=null && ((old?.md5==file.md5 && old.bytes==file.bytes) ||
-            (backup?.remoteMd5==file.md5 && backup.uploadedBytes==file.bytes))
-        val linkedId=if(sameContent) old?.photoId ?: backup?.photoId else null
+        val account=database.drive().source(binding)?.accountId
+        val shared=if(account!=null && file.md5!=null) cloud.sameAccountCopy(account,file.id,file.md5,file.bytes) else null
+        val oldMatches=file.md5!=null && old?.md5==file.md5 && old.bytes==file.bytes
+        val backupMatches=file.md5!=null && backup?.remoteMd5==file.md5 && backup.uploadedBytes==file.bytes
+        val linkedId=(if(oldMatches) old?.photoId else null) ?:
+            (if(backupMatches) backup?.photoId else null) ?: shared?.photoId
         val linked=linkedId?.let { database.photos().find(it) }
-        if(linked!=null && linked.sourceRemoteId==file.id && linked.cachedVersion==old?.version && sameContent)
+        if(linked!=null && linked.sourceRemoteId==file.id && linked.cachedVersion==old?.version && oldMatches)
             database.photos().update(linked.copy(cachedVersion=file.version,displayName=file.name))
         cloud.savePhoto(CloudPhoto("$binding:${file.id}",binding,file.id,parent,file.name,file.mimeType,file.bytes,file.md5,
             file.version,file.modifiedTime,file.capturedAt,file.latitude,file.longitude,
@@ -175,6 +178,7 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
             try { temp.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,it)) } }
             finally { bitmap.recycle() }
             app.cache.lock.withLock {
+                ensureBinding(binding)
                 val current=cloud.photo(row.key) ?: return@withLock
                 if(current.version==file.version && temp.renameTo(target)) cloud.savePhoto(current.copy(thumbnailVersion=file.version,thumbnailUpdatedAt=System.currentTimeMillis()))
             }
@@ -193,15 +197,14 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
         }
         return false
     }
-    fun stop() { WorkManager.getInstance(context).cancelAllWorkByTag(SYNC_TAG) }
+    fun stop(binding: String) { WorkManager.getInstance(context).cancelAllWorkByTag("$SYNC_TAG:$binding") }
     companion object { const val SYNC_TAG="mpa-cloud-sync" }
 }
 class CloudSyncWorker(context: Context,params: WorkerParameters): CoroutineWorker(context,params) {
     override suspend fun doWork(): Result {
         val app=applicationContext as MpaApplication
         val binding=inputData.getString("bindingKey") ?: return Result.failure()
-        val active=app.database.drive().connection() ?: return Result.success()
-        if(active.binding()?.key!=binding) return Result.success()
+        val active=app.database.drive().source(binding)?.connection() ?: return Result.success()
         return try { app.sync.run(active); app.cache.enforce(); Result.success() }
         catch(e: CancellationException) { throw e }
         catch(e: DriveAuthorizationNeeded) { Result.success() }

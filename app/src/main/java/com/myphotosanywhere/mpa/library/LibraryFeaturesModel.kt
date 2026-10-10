@@ -28,6 +28,7 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
     val sync=db.cloud().observeSync().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val downloads=db.cloud().observeDownloads().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val connection=app.drive.connection.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),null)
+    val sources=app.drive.sources.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val settings=app.settings.state.asStateFlow()
     val message=MutableStateFlow<String?>(null)
     val busy=MutableStateFlow(false)
@@ -75,8 +76,10 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
     fun download(row: CloudPhoto,pin: Boolean = false) = perform { app.downloads.enqueue(row,pin); message.value="Download queued; unmetered network preference applies." }
     fun retryDownloads() = perform { app.downloads.retry() }
     fun refreshCloud() = perform {
-        val active=db.drive().connection() ?: error("Connect Drive in Storage first.")
-        require(active.folderId!=null); app.sync.schedule(active,true); message.value="Drive refresh queued."
+        val sources=db.drive().sources()
+        require(sources.isNotEmpty()) { "Connect a Drive source in Storage first." }
+        sources.forEach { app.sync.schedule(it.connection(),true) }
+        message.value="Refresh queued for ${sources.size} Drive sources."
     }
     fun updateSettings(value: StorageSettings) {
         app.settings.update(value); app.people.schedule()
@@ -122,8 +125,7 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
         message.value="Export saved. Original bytes and metadata preserved."
     }
     init { viewModelScope.launch {
-        val active=db.drive().connection()
-        if(active?.folderId!=null) app.sync.schedule(active,true)
+        db.drive().sources().forEach { app.sync.schedule(it.connection(),true) }
         app.downloads.resume(); app.people.schedule()
     } }
 }

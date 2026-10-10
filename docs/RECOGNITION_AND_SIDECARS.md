@@ -4,6 +4,8 @@ Status: researched design, not functionality shipped in the 0.3 APK. The owner h
 
 ## What the current implementation cannot establish
 
+Multiple folders/accounts share one phone-wide identity library and common inference models; source selection never partitions people or pets. One chosen default destination receives imports and edited copies. Each source's XMP catalog must contain only annotations relevant to that source, while preserving global identity UUIDs. This prevents names or photo references from unrelated accounts being copied into a folder's metadata. See [the implementation stages](IMPLEMENTATION_0_4.md).
+
 The 0.3 Android inference smoke test proves the model runs, not that identities are accurate. `PeopleRepository` indexes only available local originals and downsamples images to a 1600-pixel preview. `FaceEmbedding` excludes faces below 64 pixels, missing landmarks, and poses beyond 25 degrees. Faces passing the detector can therefore remain without a recognition embedding. Human matching uses fixed experimental thresholds and the highest score against any confirmed reference. There is no individual pet model: image labels such as Cat/Dog are category labels.
 
 Face IDs currently depend on detector list order (`photoId:index`); records have no durable region geometry, quality score, model fingerprint, or structured rejected-identity constraints. Existing scans are skipped based on the photo checksum, so a new model alone will not schedule re-embedding. These are concrete blockers to reliable upgrades and portable corrections, even before choosing a better network.

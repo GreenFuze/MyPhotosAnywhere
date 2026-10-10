@@ -24,7 +24,7 @@ class DriveBackupWorker(context: Context, parameters: WorkerParameters) : Corout
         val auth = DriveAuthorization(applicationContext)
         var token: String? = null
         suspend fun stillActive(): Boolean {
-            val active = dao.connection() ?: return false
+            val active = dao.source(task.bindingKey)?.connection() ?: return false
             return active.backupEnabled && active.binding()?.key == task.bindingKey &&
                 DriveBinding(task.accountId, task.folderId).accepts(active.accountId, active.folderId ?: "")
         }

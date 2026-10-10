@@ -15,6 +15,7 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,7 +36,11 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
     private val app = application as MpaApplication
     private val dao = app.database.drive()
     private val auth = DriveAuthorization(application)
-    val connection = app.drive.connection.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    val sources = app.drive.sources.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val connection = combine(app.drive.connection,app.drive.sources) { browser,sources ->
+        browser?.let { selected -> sources.find { it.key==selected.binding()?.key }?.connection()
+            ?: selected.copy(backupEnabled=false) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     val backups = app.drive.backups.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
@@ -70,7 +75,11 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         val active = if (same) requireNotNull(previous).copy(email = user.email) else
             DriveConnection(accountId = user.id, email = user.email, mode = mode.name)
         dao.saveConnection(active)
-        if(active.folderId!=null) { app.sync.schedule(active,true); app.downloads.retry() }
+        for(source in dao.sources().filter { it.accountId==user.id }) {
+            val refreshed=source.copy(email=user.email)
+            dao.saveSource(refreshed)
+            app.sync.schedule(refreshed.connection(),true); app.downloads.retry(source.key)
+        }
         path.clear()
         _browser.value = readBrowser(api, "root", "My Drive")
         if (same && active.backupEnabled) app.drive.resume(retryFailures = true)
@@ -123,14 +132,15 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         require(selected.parentId != "root") { "Choose a dedicated photo folder, not the root of Drive." }
         val active = dao.connection() ?: error("Connect Drive first.")
         val file = authorizedApi(active).file(selected.parentId)
-        require(file.mimeType == DriveGateway.FOLDER_MIME && file.canAddChildren) { "This folder is not writable." }
-        // Folder choice pauses backup. A separate visible action opts in to uploading existing local photos.
-        app.drive.pause()
-        dao.saveConnection(active.copy(folderId = file.id, folderName = file.name, backupEnabled = false))
-        app.sync.stop(); app.downloads.stop()
-        app.sync.schedule(active.copy(folderId=file.id,folderName=file.name,backupEnabled=false),true)
+        require(!file.trashed && file.mimeType == DriveGateway.FOLDER_MIME) { "This folder is unavailable." }
+        val key=DriveBinding(active.accountId,file.id).key
+        val old=dao.source(key)
+        val source=DriveSource.from(active.copy(folderId=file.id,folderName=file.name,
+            backupEnabled=old?.backupEnabled ?: false,unmeteredOnly=old?.unmeteredOnly ?: active.unmeteredOnly))
+        dao.saveSource(source); dao.saveConnection(source.connection())
+        app.sync.schedule(source.connection(),true); app.downloads.retry(source.key)
         _browser.value = null
-        _message.value = "Selected ${file.name}. Enable backup when you are ready."
+        _message.value = "Added ${file.name}. Your other Drive sources and backup destination are preserved."
     }
 
     fun browseSelected() = perform {
@@ -140,23 +150,44 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         _browser.value = readBrowser(authorizedApi(active), folder, active.folderName ?: "Photo folder")
     }
 
+    fun selectSource(source: DriveSource) = perform {
+        val stored=dao.source(source.key) ?: error("Reconnect this source first.")
+        dao.saveConnection(stored.connection()); path.clear(); _browser.value=null
+    }
+    fun addAccount() = perform {
+        dao.disconnect(); path.clear(); _browser.value=null
+        _message.value="Choose another Google account. Existing sources continue syncing."
+    }
+
     fun closeBrowser() { if (!_busy.value) _browser.value = null }
 
     fun enableBackup() = perform {
         val active = dao.connection() ?: error("Connect Drive first.")
         require(active.folderId != null) { "Choose a folder first." }
+        val binding=requireNotNull(active.binding()).key
+        val folder=authorizedApi(active).file(requireNotNull(active.folderId))
+        require(!folder.trashed && folder.canAddChildren) { "This folder is read-only. Choose a writable backup destination." }
+        val previous=dao.backupDestination()
+        dao.chooseBackupDestination(binding)
+        if(previous!=null && previous.key!=binding) androidx.work.WorkManager.getInstance(app)
+            .cancelAllWorkByTag("${DriveCoordinator.BACKUP_TAG}:${previous.key}")
         dao.saveConnection(active.copy(backupEnabled = true))
         app.drive.resume(retryFailures = true)
-        _message.value = "Backup queued. Originals stay on this device."
+        _message.value = "${active.folderName} is the single backup destination. Imports and edited copies queued."
     }
 
     fun retryBackup() = perform { app.drive.resume(retryFailures = true); _message.value = "Pending backups queued again." }
     fun pauseBackup() = perform { app.drive.pause() }
     fun unmeteredOnly(enabled: Boolean) = perform {
         val active = dao.connection() ?: return@perform
+        val key=active.binding()?.key
         dao.saveConnection(active.copy(unmeteredOnly = enabled))
+        if(key!=null) dao.source(key)?.let { source ->
+            dao.saveSource(source.copy(unmeteredOnly=enabled))
+            app.sync.schedule(source.connection().copy(unmeteredOnly=enabled),true)
+            app.downloads.retry(key)
+        }
         app.drive.resume(replace = true)
-        app.sync.schedule(active.copy(unmeteredOnly=enabled),true)
     }
     fun disconnect() = perform { app.drive.disconnect(); _browser.value = null; path.clear() }
 

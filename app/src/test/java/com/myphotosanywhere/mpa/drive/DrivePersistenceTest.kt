@@ -54,7 +54,7 @@ class DrivePersistenceTest {
     }
 
     private fun open(): PhotoDatabase = Room.databaseBuilder(RuntimeEnvironment.getApplication(), PhotoDatabase::class.java, name)
-        .addMigrations(DRIVE_MIGRATION_1_2, LIBRARY_MIGRATION_2_3).allowMainThreadQueries().build().also { database = it }
+        .addMigrations(DRIVE_MIGRATION_1_2, LIBRARY_MIGRATION_2_3, SOURCES_MIGRATION_3_4).allowMainThreadQueries().build().also { database = it }
 
     @After fun cleanup() {
         database?.close()

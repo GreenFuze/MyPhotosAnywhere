@@ -43,6 +43,7 @@ import com.myphotosanywhere.mpa.data.Photo
 @Composable
 fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel()) {
     val active by model.connection.collectAsStateWithLifecycle()
+    val sources by model.sources.collectAsStateWithLifecycle()
     val backups by model.backups.collectAsStateWithLifecycle()
     val browser by model.browser.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
@@ -81,6 +82,21 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
                 }
             }
         }
+        if(sources.isNotEmpty()) {
+            Text("Connected Drive sources",style=MaterialTheme.typography.titleMedium)
+            sources.forEach { source ->
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(source.folderName)
+                        Text(source.email,style=MaterialTheme.typography.bodySmall)
+                        if(source.backupEnabled) Text("Default backup destination",style=MaterialTheme.typography.labelMedium)
+                        TextButton(enabled=!busy,onClick={ model.selectSource(source) }) { Text("Manage source") }
+                    }
+                }
+            }
+            Text("People and recognition are shared across every connected source. Transfers keep their own account and folder.",style=MaterialTheme.typography.bodySmall)
+            TextButton(enabled=!busy,onClick=model::addAccount) { Text("Add another Google account") }
+        }
         if (current == null) {
             Text("Connect your Google Drive", style = MaterialTheme.typography.titleMedium)
             DriveMode.entries.forEach { mode ->
@@ -100,16 +116,16 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
                     Text(current.email, style = MaterialTheme.typography.titleMedium)
                     Text(current.folderName ?: "No photo folder selected")
                     Text(DriveMode.valueOf(current.mode).title, style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(enabled = !busy, onClick = { model.browse() }) { Text("Choose Drive folder") }
+                    OutlinedButton(enabled = !busy, onClick = { model.browse() }) { Text("Add Drive folder") }
                     if (current.folderId != null) {
                         OutlinedButton(enabled = !busy, onClick = model::browseSelected) { Text("Browse Drive photos") }
                         Button(enabled = !busy, onClick = if (current.backupEnabled) model::pauseBackup else model::enableBackup) {
-                            Text(if (current.backupEnabled) "Pause backup" else "Enable backup for this library")
+                            Text(if (current.backupEnabled) "Pause backup" else "Use as default backup destination")
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(checked = current.unmeteredOnly, enabled = !busy, onCheckedChange = model::unmeteredOnly)
-                        Text("Back up on unmetered networks only", style = MaterialTheme.typography.bodySmall)
+                        Text("Transfer on unmetered networks only", style = MaterialTheme.typography.bodySmall)
                     }
                     Text("${currentBackups.count { it.state == "COMPLETE" }} backed up · ${currentBackups.count { it.state != "COMPLETE" }} pending")
                     if (current.backupEnabled) TextButton(enabled = !busy, onClick = model::retryBackup) { Text("Retry pending backups") }
@@ -127,13 +143,13 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
                         resolution.launch(IntentSenderRequest.Builder(pending.intentSender).build())
                     }
                 }) { Text("Reconnect") }
-                TextButton(enabled = !busy, onClick = model::disconnect) { Text("Disconnect") }
+                TextButton(enabled = !busy, onClick = model::disconnect) { Text("Remove this source") }
             }
         }
         com.myphotosanywhere.mpa.library.StorageControls(photos)
-        Text("Disconnect stops MPA backup without deleting photos or revoking Google permissions. You can remove permission in your Google account settings.", style = MaterialTheme.typography.bodySmall)
+        Text("Removing a source stops its transfers. Other sources continue syncing; local photos and people are preserved. Google permissions can be revoked in your account settings.", style = MaterialTheme.typography.bodySmall)
         Text("Keep your source copies. Uninstalling MPA removes this device's private library.", style = MaterialTheme.typography.bodySmall)
-        Text("MyPhotosAnywhere · MPA 0.3", style = MaterialTheme.typography.labelMedium)
+        Text("MyPhotosAnywhere · MPA 0.4 development", style = MaterialTheme.typography.labelMedium)
     }
     val listing = browser
     if (listing != null) {
@@ -166,7 +182,7 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
                     OutlinedTextField(value = folderName, onValueChange = { if (it.length <= 200) folderName = it },
                         label = { Text("New folder name") }, enabled = !busy, singleLine = true)
                     TextButton(enabled = !busy && folderName.isNotBlank(), onClick = { model.createFolder(folderName) }) { Text("Create folder here") }
-                    if (listing.parentId != "root") Text("Choosing this folder pauses backup. Enable backup afterward to upload local photos into it.",
+                    if (listing.parentId != "root") Text("Adding a folder preserves other sources. Backups use one explicitly chosen default destination.",
                         style = MaterialTheme.typography.bodySmall)
                 }
             }, confirmButton = {

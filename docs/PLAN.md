@@ -4,11 +4,12 @@
 
 - Name: **MyPhotosAnywhere**, abbreviation **MPA**.
 - Platform: native Android, Kotlin and Jetpack Compose; minimum API 26.
-- Source of truth: ordinary image/video files in a user-selected Google Drive folder after successful upload. The local Room database drives browsing and tracks synchronization.
+- Source of truth: ordinary image/video files in user-selected Google Drive folders across accounts after successful upload. One chosen default destination receives new imports and edited copies; other sources remain available for browsing and recognition. The local Room database drives browsing and tracks synchronization.
 - Account model: user's Google account for Drive; user's official ChatGPT, Gemini, or Claude app and subscription for AI handoff. MPA never takes provider passwords, session cookies, or AI API keys.
 - Preserve originals. Every exported edit is a separate asset with a parent link and an edit history record.
 - Next priority: measured people and individual-pet recognition quality, with durable XMP sidecars for library annotations. The owner explicitly requested portable sidecar metadata after 0.3. Read [the recognition and sidecar design](RECOGNITION_AND_SIDECARS.md) for pipeline, evaluation, storage, and release gates. Model selection remains an evaluation decision.
 - Recognition runs on the phone by default. Offer manual/on-demand scans and charging/overnight scheduling with resumable batches and resource controls. A paired desktop/NAS companion is optional acceleration; it must not become an onboarding requirement. Model training and phone inference are separate concerns.
+- One global identity library and shared inference models cover every source. Follow [the staged 0.4 implementation](IMPLEMENTATION_0_4.md): multiple sources, stable regions/XMP, scheduled indexing and measured model upgrades.
 - Repository visibility: private. Preserve the owner's selected LGPL 2.1 license in `LICENSE`.
 
 ## Milestones and acceptance criteria

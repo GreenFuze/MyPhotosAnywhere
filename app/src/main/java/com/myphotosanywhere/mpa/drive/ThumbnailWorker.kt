@@ -11,8 +11,8 @@ class ThumbnailWorker(context: Context,params: WorkerParameters): CoroutineWorke
         val app=applicationContext as MpaApplication
         val key=inputData.getString("key") ?: return Result.failure()
         val row=app.database.cloud().photo(key) ?: return Result.success()
-        val active=app.database.drive().connection() ?: return Result.success()
-        if(row.bindingKey!=active.binding()?.key || row.removed) return Result.success()
+        val active=app.database.drive().source(row.bindingKey)?.connection() ?: return Result.success()
+        if(row.removed) return Result.success()
         return try {
             val api=app.sync.api(active)
             val file=api.file(row.remoteId)
@@ -31,7 +31,7 @@ class ThumbnailWorker(context: Context,params: WorkerParameters): CoroutineWorke
                 OneTimeWorkRequestBuilder<ThumbnailWorker>().setInputData(workDataOf("key" to row.key))
                     .setConstraints(Constraints.Builder().setRequiredNetworkType(
                         if(active.unmeteredOnly) NetworkType.UNMETERED else NetworkType.CONNECTED).build())
-                    .addTag(CloudSync.SYNC_TAG).build())
+                    .addTag(CloudSync.SYNC_TAG).addTag("${CloudSync.SYNC_TAG}:${row.bindingKey}").build())
         }
     }
 }

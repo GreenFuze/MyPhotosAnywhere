@@ -22,6 +22,11 @@ data class DownloadTask(@PrimaryKey val key: String, val bindingKey: String, val
 
 @Dao
 interface CloudDao {
+    @Query("""SELECT cloud_photos.* FROM cloud_photos JOIN drive_sources ON cloud_photos.bindingKey = drive_sources.key
+        WHERE drive_sources.accountId = :account AND cloud_photos.remoteId = :remote
+        AND cloud_photos.md5 = :md5 AND cloud_photos.bytes = :bytes
+        AND cloud_photos.photoId IS NOT NULL AND cloud_photos.removed = 0 LIMIT 1""")
+    suspend fun sameAccountCopy(account: String, remote: String, md5: String, bytes: Long): CloudPhoto?
     @Query("SELECT * FROM cloud_photos ORDER BY capturedAt DESC, modifiedTime DESC, name") fun observePhotos(): Flow<List<CloudPhoto>>
     @Query("SELECT * FROM sync_states") fun observeSync(): Flow<List<SyncState>>
     @Query("SELECT * FROM downloads") fun observeDownloads(): Flow<List<DownloadTask>>

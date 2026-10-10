@@ -8,6 +8,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Transaction
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
@@ -46,6 +47,28 @@ data class DriveBackup(
 
 @Dao
 interface DriveDao {
+    @Query("SELECT * FROM drive_sources WHERE enabled = 1 ORDER BY email, folderName, key")
+    fun observeSources(): Flow<List<DriveSource>>
+    @Query("SELECT * FROM drive_sources WHERE enabled = 1 ORDER BY key")
+    suspend fun sources(): List<DriveSource>
+    @Query("SELECT * FROM drive_sources WHERE key = :key AND enabled = 1")
+    suspend fun source(key: String): DriveSource?
+    @Query("SELECT * FROM drive_sources WHERE enabled = 1 AND backupEnabled = 1 LIMIT 1")
+    suspend fun backupDestination(): DriveSource?
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveSource(source: DriveSource)
+    @Query("UPDATE drive_sources SET backupEnabled = 0")
+    suspend fun pauseAllBackups()
+    @Query("UPDATE drive_sources SET backupEnabled = 1 WHERE key = :key AND enabled = 1")
+    suspend fun enableSourceBackup(key: String)
+    @Transaction
+    suspend fun chooseBackupDestination(key: String) {
+        require(source(key) != null) { "Connect this source before enabling backup." }
+        pauseAllBackups()
+        enableSourceBackup(key)
+    }
+    @Query("UPDATE drive_sources SET enabled = 0, backupEnabled = 0 WHERE key = :key")
+    suspend fun disconnectSource(key: String)
     @Query("SELECT * FROM drive_connection WHERE singleton = 1")
     fun observeConnection(): Flow<DriveConnection?>
     @Query("SELECT * FROM drive_connection WHERE singleton = 1")
@@ -56,6 +79,8 @@ interface DriveDao {
     suspend fun disconnect()
     @Query("SELECT * FROM drive_backups WHERE bindingKey = :bindingKey ORDER BY photoId")
     suspend fun backups(bindingKey: String): List<DriveBackup>
+    @Query("SELECT * FROM drive_backups WHERE photoId = :photoId")
+    suspend fun backupsForPhoto(photoId: String): List<DriveBackup>
     @Query("SELECT * FROM drive_backups WHERE bindingKey = :binding AND remoteId = :remote AND state = 'COMPLETE' LIMIT 1")
     suspend fun backupForRemote(binding: String, remote: String): DriveBackup?
     @Query("SELECT * FROM drive_backups ORDER BY photoId")

@@ -14,6 +14,8 @@ Read [0.3 feature behavior and the phone checklist](docs/FEATURES_0_3.md), [the 
 
 The next priority is [measured people/pet recognition and portable XMP sidecars](docs/RECOGNITION_AND_SIDECARS.md). The design includes durable naming/corrections, species-specific pet identity, representative-photo evaluation, and Drive metadata recovery. These changes are planned; the 0.3 APK still keeps library annotations locally.
 
+The 0.4 development implementation connects multiple Drive folders/accounts in one gallery, with one default backup destination and shared local person identities. See [the staged implementation and remaining recognition work](docs/IMPLEMENTATION_0_4.md). It does not yet add individual pet recognition, XMP sync or overnight indexing.
+
 ## Development
 
 To choose a clone directory and continue in a local Codex session, follow [the local setup guide](docs/LOCAL_DEVELOPMENT.md).

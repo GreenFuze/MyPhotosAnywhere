@@ -48,7 +48,7 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
             for(id in plan.ids) {
                 val photo=database.photos().find(id) ?: continue
                 val file=File(photo.originalPath)
-                val active=database.drive().connection()
+                val active=photo.sourceBindingKey?.let { database.drive().source(it)?.connection() }
                 val verified=try {
                     if(remoteVerifier!=null) remoteVerifier.invoke(photo,file)
                     else if(active?.binding()?.key!=photo.sourceBindingKey) false

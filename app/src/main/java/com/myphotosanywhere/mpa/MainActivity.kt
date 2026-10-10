@@ -63,7 +63,7 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
     val people by features.people.collectAsStateWithLifecycle()
     val faces by features.faces.collectAsStateWithLifecycle()
     val cloud by features.cloud.collectAsStateWithLifecycle()
-    val connection by features.connection.collectAsStateWithLifecycle()
+    val sources by features.sources.collectAsStateWithLifecycle()
     val sync by features.sync.collectAsStateWithLifecycle()
     val downloads by features.downloads.collectAsStateWithLifecycle()
     val settings by features.settings.collectAsStateWithLifecycle()
@@ -76,6 +76,7 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("All") }
     var albumId by rememberSaveable { mutableStateOf<String?>(null) }
+    var sourceKey by rememberSaveable { mutableStateOf<String?>(null) }
     var personId by rememberSaveable { mutableStateOf<String?>(null) }
     var activity by rememberSaveable { mutableStateOf(false) }
     var exportId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -128,35 +129,44 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
                         }
                         if(albumId!=null || personId!=null) TextButton(onClick={ albumId=null; personId=null }) { Text("Clear collection") }
                     }
-                    val currentKey=connection?.binding()?.key
+                    val sourcesByKey=sources.associateBy { it.key }
+                    val sourceKeys=sourcesByKey.keys
+                    Row(Modifier.fillMaxWidth().padding(horizontal=16.dp).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected=sourceKey==null,onClick={ sourceKey=null },label={ Text("All sources") })
+                        sources.forEach { source -> FilterChip(selected=sourceKey==source.key,onClick={ sourceKey=source.key },
+                            label={ Text("${source.folderName} · ${source.email}") }) }
+                    }
+                    val sourcePhotoIds=cloud.filter { it.bindingKey==sourceKey && !it.removed }.mapNotNull { it.photoId }.toSet()
                     val local=photos.filter { photo ->
                         val names=namesByPhoto[photo.id] ?: emptyList()
                         val indexed=cloudByPhoto[photo.id]?.removed==false
                         (photo.sourceRemoteId==null || photo.originalPath.isNotBlank() || indexed || albumId!=null || filter=="Favorites" || filter=="Archive") &&
+                        (sourceKey==null || photo.sourceBindingKey==sourceKey || photo.id in sourcePhotoIds) &&
                         LibrarySearch.matches(photo,query,names) && (if(filter=="Archive") photo.archived else !photo.archived) &&
                             (filter!="Favorites" || photo.favorite) && (filter!="Offline" || photo.originalPath.isNotBlank()) &&
                             (filter!="Videos" || photo.mimeType.startsWith("video/")) && (filter!="Edits" || photo.parentId!=null) &&
                             (albumId==null || photo.id in albumPhotoIds) &&
                             (personId==null || photo.id in personPhotoIds)
                     }.sortedWith(compareByDescending<Photo> { it.capturedAt ?: it.importedAt }.thenByDescending { it.id })
-                    val remote=cloud.filter { row -> row.bindingKey==currentKey && !row.removed && row.photoId !in localIds &&
+                    val remote=cloud.filter { row -> row.bindingKey in sourceKeys && (sourceKey==null || row.bindingKey==sourceKey) && !row.removed && row.photoId !in localIds &&
                         albumId==null && personId==null && filter in listOf("All","Videos") &&
                         (filter!="Videos" || row.mimeType.startsWith("video/")) && (query.isBlank() || row.name.contains(query,true) || row.mimeType.contains(query,true)) }
-                    val activeSync=sync.find { it.bindingKey==currentKey }
-                    if(activeSync?.running==true) Text("Updating Drive library…",Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall)
-                    if(activeSync?.error!=null) Text(activeSync.error ?: "",Modifier.padding(horizontal=16.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
-                    if(connection?.folderId!=null) TextButton(onClick=features::refreshCloud) { Text("Refresh Drive · ${remote.size} cloud items") }
+                    val activeSync=sync.filter { it.bindingKey in sourceKeys && (sourceKey==null || it.bindingKey==sourceKey) }
+                    if(activeSync.any { it.running }) Text("Updating Drive library…",Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall)
+                    activeSync.filter { it.error!=null }.forEach { state -> Text("${sourcesByKey[state.bindingKey]?.folderName}: ${state.error}",Modifier.padding(horizontal=16.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
+                    if(sources.isNotEmpty()) TextButton(onClick=features::refreshCloud) { Text("Refresh Drive · ${remote.size} cloud items") }
                     if(local.isEmpty() && remote.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth().padding(32.dp),contentAlignment=Alignment.Center) {
                         Text(if(photos.isEmpty()) "Add photos or connect a Drive folder in Storage to start your library." else "No items match your search.")
                     } else LazyVerticalGrid(columns=GridCells.Adaptive(110.dp),contentPadding=PaddingValues(8.dp),
                         horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.spacedBy(4.dp),modifier=Modifier.weight(1f)) {
                         items(local,key={ it.id }) { photo ->
                             val cloudRow=cloudByPhoto[photo.id]
-                            PhotoTile(photo,features,cloudRow?.thumbnailUpdatedAt ?: 0,cloudRow) { selectPhoto(photo.id) }
+                            PhotoTile(photo,features,cloudRow?.thumbnailUpdatedAt ?: 0,cloudRow,
+                                sourcesByKey[cloudRow?.bindingKey]?.connection()) { selectPhoto(photo.id) }
                         }
                         items(remote,key={ "cloud:${it.key}" }) { row ->
-                            LaunchedEffect(row.key,row.version,row.thumbnailUpdatedAt) {
-                                com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(context,row,connection)
+                            LaunchedEffect(row.key,row.version,row.thumbnailUpdatedAt,sourcesByKey[row.bindingKey]) {
+                                com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(context,row,sourcesByKey[row.bindingKey]?.connection())
                             }
                             Card(Modifier.aspectRatio(1f).clickable { features.download(row) }) {
                                 Box(Modifier.fillMaxSize()) {
@@ -207,10 +217,11 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
 }
 
 @Composable
-private fun PhotoTile(photo: Photo,features: LibraryFeaturesModel,thumbnailVersion: Long,cloudRow: com.myphotosanywhere.mpa.drive.CloudPhoto?,onClick: ()->Unit) {
+private fun PhotoTile(photo: Photo,features: LibraryFeaturesModel,thumbnailVersion: Long,cloudRow: com.myphotosanywhere.mpa.drive.CloudPhoto?,
+    source: com.myphotosanywhere.mpa.drive.DriveConnection?,onClick: ()->Unit) {
     val thumb by produceState<File?>(null,photo.id,photo.originalPath,thumbnailVersion) { value=runCatching { features.app.cache.thumbnail(photo) }.getOrNull() }
-    LaunchedEffect(photo.id,cloudRow?.version,thumbnailVersion) {
-        if(cloudRow!=null) com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(features.app,cloudRow,features.connection.value)
+    LaunchedEffect(photo.id,cloudRow?.version,thumbnailVersion,source) {
+        if(cloudRow!=null) com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(features.app,cloudRow,source)
     }
     Card(Modifier.aspectRatio(1f).testTag("photo:${photo.id}").clickable(onClick=onClick)) {
         Box(Modifier.fillMaxSize()) {

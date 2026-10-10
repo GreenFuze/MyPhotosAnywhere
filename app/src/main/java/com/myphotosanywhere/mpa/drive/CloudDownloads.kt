@@ -15,33 +15,33 @@ import java.util.concurrent.TimeUnit
 class CloudDownloads(private val context: Context) {
     private val app get() = context.applicationContext as MpaApplication
     suspend fun enqueue(row: CloudPhoto,pin: Boolean = false,retry: Boolean = false) {
-        val active=app.database.drive().connection() ?: error("Connect Drive first.")
-        require(active.binding()?.key==row.bindingKey && !row.removed) { "Choose this photo's Drive library first." }
+        val active=app.database.drive().source(row.bindingKey)?.connection() ?: error("Reconnect this photo's Drive source.")
+        require(!row.removed) { "This photo is no longer in its Drive folder." }
         val old=app.database.cloud().download(row.key)
         app.database.cloud().saveDownload(DownloadTask(row.key,row.bindingKey,row.remoteId,pin || old?.pinned==true))
-        schedule(row.key,active.unmeteredOnly,retry)
+        schedule(row.key,row.bindingKey,active.unmeteredOnly,retry)
     }
-    private fun schedule(key: String,unmetered: Boolean,replace: Boolean = false) {
+    private fun schedule(key: String,binding: String,unmetered: Boolean,replace: Boolean = false) {
         WorkManager.getInstance(context).enqueueUniqueWork("mpa-download:$key",
             if(replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<CloudDownloadWorker>().setInputData(workDataOf("key" to key))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(if(unmetered) NetworkType.UNMETERED else NetworkType.CONNECTED).build())
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).addTag(TAG).build())
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).addTag(TAG).addTag("$TAG:$binding").build())
     }
     suspend fun resume() {
-        val active=app.database.drive().connection() ?: return
-        val key=active.binding()?.key ?: return
-        app.database.cloud().pendingDownloads(key).forEach { schedule(it.key,active.unmeteredOnly) }
-    }
-    suspend fun retry() {
-        val active=app.database.drive().connection() ?: return
-        val binding=active.binding()?.key ?: return
-        val tasks=app.database.cloud().observeDownloads().first()
-        tasks.filter { it.bindingKey==binding && it.state!="COMPLETE" }.forEach {
-            app.database.cloud().saveDownload(it.copy(state="PENDING",error=null)); schedule(it.key,active.unmeteredOnly,true)
+        for(source in app.database.drive().sources()) {
+            app.database.cloud().pendingDownloads(source.key).forEach { schedule(it.key,source.key,source.unmeteredOnly) }
         }
     }
-    fun stop() { WorkManager.getInstance(context).cancelAllWorkByTag(TAG) }
+    suspend fun retry(binding: String? = null) {
+        val sources=app.database.drive().sources().filter { binding==null || it.key==binding }.associateBy { it.key }
+        val tasks=app.database.cloud().observeDownloads().first()
+        tasks.filter { it.bindingKey in sources && it.state!="COMPLETE" }.forEach {
+            app.database.cloud().saveDownload(it.copy(state="PENDING",error=null))
+            schedule(it.key,it.bindingKey,requireNotNull(sources[it.bindingKey]).unmeteredOnly,true)
+        }
+    }
+    fun stop(binding: String) { WorkManager.getInstance(context).cancelAllWorkByTag("$TAG:$binding") }
     companion object { const val TAG="mpa-cloud-download" }
 }
 class CloudDownloadWorker(context: Context,params: WorkerParameters): CoroutineWorker(context,params) {
@@ -49,8 +49,7 @@ class CloudDownloadWorker(context: Context,params: WorkerParameters): CoroutineW
         val app=applicationContext as MpaApplication; val db=app.database; val dao=db.cloud()
         val key=inputData.getString("key") ?: return@withContext Result.failure()
         var task=dao.download(key) ?: return@withContext Result.success()
-        val active=db.drive().connection() ?: return@withContext Result.success()
-        if(active.binding()?.key!=task.bindingKey) return@withContext Result.success()
+        val active=db.drive().source(task.bindingKey)?.connection() ?: return@withContext Result.success()
         val temp=File(app.filesDir,"download-stage/${java.security.MessageDigest.getInstance("SHA-256").digest(key.toByteArray()).joinToString(""){"%02x".format(it)}}.part")
         try {
             val row=dao.photo(key) ?: error("Photo is missing from the cloud index.")
@@ -76,17 +75,29 @@ class CloudDownloadWorker(context: Context,params: WorkerParameters): CoroutineW
             val after=api.file(before.id)
             require(!after.trashed && before.version==after.version && before.md5==after.md5 &&
                 app.sync.inside(api,after,requireNotNull(active.folderId))) { "The file changed or moved during download. Retry it." }
-            require(db.drive().connection()?.binding()?.key==task.bindingKey) { "Selected Drive library changed. Download paused." }
+            require(db.drive().source(task.bindingKey)!=null) { "This Drive source was disconnected. Download paused." }
             app.cache.lock.withLock {
                 // A missing disposable original can be restored under its existing local ID, preserving albums and face corrections.
+                currentCoroutineContext().ensureActive()
+                require(db.drive().source(task.bindingKey)!=null) { "Drive source disconnected." }
                 val latest=dao.photo(key) ?: error("Cloud index changed.")
-                val saved=latest.photoId?.let { db.photos().find(it) }
-                if(saved!=null && saved.sourceRemoteId==before.id && saved.cachedVersion==before.version && saved.originalPath.isBlank()) {
+                val shared=dao.sameAccountCopy(active.accountId,before.id,requireNotNull(before.md5),before.bytes)
+                val saved=(shared?.photoId ?: latest.photoId)?.let { db.photos().find(it) }
+                if(shared!=null && saved!=null && saved.originalPath.isNotBlank() && File(saved.originalPath).isFile) {
+                    db.withTransaction {
+                        db.photos().update(saved.copy(pinned=saved.pinned || task.pinned,
+                            cachedVersion=if(saved.sourceRemoteId==before.id) before.version else saved.cachedVersion))
+                        dao.savePhoto(latest.copy(photoId=saved.id,version=before.version,md5=before.md5,bytes=before.bytes))
+                        dao.saveDownload(task.copy(state="COMPLETE",error=null))
+                    }
+                } else if(saved!=null && saved.sourceRemoteId==before.id &&
+                    (saved.cachedVersion==before.version || shared!=null) && saved.originalPath.isBlank()) {
                     val destination=File(app.filesDir,"originals/${saved.id}")
                     check(temp.renameTo(destination)) { "Cannot store downloaded photo." }
                     try { db.withTransaction {
                         db.photos().update(saved.copy(originalPath=destination.absolutePath,pinned=saved.pinned || task.pinned,
-                            lastAccess=System.currentTimeMillis()))
+                            lastAccess=System.currentTimeMillis(),cachedVersion=before.version))
+                        dao.savePhoto(latest.copy(photoId=saved.id,version=before.version,md5=before.md5,bytes=before.bytes))
                         dao.saveDownload(task.copy(state="COMPLETE",error=null))
                     } } catch(e: Exception) { destination.delete(); throw e }
                 } else app.repository.importPhoto(Uri.fromFile(temp),nameOverride=before.name,mimeOverride=before.mimeType) { photo ->

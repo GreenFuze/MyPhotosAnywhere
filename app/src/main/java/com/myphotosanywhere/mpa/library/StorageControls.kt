@@ -16,11 +16,11 @@ fun StorageControls(photos: List<Photo>,model: LibraryFeaturesModel = viewModel(
     val settings by model.settings.collectAsStateWithLifecycle()
     val downloads by model.downloads.collectAsStateWithLifecycle()
     val sync by model.sync.collectAsStateWithLifecycle()
-    val connection by model.connection.collectAsStateWithLifecycle()
+    val sources by model.sources.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
-    val binding=connection?.binding()?.key
-    val queued=downloads.filter { it.bindingKey==binding }
-    val state=sync.find { it.bindingKey==binding }
+    val keys=sources.map { it.key }.toSet()
+    val queued=downloads.filter { it.bindingKey in keys }
+    val states=sync.filter { it.bindingKey in keys }
     Text("Offline storage",style=MaterialTheme.typography.titleLarge)
     val disposable=photos.filter { it.sourceRemoteId!=null && it.originalPath.isNotBlank() }.sumOf { it.bytes }
     val protected=photos.filter { it.sourceRemoteId==null && it.originalPath.isNotBlank() }.sumOf { it.bytes }
@@ -42,10 +42,10 @@ fun StorageControls(photos: List<Photo>,model: LibraryFeaturesModel = viewModel(
     Text("Imports, edited copies, pinned albums, open photos, and pending AI work are protected. MPA rechecks the remote revision and checksum before removing a disposable download. Offline or changed files are kept.",style=MaterialTheme.typography.bodySmall)
     Row { Switch(checked=settings.objectIndexing,onCheckedChange={ model.updateSettings(settings.copy(objectIndexing=it)) }); Text("On-device object and scene labels",Modifier.padding(12.dp)) }
     Text("Search objects such as dogs, cats, food, and landscapes after indexing. No photo data is sent to an AI provider.",style=MaterialTheme.typography.bodySmall)
-    if(binding!=null) {
+    if(sources.isNotEmpty()) {
         Text("Cloud library",style=MaterialTheme.typography.titleLarge)
-        if(state?.running==true) LinearProgressIndicator(Modifier.fillMaxWidth())
-        state?.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+        if(states.any { it.running }) LinearProgressIndicator(Modifier.fillMaxWidth())
+        states.filter { it.error!=null }.forEach { state -> Text("${sources.find { it.key==state.bindingKey }?.folderName}: ${state.error}",color=MaterialTheme.colorScheme.error) }
         Text("Drive refresh runs approximately every 15 minutes when network constraints permit. External deletions hide cloud entries; local files are preserved.",style=MaterialTheme.typography.bodySmall)
         TextButton(enabled=!busy,onClick=model::refreshCloud) { Text("Refresh Drive now") }
         Text("${queued.count { it.state=="COMPLETE" }} downloads completed · ${queued.count { it.state!="COMPLETE" }} pending")
