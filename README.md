@@ -8,7 +8,7 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 The 0.3 implementation adds photo editing (crop/rotate/straighten, adjustments, filters, markup, saved drafts, undo/redo), albums/favorites/archive, video import/playback, optional on-device faces and object labels, place search and a clustered map, recursive Drive discovery, change reconciliation, queued downloads, and storage budgets. AI editing still uses the user's official provider app and subscription through a share-sheet handoff.
 
-The current downloadable release is [v0.2.0](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.2.0). The 0.3 feature branch is being verified before publication. Configure [Google Drive OAuth](docs/GOOGLE_DRIVE_SETUP.md) for the exact APK signing certificate you install. The user has confirmed the initial Google setup works; new feature behavior still needs phone testing.
+Download [v0.3.0](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.3.0), an experimental test prerelease. Its source passed 49 unit/integration tests, lint, APK assembly, and two Android emulator smoke tests. Configure [Google Drive OAuth](docs/GOOGLE_DRIVE_SETUP.md) for the exact APK signing certificate you install. The user has confirmed the initial Google setup works; new feature behavior still needs phone testing.
 
 Read [0.3 feature behavior and the phone checklist](docs/FEATURES_0_3.md), [the roadmap](docs/PLAN.md), and [validation evidence](docs/VALIDATION.md). Full Google Photos parity is an ongoing roadmap, including video editing, calibrated recognition, production signing, and optional encrypted metadata recovery.
 

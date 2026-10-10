@@ -1,36 +1,50 @@
 # Validation status and device checklist
 
-## Current evidence
+## MPA 0.3 evidence
 
-- MPA 0.2: **21 tests passed, 0 failures/errors/skipped**, Android lint reported no errors, and APK assembly passed for source commit `cc8e56aee0a99b0b7311b85917c45e6e34a1d6f4`. [Successful build and APK/checks artifacts](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/37954645025). `MPA-checks` includes the JUnit XML, lint reports, Room v2 schema, and signing-certificate report. This is automated evidence; no live Google account or phone has been exercised.
+Source `a5977ddb74766ff12bed87939cdcf588174b429b` passed:
 
-- Source-level review completed for the first gallery/handoff implementation.
-- Android manifest and resource XML parse successfully.
-- GitHub Actions successfully ran `testDebugUnitTest`, `lintDebug`, and `assembleDebug` for source commit `7888e298dea92457968bda42d7b0f66c9d7297a8`. [Build and APK artifact](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/37950038970). The uploaded artifact is named **MPA-debug**.
-- The cloud workspace itself has no installed Android SDK/Gradle distribution; compilation was performed by GitHub Actions with the committed wrapper.
-- Real-device checks have **not yet run**. Automated build checks passed, but a phone/emulator test is still required before declaring the gallery and provider round trip fully verified.
+- **49 unit/integration tests, zero failures/errors/skipped**, Android lint with zero errors, and debug APK assembly. [Build checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38037767687). The generated Room v3 schema matches the committed schema.
+- **Two Android 10 (API 29) emulator tests, zero failures/errors/skipped**. [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38037767678). One imports a fixture, opens/closes the full-screen viewer, opens editing, saves a linked copy, and verifies the original SHA-256 is unchanged. The other executes the bundled embedding model and ML Kit face detector on Android without a cloud inference service. A real PNG screenshot is retained in the device artifact.
+- Checksum-pinned model acquisition, CPU TensorFlow Lite inference, tensor shapes, finite/nonzero output, and duplicate-input consistency. These are compatibility checks, not measured recognition accuracy.
 
-The project uses pinned, established Android dependency versions for its initial scaffold. Before Play Store release, revisit the then-current target SDK requirement and upgrade/test the toolchain as needed.
+The user confirmed Google setup works on their phone with 0.2. New 0.3 live-account transfers, reconciliation, maps, face accuracy, video codecs, and storage-pressure behavior have not yet been phone-tested. Emulator fixtures are synthetic; they do not establish face detection/recognition accuracy on actual photographs. See the [0.3 phone checklist](FEATURES_0_3.md#test-on-the-phone) and [Google live checks](GOOGLE_DRIVE_SETUP.md#required-live-checks).
 
-## Meaningful automated checks
+The release uses an existing successful APK artifact, rather than rebuilding during publication. `docs/releases/v0.3.0.json` identifies the exact source and successful build/device runs selected for publication. Its attached `BUILD_EVIDENCE.json` records test totals, APK checksum, and size; the signing report identifies the Google OAuth certificate required by that APK.
 
-Run `./gradlew testDebugUnitTest lintDebug assembleDebug` with SDK 35 (on Windows, use `gradlew.bat`).
+## Meaningful automated coverage
 
-- `CachePolicyTest`: unbacked-up, pending, pinned, and actively-read files cannot be eviction candidates; least-recently-used downloads are selected until budget is met; unsafe input is rejected.
-- `EditPromptTest`: instructions are preserved, providers without generation get a fallback, and empty/oversized prompts are rejected.
-- Lint and APK assembly must check Android API compatibility, Room/KSP generation, Compose compilation, and resource/manifest consistency.
+- Drive gateway: pagination/query escaping, resumable uploads and reserved IDs, acknowledged offsets, host checks, rate-limit classification, size limits, recursive image/video/folder discovery, and change-page metadata/checkpoints.
+- Drive identity/persistence: account/folder separation, the v1→v2→v3 database upgrade preserving original photos/handoffs/upload checkpoints across restart, unchanged old-destination tasks, and atomic rollback of imported photos/links/files.
+- Cloud/library persistence: changed remote bytes preserve old local snapshots and people corrections; metadata-only changes retain verified files; failed checkpoint transactions roll back; name merges/deletions preserve individual corrections and photos.
+- Cache: real filesystem deletion only for verified, unprotected downloads; imports, pins, drafts, and active readers survive; failed remote verification preserves a disposable download. Policy tests also cover pending handoffs, LRU order, and invalid input.
+- Editing: recipe round trips, validation of finite adjustments/crop/markup, undo/redo branching, crop/rotation geometry, untouched original bytes, and conservative removal of straightening's transparent corners.
+- Search/places: combined people/place/object terms, capture-date queries, type/favorite filters, unknown GPS, and coordinate validation including valid zero coordinates.
+- Face matching: normalized embedding serialization, ambiguity between identities, multiple reference faces, distant unknowns, conservative grouping, and invalid vectors.
+- AI prompts: bounded nonempty instructions and provider capabilities. End-to-end provider editing remains a manual handoff test.
 
-The 0.2 checks passed: `DriveGatewayTest` covers pagination/query escaping, reserved-ID uploads, acknowledged offsets, session-host validation, rate-limit handling, and download limits; `DriveBindingTest` covers account/folder separation and range checks; and `DrivePersistenceTest` covers the v1-to-v2 upgrade, original/handoff retention, upload checkpoints, destination changes, and atomic rollback of imported photos/links/files. Live Drive/OAuth checks are in [GOOGLE_DRIVE_SETUP.md](GOOGLE_DRIVE_SETUP.md).
+## Running checks
 
-The cache policy's unit tests passed. It is a standalone component awaiting integration with verified Drive downloads. There is no original-file eviction in milestone 1.
+Use JDK 17, SDK 35, and Python 3. Gradle fetches the licensed model with verified hashes. On Windows use `gradlew.bat`.
 
-## Real-device acceptance checklist
+```sh
+./gradlew testDebugUnitTest lintDebug assembleDebug
+./gradlew connectedDebugAndroidTest
+```
 
-1. Import JPEG, PNG, and supported HEIC images, including EXIF-rotated portraits, transparent images, and a GPS-tagged image. Corrupt and oversized files must produce a useful error without losing existing imports.
-2. Close/restart with airplane mode on. The grid, filename search, and details remain available. Hash the imported original and confirm that its bytes match the source.
-3. Hand off a photo. Confirm the notice, clipboard prompt, correct orientation, maximum export dimension of 2048 pixels, and absent GPS EXIF in the temporary JPEG. A receiving app that ignores text should still receive the image.
-4. Complete one round trip with each installed provider that supports it. Provider-specific limitations must remain visible; do not claim Claude generates edited images without verifying that capability.
-5. Save an output, reopen MPA, and import it from AI activity. The original remains intact and the edited photo retains the source link, provider, and instructions.
-6. Kill/recreate MPA while a result picker is open. Its saved handoff ID must resolve through Room, rather than depending on a UI list that may not have loaded yet. Cancel the picker and verify the handoff remains pending.
-7. Dismiss a pending handoff. Only that activity entry is removed; its photo remains. If storage is nearly full, import should fail clearly and leave the existing library intact.
-8. Review private storage and FileProvider configuration. Only explicit handoff exports are shareable; original photo directories must not be exposed.
+GitHub Actions performs build and device jobs separately. The cloud workspace has no local Android SDK/Gradle installation. CI runs a CPU model smoke check and an accelerated Android emulator. A production rollout also needs broader Android-version/device/codec coverage, real Google authorization/reconciliation tests, consented face-model calibration, and owner-managed signing.
+
+## Historical evidence
+
+MPA 0.2 passed **21 tests, zero failures/errors/skipped**, lint with no errors, and APK assembly for source `cc8e56aee0a99b0b7311b85917c45e6e34a1d6f4`. [Build/artifacts](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/37954645025). Its checks include Room v2 and its old signing report. The user subsequently confirmed Google setup works. The original gallery scaffold also [built successfully](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/37950038970).
+
+## AI round-trip acceptance checklist
+
+1. Import JPEG, PNG, supported HEIC, EXIF-rotated portraits, transparent images, and GPS-tagged media. Corrupt/oversized files must fail clearly without losing existing photos.
+2. Restart in airplane mode. Cached previews/details and imported originals remain available. Compare the original checksum with its source.
+3. Hand off a photo: confirm the disclosure, clipboard prompt, orientation, bounded 2048-pixel JPEG, and absent GPS EXIF. A provider ignoring text should still receive the image.
+4. Test each installed official provider. Its subscription and app capabilities determine available edits; do not assume Claude generates an edited image.
+5. Save an output, return to MPA, and import the AI result. Verify its parent/provider/prompt link and preserved original.
+6. Recreate MPA while its result picker is open. The saved handoff ID must resolve from Room. Canceling leaves the pending handoff intact.
+7. Dismiss a handoff: only that activity entry disappears. A low-storage failure must leave existing library files intact.
+8. FileProvider exposes explicit handoff exports only. No provider receives the library or background face metadata.
