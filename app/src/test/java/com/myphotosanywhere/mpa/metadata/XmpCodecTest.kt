@@ -36,4 +36,12 @@ class XmpCodecTest {
         assertThrows(Exception::class.java) { XmpCodec.encode(catalog().copy(assets=catalog().assets.map { it.copy(recipe="{\"left\":2}") })) }
         assertThrows(IllegalArgumentException::class.java) { XmpCodec.decode(" ".repeat(XmpCodec.MAX_BYTES+1)) }
     }
+    @Test fun markupRecipeProvenanceIsNotLimitedToTheShortAiPromptLength() {
+        val recipe=EditRecipe(strokes=listOf(com.myphotosanywhere.mpa.edit.Stroke(
+            List(1200) { com.myphotosanywhere.mpa.edit.MarkPoint(.25f,.75f) }))).json()
+        assertTrue(recipe.length>10000)
+        val original=catalog().let { it.copy(assets=it.assets.map { a -> a.copy(instructions=recipe,recipe=recipe) }) }
+        assertEquals(original,XmpCodec.decode(XmpCodec.encode(original)))
+    }
+
 }

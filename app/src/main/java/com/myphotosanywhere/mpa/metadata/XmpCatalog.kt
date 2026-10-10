@@ -81,7 +81,7 @@ object XmpCodec {
         val assets=root.children("Asset").map { a ->
             val lat=a.number("latitude"); val lon=a.number("longitude")
             require((lat==null)==(lon==null) && (lat==null || lat in -90.0..90.0 && lon!! in -180.0..180.0))
-            val recipe=a.text("recipe",500000)?.also { EditRecipe.parse(it) }
+            val recipe=a.text("recipe",MAX_BYTES)?.also { EditRecipe.parse(it) }
             val faces=a.children("Face").map { f ->
                 val l=f.number("left"); val t=f.number("top"); val r=f.number("right"); val b=f.number("bottom")
                 require(listOf(l,t,r,b).all { it==null } || listOf(l,t,r,b).all { it!=null })
@@ -92,7 +92,7 @@ object XmpCodec {
             val members=a.children("Member").map { it.required("album") }
             PortableAsset(a.required("id"),a.required("remote"),a.required("sha256").also { require(it.matches(Regex("[a-f0-9]{64}"))) },
                 a.required("bytes").toLong().also { require(it>0) },a.flag("favorite"),a.flag("archived"),a.text("place",500) ?: "",
-                lat,lon,a.text("captured")?.toLong(),a.text("parent"),a.text("provider"),a.text("instructions",10000),
+                lat,lon,a.text("captured")?.toLong(),a.text("parent"),a.text("provider"),a.text("instructions",MAX_BYTES),
                 a.text("labels",5000) ?: "",recipe,members,faces)
         }
         require(assets.size<=10000 && assets.sumOf { it.faces.size }<=50000)

@@ -113,7 +113,8 @@ class CloudDownloadWorker(context: Context,params: WorkerParameters): CoroutineW
                     dao.saveDownload(task.copy(state="COMPLETE",error=null))
                 }
             }
-            app.people.schedule(); app.metadata.changed(); app.cache.enforce()
+            try { app.people.schedule(); app.metadata.changed(); app.cache.enforce() } catch(e: CancellationException) { throw e }
+            catch(_: Exception) { /* Verified media and the persistent annotation outbox are already committed. */ }
             Result.success()
         } catch(e: CancellationException) { throw e }
         catch(e: Exception) {
