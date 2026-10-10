@@ -1,5 +1,16 @@
 # Validation status and device checklist
 
+## MPA 0.4 alpha evidence
+
+Source `f1520f84828777306724ed96805edc9f9ba945bf` passed:
+
+- **55 unit/integration tests, zero failures/errors/skipped**, Android lint with zero errors, model-contract checks and debug APK assembly. [Build checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38060276539). The generated Room v4 schema matches the committed schema, with existing v3 tables preserved.
+- **Three Android 10 (API 29) emulator tests, zero failures/errors/skipped**. [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38060276437). The new test combines two sources and switches source filters independently of Storage's selected source, in addition to edit-copy preservation and offline model execution.
+- Released-schema v3→v4 migration preserves media, confirmed identities, the default destination, upload sessions/offsets and change tokens. Additional regressions cover one destination, existing task bindings, source removal, global cross-account suggestions, rejected matches, overlapping folders, separate accounts and changed remote bytes.
+- The APK signer SHA-1 matches v0.3: `A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`. Use package `com.myphotosanywhere.mpa` for Google OAuth registration.
+
+The prerelease reuses this successful source build's APK. Live multi-account OAuth, sync, downloads and cache behavior need the [0.4 phone checklist](releases/v0.4.0-alpha.1.md). Synthetic matching tests establish shared identity behavior, not recognition accuracy. Individual pet recognition, XMP synchronization and overnight indexing remain planned in [the implementation stages](IMPLEMENTATION_0_4.md).
+
 ## MPA 0.3 evidence
 
 Source `a5977ddb74766ff12bed87939cdcf588174b429b` passed:
