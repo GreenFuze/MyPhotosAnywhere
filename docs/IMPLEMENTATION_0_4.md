@@ -1,5 +1,10 @@
 # Multiple sources and recognition implementation
 
+## 0.4 release boundary
+
+0.4 implements multiple sources, source-scoped XMP catalogue backup/recovery, normalized stable face regions, a transactional annotation outbox and bounded phone indexing with pause/resume and a charging/night window. See [actual behavior and limitations](FEATURES_0_4.md). This release uses one `.mpa-catalog.xmp` per source; adjacent sidecars, MWG interoperability, partitioning, automatic conflict merging, stronger calibrated human models and individual pet identity remain later stages. The implementation does not claim that all of the design below has shipped.
+
+
 ## Decisions
 
 MPA connects several Google Drive folders across Google accounts. All connected sources appear in one gallery, with source filters. The user chooses **one default backup destination** for newly imported media and edited copies. Other sources remain available for browsing, downloads and recognition; imports are not broadcast to every account.

@@ -133,4 +133,22 @@ class DeviceSmokeTest {
         }
     }
 
+    @Test fun storageExposesXmpPrivacyAndSavesMidnightScheduleWithPause() = runBlocking<Unit> {
+        val original=app.settings.state.value
+        try {
+            app.settings.update(original.copy(overnightIndexing=false))
+            compose.onNodeWithText("Storage").performClick()
+            compose.onNodeWithTag("index-night-switch").performScrollTo().performClick()
+            compose.onNodeWithTag("index-start").performScrollTo().performTextReplacement("22:00")
+            compose.onNodeWithTag("index-end").performScrollTo().performTextReplacement("06:00")
+            compose.onNodeWithText("Save window").performScrollTo().performClick()
+            assertTrue(app.settings.state.value.overnightIndexing)
+            assertEquals(22*60,app.settings.state.value.nightStart); assertEquals(6*60,app.settings.state.value.nightEnd)
+            compose.onNodeWithText("Pause scans").performScrollTo().performClick()
+            assertTrue(app.settings.state.value.indexingPaused)
+            compose.onNodeWithText("Portable annotations").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Back up annotations to connected folders").performScrollTo().assertIsDisplayed()
+        } finally { app.settings.update(original); app.people.schedule() }
+    }
+
 }

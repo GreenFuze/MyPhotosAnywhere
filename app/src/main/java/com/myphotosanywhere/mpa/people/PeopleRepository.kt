@@ -31,6 +31,7 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
     fun pause() {
         settings.update(settings.state.value.copy(indexingPaused=true))
         WorkManager.getInstance(context).cancelUniqueWork("mpa-local-index")
+        WorkManager.getInstance(context).cancelUniqueWork("mpa-night-index")
         report("Paused",progress.value.done,progress.value.total,progress.value.errors)
     }
     suspend fun scanNow() {

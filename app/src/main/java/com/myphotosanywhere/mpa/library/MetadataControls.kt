@@ -24,7 +24,7 @@ fun MetadataControls(model: LibraryFeaturesModel) {
     Text("MPA uses .mpa-catalog.xmp in each selected Drive folder. It stores names, reviewed face regions, albums, favorites, locations and edit recipes. Anyone with access to that folder can read them. Face crops and biometric vectors stay on this phone.",style=MaterialTheme.typography.bodySmall)
     Row { Switch(checked=settings.sidecarBackup,onCheckedChange={ model.updateSettings(settings.copy(sidecarBackup=it)) })
         Text("Back up annotations to connected folders",Modifier.padding(12.dp)) }
-    Text("Each catalogue contains only that source’s annotations, sharing global person IDs across accounts. Read-only sources keep a local overlay; you can export it below. Original media and its embedded EXIF are preserved.",style=MaterialTheme.typography.bodySmall)
+    Text("Each catalogue contains only that source’s annotations, sharing global person IDs across accounts. Read-only sources keep a local overlay; you can export it below. Original media and its embedded EXIF are preserved. Catalogues currently have a 2 MiB limit.",style=MaterialTheme.typography.bodySmall)
     if(settings.sidecarBackup) TextButton(enabled=!busy,onClick={ model.backupMetadata() }) { Text("Back up XMP now") }
     sources.forEach { source ->
         Text("${source.folderName} · ${source.email}",style=MaterialTheme.typography.titleSmall)

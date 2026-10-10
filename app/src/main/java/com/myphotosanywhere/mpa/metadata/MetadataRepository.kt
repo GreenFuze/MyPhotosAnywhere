@@ -35,11 +35,12 @@ class MetadataRepository(private val context: Context,private val database: Phot
             val constraints=Constraints.Builder().setRequiredNetworkType(if(source.unmeteredOnly) NetworkType.UNMETERED else NetworkType.CONNECTED).build()
             val data=workDataOf("binding" to source.key)
             manager.enqueueUniquePeriodicWork("mpa-metadata-periodic:${source.key}",ExistingPeriodicWorkPolicy.UPDATE,
-                PeriodicWorkRequestBuilder<MetadataWorker>(15,TimeUnit.MINUTES).setConstraints(constraints).setInputData(data).addTag(TAG).build())
+                PeriodicWorkRequestBuilder<MetadataWorker>(15,TimeUnit.MINUTES).setConstraints(constraints).setInputData(data).addTag(TAG).addTag("$TAG:${source.key}").build())
             manager.enqueueUniqueWork("mpa-metadata:${source.key}",ExistingWorkPolicy.KEEP,
-                OneTimeWorkRequestBuilder<MetadataWorker>().setConstraints(constraints).setInputData(data).addTag(TAG).build())
+                OneTimeWorkRequestBuilder<MetadataWorker>().setConstraints(constraints).setInputData(data).addTag(TAG).addTag("$TAG:${source.key}").build())
         }
     }
+    fun stop(key: String) { WorkManager.getInstance(context).cancelAllWorkByTag("$TAG:$key") }
     private fun base(key: String)=File(app.filesDir,"metadata/$key.xmp")
     private fun saveBase(key: String,xml: String) {
         val file=base(key); file.parentFile?.mkdirs(); val stage=File(file.parentFile,"$key.part")
@@ -74,7 +75,7 @@ class MetadataRepository(private val context: Context,private val database: Phot
     }
     private suspend fun remote(api: DriveGateway,source: DriveSource,id: String): DriveFile {
         val file=api.file(id)
-        require(!file.trashed && file.name==".mpa-catalog.xmp" && file.mimeType=="application/rdf+xml" && source.folderId in file.parents) {
+        require(!file.trashed && file.name==".mpa-catalog.xmp" && file.mimeType in listOf("application/rdf+xml","application/xml","text/xml","application/octet-stream","text/plain") && source.folderId in file.parents) {
             "The XMP catalog was renamed, moved or replaced. Metadata is preserved; review it in Drive."
         }
         return file

@@ -68,7 +68,7 @@ class DriveCoordinator(private val context: Context, private val database: Photo
         if(binding!=null) {
             database.drive().disconnectSource(binding)
             val app=context.applicationContext as com.myphotosanywhere.mpa.MpaApplication
-            app.sync.stop(binding); app.downloads.stop(binding)
+            app.sync.stop(binding); app.downloads.stop(binding); app.metadata.stop(binding)
             WorkManager.getInstance(context).cancelAllWorkByTag("$BACKUP_TAG:$binding")
         }
         database.drive().disconnect()

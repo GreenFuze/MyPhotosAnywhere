@@ -186,6 +186,7 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
             dao.saveSource(source.copy(unmeteredOnly=enabled))
             app.sync.schedule(source.connection().copy(unmeteredOnly=enabled),true)
             app.downloads.retry(key)
+            app.metadata.stop(key); app.metadata.schedule()
         }
         app.drive.resume(replace = true)
     }

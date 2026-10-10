@@ -34,6 +34,7 @@ fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<Fa
                 Switch(checked=enabled,onCheckedChange={ model.updateSettings(model.settings.value.copy(faceIndexing=it)) })
                 Text("On-device face indexing",Modifier.padding(12.dp))
             }
+            if(faces.any { it.cropPath.isBlank() }) Text("Some restored regions need a phone scan to rebuild their previews. Legacy assignments without geometry remain for manual review.",style=MaterialTheme.typography.bodySmall)
             IndexingControls(model)
             if(faces.isNotEmpty() || people.isNotEmpty()) TextButton(onClick={ deleting=true }) { Text("Delete people index") }
         }
