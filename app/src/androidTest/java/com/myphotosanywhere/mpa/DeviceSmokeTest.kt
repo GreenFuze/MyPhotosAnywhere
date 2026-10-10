@@ -172,9 +172,12 @@ class DeviceSmokeTest {
             app.database.library().saveFace(com.myphotosanywhere.mpa.data.FaceRecord(face,photo,"",null,
                 modelVersion=com.myphotosanywhere.mpa.people.PeopleRepository.MODEL_VERSION))
             compose.onNode(hasText("People") and hasClickAction()).performClick()
+            compose.waitUntil(30000) { compose.onAllNodesWithText("unassigned faces lack usable matching data",substring=true).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("face-why:$face"))
             compose.onNodeWithTag("face-why:$face").performScrollTo().performClick()
             compose.waitUntil(30000) { compose.onAllNodesWithText("Face detected, but no usable recognition data",substring=true).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("Close").performClick()
+            compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("rescan-faces"))
             compose.onNodeWithTag("rescan-faces").performScrollTo().performClick()
             compose.onNodeWithText("Rescan all faces?").assertIsDisplayed()
             compose.onNodeWithText("Cancel").performClick()

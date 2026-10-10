@@ -40,7 +40,7 @@ fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<Fa
     fun startNaming(ids: List<String>,person: Person?=null) {
         naming=ids; selected=ids.toSet(); namingPerson=person; name=person?.name ?: ""
     }
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize().testTag("people-list"),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
             Text("People",style=MaterialTheme.typography.headlineSmall)
             ScanActions(model)
