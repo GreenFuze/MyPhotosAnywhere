@@ -104,6 +104,7 @@ class CloudDownloadWorker(context: Context,params: WorkerParameters): CoroutineW
                     db.photos().update(photo.copy(sourceBindingKey=task.bindingKey,sourceRemoteId=before.id,cachedVersion=before.version,
                         pinned=task.pinned,capturedAt=photo.capturedAt ?: before.capturedAt,
                         latitude=photo.latitude ?: before.latitude,longitude=photo.longitude ?: before.longitude,
+                        metadataAssetId=before.assetId,
                         parentId=before.sourceAssetId?.let { source -> db.photos().all().find { it.id==source }?.id }))
                     dao.savePhoto(latest.copy(photoId=photo.id,version=before.version,md5=before.md5,bytes=before.bytes))
                     db.drive().insertBackup(DriveBackup("${task.bindingKey}:${photo.id}",task.bindingKey,photo.id,active.accountId,
@@ -112,7 +113,7 @@ class CloudDownloadWorker(context: Context,params: WorkerParameters): CoroutineW
                     dao.saveDownload(task.copy(state="COMPLETE",error=null))
                 }
             }
-            app.people.schedule(); app.cache.enforce()
+            app.people.schedule(); app.metadata.changed(); app.cache.enforce()
             Result.success()
         } catch(e: CancellationException) { throw e }
         catch(e: Exception) {

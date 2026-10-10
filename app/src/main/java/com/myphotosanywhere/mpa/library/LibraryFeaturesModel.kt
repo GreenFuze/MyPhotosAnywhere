@@ -30,6 +30,9 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
     val connection=app.drive.connection.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),null)
     val sources=app.drive.sources.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val settings=app.settings.state.asStateFlow()
+    val indexProgress=app.people.progress.asStateFlow()
+    val metadata=db.metadata().observe().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
+    val metadataPreview=MutableStateFlow<com.myphotosanywhere.mpa.metadata.MetadataPreview?>(null)
     val message=MutableStateFlow<String?>(null)
     val busy=MutableStateFlow(false)
     fun clearMessage() { message.value=null }
@@ -37,7 +40,7 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
         if(busy.value) return
         busy.value=true
         viewModelScope.launch {
-            try { action() }
+            try { action(); app.metadata.changed() }
             catch(e: CancellationException) { throw e }
             catch(e: Exception) { message.value=e.message ?: "Operation failed. Your photos are preserved." }
             finally { busy.value=false }
@@ -83,10 +86,26 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
     }
     fun updateSettings(value: StorageSettings) {
         app.settings.update(value); app.people.schedule()
+        viewModelScope.launch { app.metadata.changed() }
     }
     fun trimCache(clear: Boolean = false) = perform { message.value=app.cache.enforce(clear) }
     fun deletePeopleIndex() = perform { app.people.deleteIndex(); message.value="Face crops, names, and embeddings deleted from this phone." }
-    fun scanFaces() { app.people.schedule(); message.value="On-device indexing queued. Downloads are indexed when they become available." }
+    fun scanFaces() = perform { app.people.scanNow(); message.value="On-device scan queued; global identities are shared across all connected sources." }
+    fun pauseIndexing() { app.people.pause() }
+    fun previewMetadata(key: String) = perform { metadataPreview.value=app.metadata.preview(key) }
+    fun recoverMetadata() = perform {
+        val preview=metadataPreview.value ?: error("Preview recovery first.")
+        app.metadata.recover(preview); metadataPreview.value=null
+        message.value="Annotations recovered for ${preview.matching} checksum-matched photos. Other photos are preserved."
+    }
+    fun backupMetadata() = perform { app.metadata.changed(); message.value="XMP backups queued. Network preferences apply; conflicts require recovery review." }
+    fun exportMetadata(key: String,uri: Uri) = perform {
+        val source=db.drive().source(key) ?: error("Reconnect this source.")
+        val xml=com.myphotosanywhere.mpa.metadata.XmpCodec.encode(app.metadata.snapshot(source))
+        withContext(Dispatchers.IO) { app.contentResolver.openOutputStream(uri)?.use { it.write(xml.toByteArray(Charsets.UTF_8)) }
+            ?: error("Cannot write XMP export.") }
+        message.value="Source annotations exported as XMP. Original media is unchanged."
+    }
     fun assign(faceIds: List<String>,name: String,personId: String? = null) = perform {
         require(name.isNotBlank() && name.length<=100)
         app.people.assign(faceIds,Person(personId ?: UUID.randomUUID().toString(),name.trim()))
@@ -126,6 +145,6 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
     }
     init { viewModelScope.launch {
         db.drive().sources().forEach { app.sync.schedule(it.connection(),true) }
-        app.downloads.resume(); app.people.schedule()
+        app.downloads.resume(); app.people.schedule(); app.metadata.schedule()
     } }
 }

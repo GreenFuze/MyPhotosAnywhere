@@ -35,3 +35,15 @@ val LIBRARY_MIGRATION_2_3 = object : Migration(2, 3) {
         db.execSQL("CREATE INDEX index_downloads_bindingKey ON downloads(bindingKey)")
     }
 }
+
+/** Preserve reviewed identities; old geometry is unknown and must never be guessed from face order. */
+val METADATA_MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE photos ADD COLUMN metadataAssetId TEXT")
+        listOf("left REAL", "top REAL", "right REAL", "bottom REAL", "imageWidth INTEGER",
+            "imageHeight INTEGER", "modelVersion TEXT").forEach { db.execSQL("ALTER TABLE faces ADD COLUMN $it") }
+        db.execSQL("ALTER TABLE face_scans ADD COLUMN modelVersion TEXT NOT NULL DEFAULT ''")
+        db.execSQL("""CREATE TABLE metadata_states (bindingKey TEXT NOT NULL PRIMARY KEY, generation INTEGER NOT NULL,
+            uploadedGeneration INTEGER NOT NULL, remoteId TEXT, etag TEXT, error TEXT)""")
+    }
+}

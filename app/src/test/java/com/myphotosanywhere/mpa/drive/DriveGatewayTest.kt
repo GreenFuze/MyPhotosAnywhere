@@ -105,4 +105,26 @@ class DriveGatewayTest {
         } finally { file.delete() }
     }
 
+    @Test fun xmpUpdatesAreConditionalAndConflictsDoNotRetryAnOverwrite() = runBlocking {
+        server.enqueue(MockResponse().setHeader("ETag", "\"revision-1\"").setBody("<xmp/>"))
+        assertEquals("<xmp/>" to "\"revision-1\"",api.readMetadata("catalog"))
+        assertEquals("media",server.takeRequest().requestUrl?.queryParameter("alt"))
+        server.enqueue(MockResponse().setResponseCode(412).setBody("{}"))
+        try { api.writeMetadata("catalog","folder","<new/>","\"revision-1\""); throw AssertionError("Expected conflict") }
+        catch(e: DriveHttpException) { assertEquals(412,e.status); assertFalse(e.retryable) }
+        val write=server.takeRequest()
+        assertEquals("PATCH",write.method); assertEquals("\"revision-1\"",write.getHeader("If-Match"))
+        assertEquals("/upload/drive/v3/files/catalog",write.requestUrl?.encodedPath)
+        assertEquals(2,server.requestCount)
+    }
+    @Test fun xmpDiscoveryRejectsDuplicateCatalogsAndMissingRevision() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"files":[{"id":"one"},{"id":"two"}]}"""))
+        try { api.metadataFiles("folder"); throw AssertionError("Expected duplicates") }
+        catch(_: IllegalArgumentException) { }
+        assertTrue(requireNotNull(server.takeRequest().requestUrl?.queryParameter("q")).contains("'.mpa-catalog.xmp'"))
+        server.enqueue(MockResponse().setBody("<xmp/>"))
+        try { api.readMetadata("one"); throw AssertionError("Expected revision guard") }
+        catch(_: IllegalStateException) { }
+    }
+
 }

@@ -38,9 +38,13 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
                 val cloud=database.cloud().photo("${photo.sourceBindingKey}:${photo.sourceRemoteId}")
                 val drafts=database.library().draft(photo.id)
                 val handoffs=database.photos().findHandoffsForPhoto(photo.id)
+                val options=settings.state.value; val scan=database.library().scan(photo.id)
+                val awaitingIndex=photo.mimeType.startsWith("image/") && !options.indexingPaused && scan?.error==null &&
+                    (options.faceIndexing && (scan==null || scan.sha256!=photo.sha256 || scan.modelVersion!=com.myphotosanywhere.mpa.people.PeopleRepository.SCAN_VERSION) ||
+                        options.objectIndexing && photo.labels.isBlank())
                 CachedFile(photo.id,File(photo.originalPath).length(),photo.lastAccess,
                     cloud!=null && !cloud.removed && cloud.version==photo.cachedVersion && cloud.photoId==photo.id,
-                    photo.pinned || database.library().pinnedAlbumCount(photo.id)>0,drafts!=null || handoffs.isNotEmpty(),
+                    photo.pinned || database.library().pinnedAlbumCount(photo.id)>0,drafts!=null || handoffs.isNotEmpty() || awaitingIndex,
                     synchronized(readers) { readers[photo.id] ?: 0 })
             }
             val plan=CachePolicy.plan(items,if(clear) 0 else settings.state.value.originalBudget)

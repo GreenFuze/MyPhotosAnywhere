@@ -29,12 +29,12 @@ fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<Fa
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
             Text("People",style=MaterialTheme.typography.headlineSmall)
-            Text("Face crops, names, and matching data stay on this phone. Matches are suggestions for you to review.")
+            Text("Matching runs on this phone. Face crops and embeddings stay here; names and reviewed regions can be backed up as XMP if enabled in Storage. Matches require your review.")
             Row {
                 Switch(checked=enabled,onCheckedChange={ model.updateSettings(model.settings.value.copy(faceIndexing=it)) })
                 Text("On-device face indexing",Modifier.padding(12.dp))
             }
-            if(enabled) TextButton(onClick=model::scanFaces) { Text("Scan available photos") }
+            IndexingControls(model)
             if(faces.isNotEmpty() || people.isNotEmpty()) TextButton(onClick={ deleting=true }) { Text("Delete people index") }
         }
         items(people,key={ it.id }) { person ->
@@ -68,7 +68,7 @@ fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<Fa
                 }
             }
         }
-        if(enabled && faces.isEmpty()) item { Text("Indexing runs on your phone when its battery is not low. Download cloud photos to index their faces.") }
+        if(enabled && faces.isEmpty()) item { Text("Enable indexing of connected Drive sources in Storage, or download photos to scan them on this phone. Individual pet recognition is not yet included; cats and dogs are searchable object labels.") }
     }
     if(naming.isNotEmpty()) AlertDialog(onDismissRequest={ naming=emptyList() },title={ Text("Name these faces") },
         text={ Column {

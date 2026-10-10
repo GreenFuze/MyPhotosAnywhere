@@ -48,7 +48,7 @@ class SourceMigrationTest {
         var db: PhotoDatabase?=null
         try {
             helper.writableDatabase; helper.close()
-            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(SOURCES_MIGRATION_3_4)
+            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(SOURCES_MIGRATION_3_4, com.myphotosanywhere.mpa.data.METADATA_MIGRATION_4_5)
                 .allowMainThreadQueries().build()
             db=opened
             val source=requireNotNull(opened.drive().source(binding))

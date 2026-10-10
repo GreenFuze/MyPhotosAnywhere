@@ -137,7 +137,7 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         val old=dao.source(key)
         val source=DriveSource.from(active.copy(folderId=file.id,folderName=file.name,
             backupEnabled=old?.backupEnabled ?: false,unmeteredOnly=old?.unmeteredOnly ?: active.unmeteredOnly))
-        dao.saveSource(source); dao.saveConnection(source.connection())
+        dao.saveSource(source); dao.saveConnection(source.connection()); app.metadata.changed()
         app.sync.schedule(source.connection(),true); app.downloads.retry(source.key)
         _browser.value = null
         _message.value = "Added ${file.name}. Your other Drive sources and backup destination are preserved."

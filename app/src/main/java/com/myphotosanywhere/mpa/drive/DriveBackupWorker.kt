@@ -84,6 +84,7 @@ class DriveBackupWorker(context: Context, parameters: WorkerParameters) : Corout
             }
             dao.updateBackup(task.copy(state = "COMPLETE", uploadedBytes = photo.bytes, sessionUri = null,
                 remoteMd5 = md5, remoteVersion = uploaded.version, errorMessage = null))
+            app.metadata.changed()
             Result.success()
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (needed: DriveAuthorizationNeeded) {

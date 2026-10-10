@@ -47,6 +47,7 @@ data class Photo(
     @ColumnInfo(defaultValue = "0") val pinned: Boolean = false,
     @ColumnInfo(defaultValue = "0") val lastAccess: Long = 0,
     @ColumnInfo(defaultValue = "''") val labels: String = "",
+    val metadataAssetId: String? = null,
 )
 
 @Entity(tableName = "handoffs")
@@ -93,10 +94,11 @@ interface PhotoDao {
 
 @Database(entities = [Photo::class, Handoff::class, DriveConnection::class, DriveBackup::class,
     Album::class, AlbumPhoto::class, EditDraft::class, Person::class, FaceRecord::class, FaceScan::class,
-    CloudPhoto::class, CloudFolder::class, SyncState::class, DownloadTask::class, DriveSource::class], version = 4, exportSchema = true)
+    CloudPhoto::class, CloudFolder::class, SyncState::class, DownloadTask::class, DriveSource::class, com.myphotosanywhere.mpa.metadata.MetadataState::class], version = 5, exportSchema = true)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photos(): PhotoDao
     abstract fun drive(): DriveDao
     abstract fun library(): LibraryDao
     abstract fun cloud(): CloudDao
+    abstract fun metadata(): com.myphotosanywhere.mpa.metadata.MetadataDao
 }

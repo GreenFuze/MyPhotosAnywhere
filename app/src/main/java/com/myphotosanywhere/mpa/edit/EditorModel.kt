@@ -40,6 +40,7 @@ class EditorModel(application: Application): AndroidViewModel(application) {
             recipe.debounce(200).collectLatest { value ->
                 try {
                     app.database.library().saveDraft(EditDraft(id,value.json(),System.currentTimeMillis()))
+                    app.metadata.changed()
                     val bitmap=app.cache.withOriginal(id) { _,file -> PhotoRenderer.render(file,value,1024) }
                     try { currentCoroutineContext().ensureActive(); preview.value=bitmap }
                     catch(e: CancellationException) { bitmap.recycle(); throw e }
@@ -86,7 +87,7 @@ class EditorModel(application: Application): AndroidViewModel(application) {
                 try { app.drive.enqueue(app.database.photos().find(result.id) ?: result) }
                 catch(e: CancellationException) { throw e }
                 catch(_: Exception) { /* The next backup resume queues the durable edited copy. */ }
-                app.people.schedule()
+                app.people.schedule(); app.metadata.changed()
                 savedId.value=result.id
             } catch(e: CancellationException) { throw e }
             catch(e: Exception) { error.value=e.message ?: "Could not save this edit." }

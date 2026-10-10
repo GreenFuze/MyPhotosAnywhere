@@ -14,13 +14,18 @@ data class Person(@PrimaryKey val id: String, val name: String)
 @Entity(tableName = "faces", indices = [Index("photoId"), Index("personId")])
 data class FaceRecord(@PrimaryKey val id: String, val photoId: String, val cropPath: String,
     val embedding: ByteArray?, val personId: String? = null, val suggestedPersonId: String? = null,
-    val similarity: Float? = null, val corrected: Boolean = false)
+    val similarity: Float? = null, val corrected: Boolean = false,
+    val left: Float? = null, val top: Float? = null, val right: Float? = null, val bottom: Float? = null,
+    val imageWidth: Int? = null, val imageHeight: Int? = null, val modelVersion: String? = null)
 @Entity(tableName = "face_scans")
-data class FaceScan(@PrimaryKey val photoId: String, val sha256: String, val error: String? = null)
+data class FaceScan(@PrimaryKey val photoId: String, val sha256: String, val error: String? = null,
+    @ColumnInfo(defaultValue = "''") val modelVersion: String = "")
 
 @Dao
 interface LibraryDao {
     @Query("SELECT * FROM albums ORDER BY name COLLATE NOCASE") fun albums(): Flow<List<Album>>
+    @Query("SELECT * FROM albums") suspend fun allAlbums(): List<Album>
+    @Query("SELECT * FROM album_photos") suspend fun allMemberships(): List<AlbumPhoto>
     @Query("SELECT * FROM album_photos") fun memberships(): Flow<List<AlbumPhoto>>
     @Query("SELECT * FROM album_photos WHERE albumId = :id") suspend fun members(id: String): List<AlbumPhoto>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun saveAlbum(album: Album)
@@ -47,6 +52,8 @@ interface LibraryDao {
     @Query("UPDATE faces SET personId = NULL, corrected = 1 WHERE personId = :id") suspend fun unassignPerson(id: String)
     @Query("SELECT * FROM face_scans WHERE photoId = :id") suspend fun scan(id: String): FaceScan?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun saveScan(scan: FaceScan)
+    @Query("DELETE FROM face_scans WHERE error IS NOT NULL") suspend fun retryScans()
+    @Query("DELETE FROM faces WHERE photoId=:id") suspend fun deletePhotoFaces(id: String)
     @Query("DELETE FROM faces") suspend fun deleteFaces()
     @Query("DELETE FROM face_scans") suspend fun deleteScans()
     @Query("DELETE FROM people") suspend fun deletePeople()

@@ -154,6 +154,52 @@ class DriveGateway(
             } }
         }
 
+    /** Catalog discovery uses an exact filename and remains inside the explicitly selected root. */
+    suspend fun metadataFiles(parent: String): List<DriveFile> {
+        val result=mutableListOf<DriveFile>(); var page: String?=null
+        do {
+            val next=list("'${literal(parent)}' in parents and trashed = false and name = '.mpa-catalog.xmp'",page)
+            result.addAll(next.files); require(result.size<=1) { "Multiple MPA catalogs found. Resolve duplicate files in Drive before syncing annotations." }
+            page=next.nextPage
+        } while(page!=null)
+        return result
+    }
+    suspend fun readMetadata(id: String): Pair<String,String> = execute(Request.Builder()
+        .url(url("files/$id", "alt" to "media", "supportsAllDrives" to "true"))) { r ->
+        checkSuccess(r)
+        val tag=r.header("ETag") ?: error("Drive did not return an annotation revision. Metadata is preserved.")
+        val body=r.body ?: error("Empty metadata file.")
+        require(body.contentLength()<=com.myphotosanywhere.mpa.metadata.XmpCodec.MAX_BYTES)
+        val bytes=body.byteStream().use { input ->
+            val out=java.io.ByteArrayOutputStream(); val buffer=ByteArray(16384)
+            while(true) { val n=input.read(buffer); if(n<0) break
+                require(out.size()+n<=com.myphotosanywhere.mpa.metadata.XmpCodec.MAX_BYTES); out.write(buffer,0,n) }
+            out.toByteArray()
+        }
+        bytes.toString(Charsets.UTF_8) to tag
+    }
+    /** A conditional media PATCH can never replace photo bytes or silently clobber another device. */
+    suspend fun writeMetadata(id: String,parent: String,xml: String,etag: String?): String {
+        val bytes=xml.toByteArray(Charsets.UTF_8)
+        require(bytes.size<=com.myphotosanywhere.mpa.metadata.XmpCodec.MAX_BYTES)
+        val request=if(etag!=null) Request.Builder().url(upload.newBuilder().addPathSegment(id)
+            .addQueryParameter("uploadType","media").addQueryParameter("supportsAllDrives","true").build())
+            .header("If-Match",etag).patch(bytes.toRequestBody("application/rdf+xml".toMediaType()))
+        else {
+            val metadata=JsonObject().apply { addProperty("id",id); addProperty("name",".mpa-catalog.xmp")
+                addProperty("mimeType","application/rdf+xml"); add("parents",com.google.gson.JsonArray().apply { add(parent) }) }
+            val body=okhttp3.MultipartBody.Builder().setType("multipart/related".toMediaType())
+                .addPart(metadata.toString().toRequestBody(JSON))
+                .addPart(bytes.toRequestBody("application/rdf+xml".toMediaType())).build()
+            Request.Builder().url(upload.newBuilder().addQueryParameter("uploadType","multipart")
+                .addQueryParameter("supportsAllDrives","true").build()).post(body)
+        }
+        return execute(request) { r -> checkSuccess(r)
+            // A missing response ETag is safe: the next pass must read and compare the stored content.
+            r.header("ETag") ?: ""
+        }
+    }
+
     private fun sessionUrl(raw: String): HttpUrl {
         val result = raw.toHttpUrl()
         require(result.scheme == upload.scheme && result.host == upload.host && result.port == upload.port &&

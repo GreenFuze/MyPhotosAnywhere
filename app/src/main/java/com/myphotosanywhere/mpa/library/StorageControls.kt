@@ -42,6 +42,8 @@ fun StorageControls(photos: List<Photo>,model: LibraryFeaturesModel = viewModel(
     Text("Imports, edited copies, pinned albums, open photos, and pending AI work are protected. MPA rechecks the remote revision and checksum before removing a disposable download. Offline or changed files are kept.",style=MaterialTheme.typography.bodySmall)
     Row { Switch(checked=settings.objectIndexing,onCheckedChange={ model.updateSettings(settings.copy(objectIndexing=it)) }); Text("On-device object and scene labels",Modifier.padding(12.dp)) }
     Text("Search objects such as dogs, cats, food, and landscapes after indexing. No photo data is sent to an AI provider.",style=MaterialTheme.typography.bodySmall)
+    IndexingControls(model)
+    MetadataControls(model)
     if(sources.isNotEmpty()) {
         Text("Cloud library",style=MaterialTheme.typography.titleLarge)
         if(states.any { it.running }) LinearProgressIndicator(Modifier.fillMaxWidth())
