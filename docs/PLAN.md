@@ -8,6 +8,7 @@
 - Account model: user's Google account for Drive; user's official ChatGPT, Gemini, or Claude app and subscription for AI handoff. MPA never takes provider passwords, session cookies, or AI API keys.
 - Preserve originals. Every exported edit is a separate asset with a parent link and an edit history record.
 - Next priority: measured people and individual-pet recognition quality, with durable XMP sidecars for library annotations. The owner explicitly requested portable sidecar metadata after 0.3. Read [the recognition and sidecar design](RECOGNITION_AND_SIDECARS.md) for pipeline, evaluation, storage, and release gates. Model selection remains an evaluation decision.
+- Recognition runs on the phone by default. Offer manual/on-demand scans and charging/overnight scheduling with resumable batches and resource controls. A paired desktop/NAS companion is optional acceleration; it must not become an onboarding requirement. Model training and phone inference are separate concerns.
 - Repository visibility: private. Preserve the owner's selected LGPL 2.1 license in `LICENSE`.
 
 ## Milestones and acceptance criteria

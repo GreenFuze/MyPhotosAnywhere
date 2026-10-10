@@ -39,7 +39,47 @@ Benchmark a reproducible shortlist. Every candidate needs a pinned source revisi
 
 Public InsightFace pretrained weights are also research-restricted despite the library code's permissive license. Do not silently bundle them as an unrestricted improvement. If a licensed checkpoint cannot meet the quality goal, investigate author licensing or training a model rather than loosening identity thresholds.
 
-The first implementation should remain usable on the phone. An **optional local computer/NAS batch indexer** could run a larger quality model while charging/overnight and write the same sidecars. The phone would browse those results and index new captures. This can expand compute choices without uploading the library to an AI service, but it does not itself prove accuracy. Do not make a server mandatory. Official ChatGPT/Gemini/Claude subscription handoff remains for editing; it is not an unattended bulk recognition API.
+The owner explicitly prefers **phone-first inference**, with on-demand scans and optional overnight scheduling. A server is an optional accelerator, not an installation requirement. The existing human model already runs on Android; a higher-quality human model and a dedicated pet model still need mobile execution, licensing, and accuracy validation. Official ChatGPT/Gemini/Claude subscription handoff remains for editing; it is not an unattended bulk recognition API.
+
+## Phone-first execution and optional companion
+
+Use a pretrained recognition model to produce identity features on the phone. Naming photos supplies confirmed reference examples and corrections; it does not require training a large neural network overnight on the phone. Fine-tuning/distilling a general pet model, if necessary, is a separate development task with licensed training data. The future Google Photos import can enlarge the reference/evaluation collection; inspect its actual export before assuming it includes reusable face identities/regions. Recognition must also work for fresh libraries and manually named examples.
+
+### Scan modes
+
+| Mode | Proposed behavior |
+| --- | --- |
+| Scan now | User selects photos/an album or requests the pending library. Prioritize those assets, show progress and Pause/Cancel, and process while the app is visible. A long scan continuing in the background needs a version-appropriate visible foreground mode and must honor Android limits. |
+| Overnight | Explicitly enabled, configurable local-time window; proposed default 00:00–06:00. Require charging, battery-not-low, adequate free storage, and acceptable temperature. Fetch uncached Drive assets only on unmetered networks by default. Cached-photo inference can run without connectivity. |
+| Whenever charging | Optional alternative for people whose charging schedule is not overnight; same resource protections, without a night window. |
+| Manual only | Queue discovered assets and perform no automatic indexing. Names/search results already computed remain available. |
+
+Scanning and people/pet indexing remain opt-in. Separate **when to scan** from **recognition quality**: choosing manual/overnight must not silently switch to a less accurate model. Start with the best validated mobile pipeline; make hardware acceleration automatic when it passes output/decision compatibility checks. Use CPU fallback where GPU/NPU support, operator coverage, or memory is inadequate. Evaluate LiteRT and, if required by a selected checkpoint, an appropriate Android ONNX runtime; the current bundled TensorFlow Lite model does not require a runtime migration merely to add scheduling.
+
+Downloadable, versioned people/pet model packs can keep optional components out of the base APK, provided redistribution and hosting are appropriate. Show download size, verify the publisher/checksum/manifest, install atomically, and retain the previous working model until validation succeeds. Once present, inference runs offline. Do not load all models and full-size originals simultaneously; bound decoder/encoder concurrency and memory, and release the current batch's buffers promptly. Quantization, distillation, or a new accelerator is accepted only after comparing identity decisions and held-out quality with the validated baseline.
+
+### Scheduling and progress
+
+Use WorkManager for durable deferred jobs with charging/battery/storage constraints. Compute the next local window, including midnight crossings, timezone changes, and daylight-saving changes. Check the window and resources again at execution and between assets. A delayed job outside its window defers to the next suitable window. Pause processing at the end of the window, when unplugged, under thermal pressure, or when requested; commit completed asset results first. Distinguish ordinary offline inference from Drive-download tasks so absent Wi-Fi does not prevent useful work on available originals.
+
+Run short, resumable batches, initially targeting approximately 2–5 minutes subject to measurement. Persist checkpoints per asset/content version/model fingerprint and use one active owner per task so repeated scheduling cannot create duplicate scans. Stop and reschedule after the batch budget; cancellation/process death must not restart the whole collection or lose reviewed annotations. Android's quotas still apply to successive batches: short jobs do not guarantee continuous execution through the night. Repeatedly retrying to defeat system limits is not a scheduling strategy. Initial large imports may take multiple charging sessions; subsequent scans process new/changed assets. Model upgrades re-embed affected assets without resetting user decisions.
+
+Show discovered/indexed/pending/deferred counts and a clear reason such as Waiting for charging, Waiting for Wi-Fi, Cooling down, or Waiting for Android. Estimate remaining work only after measuring actual per-stage throughput on this phone; avoid a fixed overnight-completion promise. Prioritize selected items, new photos, and unresolved items over a complete-history rescan.
+
+WorkManager timing is inexact and can be deferred by the operating system. Do not request exact-alarm permission for photo indexing. Long-running WorkManager jobs can exhaust job quota on Android 16 even when foreground execution is used. Validate on modern Android versions as well as the minimum-supported device, with force-stop/reboot, low storage, unplugging, failed model download, thermal pauses, and conflicting manual/automatic scans. Advanced battery settings can be offered with an explanation if needed; they are not part of normal onboarding.
+
+### Optional MPA Companion
+
+Keep all ordinary setup within the Android app. The optional accelerator should offer a desktop application/installer with a tray status screen; an optional NAS package can serve advanced users. Docker commands, IP entry, port forwarding, provider keys, and a second Google login are not normal setup steps.
+
+1. Install/open MPA Companion on a supported computer.
+2. Tap Add companion in MPA and scan the pairing QR code; automatic local discovery is a convenience, not identity verification.
+3. Confirm the computer and processing scope. Pair using a short-lived secret and pinned device identity over an encrypted channel. Show that selected images/crops will be processed by that computer, and allow revoking the pairing.
+4. Enable Use when available. The phone schedules compatible queued jobs over the local network; the companion returns versioned candidate detections/features. If unavailable, resume eligible tasks on the phone and show progress rather than requiring troubleshooting before browsing.
+
+The first companion mode keeps Drive authorization on the phone: MPA supplies bounded, explicitly authorized task inputs, so the computer does not need Drive credentials. The phone owns metadata commits and applies corrections. Verify asset checksum, job ID, expected model/preprocessing fingerprint, and annotation generation before accepting results. Late or duplicate results cannot overwrite a newer human decision or cross accounts/folders. If phone and companion use different models, retain separate feature spaces and re-embed the required references; do not compare their vectors directly or downgrade quality silently during fallback. Default to ephemeral companion inputs with defined cleanup; permanent computer caching or autonomous Drive access would need a separate opt-in flow.
+
+No public listener or remote-access configuration is required for local acceleration. A later off-LAN feature needs its own authenticated transport and consent; do not require router configuration. Build the phone pipeline and scheduling first, then add the companion only after its usefulness is measured. Both modes persist the same XMP annotations/corrections through the phone's durable sync path.
 
 ## Evaluation before a quality claim
 
@@ -104,7 +144,7 @@ Room remains the fast local browse/index layer and operational outbox. Durable l
 3. **Recognition evaluation:** local annotation/evaluation runner with a consented photo set; baseline the existing model and detector, then benchmark licensed human and animal candidates. Publish only aggregate results/config/checkpoint fingerprints in the repository, never private photos/vectors/names.
 4. **Human quality upgrade:** adaptive-resolution detection, validated alignment, quality measurements, versioned embeddings, retrieval/prototypes, rejected links, stable correction remapping, and regression tests for every reproduced failure. Keep unknowns where evidence is insufficient.
 5. **Individual pets:** cats/dogs first unless the owner requests another scope; head/body detection, dedicated identity features, enrollment, open-set matching, and separate calibration. Do not ship a category tag as individual recognition.
-6. **Product-quality gate:** target-phone measurements, held-out precision/coverage and correction-effort results, model-license manifests, backup/restore proof, and a reviewed-label regression set. Add optional desktop acceleration only if measurements show it is needed/useful.
+6. **Phone scheduling and quality gate:** scan-now/overnight/manual controls, bounded checkpoints, resource/thermal protection, target-phone measurements, held-out precision/coverage and correction-effort results, model-license manifests, backup/restore proof, and a reviewed-label regression set. Add optional desktop acceleration only if measurements show it is needed/useful.
 
 Outstanding input: pet species, library size, target Android phone, and availability of representative locally evaluated photos. These affect model/compute selection and evaluation scope; they do not block defining portable metadata. No private photo access, model training job, or paid licensing has been initiated.
 
@@ -117,3 +157,6 @@ Outstanding input: pet species, library size, target Android phone, and availabi
 - [PetFace official dataset/model repository](https://github.com/mapooon/PetFace): animal identification, per-species experiments, alignment, and explicit research-only terms.
 - [InsightFace official repository](https://github.com/deepinsight/insightface): code versus pretrained-model licensing.
 - [DINOv2 official repository](https://github.com/facebookresearch/dinov2): natural-image backbone and model-specific licensing differences. General visual features still need pet-identity evaluation/adaptation.
+- [Android work requests and constraints](https://developer.android.com/develop/background-work/background-tasks/persistent/getting-started/define-work): charging, network, storage, battery, cancellation, and inexact scheduling.
+- [Android long-running workers](https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/long-running): visible foreground execution and Android 16 job quotas.
+- [LiteRT for Android](https://developers.google.com/edge/litert/android): Android runtime options and CPU/GPU/NPU execution. The supported runtime/operator/device contract still needs validation for each chosen model.
