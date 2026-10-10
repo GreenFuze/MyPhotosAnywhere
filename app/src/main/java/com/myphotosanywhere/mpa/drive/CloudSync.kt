@@ -84,7 +84,6 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
                         } else save(binding,folder,file,generation)
                     }
                 } }
-                result.files.filter { it.mimeType!=DriveGateway.FOLDER_MIME }.forEach { thumbnail(api,binding,it) }
                 page=result.nextPage
             } while(page!=null)
         }
@@ -103,7 +102,10 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
             val page=api.changes(token)
             val folders=cloud.folders(binding).map { it.remoteId }.toSet()
             // Folder changes require an authoritative tree scan; no recursive removal on incomplete data.
-            if(page.changes.any { it.file?.mimeType==DriveGateway.FOLDER_MIME || (it.removed && it.id in folders) }) {
+            if(page.changes.any { change ->
+                (change.file?.mimeType==DriveGateway.FOLDER_MIME && (change.id in folders || change.file.parents.any { it in folders })) ||
+                    (change.removed && change.id in folders)
+            }) {
                 scanWithoutReplay(api,active); return
             }
             app.cache.lock.withLock { database.withTransaction {
@@ -117,7 +119,6 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
                 val next=page.nextPage ?: page.newStart ?: error("Drive returned no next change token.")
                 cloud.saveSync((cloud.sync(binding) ?: SyncState(binding)).copy(changeToken=next,running=true))
             } }
-            page.changes.mapNotNull { it.file }.filter { !it.trashed && it.parents.any { p -> p in folders } }.forEach { thumbnail(api,binding,it) }
             token=page.nextPage ?: return
         }
     }
@@ -139,7 +140,7 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
                     if(f.mimeType==DriveGateway.FOLDER_MIME) { cloud.saveFolder(CloudFolder(binding,f.id,parent,f.name,generation)); queue.add(f.id) }
                     else save(binding,parent,f,generation)
                 } } }
-                result.files.filter { it.mimeType!=DriveGateway.FOLDER_MIME }.forEach { thumbnail(api,binding,it) }; page=result.nextPage
+                page=result.nextPage
             } while(page!=null)
         }
         ensureBinding(binding)
@@ -148,13 +149,19 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
             cloud.saveSync(SyncState(binding,token,System.currentTimeMillis(),running=true))
         } }
     }
-    private suspend fun save(binding: String,parent: String,file: DriveFile,generation: String) {
+    internal suspend fun save(binding: String,parent: String,file: DriveFile,generation: String) {
         val old=cloud.photo("$binding:${file.id}")
         val backup=database.drive().backupForRemote(binding,file.id)
+        val sameContent=file.md5!=null && ((old?.md5==file.md5 && old.bytes==file.bytes) ||
+            (backup?.remoteMd5==file.md5 && backup.uploadedBytes==file.bytes))
+        val linkedId=if(sameContent) old?.photoId ?: backup?.photoId else null
+        val linked=linkedId?.let { database.photos().find(it) }
+        if(linked!=null && linked.sourceRemoteId==file.id && linked.cachedVersion==old?.version && sameContent)
+            database.photos().update(linked.copy(cachedVersion=file.version,displayName=file.name))
         cloud.savePhoto(CloudPhoto("$binding:${file.id}",binding,file.id,parent,file.name,file.mimeType,file.bytes,file.md5,
             file.version,file.modifiedTime,file.capturedAt,file.latitude,file.longitude,
             old?.thumbnailPath ?: File(context.filesDir,"cloud-thumbnails/$binding/${file.id}.jpg").absolutePath,
-            old?.thumbnailVersion,old?.photoId ?: backup?.photoId,false,generation,file.assetId,file.sourceAssetId,old?.thumbnailUpdatedAt ?: 0))
+            old?.thumbnailVersion,linkedId,false,generation,file.assetId,file.sourceAssetId,old?.thumbnailUpdatedAt ?: 0))
     }
     suspend fun thumbnail(api: DriveGateway,binding: String,file: DriveFile) {
         val row=cloud.photo("$binding:${file.id}") ?: return

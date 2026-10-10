@@ -26,7 +26,7 @@ class DeviceSmokeTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
 
-    @Test fun importEditSaveAndBrowseCopyWithoutChangingOriginal() = runBlocking {
+    @Test fun importEditSaveAndBrowseCopyWithoutChangingOriginal() = runBlocking<Unit> {
         val fixture=File.createTempFile("fixture",".png",app.cacheDir)
         val source=Bitmap.createBitmap(120,80,Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
         try { fixture.outputStream().use { check(source.compress(Bitmap.CompressFormat.PNG,100,it)) } } finally { source.recycle() }
@@ -44,9 +44,13 @@ class DeviceSmokeTest {
             val result=app.database.photos().all().first { it.parentId==photo.id }
             assertEquals("MPA",result.editProvider);assertTrue(File(result.originalPath).isFile)
             assertEquals(hash,DriveBackupWorker.digest(File(photo.originalPath),"SHA-256"))
+            val screenshot=InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            if(screenshot!=null) try { File(app.filesDir,"device-preview.png").outputStream().use {
+                screenshot.compress(Bitmap.CompressFormat.PNG,100,it)
+            } } finally { screenshot.recycle() }
         } finally { fixture.delete() }
     }
-    @Test fun bundledModelRunsOnAndroidAndDetectorCanProcessAnImageOffline() = runBlocking {
+    @Test fun bundledModelRunsOnAndroidAndDetectorCanProcessAnImageOffline() = runBlocking<Unit> {
         withTimeout(60000) {
             val bitmap=Bitmap.createBitmap(112,112,Bitmap.Config.ARGB_8888).apply { eraseColor(Color.rgb(110,80,60)) }
             try {

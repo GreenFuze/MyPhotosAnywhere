@@ -31,7 +31,10 @@ jobs:
           arch: x86_64
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: ./gradlew connectedDebugAndroidTest --no-daemon
+          script: |
+            ./gradlew connectedDebugAndroidTest --no-daemon
+            mkdir -p app/build/reports/androidTests/screenshots
+            adb exec-out run-as com.myphotosanywhere.mpa cat files/device-preview.png > app/build/reports/androidTests/screenshots/mpa-edit.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:

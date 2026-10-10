@@ -16,7 +16,7 @@ class ThumbnailWorker(context: Context,params: WorkerParameters): CoroutineWorke
         return try {
             val api=app.sync.api(active)
             val file=api.file(row.remoteId)
-            if(file.version==row.version && !file.trashed) app.sync.thumbnail(api,row.bindingKey,file)
+            if(file.version==row.version && !file.trashed && app.sync.inside(api,file,requireNotNull(active.folderId))) app.sync.thumbnail(api,row.bindingKey,file)
             Result.success()
         } catch(e: CancellationException) { throw e }
         catch(e: DriveHttpException) { if(e.retryable) Result.retry() else Result.success() }
@@ -26,7 +26,7 @@ class ThumbnailWorker(context: Context,params: WorkerParameters): CoroutineWorke
     }
     companion object {
         fun request(context: Context,row: CloudPhoto,active: DriveConnection?) {
-            if(active==null || row.removed || row.bindingKey!=active.binding()?.key || File(row.thumbnailPath).isFile) return
+            if(active==null || row.removed || row.bindingKey!=active.binding()?.key || (row.thumbnailVersion==row.version && File(row.thumbnailPath).isFile)) return
             WorkManager.getInstance(context).enqueueUniqueWork("mpa-thumbnail:${row.key}",ExistingWorkPolicy.KEEP,
                 OneTimeWorkRequestBuilder<ThumbnailWorker>().setInputData(workDataOf("key" to row.key))
                     .setConstraints(Constraints.Builder().setRequiredNetworkType(

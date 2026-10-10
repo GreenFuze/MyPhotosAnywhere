@@ -12,12 +12,13 @@ import java.nio.ByteOrder
 /** Qualcomm MobileFaceNet v0.64.0: two RGB NCHW [0,1] inputs, two 128-dimensional outputs. */
 class FaceEmbedding(context: Context): AutoCloseable {
     private val interpreter: Interpreter
+    private val modelBuffer: ByteBuffer
     init {
         val bytes=context.assets.open("mobile_facenet.tflite").use { it.readBytes() }
         val hash=java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(""){"%02x".format(it)}
         check(hash=="2046ab776fba2ec7e420767ffe7eb74a7402a8412d3d7ea8b9f4ca8420e5f3d7") { "Face model checksum mismatch." }
-        interpreter=Interpreter(ByteBuffer.allocateDirect(bytes.size).order(ByteOrder.nativeOrder()).apply { put(bytes); rewind() },
-            Interpreter.Options().setNumThreads(2))
+        modelBuffer=ByteBuffer.allocateDirect(bytes.size).order(ByteOrder.nativeOrder()).apply { put(bytes); rewind() }
+        interpreter=Interpreter(modelBuffer,Interpreter.Options().setNumThreads(2))
         for(i in 0..1) check(interpreter.getInputTensor(i).shape().contentEquals(intArrayOf(1,3,112,112)) &&
             interpreter.getInputTensor(i).dataType()==DataType.FLOAT32) { "Face model input contract mismatch." }
         check(interpreter.getOutputTensor(0).shape().contentEquals(intArrayOf(2,128)))

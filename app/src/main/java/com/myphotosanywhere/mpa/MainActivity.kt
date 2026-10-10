@@ -122,6 +122,8 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
                     val currentKey=connection?.binding()?.key
                     val local=photos.filter { photo ->
                         val names=faces.filter { it.photoId==photo.id }.mapNotNull { face -> people.find { it.id==face.personId }?.name }
+                        val indexed=cloud.any { it.photoId==photo.id && !it.removed }
+                        (photo.sourceRemoteId==null || photo.originalPath.isNotBlank() || indexed || albumId!=null || filter=="Favorites" || filter=="Archive") &&
                         LibrarySearch.matches(photo,query,names) && (if(filter=="Archive") photo.archived else !photo.archived) &&
                             (filter!="Favorites" || photo.favorite) && (filter!="Offline" || photo.originalPath.isNotBlank()) &&
                             (filter!="Videos" || photo.mimeType.startsWith("video/")) && (filter!="Edits" || photo.parentId!=null) &&
@@ -144,7 +146,7 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
                             PhotoTile(photo,features,cloudRow?.thumbnailUpdatedAt ?: 0,cloudRow) { selectPhoto(photo.id) }
                         }
                         items(remote,key={ "cloud:${it.key}" }) { row ->
-                            LaunchedEffect(row.key,row.thumbnailUpdatedAt) {
+                            LaunchedEffect(row.key,row.version,row.thumbnailUpdatedAt) {
                                 com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(context,row,connection)
                             }
                             Card(Modifier.aspectRatio(1f).clickable { features.download(row) }) {
@@ -196,7 +198,7 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
 @Composable
 private fun PhotoTile(photo: Photo,features: LibraryFeaturesModel,thumbnailVersion: Long,cloudRow: com.myphotosanywhere.mpa.drive.CloudPhoto?,onClick: ()->Unit) {
     val thumb by produceState<File?>(null,photo.id,photo.originalPath,thumbnailVersion) { value=runCatching { features.app.cache.thumbnail(photo) }.getOrNull() }
-    LaunchedEffect(photo.id,thumbnailVersion) {
+    LaunchedEffect(photo.id,cloudRow?.version,thumbnailVersion) {
         if(cloudRow!=null) com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(features.app,cloudRow,features.connection.value)
     }
     Card(Modifier.aspectRatio(1f).testTag("photo:${photo.id}").clickable(onClick=onClick)) {
