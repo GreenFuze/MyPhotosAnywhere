@@ -93,7 +93,11 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
     fun selectPhoto(id: String) { selectedId=id; showShare=false }
     val selected=photos.find { it.id==selectedId }
     val localIds=remember(photos) { photos.map { it.id }.toSet() }
-    val cloudByPhoto=remember(cloud) { cloud.filter { it.photoId!=null }.associateBy { requireNotNull(it.photoId) } }
+    val cloudByPhoto=remember(cloud,sources,sourceKey) {
+        val enabled=sources.map { it.key }.toSet()
+        cloud.filter { it.photoId!=null && !it.removed && it.bindingKey in enabled &&
+            (sourceKey==null || it.bindingKey==sourceKey) }.associateBy { requireNotNull(it.photoId) }
+    }
     val namesByPhoto=remember(faces,people) {
         val byId=people.associateBy { it.id }
         faces.groupBy { it.photoId }.mapValues { (_,items) -> items.mapNotNull { byId[it.personId]?.name } }
