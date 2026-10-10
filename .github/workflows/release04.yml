@@ -50,6 +50,25 @@ jobs:
               assert run['conclusion'] == 'success', f'{path} did not pass'
               assert run['head_sha'] == os.environ['SOURCE_SHA'], f'{path} source mismatch'
           PY
+          # GitHub's workflow token may not tag an older commit containing workflow changes.
+          # Tag this publication commit only after proving its changes are publication metadata.
+          cat > verify-publication.py <<'PY'
+          import json, os, sys
+          with open(sys.argv[1]) as stream:
+              comparison = json.load(stream)
+          assert comparison['status'] in ['ahead','identical'], 'Release commit is not descended from tested source'
+          assert comparison['merge_base_commit']['sha'] == os.environ['SOURCE_SHA'], 'Unexpected release ancestry'
+          files = comparison['files']
+          assert len(files) < 300, 'Comparison may be truncated'
+          def allowed(path):
+              return path in ['README.md','docs/VALIDATION.md','.github/workflows/release04.yml'] or path.startswith('docs/releases/')
+          for item in files:
+              assert allowed(item['filename']), f"Untested app change: {item['filename']}"
+              if 'previous_filename' in item:
+                  assert allowed(item['previous_filename']), 'Untested renamed app file'
+          PY
+          gh api "repos/$GH_REPO/compare/$SOURCE_SHA...$GITHUB_SHA" > publication-compare.json
+          python3 verify-publication.py publication-compare.json
       - name: Package the tested APK and evidence
         run: |
           set -euo pipefail
@@ -78,6 +97,7 @@ jobs:
           evidence = {'unit_tests':results('checks/build/test-results'), 'device_tests':results('device/outputs/androidTest-results')}
           apk = Path('assets/MPA-0.4-debug.apk')
           evidence['source_sha'] = os.environ['SOURCE_SHA']
+          evidence['release_commit'] = os.environ['GITHUB_SHA']
           evidence['build_run_id'] = int(os.environ['BUILD_RUN_ID'])
           evidence['device_run_id'] = int(os.environ['DEVICE_RUN_ID'])
           evidence['apk_sha256'] = hashlib.sha256(apk.read_bytes()).hexdigest()
@@ -90,6 +110,7 @@ jobs:
           print(json.dumps(evidence))
           notes = Path('docs/releases/v0.4.0-alpha.2.md').read_text()
           notes += f"\nSource: `{os.environ['SOURCE_SHA']}`. [Build](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['BUILD_RUN_ID']}) · [Device checks](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['DEVICE_RUN_ID']}).\n"
+          notes += f"\nThe release tag points to publication commit `{os.environ['GITHUB_SHA']}`. Its app code is identical to the tested source; only documentation and publication metadata differ.\n"
           notes += f"\nAPK SHA-256: `{evidence['apk_sha256']}`\n"
           notes += f"\nAndroid OAuth SHA-1 for package `com.myphotosanywhere.mpa`: `{evidence['android_oauth_sha1']}`\n"
           Path('release-notes.md').write_text(notes)
@@ -115,13 +136,18 @@ jobs:
           import json, os
           with open('tag.json') as stream:
               tag=json.load(stream)
-          assert tag['object']['sha']==os.environ['SOURCE_SHA'], 'Existing tag has another source'
+          assert tag['object']['type']=='commit', 'Expected a lightweight release tag'
+          with open(os.environ['GITHUB_ENV'],'a') as stream:
+              stream.write(f"EXISTING_TAG_SHA={tag['object']['sha']}\n")
           PY
+            TAG_SHA=$(python3 -c "import json; print(json.load(open('tag.json'))['object']['sha'])")
+            gh api "repos/$GH_REPO/compare/$SOURCE_SHA...$TAG_SHA" > existing-compare.json
+            python3 verify-publication.py existing-compare.json
             gh release download "$RELEASE_TAG" --pattern MPA-0.4-debug.apk --dir existing
             cmp assets/MPA-0.4-debug.apk existing/MPA-0.4-debug.apk
             echo 'Identical APK already published; existing release preserved.'
             exit 0
           fi
-          gh release create "$RELEASE_TAG" assets/* --target "$SOURCE_SHA" \
+          gh release create "$RELEASE_TAG" assets/* --target "$GITHUB_SHA" \
             --title 'MyPhotosAnywhere 0.4 alpha 2 — New MPA launcher icon' \
             --prerelease --notes-file release-notes.md
