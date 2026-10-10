@@ -1,0 +1,41 @@
+name: Verify face model
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/model.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: pip install flatbuffers tflite
+      - name: Inspect the licensed model artifact
+        run: |
+          python3 - <<'PY'
+          import urllib.request, zipfile, io, hashlib, json, pathlib, tflite
+          url = 'https://qaihub-public-assets.s3.us-west-2.amazonaws.com/qai-hub-models/models/mobile_facenet/releases/v0.64.0/mobile_facenet-tflite-float.zip'
+          data = urllib.request.urlopen(url, timeout=60).read()
+          print('Archive SHA256:', hashlib.sha256(data).hexdigest())
+          out = pathlib.Path('model'); out.mkdir()
+          with zipfile.ZipFile(io.BytesIO(data)) as z:
+              print('Archive files:', z.namelist())
+              for name in z.namelist():
+                  if name.endswith(('.tflite', 'LICENSE', '.txt')):
+                      content = z.read(name)
+                      (out / pathlib.Path(name).name).write_bytes(content)
+                      print(name, 'SHA256:', hashlib.sha256(content).hexdigest())
+                      if name.endswith('.tflite'):
+                          model = tflite.Model.GetRootAsModel(content, 0)
+                          graph = model.Subgraphs(0)
+                          for label, indexes in [('inputs',graph.InputsAsNumpy()),('outputs',graph.OutputsAsNumpy())]:
+                              for index in indexes:
+                                  t = graph.Tensors(int(index))
+                                  print(label, t.Name().decode(), t.ShapeAsNumpy().tolist(), 'type', t.Type())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MPA-face-model
+          path: model/
