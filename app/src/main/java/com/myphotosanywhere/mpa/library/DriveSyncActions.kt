@@ -3,6 +3,7 @@ package com.myphotosanywhere.mpa.library
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,7 +24,12 @@ fun DriveSyncActions(model: LibraryFeaturesModel = viewModel()) {
         val transfers = downloads.filter { it.bindingKey == source.key }
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("${source.folderName} · ${source.email}")
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${source.folderName} · ${source.email}", Modifier.weight(1f))
+                    TextButton(onClick = { model.refreshSource(source.key) }) {
+                        Text(if (state?.error != null) "Retry refresh" else "Refresh Drive")
+                    }
+                }
                 Text(when (state?.status) {
                     "AUTH_REQUIRED" -> "Reconnect this source using Manage source below."
                     "FAILED" -> "Refresh failed; saved progress is preserved."
@@ -39,9 +45,6 @@ fun DriveSyncActions(model: LibraryFeaturesModel = viewModel()) {
                 state?.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 Text("${transfers.count { it.state == "COMPLETE" }} downloads completed · ${transfers.count { it.state !in listOf("COMPLETE", "FAILED", "AUTH_REQUIRED") }} pending",
                     style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = { model.refreshSource(source.key) }) {
-                    Text(if (state?.error != null) "Retry refresh" else "Refresh Drive")
-                }
             }
         }
     }
