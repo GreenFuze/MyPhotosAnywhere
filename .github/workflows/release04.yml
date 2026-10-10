@@ -1,17 +1,17 @@
-name: Publish MPA 0.4 prerelease
+name: Publish MPA 0.4.0 release
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - '.github/workflows/release04.yml'
-      - 'docs/releases/v0.4.0-alpha.2.json'
-      - 'docs/releases/v0.4.0-alpha.2.md'
+      - 'docs/releases/v0.4.0.json'
+      - 'docs/releases/v0.4.0.md'
 permissions:
   contents: write
   actions: read
 concurrency:
-  group: android-prerelease-v0.4.0-alpha.2
+  group: android-release-v0.4.0
   cancel-in-progress: false
 jobs:
   publish:
@@ -27,9 +27,9 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, os, re
-          with open('docs/releases/v0.4.0-alpha.2.json') as stream:
+          with open('docs/releases/v0.4.0.json') as stream:
               config = json.load(stream)
-          assert config['tag'] == 'v0.4.0-alpha.2'
+          assert config['tag'] == 'v0.4.0'
           assert re.fullmatch('[0-9a-f]{40}', config['source_sha'])
           assert isinstance(config['build_run_id'], int) and isinstance(config['device_run_id'], int)
           with open(os.environ['GITHUB_ENV'], 'a') as stream:
@@ -61,7 +61,7 @@ jobs:
           files = comparison['files']
           assert len(files) < 300, 'Comparison may be truncated'
           def allowed(path):
-              return path in ['README.md','docs/VALIDATION.md','.github/workflows/release04.yml'] or path.startswith('docs/releases/')
+              return path in ['README.md','docs/VALIDATION.md','docs/FEATURES_0_4.md','.github/workflows/release04.yml'] or path.startswith('docs/releases/')
           for item in files:
               assert allowed(item['filename']), f"Untested app change: {item['filename']}"
               if 'previous_filename' in item:
@@ -80,6 +80,7 @@ jobs:
           cp checks/build/reports/signing-report.txt assets/MPA-0.4-signing-report.txt
           cp docs/GOOGLE_DRIVE_SETUP.md assets/GOOGLE_DRIVE_SETUP.md
           cp docs/IMPLEMENTATION_0_4.md assets/IMPLEMENTATION_0_4.md
+          cp docs/FEATURES_0_4.md assets/FEATURES_0_4.md
           cp docs/branding/mpa-icon.svg assets/MPA-icon.svg
           (cd assets && sha256sum MPA-0.4-debug.apk > SHA256SUMS.txt)
           python3 - <<'PY'
@@ -106,9 +107,10 @@ jobs:
           certificate = re.search(r'^SHA1: ([0-9A-F:]{59})$', report, re.MULTILINE)
           assert certificate is not None, 'Missing debug signing certificate'
           evidence['android_oauth_sha1'] = certificate.group(1)
+          assert evidence['android_oauth_sha1'] == 'A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD', 'Signer changed; preserve the established upgrade/OAuth certificate'
           Path('assets/BUILD_EVIDENCE.json').write_text(json.dumps(evidence,indent=2)+'\n')
           print(json.dumps(evidence))
-          notes = Path('docs/releases/v0.4.0-alpha.2.md').read_text()
+          notes = Path('docs/releases/v0.4.0.md').read_text()
           notes += f"\nSource: `{os.environ['SOURCE_SHA']}`. [Build](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['BUILD_RUN_ID']}) · [Device checks](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['DEVICE_RUN_ID']}).\n"
           notes += f"\nThe release tag points to publication commit `{os.environ['GITHUB_SHA']}`. Its app code is identical to the tested source; only documentation and publication metadata differ.\n"
           notes += f"\nAPK SHA-256: `{evidence['apk_sha256']}`\n"
@@ -149,5 +151,5 @@ jobs:
             exit 0
           fi
           gh release create "$RELEASE_TAG" assets/* --target "$GITHUB_SHA" \
-            --title 'MyPhotosAnywhere 0.4 alpha 2 — New MPA launcher icon' \
-            --prerelease --notes-file release-notes.md
+            --title 'MyPhotosAnywhere 0.4.0 — Shared library, XMP recovery and phone indexing' \
+            --notes-file release-notes.md

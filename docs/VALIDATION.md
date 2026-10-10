@@ -1,5 +1,19 @@
 # Validation status and device checklist
 
+## MPA 0.4.0 evidence
+
+Source `5211cb7bdbd35c120d4362500f4f920e302576c0` is the 0.4 APK source:
+
+- **77 unit/integration tests, zero failures/errors/skipped**, lint with zero errors and debug APK assembly. [Build checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38064322367). The generated Room v5 schema matches the committed schema. Upgrade tests preserve existing photos, reviewed names, upload sessions and Drive change checkpoints.
+- **Five Android 10 (API 29) emulator tests, zero failures/errors/skipped**. [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38064322371). These cover combined source filtering, import/view/edit with unchanged original checksum, offline Android inference, an actual Android XMP encode/decode/recovery round trip, and Storage controls saving a window across midnight and pausing scans.
+- New regression coverage checks source-only XMP projections, unknown XML namespace preservation, bounded/validated input, rejected document/entity declarations, conditional Drive writes and duplicate catalogue rejection, markup recipe provenance, checksum-matched recovery, transaction rollback on face-ID collisions, durable outbox generations, annotation/outbox atomicity, pending-scan cache protection, mutual geometry matches instead of detector order, and scheduling across midnight and daylight-saving changes.
+- CPU model contract checks and the established debug signer **A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD** are retained. Model smoke tests are compatibility checks, not measured identity accuracy.
+
+The release publisher reuses the passed source build's APK and verifies both workflow runs belong to that source. Its tag may point to a later publication commit, after comparison verifies that only release documentation/publication metadata differ. Attached BUILD_EVIDENCE.json records the tested source, release commit, test totals, certificate, APK byte length and SHA-256. Existing release APKs are never silently replaced.
+
+Live multi-account OAuth/Drive writes, ETag behavior, recovery from another phone, recognition accuracy, thermal/battery behavior and vendor background restrictions require the [0.4 phone checklist](FEATURES_0_4.md). Individual pet recognition, calibrated human quality, adjacent/MWG sidecars, large catalogue partitioning and automatic conflict merging are not claimed by this release.
+
+
 ## MPA 0.4 alpha evidence
 
 Alpha 2 source `34e470e477bb4a3b23dc874a12a28936bddaf55d` adds the original MPA vector launcher icon, API 26+ adaptive resources and API 33+ monochrome resources, plus application version code 5. It passed **55 unit/integration tests, lint with zero errors, APK assembly and three Android 10 emulator tests**. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38061086555) · [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38061086556). The signer matches alpha 1 and 0.3. The SVG presentation and matching color/monochrome path geometry were inspected; Android 13 launcher theme appearance still depends on the phone's launcher and theme settings. The alpha 2 release reuses that tested APK, with no changes to database schema or multi-source behavior.
