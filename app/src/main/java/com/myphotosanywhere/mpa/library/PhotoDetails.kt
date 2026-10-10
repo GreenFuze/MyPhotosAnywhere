@@ -62,7 +62,7 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected=photo.favorite,enabled=!busy,onClick={ model.updatePhoto(photo.id) { it.copy(favorite=!it.favorite) } },label={ Text("Favorite") })
                 FilterChip(selected=photo.pinned,enabled=!busy,onClick={
-                    model.updatePhoto(photo.id) { it.copy(pinned=!it.pinned) }
+                    model.pinPhoto(photo.id,!photo.pinned)
                 },label={ Text("Keep offline") })
             }
             TextButton(onClick={ collections=true }) { Text("Albums") }

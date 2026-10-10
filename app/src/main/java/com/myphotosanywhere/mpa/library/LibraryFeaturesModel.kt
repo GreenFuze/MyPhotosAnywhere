@@ -42,6 +42,12 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
             finally { busy.value=false }
         }
     }
+    fun pinPhoto(id: String,pin: Boolean) = perform {
+        app.cache.lock.withLock { db.photos().find(id)?.let { db.photos().update(it.copy(pinned=pin)) } }
+        val photo=db.photos().find(id)
+        if(pin && photo!=null && photo.originalPath.isBlank() && photo.sourceRemoteId!=null)
+            db.cloud().photo("${photo.sourceBindingKey}:${photo.sourceRemoteId}")?.let { app.downloads.enqueue(it,true) }
+    }
     fun updatePhoto(id: String,transform: (Photo)->Photo) = perform {
         app.cache.lock.withLock { db.photos().find(id)?.let { db.photos().update(transform(it)) } }
     }

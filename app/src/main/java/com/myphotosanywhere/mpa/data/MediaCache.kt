@@ -2,6 +2,7 @@ package com.myphotosanywhere.mpa.data
 
 import android.content.Context
 import com.myphotosanywhere.mpa.core.*
+import com.myphotosanywhere.mpa.drive.binding
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -10,7 +11,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /** All readers of disposable originals and all eviction share this lock. */
-class MediaCache(private val context: Context, private val database: PhotoDatabase, private val settings: LibrarySettings) {
+class MediaCache(private val context: Context, private val database: PhotoDatabase, private val settings: LibrarySettings,
+    private val remoteVerifier: (suspend (Photo, File) -> Boolean)? = null) {
     val lock=Mutex()
     private val readers=mutableMapOf<String,Int>()
     suspend fun acquireReader(id: String): AutoCloseable = lock.withLock {
@@ -48,7 +50,8 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
                 val file=File(photo.originalPath)
                 val active=database.drive().connection()
                 val verified=try {
-                    if(active?.binding()?.key!=photo.sourceBindingKey) false
+                    if(remoteVerifier!=null) remoteVerifier.invoke(photo,file)
+                    else if(active?.binding()?.key!=photo.sourceBindingKey) false
                     else {
                         val api=(context.applicationContext as com.myphotosanywhere.mpa.MpaApplication).sync.api(requireNotNull(active))
                         val remote=api.file(requireNotNull(photo.sourceRemoteId))

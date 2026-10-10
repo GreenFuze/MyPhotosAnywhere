@@ -10,6 +10,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: |
+          python3 scripts/fetch_face_model.py
+          python3 -m pip install 'numpy==1.26.4' 'tflite-runtime==2.14.0'
+          python3 scripts/verify_face_model.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

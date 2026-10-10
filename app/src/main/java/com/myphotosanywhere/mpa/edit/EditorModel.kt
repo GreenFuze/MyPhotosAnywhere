@@ -32,6 +32,8 @@ class EditorModel(application: Application): AndroidViewModel(application) {
         photoId=id; savedId.value=null; preview.value=null
         rendering?.cancel()
         rendering=viewModelScope.launch {
+            val reader=app.cache.acquireReader(id)
+            try {
             val draft=app.database.library().draft(id)
             val initial=draft?.recipe?.let { runCatching { EditRecipe.parse(it) }.getOrNull() } ?: EditRecipe()
             history=EditHistory(initial); recipe.value=initial; historyVersion.value++
@@ -44,6 +46,7 @@ class EditorModel(application: Application): AndroidViewModel(application) {
                 } catch(e: CancellationException) { throw e }
                 catch(e: Exception) { error.value=e.message ?: "Could not render this photo." }
             }
+            } finally { reader.close() }
         }
     }
     fun change(value: EditRecipe) { if(!busy.value) recipe.value=value.validate() }

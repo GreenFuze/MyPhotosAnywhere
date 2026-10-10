@@ -80,4 +80,29 @@ class DriveGatewayTest {
             catch (_: IllegalStateException) { assertEquals(0L, file.length()) }
         } finally { file.delete() }
     }
+    @Test fun changesPagePreservesRemovalAndMetadataWithItsCheckpoint() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"newStartPageToken":"checkpoint","changes":[
+            {"fileId":"gone","removed":true},{"fileId":"photo","file":{"id":"photo","name":"family.jpg","mimeType":"image/jpeg",
+            "parents":["folder"],"version":"2","md5Checksum":"md5","imageMediaMetadata":{"time":"2020-01-02T03:04:05Z","location":{"latitude":32.0,"longitude":34.0}}}}]}"""))
+        val page=api.changes("old")
+        assertEquals("checkpoint",page.newStart);assertTrue(page.changes.first().removed)
+        assertEquals(32.0,page.changes.last().file?.latitude)
+        assertEquals(1577934245000L,page.changes.last().file?.capturedAt)
+        assertEquals("old",server.takeRequest().requestUrl?.queryParameter("pageToken"))
+    }
+    @Test fun recursiveListingIncludesVideosAndFoldersWithoutOtherFileTypes() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"files":[]}"""))
+        api.children("folder")
+        val query=requireNotNull(server.takeRequest().requestUrl?.queryParameter("q"))
+        assertTrue(query.contains("mimeType contains 'video/'"));assertTrue(query.contains(DriveGateway.FOLDER_MIME))
+        assertTrue(query.contains("'folder' in parents"))
+    }
+    @Test fun thumbnailHostIsValidatedBeforeAuthorizationCanBeSent() = runBlocking {
+        val file=File.createTempFile("thumbnail",".part")
+        try {
+            try { api.thumbnail("https://untrusted.example/image",file);throw AssertionError("Expected host validation") }
+            catch(_: IllegalArgumentException) { assertEquals(0,server.requestCount) }
+        } finally { file.delete() }
+    }
+
 }
