@@ -133,6 +133,22 @@ class DeviceSmokeTest {
         }
     }
 
+    @Test fun googleSetupDetailsDescribeTheInstalledVersionAndSigningCertificate() {
+        compose.onNodeWithText("Storage").performClick()
+        compose.onNodeWithText("Google setup details").performScrollTo().performClick()
+        compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
+        compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.4.2 (8)",substring=true).assertExists()
+        val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
+        assertEquals("com.myphotosanywhere.mpa",info.packageName)
+        assertTrue(info.sha1.isNotEmpty())
+        assertTrue(info.sha1.all { it.matches(Regex("[0-9A-F]{2}(:[0-9A-F]{2}){19}")) })
+        compose.onNodeWithText("Copy setup details").performClick()
+        val clipboard=app.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        assertEquals(info.text(),clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+        compose.onNodeWithText("Close").performClick()
+    }
+
     @Test fun scanActionIsVisibleWithoutScrollingAndRequestsConsent() = runBlocking<Unit> {
         val original=app.settings.state.value
         try {

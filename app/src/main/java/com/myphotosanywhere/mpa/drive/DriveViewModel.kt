@@ -59,8 +59,11 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         if (result.hasResolution()) launch(requireNotNull(result.pendingIntent)) else accept(result)
     }
 
-    fun authorizationResult(intent: Intent) = perform {
-        accept(Identity.getAuthorizationClient(app).getAuthorizationResultFromIntent(intent))
+    fun authorizationResult(resultCode: Int,intent: Intent?) = perform {
+        val result=GoogleAuthorizationReturn.resolve(resultCode,intent) {
+            Identity.getAuthorizationClient(app).getAuthorizationResultFromIntent(it)
+        }
+        accept(result)
     }
 
     private suspend fun accept(result: AuthorizationResult) {
@@ -232,10 +235,7 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         viewModelScope.launch {
             try { action() }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: com.google.android.gms.common.api.ApiException) {
-                _message.value = "Google authorization failed (${error.statusCode}). Check Google Cloud Android OAuth setup."
-            }
-            catch (error: Exception) { _message.value = error.message ?: "Drive operation failed. Local photos are preserved." }
+            catch (error: Exception) { _message.value = GoogleAuthorizationReturn.message(error) }
             finally { _busy.value = false }
         }
     }

@@ -51,8 +51,7 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
     var modeName by rememberSaveable { mutableStateOf(DriveMode.APP_FILES.name) }
     var folderName by rememberSaveable { mutableStateOf("MyPhotosAnywhere") }
     val resolution = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
-        if (it.resultCode == Activity.RESULT_OK && it.data != null) model.authorizationResult(requireNotNull(it.data))
-        else model.report("Google authorization canceled. Local photos are preserved.")
+        model.authorizationResult(it.resultCode,it.data)
     }
     val accountPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         val email = it.data?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
@@ -79,7 +78,9 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
         message?.let {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
-                    Text(it); TextButton(onClick = model::clearMessage) { Text("Dismiss") }
+                    Text(it)
+                    GoogleSetupDetails()
+                    TextButton(onClick = model::clearMessage) { Text("Dismiss") }
                 }
             }
         }
@@ -150,7 +151,7 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
         com.myphotosanywhere.mpa.library.StorageControls(photos)
         Text("Removing a source stops its transfers. Other sources continue syncing; local photos and people are preserved. Google permissions can be revoked in your account settings.", style = MaterialTheme.typography.bodySmall)
         Text("Keep your source copies. Uninstalling MPA removes this device's private library.", style = MaterialTheme.typography.bodySmall)
-        Text("MyPhotosAnywhere · MPA 0.4 development", style = MaterialTheme.typography.labelMedium)
+        GoogleSetupDetails()
     }
     val listing = browser
     if (listing != null) {
