@@ -7,6 +7,7 @@
 - Source of truth: ordinary image/video files in a user-selected Google Drive folder after successful upload. The local Room database drives browsing and tracks synchronization.
 - Account model: user's Google account for Drive; user's official ChatGPT, Gemini, or Claude app and subscription for AI handoff. MPA never takes provider passwords, session cookies, or AI API keys.
 - Preserve originals. Every exported edit is a separate asset with a parent link and an edit history record.
+- Next priority: measured people and individual-pet recognition quality, with durable XMP sidecars for library annotations. The owner explicitly requested portable sidecar metadata after 0.3. Read [the recognition and sidecar design](RECOGNITION_AND_SIDECARS.md) for pipeline, evaluation, storage, and release gates. Model selection remains an evaluation decision.
 - Repository visibility: private. Preserve the owner's selected LGPL 2.1 license in `LICENSE`.
 
 ## Milestones and acceptance criteria
@@ -14,6 +15,8 @@
 Progress: 0.1 and 0.2 passed unit tests, lint, and APK assembly; the user has since confirmed Google setup works on their phone. The 0.3 implementation covers image editing, local albums/favorites/archive, video import/playback, optional local people/object indexing, map/place browsing, recursive Drive discovery/change checkpoints, thumbnails, queued verified downloads, and protected cache eviction. It passed 49 unit/integration tests, lint, APK assembly, CPU model-contract checks, and two Android emulator tests. New live Drive/cache and recognition behavior still needs phone validation. Read [FEATURES_0_3.md](FEATURES_0_3.md) for exact behavior and residual work.
 
 Current storage layout keeps uploads directly in the chosen folder for compatibility with 0.2. Recursive indexing supports existing subfolders without reorganizing unrelated files. Biometric data and user library metadata stay local. Future owned subfolder layout, encrypted metadata recovery, production signing, calibrated recognition, pet identities, and video editing remain separate roadmap work.
+
+The next metadata milestone changes durable annotations from phone-only storage to XMP sidecars beside assets and a library XMP catalog in Drive. Confirmed names, face/pet regions, corrections, albums, location annotations, and recipes become recoverable; embeddings/crops/vector indexes remain local and rebuildable by default. Readable sidecars expose stored names/locations to folder collaborators. This design is not implemented in the 0.3 APK. Start with stable region IDs and portable corrections before model upgrades so rescanning cannot lose reviewed identities.
 
 ### 1. Offline gallery and AI round trip (first implementation)
 
@@ -59,7 +62,7 @@ Current storage layout keeps uploads directly in the chosen folder for compatibi
 - Opt-in on-device face detection. Detection alone is not recognition: tracking IDs must not become person identities.
 - Evaluate a licensed on-device embedding model and preprocessing pipeline before selecting a recognition engine; calibrate matching thresholds on a consented evaluation set.
 - Local clustering with unknown identities, user names, merge/split, wrong-match correction, and deletion of biometric indexes. No promise that embedding similarity proves identity.
-- Face embeddings/names stay local by default. Any Drive index backup needs a separate consent and encryption/key-recovery design; do not quietly include biometric indexes in a normal metadata backup.
+- Face embeddings and crop/vector caches stay local by default. Per the owner's sidecar request, confirmed names/regions and human decisions belong in readable XMP metadata with clear storage controls. Optional encrypted inference-cache recovery needs a separate key-recovery design.
 - Separate pet recognition feasibility from human face recognition. Add scene/object search only after memory, battery, and indexing measurements.
 - Acceptance: correction persists across rescans, deleting indexes removes embeddings and labels, offline recognition works, and uncertain matches remain unassigned.
 

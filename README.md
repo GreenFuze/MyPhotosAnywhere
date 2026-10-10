@@ -12,6 +12,8 @@ Download [v0.3.0](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.
 
 Read [0.3 feature behavior and the phone checklist](docs/FEATURES_0_3.md), [the roadmap](docs/PLAN.md), and [validation evidence](docs/VALIDATION.md). Full Google Photos parity is an ongoing roadmap, including video editing, calibrated recognition, production signing, and optional encrypted metadata recovery.
 
+The next priority is [measured people/pet recognition and portable XMP sidecars](docs/RECOGNITION_AND_SIDECARS.md). The design includes durable naming/corrections, species-specific pet identity, representative-photo evaluation, and Drive metadata recovery. These changes are planned; the 0.3 APK still keeps library annotations locally.
+
 ## Development
 
 To choose a clone directory and continue in a local Codex session, follow [the local setup guide](docs/LOCAL_DEVELOPMENT.md).

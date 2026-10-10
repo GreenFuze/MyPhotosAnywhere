@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Illustrative schema proposal only. UUIDs, names, geometry, and the zero hash
+     are placeholders; no real photograph or personal identity is represented. -->
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description rdf:about=""
+        xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+        xmlns:dc="http://purl.org/dc/elements/1.1/"
+        xmlns:mwg-rs="http://www.metadataworkinggroup.com/schemas/regions/"
+        xmlns:stDim="http://ns.adobe.com/xap/1.0/sType/Dimensions#"
+        xmlns:stArea="http://ns.adobe.com/xmp/sType/Area#"
+        xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"
+        xmlns:mpa="https://github.com/GreenFuze/MyPhotosAnywhere/ns/1.0/"
+        xmp:CreatorTool="MyPhotosAnywhere design example"
+        mpa:SchemaVersion="1"
+        mpa:AssetId="00000000-0000-4000-8000-000000000001"
+        mpa:OriginalFilename="IMG_0001.jpg"
+        mpa:ContentSHA256="0000000000000000000000000000000000000000000000000000000000000000"
+        mpa:CoordinateFrame="display-upright"
+        mpa:DecisionRevision="00000000-0000-4000-8000-000000000004"
+        mpa:Favorite="True">
+      <dc:subject>
+        <rdf:Bag><rdf:li>example</rdf:li></rdf:Bag>
+      </dc:subject>
+      <Iptc4xmpExt:PersonInImage>
+        <rdf:Bag><rdf:li>Example person</rdf:li></rdf:Bag>
+      </Iptc4xmpExt:PersonInImage>
+      <mwg-rs:Regions rdf:parseType="Resource">
+        <mwg-rs:AppliedToDimensions rdf:parseType="Resource">
+          <stDim:w>4000</stDim:w>
+          <stDim:h>3000</stDim:h>
+          <stDim:unit>pixel</stDim:unit>
+        </mwg-rs:AppliedToDimensions>
+        <mwg-rs:RegionList>
+          <rdf:Bag>
+            <rdf:li rdf:parseType="Resource">
+              <mwg-rs:Type>Face</mwg-rs:Type>
+              <mwg-rs:Name>Example person</mwg-rs:Name>
+              <mwg-rs:Area rdf:parseType="Resource">
+                <stArea:x>0.35</stArea:x>
+                <stArea:y>0.30</stArea:y>
+                <stArea:w>0.12</stArea:w>
+                <stArea:h>0.18</stArea:h>
+                <stArea:unit>normalized</stArea:unit>
+              </mwg-rs:Area>
+              <mwg-rs:Extensions rdf:parseType="Resource">
+                <mpa:RegionId>00000000-0000-4000-8000-000000000002</mpa:RegionId>
+                <mpa:IdentityId>00000000-0000-4000-8000-000000000003</mpa:IdentityId>
+                <mpa:IdentityKind>human</mpa:IdentityKind>
+                <mpa:Decision>confirmed</mpa:Decision>
+                <mpa:DecisionSource>user</mpa:DecisionSource>
+              </mwg-rs:Extensions>
+            </rdf:li>
+            <rdf:li rdf:parseType="Resource">
+              <mwg-rs:Type>Pet</mwg-rs:Type>
+              <mwg-rs:Name>Example dog</mwg-rs:Name>
+              <mwg-rs:Area rdf:parseType="Resource">
+                <stArea:x>0.68</stArea:x>
+                <stArea:y>0.65</stArea:y>
+                <stArea:w>0.20</stArea:w>
+                <stArea:h>0.25</stArea:h>
+                <stArea:unit>normalized</stArea:unit>
+              </mwg-rs:Area>
+              <mwg-rs:Extensions rdf:parseType="Resource">
+                <mpa:RegionId>00000000-0000-4000-8000-000000000005</mpa:RegionId>
+                <mpa:IdentityId>00000000-0000-4000-8000-000000000006</mpa:IdentityId>
+                <mpa:IdentityKind>dog</mpa:IdentityKind>
+                <mpa:Decision>confirmed</mpa:Decision>
+                <mpa:DecisionSource>user</mpa:DecisionSource>
+              </mwg-rs:Extensions>
+            </rdf:li>
+          </rdf:Bag>
+        </mwg-rs:RegionList>
+      </mwg-rs:Regions>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
