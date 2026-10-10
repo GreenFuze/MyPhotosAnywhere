@@ -105,4 +105,32 @@ class DeviceSmokeTest {
             } finally { bitmap.recycle() }
         }
     }
+    @Test fun portableXmpRoundTripsOnAndroidAndRecoversReviewedAnnotations() = runBlocking<Unit> {
+        val source=com.myphotosanywhere.mpa.drive.DriveSource.from(com.myphotosanywhere.mpa.drive.DriveConnection(
+            accountId="xmp-device",email="xmp@test",mode="APP_FILES",folderId="xmp-folder",folderName="XMP"))
+        val id="xmp-device-photo"
+        try {
+            app.database.drive().saveSource(source)
+            app.database.photos().insert(com.myphotosanywhere.mpa.data.Photo(id,"xmp-fixture.jpg","","","image/jpeg",10,1,"a".repeat(64)))
+            app.database.cloud().savePhoto(com.myphotosanywhere.mpa.drive.CloudPhoto("${source.key}:remote",source.key,"remote","xmp-folder",
+                "xmp-fixture.jpg","image/jpeg",10,"md5","1",null,null,null,null,photoId=id))
+            val original=app.metadata.snapshot(source)
+            val asset=original.assets.single().copy(favorite=true,place="Home & café",faces=listOf(
+                com.myphotosanywhere.mpa.metadata.PortableFace("xmp-device-face","xmp-device-person",true,
+                    com.myphotosanywhere.mpa.people.FaceRegion(.1f,.2f,.5f,.6f),1600,1200,"test-model")))
+            val catalog=original.copy(assets=listOf(asset),people=listOf(com.myphotosanywhere.mpa.metadata.PortablePerson("xmp-device-person","Sam")))
+            val xml=com.myphotosanywhere.mpa.metadata.XmpCodec.encode(catalog)
+            assertEquals(catalog,com.myphotosanywhere.mpa.metadata.XmpCodec.decode(xml))
+            app.metadata.applyCatalog(source,com.myphotosanywhere.mpa.metadata.XmpCodec.decode(xml),1)
+            assertTrue(requireNotNull(app.database.photos().find(id)).favorite)
+            assertEquals("Home & café",app.database.photos().find(id)?.placeLabel)
+            assertEquals(id,app.database.library().face("xmp-device-face")?.photoId)
+            assertEquals("xmp-device-person",app.database.library().face("xmp-device-face")?.personId)
+            assertEquals("a".repeat(64),app.database.photos().find(id)?.sha256)
+        } finally {
+            app.database.photos().find(id)?.let { app.database.photos().update(it.copy(archived=true)) }
+            app.database.drive().disconnectSource(source.key)
+        }
+    }
+
 }

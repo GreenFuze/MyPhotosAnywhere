@@ -43,10 +43,9 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
         if((!value.faceIndexing && !value.objectIndexing) || value.indexingPaused) {
             manager.cancelUniqueWork("mpa-local-index"); manager.cancelUniqueWork("mpa-night-index"); return
         }
-        if(value.overnightIndexing) manager.enqueueUniquePeriodicWork("mpa-night-index",ExistingPeriodicWorkPolicy.UPDATE,
+        manager.enqueueUniquePeriodicWork("mpa-night-index",ExistingPeriodicWorkPolicy.UPDATE,
             PeriodicWorkRequestBuilder<PeopleWorker>(15,java.util.concurrent.TimeUnit.MINUTES)
-                .setConstraints(Constraints.Builder().setRequiresCharging(true).setRequiresBatteryNotLow(true).build()).build())
-        else manager.cancelUniqueWork("mpa-night-index")
+                .setConstraints(Constraints.Builder().setRequiresCharging(value.overnightIndexing).setRequiresBatteryNotLow(true).build()).build())
         val scheduled=value.overnightIndexing && !manual
         val delay=if(scheduled) IndexWindow.delay(java.time.ZonedDateTime.now(),value.nightStart,value.nightEnd).toMillis() else 0L
         manager.enqueueUniqueWork("mpa-local-index",if(manual) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
@@ -102,7 +101,7 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
     }
     /** A per-photo checksum/model checkpoint survives process death; batches cap runtime and heat. */
     suspend fun index(manual: Boolean=false): Boolean = indexLock.withLock { withContext(Dispatchers.IO) {
-        if(!allowed(manual)) { report("Waiting for schedule, charging or phone to cool",0,0,0); return@withContext false }
+        if(!allowed(manual)) { report("Waiting for schedule, charging or phone to cool",0,0,0); return@withContext !settings.state.value.indexingPaused && (settings.state.value.faceIndexing || settings.state.value.objectIndexing) }
         val detector=FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setMinFaceSize(.03f).build())
         val labeler=ImageLabeling.getClient(ImageLabelerOptions.Builder().setConfidenceThreshold(.7f).build())
@@ -180,9 +179,9 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
             if(settings.state.value.faceIndexing) refreshSuggestions()
             if(changed) (context.applicationContext as MpaApplication).metadata.changed()
             val queued=queueCloud(manual)
-            val more=available.drop(done).any { needed(it) }
+            val more=db.photos().all().any { it.originalPath.isNotBlank() && File(it.originalPath).isFile && needed(it) }
             report(if(more) "More photos queued" else if(queued>0) "Waiting for $queued verified downloads" else "Available photos indexed",done,available.size,errors)
-            more && allowed(manual)
+            more && !settings.state.value.indexingPaused
         } finally { detector.close(); labeler.close(); model?.close() }
     } }
     suspend fun refreshSuggestions() {

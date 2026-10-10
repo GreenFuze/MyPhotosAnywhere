@@ -45,5 +45,6 @@ val METADATA_MIGRATION_4_5 = object : Migration(4, 5) {
         db.execSQL("ALTER TABLE face_scans ADD COLUMN modelVersion TEXT NOT NULL DEFAULT ''")
         db.execSQL("""CREATE TABLE metadata_states (bindingKey TEXT NOT NULL PRIMARY KEY, generation INTEGER NOT NULL,
             uploadedGeneration INTEGER NOT NULL, remoteId TEXT, etag TEXT, error TEXT)""")
+        com.myphotosanywhere.mpa.metadata.installMetadataTriggers(db)
     }
 }

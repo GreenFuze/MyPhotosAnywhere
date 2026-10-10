@@ -15,7 +15,8 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 data class MetadataPreview(val key: String,val remoteId: String,val etag: String,val xml: String,
-    val matching: Int,val unavailable: Int,val people: Int,val albums: Int,val globalNameChanges: Int)
+    val matching: Int,val unavailable: Int,val people: Int,val albums: Int,val globalNameChanges: Int,
+    val localRevision: String,val nameChanges: List<String>)
 
 class MetadataRepository(private val context: Context,private val database: PhotoDatabase?=null) {
     private val app get()=context.applicationContext as MpaApplication
@@ -117,6 +118,7 @@ class MetadataRepository(private val context: Context,private val database: Phot
         currentCoroutineContext().ensureActive()
         require(app.settings.state.value.sidecarBackup && db.drive().source(key)!=null) { "Annotation backup paused." }
         if(tag!=null) remote(api,source,id)
+        if(xml==oldXml && tag!=null) { db.metadata().uploaded(key,id,tag,state.generation); return@withContext }
         api.writeMetadata(id,source.folderId,xml,tag)
         // Read the authoritative revision back. If a concurrent writer won afterwards, retain our dirty outbox.
         remote(api,source,id)
@@ -133,6 +135,8 @@ class MetadataRepository(private val context: Context,private val database: Phot
             current?.let { photos[it.id] }?.let { asset.id to it }
         }.toMap()
     }
+    private fun fingerprint(catalog: XmpCatalog): String = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(XmpCodec.encode(catalog).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
     suspend fun preview(key: String): MetadataPreview = lock.withLock { withContext(Dispatchers.IO) {
         val source=db.drive().source(key) ?: error("Reconnect this Drive source.")
         val api=app.sync.api(source.connection()); val file=api.metadataFiles(source.folderId).singleOrNull() ?: error("No MPA XMP catalog found in this folder.")
@@ -142,7 +146,9 @@ class MetadataRepository(private val context: Context,private val database: Phot
         val names=db.library().allPeople().associateBy { it.id }
         MetadataPreview(key,file.id,read.second,read.first,matches.size,catalog.assets.size-matches.size,
             referenced.size,catalog.assets.filter { it.id in matches }.flatMap { it.albums }.distinct().size,
-            catalog.people.count { it.id in referenced && names[it.id]!=null && names[it.id]?.name!=it.name })
+            catalog.people.count { it.id in referenced && names[it.id]!=null && names[it.id]?.name!=it.name },
+            fingerprint(snapshot(source)),catalog.people.filter { it.id in referenced && names[it.id]!=null && names[it.id]?.name!=it.name }
+                .map { "${names[it.id]?.name} → ${it.name}" })
     } }
     suspend fun recover(preview: MetadataPreview) = lock.withLock { withContext(Dispatchers.IO) {
         val source=db.drive().source(preview.key) ?: error("Reconnect this Drive source.")
@@ -150,10 +156,18 @@ class MetadataRepository(private val context: Context,private val database: Phot
         val read=api.readMetadata(preview.remoteId)
         require(read.second==preview.etag && read.first==preview.xml) { "The XMP changed since the preview. Preview recovery again." }
         val catalog=XmpCodec.decode(read.first); checkCatalog(catalog,source)
-        app.cache.lock.withLock { db.withTransaction {
-            require(db.drive().source(preview.key)!=null)
+        val acceptedGeneration=app.cache.lock.withLock { applyCatalog(source,catalog,preview.matching,preview.localRevision) }
+        saveBase(preview.key,read.first)
+        // Recovery explicitly accepts this remote baseline; subsequent local edits can be uploaded conditionally.
+        db.metadata().uploaded(preview.key,preview.remoteId,read.second,acceptedGeneration)
+        app.people.schedule(); app.people.refreshSuggestions()
+    } }
+    internal suspend fun applyCatalog(source: DriveSource,catalog: XmpCatalog,expectedMatching: Int,expectedRevision: String?=null): Long = db.withTransaction {
+            checkCatalog(catalog,source)
+            if(expectedRevision!=null) require(fingerprint(snapshot(source))==expectedRevision) { "Local annotations changed since the preview. Preview recovery again." }
+            require(db.drive().source(source.key)!=null)
             val matches=matching(source,catalog)
-            require(matches.size==preview.matching) { "The local library changed. Preview recovery again." }
+            require(matches.size==expectedMatching) { "The local library changed. Preview recovery again." }
             val assets=catalog.assets.filter { it.id in matches }
             val personIds=assets.flatMap { it.faces }.mapNotNull { it.personId }.toSet(); val albumIds=assets.flatMap { it.albums }.toSet()
             catalog.people.filter { it.id in personIds }.forEach { db.library().savePerson(Person(it.id,it.name)) }
@@ -168,7 +182,7 @@ class MetadataRepository(private val context: Context,private val database: Phot
                 require(!duplicate) { "Two local assets claim the same portable identity. Resolve the duplicate before recovery." }
                 db.photos().update(photo.copy(metadataAssetId=asset.id,favorite=asset.favorite,archived=asset.archived,
                     placeLabel=asset.place,latitude=asset.latitude,longitude=asset.longitude,capturedAt=asset.capturedAt,
-                    parentId=asset.parentId?.let { matches[it]?.id },editProvider=asset.provider,editInstructions=asset.instructions,labels=asset.labels))
+                    parentId=asset.parentId?.let { parent -> matches[parent]?.id ?: db.photos().all().find { (it.metadataAssetId ?: it.id)==parent }?.id },editProvider=asset.provider,editInstructions=asset.instructions,labels=asset.labels))
                 allMemberships.filter { it.photoId==photo.id }.forEach { db.library().removeFromAlbum(it.albumId,photo.id) }
                 asset.albums.forEach { db.library().addToAlbum(AlbumPhoto(it,photo.id)) }
                 if(asset.recipe==null) db.library().deleteDraft(photo.id)
@@ -187,14 +201,10 @@ class MetadataRepository(private val context: Context,private val database: Phot
                 // Regenerate crops and embeddings using geometric matches on a later phone scan.
                 db.library().saveScan(FaceScan(photo.id,photo.sha256,modelVersion="restored"))
             }
-            db.metadata().insert(MetadataState(preview.key)); db.metadata().dirty(preview.key)
-        } }
-        saveBase(preview.key,read.first)
-        val state=requireNotNull(db.metadata().state(preview.key))
-        // Recovery explicitly accepts this remote baseline; subsequent local edits can be uploaded conditionally.
-        db.metadata().uploaded(preview.key,preview.remoteId,read.second,state.generation)
-        app.people.schedule(); app.people.refreshSuggestions()
-    } }
+            db.metadata().insert(MetadataState(source.key)); db.metadata().dirty(source.key)
+            requireNotNull(db.metadata().state(source.key)).generation
+    }
+
     companion object { const val TAG="mpa-xmp-backup" }
 }
 class MetadataWorker(context: Context,params: WorkerParameters): CoroutineWorker(context,params) {

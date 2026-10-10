@@ -62,4 +62,22 @@ class MediaCacheTest {
             assertEquals(file.absolutePath,db.photos().find("id")?.originalPath);assertTrue(file.exists())
         } finally { db.close();file.delete() }
     }
+    @Test fun originalsAwaitingAnEnabledScanAreProtectedUntilTheModelCheckpointExists() = runBlocking {
+        val context=RuntimeEnvironment.getApplication()
+        val db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).build()
+        val file=File.createTempFile("scan-cache",".jpg",context.filesDir)
+        try {
+            file.writeText("original")
+            val photo=Photo("pending","photo.jpg",file.absolutePath,"","image/jpeg",8,1,"hash",
+                sourceBindingKey="source",sourceRemoteId="remote",cachedVersion="1")
+            db.photos().insert(photo)
+            db.cloud().savePhoto(CloudPhoto("source:remote","source","remote","folder","photo.jpg","image/jpeg",8,"md5","1",null,null,null,null,photoId=photo.id))
+            val settings=LibrarySettings(context).apply { update(state.value.copy(originalBudget=0,faceIndexing=true)) }
+            val cache=MediaCache(context,db,settings) { _,_ -> true }
+            cache.enforce(); assertTrue(file.isFile)
+            db.library().saveScan(FaceScan(photo.id,photo.sha256,modelVersion=com.myphotosanywhere.mpa.people.PeopleRepository.SCAN_VERSION))
+            cache.enforce(); assertFalse(file.isFile); assertEquals("",db.photos().find(photo.id)?.originalPath)
+        } finally { db.close(); file.delete() }
+    }
+
 }
