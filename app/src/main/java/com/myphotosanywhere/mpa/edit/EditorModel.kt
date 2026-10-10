@@ -65,6 +65,13 @@ class EditorModel(application: Application): AndroidViewModel(application) {
                     val bitmap=PhotoRenderer.render(file,value)
                     try { temp.outputStream().use { out -> check(bitmap.compress(Bitmap.CompressFormat.JPEG,95,out)); out.fd.sync() } }
                     finally { bitmap.recycle() }
+                    photo.capturedAt?.let { captured ->
+                        val exif=ExifInterface(temp)
+                        exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL,java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss",java.util.Locale.US).apply {
+                            timeZone=java.util.TimeZone.getTimeZone("UTC")
+                        }.format(java.util.Date(captured)))
+                        exif.setAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL,"+00:00");exif.saveAttributes()
+                    }
                     if(value.keepLocation && photo.latitude!=null && photo.longitude!=null) {
                         val exif=ExifInterface(temp); exif.setLatLong(photo.latitude,photo.longitude); exif.saveAttributes()
                     }
@@ -76,7 +83,10 @@ class EditorModel(application: Application): AndroidViewModel(application) {
                         capturedAt=source.capturedAt ?: source.importedAt,placeLabel=if(value.keepLocation) source.placeLabel else ""))
                     app.database.library().deleteDraft(id)
                 }
-                app.drive.enqueue(app.database.photos().find(result.id) ?: result); app.people.schedule()
+                try { app.drive.enqueue(app.database.photos().find(result.id) ?: result) }
+                catch(e: CancellationException) { throw e }
+                catch(_: Exception) { /* The next backup resume queues the durable edited copy. */ }
+                app.people.schedule()
                 savedId.value=result.id
             } catch(e: CancellationException) { throw e }
             catch(e: Exception) { error.value=e.message ?: "Could not save this edit." }

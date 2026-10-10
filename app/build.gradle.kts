@@ -14,6 +14,7 @@ android {
         targetSdk = 35
         versionCode = 3
         versionName = "0.3.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -51,6 +52,11 @@ dependencies {
     implementation("com.google.mlkit:image-labeling:17.0.9")
     implementation("org.tensorflow:tensorflow-lite:2.17.0")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2025.04.01"))
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.robolectric:robolectric:4.14.1")
@@ -60,7 +66,7 @@ ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
 val fetchFaceModel by tasks.registering(Exec::class) {
     workingDir(rootProject.projectDir)
-    commandLine("python3", "scripts/fetch_face_model.py")
+    commandLine(System.getenv("MPA_PYTHON") ?: "python3", "scripts/fetch_face_model.py")
 }
 tasks.configureEach {
     if (name.matches(Regex("merge.*Assets"))) dependsOn(fetchFaceModel)

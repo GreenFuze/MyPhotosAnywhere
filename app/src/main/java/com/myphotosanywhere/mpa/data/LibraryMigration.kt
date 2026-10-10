@@ -23,7 +23,7 @@ val LIBRARY_MIGRATION_2_3 = object : Migration(2, 3) {
         db.execSQL("""CREATE TABLE cloud_photos (key TEXT NOT NULL PRIMARY KEY, bindingKey TEXT NOT NULL, remoteId TEXT NOT NULL,
             parentId TEXT NOT NULL, name TEXT NOT NULL, mimeType TEXT NOT NULL, bytes INTEGER NOT NULL, md5 TEXT, version TEXT,
             modifiedTime TEXT, capturedAt INTEGER, latitude REAL, longitude REAL, thumbnailPath TEXT NOT NULL,
-            thumbnailVersion TEXT, photoId TEXT, removed INTEGER NOT NULL, seenGeneration TEXT NOT NULL, assetId TEXT, sourceAssetId TEXT)""")
+            thumbnailVersion TEXT, photoId TEXT, removed INTEGER NOT NULL, seenGeneration TEXT NOT NULL, assetId TEXT, sourceAssetId TEXT, thumbnailUpdatedAt INTEGER NOT NULL)""")
         db.execSQL("CREATE INDEX index_cloud_photos_bindingKey ON cloud_photos(bindingKey)")
         db.execSQL("CREATE INDEX index_cloud_photos_photoId ON cloud_photos(photoId)")
         db.execSQL("""CREATE TABLE cloud_folders (bindingKey TEXT NOT NULL, remoteId TEXT NOT NULL, parentId TEXT,

@@ -11,7 +11,9 @@
 
 ## Milestones and acceptance criteria
 
-Progress: the 0.1 offline/handoff implementation passed unit tests, lint, and APK assembly. The 0.2 implementation adds account authorization, paginated My Drive folder browsing/creation, immutable account/folder task binding, resumable background upload with verified checksums, and direct-child image downloads. Database upgrade and network-boundary tests are included. Google-project setup and live-account/device tests remain necessary. Initial uploads are stored directly in the selected folder; owned subfolder organization, recursive discovery, Drive changes tokens, thumbnail indexing, and cache-budget enforcement are still outstanding milestone 2/3 work.
+Progress: 0.1 and 0.2 passed unit tests, lint, and APK assembly; the user has since confirmed Google setup works on their phone. The 0.3 implementation covers image editing, local albums/favorites/archive, video import/playback, optional local people/object indexing, map/place browsing, recursive Drive discovery/change checkpoints, thumbnails, queued verified downloads, and protected cache eviction. It is undergoing CI and emulator verification. Read [FEATURES_0_3.md](FEATURES_0_3.md) for exact behavior and residual work.
+
+Current storage layout keeps uploads directly in the chosen folder for compatibility with 0.2. Recursive indexing supports existing subfolders without reorganizing unrelated files. Biometric data and user library metadata stay local. Future owned subfolder layout, encrypted metadata recovery, production signing, calibrated recognition, pet identities, and video editing remain separate roadmap work.
 
 ### 1. Offline gallery and AI round trip (first implementation)
 

@@ -23,8 +23,8 @@ fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<Fa
     var mergeTarget by remember { mutableStateOf<Person?>(null) }
     val groups by produceState<List<List<String>>>(emptyList(),faces) { value=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val unknown=faces.filter { it.personId==null }
-        val matched=FaceMatching.clusters(unknown.mapNotNull { f -> f.embedding?.let { f.id to FaceMatching.decode(it) } })
-        matched + unknown.filter { it.embedding==null }.map { listOf(it.id) }
+        val matched=FaceMatching.clusters(unknown.mapNotNull { f -> if(f.corrected) null else f.embedding?.let { f.id to FaceMatching.decode(it) } })
+        matched + unknown.filter { it.embedding==null || it.corrected }.map { listOf(it.id) }
     } }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {

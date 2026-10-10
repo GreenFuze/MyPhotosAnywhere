@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -139,12 +140,17 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
                     } else LazyVerticalGrid(columns=GridCells.Adaptive(110.dp),contentPadding=PaddingValues(8.dp),
                         horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.spacedBy(4.dp),modifier=Modifier.weight(1f)) {
                         items(local,key={ it.id }) { photo ->
-                            PhotoTile(photo,features) { selectPhoto(photo.id) }
+                            val cloudRow=cloud.find { it.photoId==photo.id }
+                            PhotoTile(photo,features,cloudRow?.thumbnailUpdatedAt ?: 0,cloudRow) { selectPhoto(photo.id) }
                         }
                         items(remote,key={ "cloud:${it.key}" }) { row ->
+                            LaunchedEffect(row.key,row.thumbnailUpdatedAt) {
+                                com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(context,row,connection)
+                            }
                             Card(Modifier.aspectRatio(1f).clickable { features.download(row) }) {
                                 Box(Modifier.fillMaxSize()) {
-                                    AsyncImage(File(row.thumbnailPath),row.name,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+                                    AsyncImage(coil.request.ImageRequest.Builder(context).data(File(row.thumbnailPath))
+                                        .memoryCacheKey("${row.key}:${row.thumbnailUpdatedAt}").build(),row.name,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
                                     Surface(Modifier.align(Alignment.BottomStart),color=MaterialTheme.colorScheme.surface.copy(alpha=.85f)) {
                                         Text(if(downloads.any { it.key==row.key && it.state in listOf("PENDING","DOWNLOADING","RETRYING") }) "Downloading…" else "☁ ${row.name}",maxLines=2,
                                             modifier=Modifier.padding(4.dp),style=MaterialTheme.typography.labelSmall)
@@ -188,11 +194,15 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
 }
 
 @Composable
-private fun PhotoTile(photo: Photo,features: LibraryFeaturesModel,onClick: ()->Unit) {
-    val thumb by produceState<File?>(null,photo.id,photo.originalPath) { value=runCatching { features.app.cache.thumbnail(photo) }.getOrNull() }
-    Card(Modifier.aspectRatio(1f).clickable(onClick=onClick)) {
+private fun PhotoTile(photo: Photo,features: LibraryFeaturesModel,thumbnailVersion: Long,cloudRow: com.myphotosanywhere.mpa.drive.CloudPhoto?,onClick: ()->Unit) {
+    val thumb by produceState<File?>(null,photo.id,photo.originalPath,thumbnailVersion) { value=runCatching { features.app.cache.thumbnail(photo) }.getOrNull() }
+    LaunchedEffect(photo.id,thumbnailVersion) {
+        if(cloudRow!=null) com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(features.app,cloudRow,features.connection.value)
+    }
+    Card(Modifier.aspectRatio(1f).testTag("photo:${photo.id}").clickable(onClick=onClick)) {
         Box(Modifier.fillMaxSize()) {
-            AsyncImage(thumb ?: File(photo.thumbnailPath),photo.displayName,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+            AsyncImage(coil.request.ImageRequest.Builder(features.app).data(thumb ?: File(photo.thumbnailPath))
+                .memoryCacheKey("${photo.id}:$thumbnailVersion:${photo.originalPath}").build(),photo.displayName,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
             val label=listOfNotNull(if(photo.favorite) "★" else null,if(photo.pinned) "↓" else null,
                 if(photo.originalPath.isBlank()) "☁" else null,if(photo.mimeType.startsWith("video/")) "▶" else null,
                 if(photo.parentId!=null) "Edit" else null).joinToString(" ")

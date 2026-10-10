@@ -85,7 +85,10 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
     suspend fun thumbnail(photo: Photo): File? = withContext(Dispatchers.IO) {
         val target=File(photo.thumbnailPath)
         if(target.isFile) { target.setLastModified(System.currentTimeMillis()); return@withContext target }
-        if(photo.originalPath.isBlank()) return@withContext null
+        if(photo.originalPath.isBlank()) {
+            val row=database.cloud().photo("${photo.sourceBindingKey}:${photo.sourceRemoteId}")
+            return@withContext row?.thumbnailPath?.let { File(it) }?.takeIf { it.isFile }
+        }
         withOriginal(photo.id) { _,file ->
             target.parentFile?.mkdirs()
             val bitmap=PhotoRepository.mediaPreview(file,photo.mimeType,480)

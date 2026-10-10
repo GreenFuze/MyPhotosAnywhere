@@ -124,6 +124,11 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
                     retriever.getScaledFrameAtTime(0,android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
                         maxOf(1,(width*scale).toInt()),maxOf(1,(height*scale).toInt())) ?: error("No video preview.")
                 } else {
+                    val width=retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toLongOrNull() ?: 0
+                    val height=retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toLongOrNull() ?: 0
+                    require(width>0 && height>0 && width*height<=Runtime.getRuntime().maxMemory()/16) {
+                        "This video resolution is too large to preview on Android 8. Use a newer device or a smaller clip."
+                    }
                     val image=retriever.getFrameAtTime(0) ?: error("No video preview.")
                     val scale=minOf(1.0,maximum.toDouble()/maxOf(image.width,image.height))
                     val small=Bitmap.createScaledBitmap(image,maxOf(1,(image.width*scale).toInt()),maxOf(1,(image.height*scale).toInt()),true)
@@ -133,8 +138,10 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
             } finally { retriever.release() }
         }
 
-        fun preview(file: File, maxDimension: Int): Bitmap {
-            require(maxDimension > 0)
+        fun preview(file: File, requestedDimension: Int): Bitmap {
+            require(requestedDimension > 0)
+            // Rendering can hold several bitmaps. Adapt the upper bound to smaller phone heaps.
+            val maxDimension=minOf(requestedDimension,kotlin.math.sqrt(Runtime.getRuntime().maxMemory()/32.0).toInt().coerceAtLeast(480))
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 return ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder, info, _ ->
                     val scale = minOf(1.0, maxDimension.toDouble() / maxOf(info.size.width, info.size.height))

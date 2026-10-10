@@ -57,7 +57,7 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
             ensureBinding(binding)
             val completed=cloud.sync(binding) ?: previous
             cloud.saveSync(completed.copy(running=false,error=null))
-        } catch(e: CancellationException) { cloud.saveSync((cloud.sync(binding) ?: previous).copy(running=false)); throw e }
+        } catch(e: CancellationException) { withContext(NonCancellable) { cloud.saveSync((cloud.sync(binding) ?: previous).copy(running=false)) }; throw e }
         catch(e: Exception) { cloud.saveSync((cloud.sync(binding) ?: previous).copy(running=false,error=e.message ?: "Drive sync failed.")); throw e }
     }
     }
@@ -154,9 +154,9 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
         cloud.savePhoto(CloudPhoto("$binding:${file.id}",binding,file.id,parent,file.name,file.mimeType,file.bytes,file.md5,
             file.version,file.modifiedTime,file.capturedAt,file.latitude,file.longitude,
             old?.thumbnailPath ?: File(context.filesDir,"cloud-thumbnails/$binding/${file.id}.jpg").absolutePath,
-            old?.thumbnailVersion,old?.photoId ?: backup?.photoId,false,generation,file.assetId,file.sourceAssetId))
+            old?.thumbnailVersion,old?.photoId ?: backup?.photoId,false,generation,file.assetId,file.sourceAssetId,old?.thumbnailUpdatedAt ?: 0))
     }
-    private suspend fun thumbnail(api: DriveGateway,binding: String,file: DriveFile) {
+    suspend fun thumbnail(api: DriveGateway,binding: String,file: DriveFile) {
         val row=cloud.photo("$binding:${file.id}") ?: return
         if(row.thumbnailVersion==file.version && File(row.thumbnailPath).isFile) return
         val link=file.thumbnailLink ?: return
@@ -169,7 +169,7 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
             finally { bitmap.recycle() }
             app.cache.lock.withLock {
                 val current=cloud.photo(row.key) ?: return@withLock
-                if(current.version==file.version && temp.renameTo(target)) cloud.savePhoto(current.copy(thumbnailVersion=file.version))
+                if(current.version==file.version && temp.renameTo(target)) cloud.savePhoto(current.copy(thumbnailVersion=file.version,thumbnailUpdatedAt=System.currentTimeMillis()))
             }
         } catch(e: CancellationException) { throw e }
         catch(_: Exception) { /* The metadata remains browsable when a thumbnail is unavailable. */ }

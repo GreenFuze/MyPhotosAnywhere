@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -96,7 +97,7 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
             }
             onResult?.let { OutlinedButton(onClick=it) { Text("Import AI result") } }
         }
-    },confirmButton={ Button(enabled=available && !busy && photo.mimeType.startsWith("image/"),onClick=onEdit) { Text("Edit") } },
+    },confirmButton={ Button(modifier=Modifier.testTag("photo-edit"),enabled=available && !busy && photo.mimeType.startsWith("image/"),onClick=onEdit) { Text("Edit") } },
         dismissButton={ TextButton(onClick=onClose) { Text("Close") } })
     if(collections) AlertDialog(onDismissRequest={ collections=false },title={ Text("Albums") },text={
         Column(Modifier.verticalScroll(rememberScrollState())) {

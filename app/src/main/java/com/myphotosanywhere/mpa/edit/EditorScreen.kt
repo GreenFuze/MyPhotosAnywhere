@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,7 +39,7 @@ fun EditorScreen(photoId: String,onClose: ()->Unit,onSaved: (String)->Unit,model
                 Row(Modifier.fillMaxWidth().padding(12.dp),horizontalArrangement=Arrangement.SpaceBetween) {
                     TextButton(enabled=!busy,onClick=onClose) { Text("Close") }
                     Text("Edit photo",style=MaterialTheme.typography.titleLarge,modifier=Modifier.padding(top=12.dp))
-                    Button(enabled=!busy && image!=null,onClick=model::save) { Text("Save copy") }
+                    Button(modifier=Modifier.testTag("editor-save"),enabled=!busy && image!=null,onClick=model::save) { Text("Save copy") }
                 }
                 if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 error?.let { Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.padding(12.dp)) }

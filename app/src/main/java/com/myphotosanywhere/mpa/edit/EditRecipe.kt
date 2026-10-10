@@ -11,7 +11,7 @@ data class EditRecipe(val left: Float = 0f, val top: Float = 0f, val right: Floa
     val filter: String = "Original", val strokes: List<Stroke> = emptyList(), val keepLocation: Boolean = false) {
     fun validate(): EditRecipe {
         require(listOf(left,top,right,bottom,straighten,exposure,contrast,saturation,warmth).all { it.isFinite() })
-        require(left >= 0 && top >= 0 && right <= 1 && bottom <= 1 && right-left >= .05f && bottom-top >= .05f)
+        require(left >= 0 && top >= 0 && right <= 1 && bottom <= 1 && right-left >= .04999f && bottom-top >= .04999f)
         require(quarterTurns in 0..3 && straighten in -15f..15f && exposure in -2f..2f && contrast in .5f..2f &&
             saturation in 0f..2f && warmth in -1f..1f && filter in FILTERS)
         require(strokes.size <= 100 && strokes.all { it.width in .002f.. .05f && it.points.size <= 4000 &&

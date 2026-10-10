@@ -9,7 +9,7 @@ data class CloudPhoto(@PrimaryKey val key: String, val bindingKey: String, val r
     val md5: String?, val version: String?, val modifiedTime: String?, val capturedAt: Long?,
     val latitude: Double?, val longitude: Double?, val thumbnailPath: String = "",
     val thumbnailVersion: String? = null, val photoId: String? = null, val removed: Boolean = false,
-    val seenGeneration: String = "", val assetId: String? = null, val sourceAssetId: String? = null)
+    val seenGeneration: String = "", val assetId: String? = null, val sourceAssetId: String? = null, val thumbnailUpdatedAt: Long = 0)
 @Entity(tableName = "cloud_folders", primaryKeys = ["bindingKey", "remoteId"])
 data class CloudFolder(val bindingKey: String, val remoteId: String, val parentId: String?, val name: String,
     val seenGeneration: String)
