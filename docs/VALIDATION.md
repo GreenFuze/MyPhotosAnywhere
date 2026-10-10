@@ -1,5 +1,13 @@
 # Validation status and device checklist
 
+## MPA 0.4.3 face grouping and review
+
+Source `21f826723bb45a93d7a5aa80dee0d84b0ac39621` passed **95 unit/integration tests**, Android lint with zero errors, APK assembly and **nine Android 10 (API 29) emulator tests**, with zero failures, errors or skipped cases. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38073741495) · [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38073741460).
+
+New regressions verify two appearances group without enrollment, grouping remains consistent across input order, separate faces in one photo do not group or suggest the person already present, naming one appearance suggests another, incompatible/missing/invalid vectors stay reviewable, weak and ambiguous matches expose their scores, and manual corrections remain respected. A Room regression invalidates successful scan checkpoints across two sources while retaining original photo rows, names, corrected face regions and embeddings, and preserves indexing opt-in. The native UI test scrolls to a separate face, opens its missing-recognition-data diagnostic and opens/cancels full rescan without deleting the face or resuming paused scans.
+
+The established signer is unchanged (`A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`); generated Room v5 schema matches the committed schema. The bundled model, alignment and experimental similarity gates are unchanged. Synthetic regressions and inference smoke checks verify behavior, not real-photo recognition accuracy. The reported three-photo case still needs the [phone diagnostic retest](releases/v0.4.3.md#three-photo-phone-retest). The owner confirmed existing-folder Google authorization works after the 0.4.2 setup correction.
+
 ## MPA 0.4.2 Google authorization diagnostics
 
 Source `c878da08d73dc600c07d53cf77816abffa7c8e30` passed **88 unit/integration tests**, Android lint with zero errors, APK assembly and **eight Android 10 (API 29) emulator tests**, with zero failures, errors or skipped cases. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38069967248) · [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38069967298).
