@@ -40,6 +40,17 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
         report("Scan queued",0,0,0)
         schedule(true)
     }
+    /** Invalidate successful checkpoints as well, retaining stable regions and all corrections. */
+    internal suspend fun resetFaceScans() = indexLock.withLock {
+        require(settings.state.value.faceIndexing) { "Enable on-device face indexing first." }
+        db.withTransaction { db.library().deleteScans() }
+        settings.update(settings.state.value.copy(indexingPaused=false))
+    }
+    suspend fun rescanFaces() {
+        resetFaceScans()
+        report("Face rescan queued",0,0,0)
+        schedule(true)
+    }
     fun schedule(manual: Boolean=false) {
         val value=settings.state.value; val manager=WorkManager.getInstance(context)
         if((!value.faceIndexing && !value.objectIndexing) || value.indexingPaused) {
@@ -188,11 +199,13 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
     } }
     suspend fun refreshSuggestions() {
         val faces=db.library().allFaces()
-        val confirmed=faces.filter { it.modelVersion==null || it.modelVersion==MODEL_VERSION }.mapNotNull { f -> if(f.personId==null || f.embedding==null) null else f.personId to FaceMatching.decode(f.embedding) }
-        db.withTransaction { faces.filter { it.personId==null && !it.corrected && it.embedding!=null && (it.modelVersion==null || it.modelVersion==MODEL_VERSION) }.forEach { f ->
-            val suggestion=FaceMatching.suggest(FaceMatching.decode(requireNotNull(f.embedding)),confirmed)
+        val diagnostics=FaceReview.assess(faces,MODEL_VERSION)
+        db.withTransaction { faces.filter { it.personId==null }.forEach { f ->
+            val assessment=diagnostics[f.id]?.takeIf { it.status==FaceReview.Status.SUGGESTED }?.named
+            val suggestion=assessment?.nearest
             val latest=db.library().face(f.id)
-            if(latest!=null && latest.personId==null && !latest.corrected) db.library().saveFace(latest.copy(suggestedPersonId=suggestion?.first,similarity=suggestion?.second))
+            if(latest!=null && latest.personId==null && !latest.corrected && latest.modelVersion==f.modelVersion &&
+                latest.embedding.contentEquals(f.embedding)) db.library().saveFace(latest.copy(suggestedPersonId=suggestion?.first,similarity=suggestion?.second))
         } }
     }
     suspend fun assign(faceIds: List<String>,person: Person) {

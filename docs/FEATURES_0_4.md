@@ -1,6 +1,18 @@
-# MPA 0.4.2: behavior and phone verification
+# MPA 0.4.3: behavior and phone verification
 
 This is an installable development build for testing, using the same debug signer as 0.3 and the 0.4 alphas. It is not a Google Photos quality recognition claim. Android 8+ is supported; automated device checks use Android 10. Keep independent backups of your photos.
+
+## Face grouping and review in 0.4.3
+
+Two usable appearances can form an unnamed group without a named reference or a large enrollment collection. Groups are deterministic across input order, require every pair to pass the existing similarity gate, and keep separate detections in one photo apart. Incompatible or invalid vectors remain available for manual naming. Naming a group applies to the selected appearances once; review includes each crop and a checkbox to leave unrelated faces out.
+
+After naming an appearance, compatible matches are shown under that person's card as **Review N possible matches**. Confirm the selected crops to include them in the person's photos. The model and experimental similarity thresholds are unchanged; automatic suggestions still require review.
+
+**Why separate?** explains missing/invalid recognition data, incompatible model versions, earlier manual corrections, insufficient similarity and ambiguous named matches. It shows actual local cosine scores and the closest compatible face in another photo. A detected face can lack an embedding: the current extractor rejects some small, angled or poorly aligned faces. Old scans do not record the specific extraction rejection, so the diagnostic cannot identify which gate failed.
+
+**Rescan all faces** invalidates successful as well as failed checkpoints, preserves names/corrections/regions, and queues phone inference again. Evicted connected originals may be downloaded using the existing network preferences. **Scan now** continues to process new and failed photos without repeating successful unchanged scans. Stable geometry matches retain reviewed assignments; ambiguous and legacy regions stay available for manual review.
+
+For the three-photo phone test: upgrade without uninstalling, open People, choose Rescan all faces, wait for completion, then check unnamed groups and possible matches under each named person. For any separate appearance, open Why separate? and report its status, closest named score and closest-face score. Similarity scores are not identity probabilities. More examples can help pose/lighting coverage; they are not needed to train the bundled pretrained model.
 
 ## Google authorization diagnostics in 0.4.2
 

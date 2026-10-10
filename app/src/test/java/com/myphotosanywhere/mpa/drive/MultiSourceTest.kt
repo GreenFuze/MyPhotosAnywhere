@@ -105,6 +105,34 @@ class MultiSourceTest {
         assertEquals("sam",db.library().face("face")?.personId)
     }
 
+    @Test fun fullFaceRescanInvalidatesSuccessfulCheckpointsAcrossSourcesWithoutLosingCorrections() = runBlocking {
+        val settings=LibrarySettings(context)
+        val original=settings.state.value
+        try {
+            settings.update(original.copy(faceIndexing=true,indexingPaused=true))
+            val repo=PeopleRepository(context,db,MediaCache(context,db,settings),settings)
+            val embedding=FaceMatching.encode(FloatArray(128) { if(it==0) 1f else 0f })
+            for((id,source) in listOf("a" to source("alice","family"),"b" to source("bob","travel"))) {
+                db.drive().saveSource(source)
+                db.photos().insert(Photo(id,"$id.jpg","/$id","/thumb","image/jpeg",8,1,"sha-$id",sourceBindingKey=source.key))
+                db.library().saveScan(FaceScan(id,"sha-$id",modelVersion=PeopleRepository.SCAN_VERSION))
+            }
+            val corrected=FaceRecord("face","a","/face",embedding,personId="sam",corrected=true,
+                left=.1f,top=.1f,right=.5f,bottom=.5f,modelVersion=PeopleRepository.MODEL_VERSION)
+            db.library().savePerson(Person("sam","Sam")); db.library().saveFace(corrected)
+            repo.resetFaceScans()
+            assertNull(db.library().scan("a")); assertNull(db.library().scan("b"))
+            val retained=requireNotNull(db.library().face("face"))
+            assertEquals("sam",retained.personId); assertTrue(retained.corrected)
+            assertEquals(corrected.left,retained.left); assertArrayEquals(embedding,retained.embedding)
+            assertEquals(listOf(Person("sam","Sam")),db.library().allPeople())
+            assertEquals(2,db.photos().all().size); assertFalse(settings.state.value.indexingPaused)
+            settings.update(settings.state.value.copy(faceIndexing=false))
+            try { repo.resetFaceScans(); fail("Rescan bypassed face-indexing consent") }
+            catch(_: IllegalArgumentException) { }
+        } finally { settings.update(original) }
+    }
+
     @Test fun aFreshSharedCopyCannotRelinkAStaleSnapshot() = runBlocking {
         val a=source("alice","parent"); val b=source("alice","child")
         db.drive().saveSource(a); db.drive().saveSource(b)

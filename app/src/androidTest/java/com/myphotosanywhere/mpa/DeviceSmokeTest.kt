@@ -138,7 +138,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
-        compose.onNodeWithText("MPA 0.4.2 (8)",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.4.3 (9)",substring=true).assertExists()
         val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
         assertEquals("com.myphotosanywhere.mpa",info.packageName)
         assertTrue(info.sha1.isNotEmpty())
@@ -162,6 +162,28 @@ class DeviceSmokeTest {
             compose.onNodeWithText("Enable on-device scanning").assertIsDisplayed()
             compose.onNodeWithText("Cancel").performClick()
         } finally { app.settings.update(original) }
+    }
+
+    @Test fun peopleExplainMissingRecognitionDataAndOfferARescanWithoutDeletingNames() = runBlocking<Unit> {
+        val original=app.settings.state.value
+        val photo="diagnostic-photo"; val face="diagnostic-face"
+        try {
+            app.settings.update(original.copy(faceIndexing=true,indexingPaused=true))
+            app.database.library().saveFace(com.myphotosanywhere.mpa.data.FaceRecord(face,photo,"",null,
+                modelVersion=com.myphotosanywhere.mpa.people.PeopleRepository.MODEL_VERSION))
+            compose.onNode(hasText("People") and hasClickAction()).performClick()
+            compose.onNodeWithTag("face-why:$face").performScrollTo().performClick()
+            compose.waitUntil(30000) { compose.onAllNodesWithText("Face detected, but no usable recognition data",substring=true).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Close").performClick()
+            compose.onNodeWithTag("rescan-faces").performScrollTo().performClick()
+            compose.onNodeWithText("Rescan all faces?").assertIsDisplayed()
+            compose.onNodeWithText("Cancel").performClick()
+            assertNotNull(app.database.library().face(face))
+            assertTrue(app.settings.state.value.indexingPaused)
+        } finally {
+            app.database.library().deletePhotoFaces(photo)
+            app.settings.update(original)
+        }
     }
 
     @Test fun originalRegionsRetainSinglePixelDetailBeyondTheOld2048Limit() {

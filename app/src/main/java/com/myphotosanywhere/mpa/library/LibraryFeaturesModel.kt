@@ -102,6 +102,7 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
     fun trimCache(clear: Boolean = false) = perform { message.value=app.cache.enforce(clear) }
     fun deletePeopleIndex() = perform { app.people.deleteIndex(); message.value="Face crops, names, and embeddings deleted from this phone." }
     fun scanFaces() = perform { app.people.scanNow(); message.value="On-device scan queued; global identities are shared across all connected sources." }
+    fun rescanFaces() = perform { app.people.rescanFaces(); message.value="Full face rescan queued. Existing names and corrections are preserved; connected originals may be downloaded again." }
     fun pauseIndexing() { app.people.pause() }
     fun previewMetadata(key: String) = perform { metadataPreview.value=app.metadata.preview(key) }
     fun recoverMetadata() = perform {

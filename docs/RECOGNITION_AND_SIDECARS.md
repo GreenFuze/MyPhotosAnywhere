@@ -1,3 +1,9 @@
+# Current grouping implementation (0.4.3)
+
+The sections below contain the original design research and historical 0.3 status. Current code uses stable normalized regions and model-versioned embeddings; XMP recovery and shared identities across Drive sources shipped in 0.4. See [current behavior and phone tests](FEATURES_0_4.md).
+
+0.4.3 adds model-safe deterministic unnamed groups, a cooccurrence guard, crop selection when naming a group, named-person candidate review, local similarity diagnostics and an explicit rescan that invalidates successful checkpoints while preserving reviewed assignments. The MobileFaceNet model, alignment preprocessing and experimental 0.72 similarity / 0.08 margin gates remain unchanged. Synthetic regression and model-contract tests do not measure recognition accuracy. Phone diagnostics from the reported three-photo case are needed before selecting preprocessing or threshold changes.
+
 # People, pets, and portable metadata: next milestone
 
 Status: researched design, not functionality shipped in the 0.3 APK. The owner has made recognition quality a priority and requested metadata sidecars. This document records the storage direction and measurable implementation gates. Exact models and release thresholds remain subject to evaluation. Cats/dogs are the provisional first pet scope, pending the owner's reply.

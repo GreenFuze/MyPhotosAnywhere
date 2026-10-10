@@ -26,19 +26,28 @@ object FaceMatching {
         require(a.size==DIMENSIONS && b.size==DIMENSIONS)
         return a.indices.sumOf { a[it].toDouble()*b[it] }.toFloat().coerceIn(-1f,1f)
     }
-    fun suggest(query: FloatArray,confirmed: List<Pair<String,FloatArray>>): Pair<String,Float>? {
+    data class Assessment(val nearest: Pair<String,Float>?,val runnerUp: Pair<String,Float>?) {
+        val accepted: Boolean get() = nearest?.second?.let { score ->
+            score>=MIN_SIMILARITY && (runnerUp==null || score-runnerUp.second>=MIN_MARGIN)
+        }==true
+    }
+    fun assess(query: FloatArray,confirmed: List<Pair<String,FloatArray>>): Assessment {
         val candidates=confirmed.groupBy { it.first }.map { (person,faces) ->
             person to faces.maxOf { cosine(query,it.second) }
-        }.sortedByDescending { it.second }
-        val first=candidates.firstOrNull() ?: return null
-        if(first.second<MIN_SIMILARITY || candidates.getOrNull(1)?.let { first.second-it.second<MIN_MARGIN }==true) return null
-        return first
+        }.sortedWith(compareByDescending<Pair<String,Float>> { it.second }.thenBy { it.first })
+        return Assessment(candidates.firstOrNull(),candidates.getOrNull(1))
+    }
+    fun suggest(query: FloatArray,confirmed: List<Pair<String,FloatArray>>): Pair<String,Float>? {
+        val result=assess(query,confirmed)
+        return result.nearest.takeIf { result.accepted }
     }
     /** Complete-link clusters prevent a chain of weak matches from merging unrelated faces. */
-    fun clusters(faces: List<Pair<String,FloatArray>>): List<List<String>> {
+    fun clusters(faces: List<Pair<String,FloatArray>>,canGroup: (String,String)->Boolean = { _,_ -> true }): List<List<String>> {
         val groups=mutableListOf<MutableList<Pair<String,FloatArray>>>()
-        faces.forEach { candidate ->
-            val matching=groups.filter { group -> group.all { cosine(candidate.second,it.second)>=MIN_SIMILARITY } }
+        faces.sortedBy { it.first }.forEach { candidate ->
+            val matching=groups.filter { group -> group.all {
+                canGroup(candidate.first,it.first) && cosine(candidate.second,it.second)>=MIN_SIMILARITY
+            } }
             if(matching.size==1) matching.first().add(candidate) else groups.add(mutableListOf(candidate))
         }
         return groups.map { group -> group.map { it.first } }
