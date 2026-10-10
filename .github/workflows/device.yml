@@ -34,7 +34,7 @@ jobs:
           script: |
             ./gradlew connectedDebugAndroidTest --no-daemon
             mkdir -p app/build/reports/androidTests/screenshots
-            adb exec-out run-as com.myphotosanywhere.mpa cat files/device-preview.png > app/build/reports/androidTests/screenshots/mpa-edit.png
+            adb pull /sdcard/Download/MPA/device-preview.png app/build/reports/androidTests/screenshots/mpa-edit.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -48,9 +48,19 @@ class DeviceSmokeTest {
             assertEquals("MPA",result.editProvider);assertTrue(File(result.originalPath).isFile)
             assertEquals(hash,DriveBackupWorker.digest(File(photo.originalPath),"SHA-256"))
             val screenshot=InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
-            if(screenshot!=null) try { File(app.filesDir,"device-preview.png").outputStream().use {
-                screenshot.compress(Bitmap.CompressFormat.PNG,100,it)
-            } } finally { screenshot.recycle() }
+            assertNotNull(screenshot)
+            if(screenshot!=null) try {
+                if(android.os.Build.VERSION.SDK_INT>=29) {
+                    val values=android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"device-preview.png")
+                        put(android.provider.MediaStore.MediaColumns.MIME_TYPE,"image/png")
+                        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA")
+                    }
+                    val uri=requireNotNull(app.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,values))
+                    app.contentResolver.openOutputStream(uri)?.use { check(screenshot.compress(Bitmap.CompressFormat.PNG,100,it)) }
+                        ?: error("Cannot save device screenshot.")
+                }
+            } finally { screenshot.recycle() }
         } finally { fixture.delete() }
     }
     @Test fun bundledModelRunsOnAndroidAndDetectorCanProcessAnImageOffline() = runBlocking<Unit> {
