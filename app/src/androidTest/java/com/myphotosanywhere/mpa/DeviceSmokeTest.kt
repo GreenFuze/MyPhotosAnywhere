@@ -80,7 +80,7 @@ class DeviceSmokeTest {
         try {
             java.util.zip.ZipOutputStream(archive.outputStream()).use { zip ->
                 zip.putNextEntry(java.util.zip.ZipEntry("Album/p.jpg")); zip.write(byteArrayOf(1,2,3,4)); zip.closeEntry()
-                zip.putNextEntry(java.util.zip.ZipEntry("Album/p.jpg.json")); zip.write("{\"title\":\"p.jpg\",\"description\":\"Kept\"}".toByteArray()); zip.closeEntry()
+                zip.putNextEntry(java.util.zip.ZipEntry("Album/p.jpg.json")); zip.write("{\"title\":\"p.jpg\",\"description\":\"Kept\",\"photoTakenTime\":{\"timestamp\":\"123\"}}".toByteArray()); zip.closeEntry()
             }
             val documents=com.myphotosanywhere.mpa.importing.TakeoutDocuments(app)
             val manifest=documents.manifest("owned-device",Uri.fromFile(archive),false)
