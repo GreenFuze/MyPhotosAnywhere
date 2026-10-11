@@ -2,7 +2,11 @@
 
 ## MPA 0.5.5 dismiss previous import errors — 2026-10-11
 
-Development checks are in progress; no 0.5.5 release is claimed yet. Version 0.5.5 / code 16 preserves Room v8. Stopped imports can dismiss persisted job/item/download error messages and their summary notification without altering status or any upload/source checkpoint. Database regressions cover actual database reopen, exact checkpoint retention, other-job isolation, active-job protection and fresh errors. Native UI checks exercise the Storage button, notification dismissal, activity recreation, preserved source/staging files and fresh errors returning on both API 29 and 35. Real-phone acceptance remains pending.
+Source `d5a61380d8638d570f1b4d96ccad711882d65db6` passed **162 unit/integration tests**, lint with **zero errors**, CPU model checks, app assembly and **22 native tests on each of Android 10/API 29 and Android 15/API 35 (44 total)**, with zero failures/errors/skips. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38152207165) · [Android 10 and 15 checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38152207167). Local Windows checks passed all 162 tests, lint and both APK builds; local device tests were not run. CI Room v8 matches the committed schema.
+
+The exact passed CI APK has SHA-256 `dcc4ab440a7c81b63c8b14e4e772925c9bb9ce3cf9ece2c003ed7e2cabaead3e` and established signer `A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`. Immutable references are in `docs/releases/v0.5.5.json`; complete results are attached as BUILD_EVIDENCE.json.
+
+ Version 0.5.5 / code 16 preserves Room v8. Stopped imports can dismiss persisted job/item/download error messages and their summary notification without altering status or any upload/source checkpoint. Database regressions cover actual database reopen, exact checkpoint retention, other-job isolation, active-job protection and fresh errors. Native UI checks exercise the Storage button, notification dismissal, activity recreation, preserved source/staging files and fresh errors returning on both API 29 and 35. Real-phone acceptance remains pending.
 
 ## MPA 0.5.4 Drive connection recovery — 2026-10-11
 

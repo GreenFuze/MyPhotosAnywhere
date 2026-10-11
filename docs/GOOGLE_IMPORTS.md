@@ -32,7 +32,7 @@ Stopped imports with saved job, file or historical download errors offer **Dismi
 
 Active imports and downloads keep their current messages; pause first to dismiss them. The database transaction rechecks the state so a job resumed since the button appeared cannot have its current errors cleared. Drive metadata-conversion review messages are separate from import-job errors.
 
-Development and CI checks are pending; no 0.5.5 release is claimed yet. Real-phone acceptance remains pending.
+All 162 unit/integration and 44 native checks (22 each on Android 10 and 15) passed. See [validation](VALIDATION.md) and [release evidence](releases/v0.5.5.json). Real-phone acceptance remains pending.
 
 ## Import destinations and controls
 

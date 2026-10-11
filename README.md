@@ -6,6 +6,8 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
+The [0.5.5 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.5) adds **Dismiss errors** for stopped imports, clearing persisted job/file/download messages and summary notifications while retaining history, Resume and every source/upload checkpoint. New failures remain visible. All 162 unit/integration and 44 native checks passed across Android 10 and 15. Phone acceptance remains pending. [Import controls](docs/GOOGLE_IMPORTS.md).
+
 The [0.5.4 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.4) explains local Takeout reading versus Drive uploads and adds clear Drive connection errors, up to three automatic retries and waiting notifications. Import checkpoints and the established upgrade signer are preserved. All 160 unit/integration and 42 native checks passed across Android 10 and 15. Recovery from the owner's real-phone DNS failure and completed migration remain acceptance checks. [Import controls](docs/GOOGLE_IMPORTS.md).
 
 The [0.5.3 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.3) adds the MPA status-bar icon and foreground progress notifications for Takeout and Photos Picker imports, with verified counts, current transfer percentage, Storage navigation and Android notification consent controls. All 152 unit/integration and 40 native checks passed across Android 10 and 15. Existing import checkpoints and the upgrade signer are preserved. The owner confirms a real ZIP import running in 0.5.2; completion and remaining phone acceptance checks are pending. [Import controls](docs/GOOGLE_IMPORTS.md).

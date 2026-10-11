@@ -1,0 +1,162 @@
+name: Publish MPA 0.5.5 release
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release055.yml'
+      - 'docs/releases/v0.5.5.json'
+      - 'docs/releases/v0.5.5.md'
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: android-release-v0.5.5
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read immutable build references
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          with open('docs/releases/v0.5.5.json') as stream:
+              config = json.load(stream)
+          assert config['tag'] == 'v0.5.5'
+          assert re.fullmatch('[0-9a-f]{40}', config['source_sha'])
+          assert isinstance(config['build_run_id'], int) and isinstance(config['device_run_id'], int)
+          with open(os.environ['GITHUB_ENV'], 'a') as stream:
+              for key, value in [('RELEASE_TAG',config['tag']),('SOURCE_SHA',config['source_sha']),
+                                 ('BUILD_RUN_ID',config['build_run_id']),('DEVICE_RUN_ID',config['device_run_id'])]:
+                  stream.write(f'{key}={value}\n')
+          PY
+      - name: Verify build and device checks for the same source
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN_ID" > build-run.json
+          gh api "repos/$GH_REPO/actions/runs/$DEVICE_RUN_ID" > device-run.json
+          python3 - <<'PY'
+          import json, os
+          for path, workflow in [('build-run.json','.github/workflows/android.yml'),('device-run.json','.github/workflows/device.yml')]:
+              with open(path) as stream:
+                  run = json.load(stream)
+              assert run['conclusion'] == 'success', f'{path} did not pass'
+              assert run['path'] == workflow, f'{path} workflow mismatch'
+              assert run['head_sha'] == os.environ['SOURCE_SHA'], f'{path} source mismatch'
+          PY
+          # GitHub's workflow token may not tag an older commit containing workflow changes.
+          # Tag this publication commit only after proving its changes are publication metadata.
+          cat > verify-publication.py <<'PY'
+          import json, os, sys
+          with open(sys.argv[1]) as stream:
+              comparison = json.load(stream)
+          assert comparison['status'] in ['ahead','identical'], 'Release commit is not descended from tested source'
+          assert comparison['merge_base_commit']['sha'] == os.environ['SOURCE_SHA'], 'Unexpected release ancestry'
+          files = comparison['files']
+          assert len(files) < 300, 'Comparison may be truncated'
+          def allowed(path):
+              return path in ['README.md','.github/workflows/release055.yml'] or path.startswith('docs/releases/') or (path.startswith('docs/') and path.endswith('.md'))
+          for item in files:
+              assert allowed(item['filename']), f"Untested app change: {item['filename']}"
+              if 'previous_filename' in item:
+                  assert allowed(item['previous_filename']), 'Untested renamed app file'
+          PY
+          gh api "repos/$GH_REPO/compare/$SOURCE_SHA...$GITHUB_SHA" > publication-compare.json
+          python3 verify-publication.py publication-compare.json
+      - name: Package the tested APK and evidence
+        run: |
+          set -euo pipefail
+          gh run download "$BUILD_RUN_ID" --name MPA-debug --dir apk
+          gh run download "$BUILD_RUN_ID" --name MPA-checks --dir checks
+          gh run download "$DEVICE_RUN_ID" --name MPA-device-checks --dir device
+          mkdir assets
+          cp apk/app-debug.apk assets/MPA-0.5.5-debug.apk
+          cp checks/build/reports/signing-report.txt assets/MPA-0.5.5-signing-report.txt
+          cp docs/GOOGLE_IMPORTS.md assets/GOOGLE_IMPORTS.md
+          cp docs/GOOGLE_DRIVE_SETUP.md assets/GOOGLE_DRIVE_SETUP.md
+          cp docs/IMPLEMENTATION_0_4.md assets/IMPLEMENTATION_0_4.md
+          cp docs/FEATURES_0_4.md assets/FEATURES_0_4.md
+          cp docs/branding/mpa-icon.svg assets/MPA-icon.svg
+          (cd assets && sha256sum MPA-0.5.5-debug.apk > SHA256SUMS.txt)
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          import hashlib, json, os, re
+          def results(folder):
+              totals = {key:0 for key in ['tests','failures','errors','skipped']}
+              for path in Path(folder).rglob('TEST-*.xml'):
+                  root = ET.parse(path).getroot()
+                  for key in totals:
+                      totals[key] += int(root.attrib.get(key,0))
+              assert totals['tests'] > 0 and totals['failures'] == totals['errors'] == totals['skipped'] == 0, totals
+              return totals
+          evidence = {'unit_tests':results('checks/build/test-results'), 'device_tests':results('device')}
+          assert evidence['unit_tests']['tests'] == 162, 'Expected all 162 unit/integration tests'
+          assert evidence['device_tests']['tests'] == 44, 'Expected 22 Android tests on each of API 29 and 35'
+          evidence['device_tests_by_api'] = {
+              str(api):results(f'device/MPA-device-checks-{api}/outputs/androidTest-results') for api in [29,35]}
+          assert all(item['tests']==22 for item in evidence['device_tests_by_api'].values())
+          apk = Path('assets/MPA-0.5.5-debug.apk')
+          evidence['source_sha'] = os.environ['SOURCE_SHA']
+          evidence['release_commit'] = os.environ['GITHUB_SHA']
+          evidence['build_run_id'] = int(os.environ['BUILD_RUN_ID'])
+          evidence['device_run_id'] = int(os.environ['DEVICE_RUN_ID'])
+          evidence['apk_sha256'] = hashlib.sha256(apk.read_bytes()).hexdigest()
+          evidence['apk_bytes'] = apk.stat().st_size
+          report = Path('assets/MPA-0.5.5-signing-report.txt').read_text()
+          certificate = re.search(r'^SHA1: ([0-9A-F:]{59})$', report, re.MULTILINE)
+          assert certificate is not None, 'Missing debug signing certificate'
+          evidence['android_oauth_sha1'] = certificate.group(1)
+          assert evidence['android_oauth_sha1'] == 'A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD', 'Signer changed; preserve the established upgrade/OAuth certificate'
+          Path('assets/BUILD_EVIDENCE.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps(evidence))
+          notes = Path('docs/releases/v0.5.5.md').read_text()
+          notes += f"\nSource: `{os.environ['SOURCE_SHA']}`. [Build](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['BUILD_RUN_ID']}) · [Device checks](https://github.com/{os.environ['GH_REPO']}/actions/runs/{os.environ['DEVICE_RUN_ID']}).\n"
+          notes += f"\nThe release tag points to publication commit `{os.environ['GITHUB_SHA']}`. Its app code is identical to the tested source; only documentation and publication metadata differ.\n"
+          notes += f"\nAPK SHA-256: `{evidence['apk_sha256']}`\n"
+          notes += f"\nAndroid OAuth SHA-1 for package `com.myphotosanywhere.mpa`: `{evidence['android_oauth_sha1']}`\n"
+          Path('release-notes.md').write_text(notes)
+          screenshot = next(Path('device').rglob('mpa-edit.png'),None)
+          if screenshot is not None:
+              assert screenshot.read_bytes().startswith(b'\x89PNG\r\n\x1a\n')
+              Path('assets/MPA-emulator-preview.png').write_bytes(screenshot.read_bytes())
+          PY
+      - name: Publish without replacing an existing release
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/releases?per_page=100" > releases.json
+          EXISTS=$(python3 - <<'PY'
+          import json, os
+          with open('releases.json') as stream:
+              releases=json.load(stream)
+          print('yes' if any(r['tag_name']==os.environ['RELEASE_TAG'] for r in releases) else 'no')
+          PY
+          )
+          if [ "$EXISTS" = yes ]; then
+            gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" > tag.json
+            python3 - <<'PY'
+          import json, os
+          with open('tag.json') as stream:
+              tag=json.load(stream)
+          assert tag['object']['type']=='commit', 'Expected a lightweight release tag'
+          with open(os.environ['GITHUB_ENV'],'a') as stream:
+              stream.write(f"EXISTING_TAG_SHA={tag['object']['sha']}\n")
+          PY
+            TAG_SHA=$(python3 -c "import json; print(json.load(open('tag.json'))['object']['sha'])")
+            gh api "repos/$GH_REPO/compare/$SOURCE_SHA...$TAG_SHA" > existing-compare.json
+            python3 verify-publication.py existing-compare.json
+            gh release download "$RELEASE_TAG" --pattern MPA-0.5.5-debug.apk --dir existing
+            cmp assets/MPA-0.5.5-debug.apk existing/MPA-0.5.5-debug.apk
+            echo 'Identical APK already published; existing release preserved.'
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" assets/* --target "$GITHUB_SHA" \
+            --title 'MyPhotosAnywhere 0.5.5 — Dismiss import errors' \
+            --notes-file release-notes.md
