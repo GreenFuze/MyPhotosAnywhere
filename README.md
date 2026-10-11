@@ -6,6 +6,8 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
+The [0.5.3 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.3) adds the MPA status-bar icon and foreground progress notifications for Takeout and Photos Picker imports, with verified counts, current transfer percentage, Storage navigation and Android notification consent controls. All 152 unit/integration and 40 native checks passed across Android 10 and 15. Existing import checkpoints and the upgrade signer are preserved. The owner confirms a real ZIP import running in 0.5.2; completion and remaining phone acceptance checks are pending. [Import controls](docs/GOOGLE_IMPORTS.md).
+
 The [0.5.2 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.2) restores direct Takeout ZIP file selection and fixes Android document access by reading the granted descriptor. URL entry is removed; automatic sole-folder destinations remain. All 144 unit/integration and 36 native checks passed across Android 10 and 15. Real-account/S23 Ultra acceptance remains outstanding. [Import controls](docs/GOOGLE_IMPORTS.md).
 
 The [0.5.1 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.1) automatically uses the sole connected Drive folder for new imports and adds direct HTTPS Takeout ZIP downloads, automatic import and verified phone cleanup. All 139 unit/integration and 14 Android emulator tests passed; real-account phone acceptance remains outstanding. [Controls and limitations](docs/GOOGLE_IMPORTS.md).

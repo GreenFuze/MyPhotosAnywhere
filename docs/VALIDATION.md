@@ -2,7 +2,11 @@
 
 ## MPA 0.5.3 background import progress — 2026-10-11
 
-Development checks are in progress; no 0.5.3 release is claimed yet. Version 0.5.3 / code 14 preserves Room v8 and upload checkpoints, adds foreground import progress, notification permission controls, MPA monochrome status icon, Storage navigation and terminal summaries. Regressions cover verified counts versus uploaded bytes, batch completion/yield, denied notifications, actual Android notification updates/navigation and a real foreground WorkManager completion. The owner reports a real ZIP import running in 0.5.2; its completion and other Google account round trips remain phone acceptance checks.
+Source `498659de11a503809a836280bc27977bfa175737` passed **152 unit/integration tests**, lint with **zero errors**, CPU model checks, app assembly and **20 native tests on each of Android 10/API 29 and Android 15/API 35 (40 total)**, with zero failures/errors/skips. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38146814939) · [Android 10 and 15 checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38146815018). Local Windows checks passed all 152 tests, lint and both app/instrumentation APK assembly; local device tests were not run. CI Room v8 matches the committed schema.
+
+The exact passed CI APK has SHA-256 `7c1191caec9d9f28076195277101968ffb49e57f04da3e49f878fd351bcf8a62` and established signer `A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`. Immutable references are in `docs/releases/v0.5.3.json`; complete results are attached as BUILD_EVIDENCE.json.
+
+ Version 0.5.3 / code 14 preserves Room v8 and upload checkpoints, adds foreground import progress, notification permission controls, MPA monochrome status icon, Storage navigation and terminal summaries. Regressions cover verified counts versus uploaded bytes, batch completion/yield, denied notifications, actual Android notification updates/navigation and a real foreground WorkManager completion. The owner reports a real ZIP import running in 0.5.2; its completion and other Google account round trips remain phone acceptance checks.
 
 ## MPA 0.5.2 ZIP file access fix — 2026-10-11
 

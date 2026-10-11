@@ -12,7 +12,7 @@ On Android 13 or later, allow notifications when starting/resuming an import. Re
 
 The foreground worker keeps one notification across files and yields between files after an eight-minute batch. Existing durable staging, reserved upload IDs and acknowledged offsets remain unchanged. WorkManager reschedules with the captured destination's network requirements. Android can stop/defer work, including foreground-service or job quotas, loss of the required connection and force-stop. This is resumable background work, not an uninterrupted-transfer guarantee. A summary is not an ongoing service after work stops. Pending/waiting jobs appear in Storage; a progress icon is shown while work is active.
 
-The owner reports that a real ZIP import is running in 0.5.2. Completion, interrupted-import recovery, Picker and Google metadata cleanup still require phone acceptance. Notification development/CI checks are pending; no 0.5.3 release is claimed yet.
+The owner reports that a real ZIP import is running in 0.5.2. Completion, interrupted-import recovery, Picker and Google metadata cleanup still require phone acceptance. All 152 unit/integration and 40 native checks (20 each on Android 10 and 15) passed. See [validation](VALIDATION.md) and [release evidence](releases/v0.5.3.json).
 
 Official Android contracts: [long-running WorkManager workers](https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/long-running), [notification permission](https://developer.android.com/develop/ui/compose/notifications/notification-permission), [Android 15 data-sync limits](https://developer.android.com/about/versions/15/behavior-changes-15).
 
