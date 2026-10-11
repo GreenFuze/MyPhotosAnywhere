@@ -129,8 +129,14 @@ class DeviceSmokeTest {
             app.database.drive().saveConnection(b.connection())
             for((id,source) in ids.zip(listOf(a,b))) app.database.photos().insert(com.myphotosanywhere.mpa.data.Photo(
                 id,"$id.jpg","","","image/jpeg",8,1,"sha-$id",sourceBindingKey=source.key))
-            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${ids[0]}").fetchSemanticsNodes().isNotEmpty() &&
-                compose.onAllNodesWithTag("photo:${ids[1]}").fetchSemanticsNodes().isNotEmpty() }
+            try {
+                compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${ids[0]}").fetchSemanticsNodes().isNotEmpty() &&
+                    compose.onAllNodesWithTag("photo:${ids[1]}").fetchSemanticsNodes().isNotEmpty() }
+            } catch (e: Exception) {
+                android.util.Log.e("GalleryFixture", "Synthetic rows: ${ids.map { app.database.photos().find(it) }}")
+                compose.onRoot(useUnmergedTree=true).printToLog("GalleryFixture")
+                throw e
+            }
             compose.onNodeWithText("A · a@test").performScrollTo().performClick()
             compose.onNodeWithTag("photo:${ids[0]}").assertExists()
             compose.onNodeWithTag("photo:${ids[1]}").assertDoesNotExist()
