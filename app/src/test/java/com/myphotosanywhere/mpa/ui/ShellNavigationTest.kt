@@ -1,0 +1,46 @@
+package com.myphotosanywhere.mpa.ui
+
+import androidx.compose.runtime.saveable.SaverScope
+import org.junit.Assert.*
+import org.junit.Test
+
+class ShellNavigationTest {
+    @Test fun backReturnsToCollectionOriginInsteadOfClosingTheApp() {
+        val nav=ShellNavigation()
+        nav.select(ShellDestination.COLLECTIONS)
+        nav.open(ShellDestination.PEOPLE)
+        nav.open(ShellDestination.PHOTOS)
+        assertEquals(ShellDestination.COLLECTIONS,nav.primary)
+        nav.back()
+        assertEquals(ShellDestination.PEOPLE,nav.destination)
+        nav.back()
+        assertEquals(ShellDestination.COLLECTIONS,nav.destination)
+        nav.back()
+        assertEquals(ShellDestination.PHOTOS,nav.destination)
+        assertFalse(nav.canGoBack)
+    }
+    @Test fun repeatedNotificationEntryDoesNotStackDuplicateStorageScreens() {
+        val nav=ShellNavigation()
+        nav.select(ShellDestination.SEARCH)
+        repeat(3) { nav.open(ShellDestination.STORAGE) }
+        nav.back()
+        assertEquals(ShellDestination.SEARCH,nav.destination)
+    }
+    @Test fun recreationRestoresOriginAndCurrentDestination() {
+        val nav=ShellNavigation()
+        nav.select(ShellDestination.COLLECTIONS)
+        nav.open(ShellDestination.PLACES)
+        nav.open(ShellDestination.STORAGE)
+        val scope=object: SaverScope { override fun canBeSaved(value: Any)=true }
+        val saved=with(ShellNavigation.Saver) { requireNotNull(scope.save(nav)) }
+        val restored=requireNotNull(ShellNavigation.Saver.restore(saved))
+        assertEquals(ShellDestination.STORAGE,restored.destination)
+        restored.back()
+        assertEquals(ShellDestination.PLACES,restored.destination)
+        assertEquals(ShellDestination.COLLECTIONS,restored.primary)
+    }
+    @Test(expected=IllegalArgumentException::class)
+    fun childCannotBecomePrimaryDestination() { ShellNavigation().select(ShellDestination.STORAGE) }
+    @Test(expected=IllegalArgumentException::class)
+    fun emptyRestoredHistoryFailsFast() { ShellNavigation(emptyList()) }
+}

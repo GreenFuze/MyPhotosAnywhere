@@ -69,7 +69,7 @@ class DeviceSmokeTest {
         try {
             // Insert after Activity resume: fixtures observe Room without scheduling real transfers.
             runBlocking { dao.saveJob(job); history.forEach { dao.saveJob(it) } }
-            compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+            compose.onNodeWithTag("shell:storage").performClick()
             waitText("import-count:$id","0/0 verified in Drive")
             compose.onNodeWithTag("import-bar:$id").assertRangeInfoEquals(androidx.compose.ui.semantics.ProgressBarRangeInfo.Indeterminate)
             runBlocking {
@@ -192,7 +192,7 @@ class DeviceSmokeTest {
             runBlocking { dao.saveJob(job); dao.insertItem(item); dao.saveDownload(download) }
             notices.finish(id,com.myphotosanywhere.mpa.importing.ImportProgress.from(job,listOf(item)))
             compose.waitUntil(5000) { notifications.activeNotifications.any { it.tag==id } }
-            compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+            compose.onNodeWithTag("shell:storage").performClick()
             compose.onNodeWithTag("dismiss-import-errors:$id").performScrollTo().performClick()
             compose.waitUntil(5000) { compose.onAllNodesWithTag("dismiss-import-errors:$id").fetchSemanticsNodes().isEmpty() }
             compose.onNodeWithTag("dismiss-import-errors:$id").assertDoesNotExist()
@@ -204,7 +204,7 @@ class DeviceSmokeTest {
             }
             assertTrue(source.isFile); assertTrue(stage.isFile)
             compose.activityRule.scenario.recreate()
-            compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+            compose.onNodeWithTag("shell:storage").performClick()
             compose.onNodeWithTag("dismiss-import-errors:$id").assertDoesNotExist()
             runBlocking { dao.saveJob(job.copy(error="Fresh import error")) }
             compose.waitUntil(5000) { compose.onAllNodesWithTag("dismiss-import-errors:$id").fetchSemanticsNodes().isNotEmpty() }
@@ -243,7 +243,7 @@ class DeviceSmokeTest {
     }
 
     @Test fun storageExposesBothGoogleImportActions() {
-        compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+        compose.onNodeWithTag("shell:storage").performClick()
         compose.onNodeWithTag("import-photos-picker").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("import-takeout").performScrollTo().assertIsDisplayed()
     }
@@ -256,7 +256,7 @@ class DeviceSmokeTest {
         assertTrue(intent.getBooleanExtra(android.content.Intent.EXTRA_ALLOW_MULTIPLE,false))
         assertTrue(intent.flags and android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         assertTrue(intent.flags and android.content.Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION != 0)
-        compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+        compose.onNodeWithTag("shell:storage").performClick()
         compose.onNodeWithTag("import-takeout").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("takeout-url").assertDoesNotExist()
         compose.onNodeWithTag("takeout-url-input").assertDoesNotExist()
@@ -300,7 +300,7 @@ class DeviceSmokeTest {
             app.database.drive().saveSource(source)
             app.database.cloud().saveSync(com.myphotosanywhere.mpa.drive.SyncState(source.key,
                 scanGeneration="saved-generation",scanToken="before",scanPages=3,status="WAITING"))
-            compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+            compose.onNodeWithTag("shell:storage").performClick()
             compose.waitUntil(30000) { compose.onAllNodesWithText("3 folder pages saved; discovery will resume.").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("scan-now").assertIsDisplayed()
             compose.onNodeWithText("Drive synchronization").assertIsDisplayed()
@@ -332,13 +332,19 @@ class DeviceSmokeTest {
                 compose.onRoot(useUnmergedTree=true).printToLog("GalleryFixture")
                 throw e
             }
+            compose.onNodeWithTag("shell:filters").performClick()
             compose.onNodeWithText("A · a@test").performScrollTo().performClick()
+            compose.onNodeWithText("Done").performScrollTo().performClick()
             compose.onNodeWithTag("photo:${ids[0]}").assertExists()
             compose.onNodeWithTag("photo:${ids[1]}").assertDoesNotExist()
+            compose.onNodeWithTag("shell:filters").performClick()
             compose.onNodeWithText("B · b@test").performScrollTo().performClick()
+            compose.onNodeWithText("Done").performScrollTo().performClick()
             compose.onNodeWithTag("photo:${ids[1]}").assertExists()
             compose.onNodeWithTag("photo:${ids[0]}").assertDoesNotExist()
+            compose.onNodeWithTag("shell:filters").performClick()
             compose.onNodeWithText("All sources").performScrollTo().performClick()
+            compose.onNodeWithText("Done").performScrollTo().performClick()
             compose.onNodeWithTag("photo:${ids[0]}").assertExists()
             compose.onNodeWithTag("photo:${ids[1]}").assertExists()
         } finally {
@@ -427,7 +433,7 @@ class DeviceSmokeTest {
     }
 
     @Test fun googleSetupDetailsDescribeTheInstalledVersionAndSigningCertificate() {
-        compose.onNodeWithText("Storage").performClick()
+        compose.onNodeWithTag("shell:storage").performClick()
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
@@ -450,11 +456,12 @@ class DeviceSmokeTest {
         val original=app.settings.state.value
         try {
             app.settings.update(original.copy(faceIndexing=false,objectIndexing=false))
+            compose.onNodeWithTag("nav:Collections").performClick()
             compose.onNode(hasText("People") and hasClickAction()).performClick()
             compose.onNodeWithTag("scan-now").assertIsDisplayed().performClick()
             compose.onNodeWithText("Enable on-device scanning").assertIsDisplayed()
             compose.onNodeWithText("Cancel").performClick()
-            compose.onNodeWithText("Storage").performClick()
+            compose.onNodeWithTag("shell:storage").performClick()
             compose.onNodeWithTag("scan-now").assertIsDisplayed().performClick()
             compose.onNodeWithText("Enable on-device scanning").assertIsDisplayed()
             compose.onNodeWithText("Cancel").performClick()
@@ -468,6 +475,7 @@ class DeviceSmokeTest {
             app.settings.update(original.copy(faceIndexing=true,indexingPaused=true))
             app.database.library().saveFace(com.myphotosanywhere.mpa.data.FaceRecord(face,photo,"",null,
                 modelVersion=com.myphotosanywhere.mpa.people.PeopleRepository.MODEL_VERSION))
+            compose.onNodeWithTag("nav:Collections").performClick()
             compose.onNode(hasText("People") and hasClickAction()).performClick()
             compose.waitUntil(30000) { compose.onAllNodesWithText("unassigned faces lack usable matching data",substring=true).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("face-why:$face"))
@@ -514,7 +522,7 @@ class DeviceSmokeTest {
         val original=app.settings.state.value
         try {
             app.settings.update(original.copy(overnightIndexing=false))
-            compose.onNodeWithText("Storage").performClick()
+            compose.onNodeWithTag("shell:storage").performClick()
             compose.onNodeWithTag("index-night-switch").performScrollTo().performClick()
             compose.onNodeWithTag("index-start").performScrollTo().performTextReplacement("22:00")
             compose.onNodeWithTag("index-end").performScrollTo().performTextReplacement("06:00")

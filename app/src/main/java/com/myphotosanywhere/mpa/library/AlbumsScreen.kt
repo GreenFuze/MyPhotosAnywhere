@@ -11,13 +11,27 @@ import com.myphotosanywhere.mpa.data.*
 
 @Composable
 fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,members: List<AlbumPhoto>,
-    onAlbum: (String)->Unit,onFavorites: ()->Unit,onArchive: ()->Unit,onActivity: ()->Unit) {
+    onAlbum: (String)->Unit,onFavorites: ()->Unit,onArchive: ()->Unit,onActivity: ()->Unit,
+    onPeople: ()->Unit,onPlaces: ()->Unit,onOffline: ()->Unit,onEdits: ()->Unit) {
     var create by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var manage by remember { mutableStateOf<Album?>(null) }
     var delete by remember { mutableStateOf(false) }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item { Text("Your collections",style=MaterialTheme.typography.headlineSmall) }
+        item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick=onPeople,modifier=Modifier.weight(1f)) {
+                com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_shell_people)
+                Spacer(Modifier.width(8.dp));Text("People")
+            }
+            OutlinedButton(onClick=onPlaces,modifier=Modifier.weight(1f)) {
+                com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_shell_places)
+                Spacer(Modifier.width(8.dp));Text("Places")
+            }
+        } }
+        item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick=onOffline) { Text("Offline") }
+            OutlinedButton(onClick=onEdits) { Text("Edits") }
+        } }
         item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick=onFavorites) { Text("Favorites") }; OutlinedButton(onClick=onArchive) { Text("Archive") }
         } }

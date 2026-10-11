@@ -44,7 +44,7 @@ class ImportAndViewerDeviceTest {
         try {
             runBlocking { jobs.forEach { dao.saveJob(it) };items.forEach { dao.insertItem(it) } }
             jobs.forEach { notices.finish(it.id,ImportProgress.from(it,items)) }
-            compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+            compose.onNodeWithTag("shell:storage").performClick()
             for(job in jobs) {
                 compose.waitUntil(10000) { compose.onAllNodesWithTag("dismiss-import:${job.id}").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithTag("dismiss-import:${job.id}").performScrollTo().performClick()
@@ -53,7 +53,7 @@ class ImportAndViewerDeviceTest {
                 compose.waitUntil(5000) { manager.activeNotifications.none { it.tag==job.id } }
             }
             compose.activityRule.scenario.recreate()
-            compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+            compose.onNodeWithTag("shell:storage").performClick()
             compose.waitUntil(10000) { compose.onAllNodesWithTag("toggle-dismissed-imports").fetchSemanticsNodes().isNotEmpty() }
             jobs.forEach { compose.onNodeWithTag("import-progress:${it.id}").assertDoesNotExist() }
             compose.onNodeWithTag("toggle-dismissed-imports").performScrollTo().performClick()
