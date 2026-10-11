@@ -152,7 +152,8 @@ class TakeoutArchiveStore(context: Context) {
     }
     companion object {
         fun canClean(items: List<ImportItem>): Boolean = items.isNotEmpty() && items.all {
-            it.state == "COMPLETE" || (it.mime == "application/json" && it.metadata != null)
+            it.state == "COMPLETE" || (it.mime == "application/json" && it.metadata != null) ||
+                (it.state == "INFORMATION" && it.mime == "text/html" && it.path in listOf("archive_browser.html", "Takeout/archive_browser.html"))
         }
     }
 }

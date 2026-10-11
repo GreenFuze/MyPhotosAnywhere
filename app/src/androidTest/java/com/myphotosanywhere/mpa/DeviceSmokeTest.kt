@@ -79,11 +79,13 @@ class DeviceSmokeTest {
         assertEquals(link,com.myphotosanywhere.mpa.importing.TakeoutLinkVault().open(sealed))
         try {
             java.util.zip.ZipOutputStream(archive.outputStream()).use { zip ->
+                zip.putNextEntry(java.util.zip.ZipEntry("Takeout/archive_browser.html")); zip.write("<html>Export help</html>".toByteArray()); zip.closeEntry()
                 zip.putNextEntry(java.util.zip.ZipEntry("Album/p.jpg")); zip.write(byteArrayOf(1,2,3,4)); zip.closeEntry()
                 zip.putNextEntry(java.util.zip.ZipEntry("Album/p.jpg.json")); zip.write("{\"title\":\"p.jpg\",\"description\":\"Kept\",\"photoTakenTime\":{\"timestamp\":\"123\"}}".toByteArray()); zip.closeEntry()
             }
             val documents=com.myphotosanywhere.mpa.importing.TakeoutDocuments(app)
             val manifest=documents.manifest("owned-device",Uri.fromFile(archive),false)
+            assertEquals("INFORMATION",manifest.single { it.path=="Takeout/archive_browser.html" }.state)
             val media=manifest.single { it.mime=="image/jpeg" }
             assertTrue(requireNotNull(media.metadata).contains("Kept"))
             documents.stage(media,stage,{})

@@ -24,12 +24,13 @@ class TakeoutDocuments(private val context: Context) {
             expanded = Math.addExact(expanded, maxOf(0, bytes))
             require(expanded <= 1024L * 1024 * 1024 * 1024) { "Archive expanded size exceeds 1 TiB." }
             require(result.size < 10000) { "Use batches of fewer than 10,000 entries; MPA's XMP catalogue is bounded." }
-            val mime = if (path.endsWith(".json", true)) "application/json" else TakeoutCodec.mime(path)
-            val supported = mime != null && (mime == "application/json" || bytes in 1..MAX_MEDIA)
+            val help = path in listOf("archive_browser.html", "Takeout/archive_browser.html")
+            val mime = if(help) "text/html" else if (path.endsWith(".json", true)) "application/json" else TakeoutCodec.mime(path)
+            val supported = mime != null && (help || mime == "application/json" || bytes in 1..MAX_MEDIA)
             val id = stableId("$job:$source:$path:$crc")
             result.add(ImportItem(id, job, source, path, path.substringAfterLast('/'), mime ?: "application/octet-stream", bytes, crc,
                 metadata = metadata, album = path.substringBeforeLast('/', "").substringAfterLast('/').take(100),
-                selected = supported && mime != "application/json", state = if (supported) "PENDING" else "UNSUPPORTED",
+                selected = supported && mime != "application/json" && !help, state = if(help) "INFORMATION" else if (supported) "PENDING" else "UNSUPPORTED",
                 error = if (supported) null else "Unsupported format or exceeds 250 MiB; source is preserved."))
         }
         if (tree) {

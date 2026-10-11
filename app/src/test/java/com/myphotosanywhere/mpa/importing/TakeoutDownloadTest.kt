@@ -153,6 +153,9 @@ class TakeoutDownloadTest {
         val photo=ImportItem("photo","job","uri","p.jpg","p.jpg","image/jpeg",4,state="COMPLETE")
         val json=photo.copy(id="json",mime="application/json",state="UNRESOLVED",metadata="{\"retained\":true}")
         assertTrue(TakeoutArchiveStore.canClean(listOf(photo,json)))
+        val help=photo.copy(id="help",path="Takeout/archive_browser.html",mime="text/html",state="INFORMATION",selected=false)
+        assertTrue(TakeoutArchiveStore.canClean(listOf(photo,json,help)))
+        assertFalse(TakeoutArchiveStore.canClean(listOf(photo,help.copy(path="Album/archive_browser.html"))))
         assertFalse(TakeoutArchiveStore.canClean(emptyList()))
         for(state in listOf("PENDING","STAGING","UPLOADING","VERIFIED","FAILED","UNSUPPORTED")) {
             assertFalse(TakeoutArchiveStore.canClean(listOf(photo.copy(state=state,selected=false))))
