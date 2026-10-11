@@ -48,6 +48,7 @@ data class Photo(
     @ColumnInfo(defaultValue = "0") val lastAccess: Long = 0,
     @ColumnInfo(defaultValue = "''") val labels: String = "",
     val metadataAssetId: String? = null,
+    @ColumnInfo(defaultValue = "''") val importedMetadata: String = "",
 )
 
 @Entity(tableName = "handoffs")
@@ -95,11 +96,14 @@ interface PhotoDao {
 @Database(entities = [Photo::class, Handoff::class, DriveConnection::class, DriveBackup::class,
     Album::class, AlbumPhoto::class, EditDraft::class, Person::class, FaceRecord::class, FaceScan::class,
     CloudPhoto::class, CloudFolder::class, SyncState::class, DownloadTask::class, DriveSource::class,
-    com.myphotosanywhere.mpa.drive.ScanFolder::class, com.myphotosanywhere.mpa.metadata.MetadataState::class], version = 6, exportSchema = true)
+    com.myphotosanywhere.mpa.drive.ScanFolder::class, com.myphotosanywhere.mpa.metadata.MetadataState::class,
+    com.myphotosanywhere.mpa.importing.ImportJob::class, com.myphotosanywhere.mpa.importing.ImportItem::class,
+    com.myphotosanywhere.mpa.importing.TakeoutSidecar::class], version = 7, exportSchema = true)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photos(): PhotoDao
     abstract fun drive(): DriveDao
     abstract fun library(): LibraryDao
     abstract fun cloud(): CloudDao
     abstract fun metadata(): com.myphotosanywhere.mpa.metadata.MetadataDao
+    abstract fun imports(): com.myphotosanywhere.mpa.importing.ImportDao
 }

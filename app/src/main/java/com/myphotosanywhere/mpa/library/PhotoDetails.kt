@@ -82,6 +82,17 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
             }
             TextButton(onClick={ place=photo.placeLabel; latitude=photo.latitude?.toString() ?: ""; longitude=photo.longitude?.toString() ?: ""; locationError=null; location=true }) { Text("Name or set location") }
             if(photo.labels.isNotBlank()) Text("Objects: ${photo.labels}",style=MaterialTheme.typography.bodySmall)
+            if(photo.importedMetadata.isNotBlank()) {
+                val provider=remember(photo.importedMetadata) { runCatching { com.google.gson.JsonParser.parseString(photo.importedMetadata).asJsonObject }.getOrNull() }
+                provider?.getAsJsonObject("googleTakeout")?.let { google ->
+                    Text("Google Takeout metadata",style=MaterialTheme.typography.titleMedium)
+                    google.get("description")?.asString?.takeIf { it.isNotBlank() }?.let { Text(it) }
+                    google.getAsJsonArray("people")?.mapNotNull { it.asJsonObject.get("name")?.asString }?.takeIf { it.isNotEmpty() }?.let {
+                        Text("People hints (unconfirmed): ${it.joinToString()}",style=MaterialTheme.typography.bodySmall)
+                    }
+                    Text("Existing MPA date and location take precedence. The full Google record is retained in MPA metadata.",style=MaterialTheme.typography.bodySmall)
+                }
+            }
             val detected=faces.filter { it.photoId==photo.id }
             if(detected.isNotEmpty()) {
                 Text("People",style=MaterialTheme.typography.titleMedium)

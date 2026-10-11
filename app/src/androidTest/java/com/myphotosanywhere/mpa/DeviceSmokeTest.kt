@@ -26,6 +26,35 @@ class DeviceSmokeTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
 
+    @Test fun takeoutZipStreamsOneEntryAndKeepsSupplementalMetadata() = runBlocking<Unit> {
+        val archive=File(app.cacheDir,"synthetic-takeout.zip")
+        val staged=File(app.cacheDir,"synthetic-stage.jpg")
+        val bitmap=Bitmap.createBitmap(16,16,Bitmap.Config.ARGB_8888)
+        val bytes=java.io.ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG,90,it) }.toByteArray()
+        bitmap.recycle()
+        try {
+            java.util.zip.ZipOutputStream(archive.outputStream()).use { zip ->
+                zip.putNextEntry(java.util.zip.ZipEntry("Takeout/Google Photos/Test/photo.jpg")); zip.write(bytes); zip.closeEntry()
+                zip.putNextEntry(java.util.zip.ZipEntry("Takeout/Google Photos/Test/photo.jpg.supplemental-metadata.json"))
+                zip.write("{\"title\":\"photo.jpg\",\"description\":\"Device test\",\"photoTakenTime\":{\"timestamp\":\"123\"}}".toByteArray()); zip.closeEntry()
+            }
+            val documents=com.myphotosanywhere.mpa.importing.TakeoutDocuments(app)
+            val manifest=documents.manifest("device-job",Uri.fromFile(archive),false)
+            assertEquals(2,manifest.size)
+            val media=manifest.single { it.mime=="image/jpeg" }
+            assertTrue(media.selected); assertNotNull(media.metadata)
+            assertEquals("MATCHED",manifest.single { it.mime=="application/json" }.state)
+            documents.stage(media,staged,{})
+            assertArrayEquals(bytes,staged.readBytes()); assertTrue(archive.isFile)
+        } finally { archive.delete(); staged.delete() }
+    }
+
+    @Test fun storageExposesBothGoogleImportActions() {
+        compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+        compose.onNodeWithTag("import-photos-picker").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("import-takeout").performScrollTo().assertIsDisplayed()
+    }
+
     @Test fun storageShowsSavedDriveDiscoveryAndRefreshAboveSettings() = runBlocking<Unit> {
         val source=com.myphotosanywhere.mpa.drive.DriveSource.from(com.myphotosanywhere.mpa.drive.DriveConnection(
             accountId="progress-device",email="progress@test",mode="EXISTING_LIBRARY",folderId="progress-folder",folderName="Progress"))
@@ -156,7 +185,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
-        compose.onNodeWithText("MPA 0.4.4 (10)",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.5.0 (11)",substring=true).assertExists()
         val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
         assertEquals("com.myphotosanywhere.mpa",info.packageName)
         assertTrue(info.sha1.isNotEmpty())

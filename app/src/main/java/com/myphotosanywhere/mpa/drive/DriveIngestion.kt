@@ -97,6 +97,7 @@ internal class DriveIngestion(
                         cloud.saveFolder(CloudFolder(binding, file.id, folder.remoteId, file.name, generation))
                         cloud.enqueueScanFolder(ScanFolder(binding, file.id))
                     } else if (isMedia(file)) saveMedia(binding, folder.remoteId, file, generation)
+                    else if(file.name.endsWith(".json",true)) discoverJson(binding,folder.remoteId,file)
                 }
                 require(cloud.scanFolderCount(binding) <= 10_000) { "This library exceeds the 10,000 folder discovery limit. Existing media is preserved." }
                 cloud.updateScanFolder(folder.copy(pageToken = page.nextPage, complete = page.nextPage == null))
@@ -144,6 +145,8 @@ internal class DriveIngestion(
                 ensureSource(binding)
                 page.changes.forEach { change ->
                     val file = change.file
+                    if(file!=null && !file.trashed && file.parents.any { it in folders } && file.name.endsWith(".json",true))
+                        discoverJson(binding,file.parents.first { it in folders },file)
                     if (change.removed || file == null || file.trashed ||
                         file.parents.none { it in folders } || !isMedia(file)) cloud.markRemoved(binding, change.id)
                     else saveMedia(binding, file.parents.first { it in folders }, file,
@@ -159,5 +162,9 @@ internal class DriveIngestion(
     }
 
     private fun isMedia(file: DriveFile) = file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")
+    private suspend fun discoverJson(binding: String,parent: String,file: DriveFile) {
+        database.imports().insertSidecar(com.myphotosanywhere.mpa.importing.TakeoutSidecar(
+            "$binding:${file.id}:${file.version}",binding,file.id,parent,file.name,file.version,file.md5,file.bytes))
+    }
     companion object { private const val DAY_MILLIS = 24 * 60 * 60 * 1000L }
 }

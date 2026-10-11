@@ -64,7 +64,7 @@ class MetadataRepository(private val context: Context,private val database: Phot
             photo.favorite,photo.archived,photo.placeLabel,photo.latitude,photo.longitude,photo.capturedAt,
             photo.parentId?.let { photos[it]?.metadataAssetId ?: it },photo.editProvider,photo.editInstructions,photo.labels,
             db.library().draft(photo.id)?.recipe,memberships.filter { it.photoId==photo.id }.map { it.albumId },
-            faces.filter { it.photoId==photo.id }.map { PortableFace(it.id,it.personId,it.corrected,FaceRegion.of(it),it.imageWidth,it.imageHeight,it.modelVersion) }) }
+            faces.filter { it.photoId==photo.id }.map { PortableFace(it.id,it.personId,it.corrected,FaceRegion.of(it),it.imageWidth,it.imageHeight,it.modelVersion) },photo.importedMetadata) }
         val personIds=assets.flatMap { it.faces }.mapNotNull { it.personId }.toSet()
         val albumIds=assets.flatMap { it.albums }.toSet()
         XmpCatalog(source.accountId,source.folderId,assets,people.filter { it.id in personIds }.map { PortablePerson(it.id,it.name) },
@@ -183,7 +183,7 @@ class MetadataRepository(private val context: Context,private val database: Phot
                 require(!duplicate) { "Two local assets claim the same portable identity. Resolve the duplicate before recovery." }
                 db.photos().update(photo.copy(metadataAssetId=asset.id,favorite=asset.favorite,archived=asset.archived,
                     placeLabel=asset.place,latitude=asset.latitude,longitude=asset.longitude,capturedAt=asset.capturedAt,
-                    parentId=asset.parentId?.let { parent -> matches[parent]?.id ?: db.photos().all().find { (it.metadataAssetId ?: it.id)==parent }?.id },editProvider=asset.provider,editInstructions=asset.instructions,labels=asset.labels))
+                    parentId=asset.parentId?.let { parent -> matches[parent]?.id ?: db.photos().all().find { (it.metadataAssetId ?: it.id)==parent }?.id },editProvider=asset.provider,editInstructions=asset.instructions,labels=asset.labels,importedMetadata=asset.importedMetadata))
                 allMemberships.filter { it.photoId==photo.id }.forEach { db.library().removeFromAlbum(it.albumId,photo.id) }
                 asset.albums.forEach { db.library().addToAlbum(AlbumPhoto(it,photo.id)) }
                 if(asset.recipe==null) db.library().deleteDraft(photo.id)

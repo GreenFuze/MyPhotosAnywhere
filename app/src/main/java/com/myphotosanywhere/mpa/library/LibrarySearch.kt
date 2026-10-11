@@ -7,7 +7,7 @@ import java.time.ZoneId
 object LibrarySearch {
     fun matches(photo: Photo,query: String,peopleNames: List<String> = emptyList()): Boolean {
         val date=Instant.ofEpochMilli(photo.capturedAt ?: photo.importedAt).atZone(ZoneId.systemDefault()).toLocalDate().toString()
-        val haystack=listOf(photo.displayName,photo.placeLabel,photo.labels,date,photo.mimeType,peopleNames.joinToString(" ")).joinToString(" ").lowercase()
+        val haystack=listOf(photo.displayName,photo.placeLabel,photo.labels,date,photo.mimeType,peopleNames.joinToString(" "),photo.importedMetadata).joinToString(" ").lowercase()
         return query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }.all { token ->
             when(token) {
                 "favorite", "favorites" -> photo.favorite

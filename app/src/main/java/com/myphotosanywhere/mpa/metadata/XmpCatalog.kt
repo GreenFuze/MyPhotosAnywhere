@@ -18,7 +18,7 @@ data class PortableFace(val id: String,val personId: String?,val corrected: Bool
 data class PortableAsset(val id: String,val remoteId: String,val sha256: String,val bytes: Long,
     val favorite: Boolean,val archived: Boolean,val place: String,val latitude: Double?,val longitude: Double?,
     val capturedAt: Long?,val parentId: String?,val provider: String?,val instructions: String?,val labels: String,
-    val recipe: String?,val albums: List<String>,val faces: List<PortableFace>)
+    val recipe: String?,val albums: List<String>,val faces: List<PortableFace>,val importedMetadata: String = "")
 data class XmpCatalog(val accountId: String,val folderId: String,val assets: List<PortableAsset>,
     val people: List<PortablePerson>,val albums: List<PortableAlbum>)
 
@@ -55,7 +55,7 @@ object XmpCodec {
             val asset=node("Asset",mapOf("id" to a.id,"remote" to a.remoteId,"sha256" to a.sha256,"bytes" to a.bytes,
                 "favorite" to a.favorite,"archived" to a.archived,"place" to a.place,"latitude" to a.latitude,
                 "longitude" to a.longitude,"captured" to a.capturedAt,"parent" to a.parentId,"provider" to a.provider,
-                "instructions" to a.instructions,"labels" to a.labels,"recipe" to a.recipe))
+                "instructions" to a.instructions,"labels" to a.labels,"recipe" to a.recipe,"importedMetadata" to a.importedMetadata))
             root.appendChild(asset)
             a.albums.forEach { asset.appendChild(node("Member",mapOf("album" to it))) }
             a.faces.forEach { f -> asset.appendChild(node("Face",mapOf("id" to f.id,"person" to f.personId,
@@ -93,7 +93,9 @@ object XmpCodec {
             PortableAsset(a.required("id"),a.required("remote"),a.required("sha256").also { require(it.matches(Regex("[a-f0-9]{64}"))) },
                 a.required("bytes").toLong().also { require(it>0) },a.flag("favorite"),a.flag("archived"),a.text("place",500) ?: "",
                 lat,lon,a.text("captured")?.toLong(),a.text("parent"),a.text("provider"),a.text("instructions",MAX_BYTES),
-                a.text("labels",5000) ?: "",recipe,members,faces)
+                a.text("labels",5000) ?: "",recipe,members,faces,(a.text("importedMetadata",com.myphotosanywhere.mpa.importing.TakeoutCodec.MAX_JSON_BYTES+1024) ?: "").also {
+                    com.myphotosanywhere.mpa.importing.TakeoutCodec.validatePortable(it)
+                })
         }
         require(assets.size<=10000 && assets.sumOf { it.faces.size }<=50000)
         require(people.map { it.id }.distinct().size==people.size && albums.map { it.id }.distinct().size==albums.size)

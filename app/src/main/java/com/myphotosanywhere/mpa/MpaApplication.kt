@@ -12,7 +12,7 @@ import com.myphotosanywhere.mpa.drive.SOURCES_MIGRATION_3_4
 class MpaApplication : Application() {
     val database: PhotoDatabase by lazy {
         Room.databaseBuilder(this, PhotoDatabase::class.java, "mpa.db")
-            .addMigrations(DRIVE_MIGRATION_1_2, LIBRARY_MIGRATION_2_3, SOURCES_MIGRATION_3_4, com.myphotosanywhere.mpa.data.METADATA_MIGRATION_4_5, com.myphotosanywhere.mpa.drive.SCAN_MIGRATION_5_6)
+            .addMigrations(DRIVE_MIGRATION_1_2, LIBRARY_MIGRATION_2_3, SOURCES_MIGRATION_3_4, com.myphotosanywhere.mpa.data.METADATA_MIGRATION_4_5, com.myphotosanywhere.mpa.drive.SCAN_MIGRATION_5_6, com.myphotosanywhere.mpa.importing.IMPORT_MIGRATION_6_7)
             .addCallback(com.myphotosanywhere.mpa.metadata.METADATA_CALLBACK).build()
     }
     val repository: PhotoRepository by lazy {
@@ -25,4 +25,6 @@ class MpaApplication : Application() {
     val metadata by lazy { com.myphotosanywhere.mpa.metadata.MetadataRepository(this) }
     val people by lazy { com.myphotosanywhere.mpa.people.PeopleRepository(this, database, cache, settings) }
     val drive: DriveCoordinator by lazy { DriveCoordinator(this, database) }
+    val imports by lazy { com.myphotosanywhere.mpa.importing.ImportRepository(this) }
+    val takeoutMetadata by lazy { com.myphotosanywhere.mpa.importing.DriveTakeoutMetadata(this) }
 }

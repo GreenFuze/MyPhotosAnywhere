@@ -157,6 +157,7 @@ class CloudSyncWorker(context: Context,params: WorkerParameters): CoroutineWorke
         val active=app.database.drive().source(binding)?.connection() ?: return Result.success()
         return try {
             val complete = app.sync.run(active)
+            app.takeoutMetadata.schedule(binding,active.unmeteredOnly)
             app.people.schedule() // Existing consent/schedule gates and bounded download queue apply.
             if (!complete) app.database.drive().source(binding)?.let { app.sync.continueScan(it.connection()) }
             // Downloads/indexing and explicit storage controls enforce cache budgets separately;

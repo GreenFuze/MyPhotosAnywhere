@@ -6,7 +6,7 @@ enum class DriveMode(val scope: String, val title: String, val explanation: Stri
     APP_FILES("https://www.googleapis.com/auth/drive.file", "New MPA folder",
         "Access files created by MPA. Existing photo collections are not included."),
     EXISTING_LIBRARY("https://www.googleapis.com/auth/drive", "Existing photo collection",
-        "Google grants access to your whole Drive. MPA only lists folders for selection and works inside your selected folder. It never deletes remote files."),
+        "Google grants access to your whole Drive. MPA works inside selected folders and preserves media originals. Optional metadata conversion moves verified Google JSON to Drive trash."),
 }
 
 data class DriveBinding(val accountId: String, val folderId: String) {

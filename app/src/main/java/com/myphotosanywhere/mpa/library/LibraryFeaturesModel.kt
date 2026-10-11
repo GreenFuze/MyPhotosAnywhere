@@ -162,6 +162,6 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
     }
     init { viewModelScope.launch {
         db.drive().sources().forEach { app.sync.schedule(it.connection(),true) }
-        app.downloads.resume(); app.people.schedule(); app.metadata.schedule()
+        app.downloads.resume(); app.people.schedule(); app.metadata.schedule(); app.imports.resumePending()
     } }
 }

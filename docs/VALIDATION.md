@@ -1,5 +1,13 @@
 # Validation status and device checklist
 
+## MPA 0.5.0 import development checks — 2026-10-11
+
+The first local pass completed 124 unit/integration tests, lint (zero errors, 34 warnings), app APK assembly and instrumentation APK assembly. A final pass with version 0.5.0 / code 11 and the additional numbered/truncated-name regression is in progress; required CI is pending. Room is now v7. These are development results, not a published release or proof of real Google account behavior.
+
+New disk-backed tests cover released v6 migration preserving photos, reviewed faces, upload reservations/offsets and destination/checkpoints; process restart during and immediately after resumable transfer; mismatched remote identity rejection; Picker response/polling contracts; full unknown-field XMP round trips; and conditional JSON cleanup only after complete backup verification. Native tests add a synthetic seekable Takeout ZIP byte round trip and Storage import controls, alongside the ten prior device checks.
+
+The browser-control helper failed to initialize twice during authorized Cloud setup. No Google Cloud changes were made. Picker API enablement, consent scope and the existing Android client therefore remain unconfirmed. Real Takeout/Picker imports, interrupted/repeated imports and Drive JSON conversion on the S23 Ultra remain live acceptance checks. [Setup, supported limits and phone checklist](GOOGLE_IMPORTS.md).
+
 ## MPA 0.4.4 resumable Drive discovery
 
 Source `11f36d41012951858e37e00e43b671f9e07577bf` passed **110 unit/integration tests**, Android lint with zero errors,
@@ -18,7 +26,7 @@ source recorded in the attached BUILD_EVIDENCE.json. Immutable run references ar
 recorded in `docs/releases/v0.4.4.json`.
 Live Google Drive, shared-drive permissions, concurrent external mutations and S23 Ultra
 background behavior remain phone acceptance checks. See [the 0.4.4 retest](releases/v0.4.4.md).
-Takeout, Picker and the shared migration engine are subsequent work.
+Takeout, Picker and the shared migration engine were subsequent work at this release; see the 0.5.0 development evidence above.
 
 
 ## Unreleased local Drive discovery increment — 2026-10-11

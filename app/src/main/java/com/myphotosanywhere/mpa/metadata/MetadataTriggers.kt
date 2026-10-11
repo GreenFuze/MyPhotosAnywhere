@@ -8,7 +8,7 @@ fun installMetadataTriggers(db: SupportSQLiteDatabase) {
     db.execSQL("""INSERT OR IGNORE INTO metadata_states(bindingKey,generation,uploadedGeneration,remoteId,etag,error)
         SELECT key,1,0,NULL,NULL,NULL FROM drive_sources WHERE enabled=1""")
     val tables=mapOf(
-        "photos" to "favorite,archived,placeLabel,latitude,longitude,capturedAt,parentId,editProvider,editInstructions,labels,metadataAssetId",
+        "photos" to "favorite,archived,placeLabel,latitude,longitude,capturedAt,parentId,editProvider,editInstructions,labels,metadataAssetId,importedMetadata",
         "faces" to "personId,corrected,left,top,right,bottom,imageWidth,imageHeight,modelVersion",
         "people" to "name", "albums" to "name", "album_photos" to "albumId,photoId", "edit_drafts" to "recipe",
         "drive_backups" to "state,remoteId,remoteMd5,remoteVersion")

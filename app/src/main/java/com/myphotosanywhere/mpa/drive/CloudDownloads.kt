@@ -94,6 +94,7 @@ class CloudDownloadWorker(context: Context,params: WorkerParameters): CoroutineW
                 } else if(saved!=null && saved.sourceRemoteId==before.id &&
                     (saved.cachedVersion==before.version || shared!=null) && saved.originalPath.isBlank()) {
                     val destination=File(app.filesDir,"originals/${saved.id}")
+                    destination.parentFile?.mkdirs()
                     check(temp.renameTo(destination)) { "Cannot store downloaded photo." }
                     try { db.withTransaction {
                         db.photos().update(saved.copy(originalPath=destination.absolutePath,pinned=saved.pinned || task.pinned,

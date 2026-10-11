@@ -40,7 +40,7 @@ class DriveGateway(
     )
 
     suspend fun children(parent: String, page: String? = null): DrivePage = list(
-        "'${literal(parent)}' in parents and trashed = false and (mimeType = '$FOLDER_MIME' or mimeType contains 'image/' or mimeType contains 'video/')", page)
+        "'${literal(parent)}' in parents and trashed = false and (mimeType = '$FOLDER_MIME' or mimeType contains 'image/' or mimeType contains 'video/' or name contains '.json')", page)
 
     suspend fun startToken(): String = json(Request.Builder().url(url("changes/startPageToken", "supportsAllDrives" to "true")))
         .string("startPageToken") ?: error("Drive change token missing.")
@@ -207,6 +207,18 @@ class DriveGateway(
             "Drive returned an invalid upload destination."
         }
         return result
+    }
+
+    /** Only revision-checked JSON sidecars may be trashed; media originals cannot use this path. */
+    suspend fun trashTakeoutJson(expected: DriveFile, etag: String) {
+        require(expected.name.endsWith(".json",true) && !expected.mimeType.startsWith("image/") &&
+            !expected.mimeType.startsWith("video/") && expected.mimeType!=FOLDER_MIME && etag.isNotBlank())
+        val current=file(expected.id)
+        require(!current.trashed && current.version==expected.version && current.md5==expected.md5 && current.parents==expected.parents && current.name==expected.name) {
+            "Google JSON changed or moved. It was preserved."
+        }
+        execute(Request.Builder().url(url("files/${expected.id}","supportsAllDrives" to "true"))
+            .header("If-Match",etag).patch("{\"trashed\":true}".toRequestBody(JSON))) { checkSuccess(it) }
     }
 
     private fun url(path: String, vararg params: Pair<String, String?>): HttpUrl {
