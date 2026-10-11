@@ -2,6 +2,8 @@
 
 Implemented in MPA 0.5.0 / version code 11, Room v7. Local checks and required CI passed on the immutable source recorded in [release evidence](releases/v0.5.0.json). Google Cloud Picker configuration was completed and verified on 2026-10-11 in the existing `myphotosanywhere` project. Real-account phone acceptance remains outstanding.
 
+**0.5.1 / code 12 / Room v8** adds automatic sole-folder destinations and Takeout ZIP URL download/import/phone cleanup. Its 139 unit/integration and 14 Android emulator tests passed. See [0.5.1 validation](VALIDATION.md) and [release evidence](releases/v0.5.1.json).
+
 ## Import destinations and controls
 
 In Storage, connect a writable Drive folder. When exactly one folder is connected, it is automatically the default import destination, even if ordinary backup is paused. With several connected folders, select **Use as default backup destination** on the intended folder. Automatic import destination selection does not enable ordinary local-media backup. Each new import captures this account/folder permanently. Changing the default affects future jobs only. Disconnecting its source pauses an import; reconnect the original source to resume it.
@@ -54,7 +56,7 @@ For a cloud-only asset, conversion first queues one verified media download. It 
 - XMP: 2 MiB / 10,000 assets. Catalogue growth fails recoverably rather than silently dropping annotations. Catalogue partitioning and large-video support remain future work.
 - Picker: at most 2,000 selected items per session. API/consent/certificate configuration and real account checks remain required on the owner's phone.
 
-Release checks passed: 125 unit/integration tests, zero lint errors, CPU model checks, APK assembly and 12 Android emulator tests. Device tests include a synthetic ZIP round trip and both import controls. Live acceptance uses a small real album, Photos consent/selection, interrupted transfer, repeat import, late JSON, changed default destination, revoked authorization and a Drive sidecar conversion/cleanup round trip. User exports/photos are never committed.
+The 0.5.0 release checks passed: 125 unit/integration tests, zero lint errors, CPU model checks, APK assembly and 12 Android emulator tests. Device tests include a synthetic ZIP round trip and both import controls. Live acceptance uses a small real album, Photos consent/selection, interrupted transfer, repeat import, late JSON, changed default destination, revoked authorization and a Drive sidecar conversion/cleanup round trip. User exports/photos are never committed.
 
 Official contracts rechecked during development:
 
