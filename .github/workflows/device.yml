@@ -36,6 +36,10 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
+            # Native fixtures use synthetic accounts and cached data, never live Google services.
+            # Keep offline browsing checks independent of authentication/network error timing.
+            adb shell svc wifi disable
+            adb shell svc data disable
             ./gradlew connectedDebugAndroidTest --no-daemon
             mkdir -p app/build/reports/androidTests/screenshots
             adb pull /sdcard/Download/MPA/device-preview.png app/build/reports/androidTests/screenshots/mpa-edit.png
