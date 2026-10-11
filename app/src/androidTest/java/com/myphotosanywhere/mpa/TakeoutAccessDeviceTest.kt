@@ -35,7 +35,9 @@ class TakeoutAccessDeviceTest {
             val media = items.single { it.mime == "image/jpeg" }
             assertTrue(requireNotNull(media.metadata).contains("Granted document"))
             assertEquals("MATCHED", items.single { it.mime == "application/json" }.state)
-            TakeoutDocuments(app).stage(media,staged,{})
+            val hashes=TakeoutDocuments(app).stage(media,staged,{})
+            assertEquals(com.myphotosanywhere.mpa.drive.DriveBackupWorker.digest(staged,"SHA-256"),hashes.sha256)
+            assertEquals(media.crc,hashes.crc)
             assertArrayEquals(byteArrayOf(1,2,3,4), staged.readBytes())
             assertEquals(2,TakeoutDocuments(app).manifest("provider-job",uri,false).size)
         } finally {

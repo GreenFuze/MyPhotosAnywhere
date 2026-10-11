@@ -100,22 +100,17 @@ class TakeoutDocuments(private val context: Context) {
         return items.map { requireNotNull(updates[it.id]) }
     }
 
-    suspend fun stage(item: ImportItem, target: File, keepGoing: suspend () -> Unit) {
+    suspend fun stage(item: ImportItem, target: File, keepGoing: suspend () -> Unit): MediaFingerprint {
         val uri = Uri.parse(item.uri)
-        if (item.crc >= 0) archive(uri) { zip ->
+        val hashes=if (item.crc >= 0) archive(uri) { zip ->
             val entry = zip.getEntry(item.path) ?: error("Archive entry missing. Reselect the unchanged export.")
             require(entry.crc == item.crc && entry.size == item.size) { "Archive changed since preview." }
             zip.getInputStream(entry).use { copyBounded(it, target, keepGoing) }
         } else resolver.openInputStream(uri)?.use { copyBounded(it, target, keepGoing) }
             ?: error("Document access was lost. Reselect the source.")
         require(item.size <= 0 || target.length() == item.size) { "Document changed since preview." }
-        if(item.crc>=0) {
-            val crc=java.util.zip.CRC32()
-            target.inputStream().use { input -> val buffer=ByteArray(65536)
-                while(true) { val n=input.read(buffer); if(n<0) break; crc.update(buffer,0,n) }
-            }
-            require(crc.value==item.crc) { "Archive entry checksum failed. Source preserved." }
-        }
+        require(item.crc<0 || hashes.crc==item.crc) { "Archive entry checksum failed. Source preserved." }
+        return hashes
     }
 
     private suspend fun <T> archive(uri: Uri, block: suspend (ZipFile) -> T): T {
@@ -156,21 +151,27 @@ class TakeoutDocuments(private val context: Context) {
     companion object {
         const val MAX_MEDIA = 250L * 1024 * 1024
         fun stableId(value: String) = java.util.UUID.nameUUIDFromBytes(value.toByteArray(Charsets.UTF_8)).toString()
-        suspend fun copyBounded(input: InputStream, target: File, keepGoing: suspend () -> Unit = {}) {
+        suspend fun copyBounded(input: InputStream, target: File, keepGoing: suspend () -> Unit = {}): MediaFingerprint {
             target.parentFile?.mkdirs()
             var bytes = 0L
+            val hashes=MediaFingerprint.Accumulator()
+            val checkpoint=MediaReadCheckpoint(action={
+                keepGoing()
+                require(target.parentFile!!.usableSpace > 16L * 1024 * 1024) { "Not enough free space. Free storage and resume." }
+            })
             target.outputStream().use { output ->
                 val buffer = ByteArray(64 * 1024)
                 while (true) {
-                    currentCoroutineContext().ensureActive(); keepGoing()
+                    currentCoroutineContext().ensureActive(); checkpoint.check()
                     val n = input.read(buffer); if (n < 0) break
                     bytes += n
                     require(bytes <= MAX_MEDIA) { "Media exceeds the 250 MiB limit. Source preserved." }
-                    require(target.parentFile!!.usableSpace > 16L * 1024 * 1024) { "Not enough free space. Free storage and resume." }
-                    output.write(buffer, 0, n)
+                    output.write(buffer, 0, n); hashes.update(buffer,n)
                 }
+                checkpoint.check(true)
                 require(bytes > 0) { "Empty media file." }; output.fd.sync()
             }
+            return hashes.finish()
         }
     }
 }

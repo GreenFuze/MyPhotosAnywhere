@@ -1,7 +1,6 @@
 package com.myphotosanywhere.mpa.importing
 
 import android.content.Context
-import android.os.SystemClock
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
@@ -38,14 +37,13 @@ class ImportWorker(context: Context, params: WorkerParameters): CoroutineWorker(
         if(app.database.imports().job(job)?.state!="RUNNING") return Result.success()
         return try {
             try { setForeground(getForegroundInfo()) } catch(e: IllegalStateException) {
-                if(runAttemptCount>=3) throw e
-                app.database.imports().job(job)?.let { app.database.imports().saveJob(it.copy(
-                    error="Waiting for Android to allow background import. Open MPA to continue.")) }
-                return Result.retry()
+                if(!ImportForegroundRecovery.isStartRefused(e)) throw e
+                val waiting=ImportForegroundRecovery(app.database.imports()).record(job)
+                val progress=snapshot(job)
+                notices.finish(job,if(waiting) progress.copy(state="WAITING") else progress)
+                return Result.success()
             }
-            app.database.imports().job(job)?.takeIf { it.state=="RUNNING" && it.error!=null }?.let {
-                app.database.imports().saveJob(it.copy(error=null))
-            }
+            app.database.imports().clearRunningError(job)
             notices.clearSummary(job)
             coroutineScope {
                 val dao=app.database.imports()
@@ -57,10 +55,9 @@ class ImportWorker(context: Context, params: WorkerParameters): CoroutineWorker(
                     }
                 }
                 try {
-                    // Keep the icon stable across files. Bound each work request and yield only at a checkpoint.
-                    val deadline=SystemClock.elapsedRealtime()+8*60*1000
-                    if(ImportBatch({ app.imports.runOne(job) },{ SystemClock.elapsedRealtime()>=deadline }).run())
-                        app.imports.continueJob(job)
+                    // Foreground WorkManager supports long-running work. Avoid restarting the service
+                    // between timed batches while the Activity is no longer visible.
+                    ImportBatch({ app.imports.runOne(job) },{ false }).run()
                 } finally { updates.cancelAndJoin() }
                 notices.finish(job,snapshot(job))
             }
@@ -73,9 +70,8 @@ class ImportWorker(context: Context, params: WorkerParameters): CoroutineWorker(
             if(retry) Result.retry() else Result.failure()
         }
         catch(_: Exception) {
-            app.database.imports().job(job)?.takeIf { it.state=="RUNNING" }?.let {
-                app.database.imports().saveJob(it.copy(state="FAILED",error="Background import stopped. Open MPA and resume; transfer checkpoints are preserved."))
-            }
+            app.database.imports().connectionState(job,"FAILED",
+                "Background import stopped. Open MPA and resume; transfer checkpoints are preserved.")
             notices.finish(job,snapshot(job))
             Result.failure()
         }

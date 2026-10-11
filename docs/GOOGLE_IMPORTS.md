@@ -1,3 +1,17 @@
+## Import recovery and exact duplicate index in 0.5.6
+
+Development and CI checks are pending; no 0.5.6 release is claimed yet.
+
+Version 0.5.6 / code 17 / Room v9 stops restarting the foreground service between eight-minute batches. If Android explicitly refuses a foreground-service start, Storage shows **waiting for MPA** with a reopening message and a summary notification when notifications are allowed. Reopen MPA to queue recovery automatically, or choose **Import selected / Resume**. Existing upload IDs, acknowledged offsets, staged bytes and verified files remain. Paused/cancelled imports stay stopped; disconnected destinations must be reconnected. Old versions' saved foreground waiting retries are replaced on reopen. Other unexpected service errors still fail visibly. Android may still defer/stop foreground work; long-running imports are not guaranteed uninterrupted.
+
+MPA now keeps a local indexed catalogue of exact byte hashes, scoped to the captured Drive destination. Drive's optional SHA-256 arrives with ordinary media listings and change reconciliation, without downloading originals just to hash them. Idle sources receive a bounded metadata rescan after upgrading; active old scan cursors continue, and earlier pages gain hashes on a later full scan. Candidates can include nested media never downloaded by MPA. A live Drive check must confirm SHA-256, MD5, size, version and ancestry in the selected folder before reuse. Missing checksums or stale/moved/trashed candidates cause a safe miss. Restore working Drive connectivity to verify/upload. Matching filenames or dates are insufficient, and unrelated destinations/accounts remain independent.
+
+SHA-256, MD5 and ZIP CRC are computed together while staging, followed by one combined integrity pass before upload or duplicate commit. The archive still must be read and each incoming media file staged to establish byte identity. This reduces redundant reads and library-wide duplicate scans; transfer speed is not benchmarked. Existing bounded staging, 250 MiB media and 10,000-asset catalogue limits remain.
+
+Similar-image review and a quality-preference policy are subsequent stages. This version reuses exact verified bytes only; it does not discard edited/lower-quality versions or delete source exports. A shared Drive hash manifest is also deferred; the local index is rebuilt from Drive metadata.
+
+Official contracts: [Drive file checksums](https://developers.google.com/workspace/drive/api/reference/rest/v3/files), [Drive change reconciliation](https://developers.google.com/workspace/drive/api/guides/manage-changes), [long-running WorkManager](https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/long-running) and [foreground-service start restrictions](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start).
+
 # Google Photos imports and Takeout metadata conversion
 
 Implemented in MPA 0.5.0 / version code 11, Room v7. Local checks and required CI passed on the immutable source recorded in [release evidence](releases/v0.5.0.json). Google Cloud Picker configuration was completed and verified on 2026-10-11 in the existing `myphotosanywhere` project. Real-account phone acceptance remains outstanding.

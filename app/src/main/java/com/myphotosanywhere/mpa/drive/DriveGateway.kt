@@ -254,14 +254,14 @@ class DriveGateway(
 
     companion object {
         const val FOLDER_MIME = "application/vnd.google-apps.folder"
-        private const val FILE_FIELDS = "id,name,mimeType,size,md5Checksum,version,parents,capabilities(canAddChildren),modifiedTime,thumbnailLink,trashed,imageMediaMetadata(time,location(latitude,longitude)),appProperties"
+        private const val FILE_FIELDS = "id,name,mimeType,size,md5Checksum,sha256Checksum,version,parents,capabilities(canAddChildren),modifiedTime,thumbnailLink,trashed,imageMediaMetadata(time,location(latitude,longitude)),appProperties"
         private val JSON = "application/json; charset=utf-8".toMediaType()
         fun literal(value: String) = value.replace("\\", "\\\\").replace("'", "\\'")
         private fun JsonObject.string(key: String): String? = get(key)?.takeUnless { it.isJsonNull }?.asString
         private fun parseFile(j: JsonObject) = DriveFile(
             id = j.string("id") ?: error("Missing Drive file ID."), name = j.string("name") ?: "Photo",
             mimeType = j.string("mimeType") ?: "application/octet-stream", bytes = j.string("size")?.toLongOrNull() ?: 0,
-            md5 = j.string("md5Checksum"), version = j.string("version"),
+            sha256 = j.string("sha256Checksum"), md5 = j.string("md5Checksum"), version = j.string("version"),
             parents = j.getAsJsonArray("parents")?.map { it.asString } ?: emptyList(),
             canAddChildren = j.getAsJsonObject("capabilities")?.get("canAddChildren")?.asBoolean ?: false,
             modifiedTime = j.string("modifiedTime"), thumbnailLink = j.string("thumbnailLink"),

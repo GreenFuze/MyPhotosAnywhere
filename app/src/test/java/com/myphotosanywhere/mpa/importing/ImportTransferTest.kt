@@ -120,6 +120,18 @@ class ImportTransferTest {
             assertTrue(file.isFile)
         } finally { server.shutdown(); file.delete() }
     }
+    @Test fun changedStagedBytesAreRejectedBeforeNetworkOrCheckpointMutation() = runBlocking<Unit> {
+        val file=File(RuntimeEnvironment.getApplication().cacheDir,"changed-stage").apply { writeBytes(byteArrayOf(1,2,3,4)) }
+        val server=MockWebServer(); server.start()
+        try {
+            val item=ImportItem("id","job","uri","photo.jpg","photo.jpg","image/jpeg",4,staged=file.absolutePath,
+                sha256=DriveBackupWorker.digest(file,"SHA-256"),md5=DriveBackupWorker.digest(file,"MD5"),remoteId="reserved",offset=2)
+            file.writeBytes(byteArrayOf(4,3,2,1))
+            try { ImportTransfer(DriveGateway("test",api=server.url("/drive/"))).upload(item,"folder",{ fail("Checkpoint must be preserved") },{}); fail() }
+            catch(_: IllegalArgumentException) { }
+            assertEquals(0,server.requestCount); assertTrue(file.isFile)
+        } finally { server.shutdown(); file.delete() }
+    }
     @Test fun rejectMediaCleanup() = runBlocking<Unit> {
         val server=MockWebServer(); server.start()
         try {

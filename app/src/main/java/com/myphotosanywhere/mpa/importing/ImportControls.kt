@@ -144,7 +144,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
         jobs.take(10).forEach { job ->
             val entries=items.filter { it.job==job.id }
             val download=downloads.find { it.job==job.id }
-            Text("${if(job.kind=="TAKEOUT") "Takeout" else "Photos Picker"}: ${job.state.lowercase()} · ${entries.count { it.state=="COMPLETE" }}/${entries.count { it.selected }} imported")
+            Text("${if(job.kind=="TAKEOUT") "Takeout" else "Photos Picker"}: ${if(job.state=="WAITING_FOR_APP") "waiting for MPA" else job.state.lowercase()} · ${entries.count { it.state=="COMPLETE" }}/${entries.count { it.selected }} imported")
             Text("Destination: ${sources.find { it.key==job.binding }?.let { "${it.folderName} (${it.email})" } ?: "Disconnected original source"}",style=MaterialTheme.typography.bodySmall)
             job.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
             if(ImportErrorDismissal.canDismiss(job) && ImportErrorDismissal.hasErrors(job,entries,download))
@@ -162,11 +162,11 @@ fun ImportControls(model: ImportModel=viewModel()) {
                     if(TakeoutArchiveStore.canClean(entries)) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.retryCleanup(job.id) } }) { Text("Retry phone ZIP cleanup") }
                     else Text("ZIP retained for skipped or unsupported files. Review them before deleting it.",style=MaterialTheme.typography.bodySmall)
                 }
-                if(it.state!="CLEANED" && job.state !in listOf("RUNNING","DOWNLOADING")) {
+                if(it.state!="CLEANED" && job.state !in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP")) {
                     TextButton(enabled=!busy,onClick={ discardZip=job.id }) { Text("Delete downloaded ZIP from phone") }
                 }
             }
-            if(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","DOWNLOADING","CANCELLED"))
+            if(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP","CANCELLED"))
                 TextButton(enabled=!busy,onClick={ targetJob=job.id; zip.launch(Unit) }) { Text("Add ZIP parts to this import") }
             if(job.state=="PICKING") {
                 Text(job.email)
@@ -175,7 +175,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
             } else if(entries.isNotEmpty()) TextButton(enabled=!busy,onClick={ preview=job.id }) { Text("Preview selection and metadata") }
             if(job.state !in listOf("RUNNING","DOWNLOADING","PICKING","COMPLETE","CANCELLED"))
                 Button(enabled=!busy,onClick={ startImport(job.id) }) { Text("Import selected / Resume") }
-            if(job.state in listOf("RUNNING","DOWNLOADING")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id) } }) { Text("Pause import") }
+            if(job.state in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id) } }) { Text("Pause import") }
             if(job.state !in listOf("COMPLETE","CANCELLED")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id,true) } }) { Text("Cancel remaining import") }
         }
         if(sidecars.isNotEmpty()) {

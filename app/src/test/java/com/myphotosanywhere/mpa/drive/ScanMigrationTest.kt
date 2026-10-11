@@ -49,11 +49,11 @@ class ScanMigrationTest {
         try {
             helper.writableDatabase; helper.close()
             val opened = Room.databaseBuilder(context, PhotoDatabase::class.java, name)
-                .addMigrations(SCAN_MIGRATION_5_6, com.myphotosanywhere.mpa.importing.IMPORT_MIGRATION_6_7, com.myphotosanywhere.mpa.importing.TAKEOUT_DOWNLOAD_MIGRATION_7_8).allowMainThreadQueries().build()
+                .addMigrations(SCAN_MIGRATION_5_6, com.myphotosanywhere.mpa.importing.IMPORT_MIGRATION_6_7, com.myphotosanywhere.mpa.importing.TAKEOUT_DOWNLOAD_MIGRATION_7_8, com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9).allowMainThreadQueries().build()
             db = opened
             val state = requireNotNull(opened.cloud().sync("binding"))
             assertEquals("cursor", state.changeToken)
-            assertEquals(123L, state.lastScan)
+            assertEquals(0L, state.lastScan) // Hash-index upgrade requests a bounded metadata rescan.
             assertFalse(state.running)
             assertEquals("WAITING", state.status)
             assertEquals(0L, state.lastSuccess) // Old full-scan time was not a complete change replay.

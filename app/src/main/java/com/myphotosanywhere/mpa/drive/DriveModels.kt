@@ -35,6 +35,7 @@ data class DriveFile(
     val trashed: Boolean = false,
     val assetId: String? = null,
     val sourceAssetId: String? = null,
+    val sha256: String? = null,
 )
 data class DrivePage(val files: List<DriveFile>, val nextPage: String?, val incompleteSearch: Boolean = false)
 data class UploadProgress(val offset: Long, val complete: Boolean)

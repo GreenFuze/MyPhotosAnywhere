@@ -78,6 +78,9 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
     }
     fun download(row: CloudPhoto,pin: Boolean = false,retry: Boolean = false) = perform { app.downloads.enqueue(row,pin,retry); message.value="Download queued; unmetered network preference applies." }
     fun retryDownloads() = perform { app.downloads.retry() }
+    fun resumeForegroundImports() {
+        viewModelScope.launch { app.imports.resumeWhenVisible() }
+    }
     private var lastForegroundRefresh=0L
     fun refreshCloudAutomatically() {
         viewModelScope.launch {

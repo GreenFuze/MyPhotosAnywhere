@@ -1,3 +1,9 @@
+## Approved follow-up: faster duplicate checks and visual review
+
+The owner approved the staged proposal on 2026-10-11. First repair foreground-start recovery, then implement a local indexed catalogue keyed by destination binding, SHA-256 and size. Capture optional Drive SHA-256 during ordinary recursive listings/change reconciliation, without downloading originals just to hash them. Hash incoming bytes during ZIP extraction together with MD5 and CRC. Candidate hashes are hints: verify current remote checksums, size, version and ancestry in the selected source before reuse. Missing checksums cause a safe miss. Never merge unrelated accounts or silently discard metadata.
+
+A later optional shared Drive manifest must be rebuildable, versioned and updated in batches, with external changes reconciled; it cannot be authoritative for deletion or verification. Visual review follows exact-byte reuse: decoded-pixel equality, perceptual candidates, then stronger pair verification. Preserve bursts, edits, crops, RAW/JPEG and motion components. Compare actual detail/encoding quality rather than byte size or pixel count alone. Prefer a verified better version while preserving metadata/albums and an undo path; never blindly move face regions or delete an original. A user-selected quality policy follows measured false-positive evaluation and review, not this first increment.
+
 # Google Photos imports and Drive storage plan
 
 Agreed direction, 2026-10-10. This is the next implementation plan, not a list of newly shipped features. Baseline: MPA 0.4.3, version code 9, Room v5. Start with reliable bulk Drive synchronization, then Takeout import, then Google Photos Picker. The combined 0.5.0 development release implements these stages and Drive JSON conversion. Its required CI passed; the live acceptance checks below remain outstanding. Smaller verified increments can ship first; 0.4.4 shipped the bounded Drive stage.

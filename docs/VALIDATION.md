@@ -1,3 +1,13 @@
+## Candidate 0.5.6: background recovery and exact duplicate index
+
+Version 0.5.6 / code 17 / Room v9. Local and required CI checks are pending; no 0.5.6 release is claimed yet.
+
+The owner reports 17/1647 imported with the old foreground-start waiting message; opening MPA then stopping/resuming helped. This message previously covered all IllegalStateException instances and does not establish an exact Android/device cause. Recognized Android start refusals now persist WAITING_FOR_APP, with immediate recovery requested from Activity ON_RESUME. Paused, cancelled, failed and disconnected jobs are not auto-resurrected. Legacy waiting retry work is replaced so old backoff cannot block reopen recovery. Eight-minute foreground-service restarts are removed; real Android limits remain.
+
+Room v9 adds a destination/SHA-256/size index. The migration preserves transfer checkpoints, identities, names and active scan cursors, backfills verified source-linked Photo identities and requests ordinary bounded metadata rescans for idle sources. SHA-256 is obtained from Drive listing/change metadata without original downloads. Active old scans continue; earlier pages without hashes may remain safe misses until a later full scan. Local hash candidates require live remote SHA-256, MD5, size, version and in-folder ancestry verification. Candidate pages contain at most 32 rows. Incoming media SHA-256, MD5 and CRC accumulate in one staging pass; a combined integrity pass remains before upload or duplicate commit. Cancellation is checked every buffer; expensive source/job/free-space checks run at most every 250ms plus start/end checks.
+
+Regression coverage includes checkpoint-preserving waiting recovery, legacy retry replacement, pause races, known service refusal classification, fresh and resumed integrity checks, nested undownloaded media, stale/missing checksums, removal/moves, cross-source isolation, 404 versus permission failures, candidate pagination, v8 upgrades and native persisted recovery/index selection. Existing media/catalogue limits remain. No real Google-account completion, Samsung background-limit reproduction or performance benchmark is claimed. Shared Drive manifests, visual deduplication and quality decisions remain future work.
+
 # Validation status and device checklist
 
 ## MPA 0.5.5 dismiss previous import errors — 2026-10-11

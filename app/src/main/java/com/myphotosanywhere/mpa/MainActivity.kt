@@ -106,7 +106,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             pendingViewKey=it.key;features.download(it)
         }
     }
-    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { features.refreshCloudAutomatically() }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { features.resumeForegroundImports(); features.refreshCloudAutomatically() }
     LaunchedEffect(sources.map { it.key }) { if(sources.isNotEmpty()) features.refreshCloudAutomatically() }
     val presence=remember(cloud,sources,sourceKey) { GalleryVisibility.Index(cloud.filter { sourceKey==null || it.bindingKey==sourceKey },sources.map { it.key }.toSet()) }
     val selected=photos.find { it.id==selectedId }

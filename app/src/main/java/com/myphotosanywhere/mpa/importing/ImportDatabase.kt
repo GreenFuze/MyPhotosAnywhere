@@ -33,11 +33,16 @@ data class TakeoutDownload(@PrimaryKey val job: String, val sealedLink: String,
 
 @Dao
 interface ImportDao {
+    @Query("""UPDATE import_jobs SET state='RUNNING',error=NULL WHERE id=:id
+        AND (state='WAITING_FOR_APP' OR (state='RUNNING' AND error=:legacyMessage))""")
+    suspend fun claimForegroundResume(id: String, legacyMessage: String): Int
+    @Query("UPDATE import_jobs SET error=NULL WHERE id=:id AND state='RUNNING'")
+    suspend fun clearRunningError(id: String)
     @Query("UPDATE import_jobs SET error=NULL WHERE id=:id") suspend fun clearJobError(id: String)
     @Query("UPDATE import_items SET error=NULL WHERE job=:id") suspend fun clearItemErrors(id: String)
     @Query("UPDATE takeout_downloads SET error=NULL WHERE job=:id") suspend fun clearDownloadError(id: String)
     @Query("UPDATE import_jobs SET state=:state,error=:message WHERE id=:id AND state='RUNNING'")
-    suspend fun connectionState(id: String, state: String, message: String): Int
+    suspend fun connectionState(id: String, state: String, message: String?): Int
     @Query("SELECT * FROM import_jobs WHERE id=:id") fun observeJob(id: String): Flow<ImportJob?>
     @Query("SELECT * FROM import_items WHERE job=:id ORDER BY path,id") fun observeJobItems(id: String): Flow<List<ImportItem>>
     @Query("SELECT * FROM takeout_downloads") fun observeDownloads(): Flow<List<TakeoutDownload>>

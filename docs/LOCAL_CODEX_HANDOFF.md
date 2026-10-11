@@ -1,3 +1,9 @@
+## In progress: 0.5.6 background recovery and exact-byte index
+
+The owner's screenshot shows a running 17/1647 Takeout job with the old foreground-start waiting message. Opening MPA and stopping/resuming helped. That message was emitted for every IllegalStateException, so the screenshot does not identify a precise Android quota or device cause. The candidate removes eight-minute foreground-service handoffs, handles recognized Android foreground-start refusals as durable WAITING_FOR_APP work, and resumes blocked jobs on Activity ON_RESUME without changing transfer checkpoints or resurrecting paused/cancelled work. Legacy waiting retries are replaced on reopen. Unexpected service/programming errors still fail fast. Android may still defer or stop long-running work.
+
+The owner approved staged smarter importing. First implement Room v9 scoped SHA-256/size indexing from Drive metadata and live remote checksum/ancestry verification, plus combined hashes during staging. Preserve all existing identities and checkpoints. Shared Drive hash manifests, perceptual candidates and quality decisions remain future increments; do not claim visual deduplication or delete lower-quality originals. Local and required immutable-source CI must pass before publishing the next version with the established signer.
+
 # Handoff to local Codex on Windows
 
 Paste the instructions below into a Codex session running on your computer. Select `C:\src\github.com\GreenFuze` as the local workspace when possible. The first task is cloning, then continuing implementation; cloud workspace files and account connections do not automatically move to Windows.

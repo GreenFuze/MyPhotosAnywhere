@@ -3,13 +3,13 @@ package com.myphotosanywhere.mpa.drive
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
-@Entity(tableName = "cloud_photos", indices = [Index("bindingKey"), Index("photoId")])
+@Entity(tableName = "cloud_photos", indices = [Index("bindingKey"), Index("photoId"), Index(value=["bindingKey","sha256","bytes"])])
 data class CloudPhoto(@PrimaryKey val key: String, val bindingKey: String, val remoteId: String,
     val parentId: String, val name: String, val mimeType: String, val bytes: Long,
     val md5: String?, val version: String?, val modifiedTime: String?, val capturedAt: Long?,
     val latitude: Double?, val longitude: Double?, val thumbnailPath: String = "",
     val thumbnailVersion: String? = null, val photoId: String? = null, val removed: Boolean = false,
-    val seenGeneration: String = "", val assetId: String? = null, val sourceAssetId: String? = null, val thumbnailUpdatedAt: Long = 0)
+    val seenGeneration: String = "", val assetId: String? = null, val sourceAssetId: String? = null, val thumbnailUpdatedAt: Long = 0, val sha256: String? = null)
 @Entity(tableName = "cloud_folders", primaryKeys = ["bindingKey", "remoteId"])
 data class CloudFolder(val bindingKey: String, val remoteId: String, val parentId: String?, val name: String,
     val seenGeneration: String)
@@ -31,6 +31,11 @@ data class DownloadTask(@PrimaryKey val key: String, val bindingKey: String, val
 
 @Dao
 interface CloudDao {
+    @Query("SELECT COUNT(*) FROM cloud_photos WHERE bindingKey=:binding AND removed=0")
+    suspend fun liveCount(binding: String): Int
+    @Query("""SELECT * FROM cloud_photos WHERE bindingKey=:binding AND sha256=:sha AND bytes=:bytes
+        AND removed=0 AND key>:after ORDER BY key LIMIT 32""")
+    suspend fun exactCandidates(binding: String, sha: String, bytes: Long, after: String): List<CloudPhoto>
     @Query("""SELECT cloud_photos.* FROM cloud_photos JOIN drive_sources ON cloud_photos.bindingKey = drive_sources.key
         WHERE drive_sources.accountId = :account AND cloud_photos.remoteId = :remote
         AND cloud_photos.md5 = :md5 AND cloud_photos.bytes = :bytes
@@ -58,4 +63,20 @@ interface CloudDao {
     @Query("SELECT * FROM downloads WHERE key = :key") suspend fun download(key: String): DownloadTask?
     @Query("SELECT * FROM downloads WHERE bindingKey = :binding AND state NOT IN ('COMPLETE','FAILED','AUTH_REQUIRED')") suspend fun pendingDownloads(binding: String): List<DownloadTask>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun saveDownload(task: DownloadTask)
+}
+
+/** The index is a rebuildable hint; a live Drive read still gates every reused original. */
+val HASH_INDEX_MIGRATION_8_9 = object : androidx.room.migration.Migration(8,9) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        // Schedule a normal bounded metadata scan for idle sources after upgrade. Preserve
+        // active traversal cursors; those continue and acquire remaining hashes on later scans.
+        db.execSQL("UPDATE sync_states SET lastScan=0 WHERE scanGeneration IS NULL")
+        db.execSQL("ALTER TABLE cloud_photos ADD COLUMN sha256 TEXT")
+        db.execSQL("CREATE INDEX index_cloud_photos_bindingKey_sha256_bytes ON cloud_photos(bindingKey,sha256,bytes)")
+        db.execSQL("""UPDATE cloud_photos SET sha256=(SELECT photos.sha256 FROM photos
+            WHERE photos.id=cloud_photos.photoId AND photos.sourceBindingKey=cloud_photos.bindingKey
+            AND photos.sourceRemoteId=cloud_photos.remoteId AND photos.bytes=cloud_photos.bytes
+            AND photos.cachedVersion=cloud_photos.version AND length(photos.sha256)=64)
+            WHERE removed=0""")
+    }
 }

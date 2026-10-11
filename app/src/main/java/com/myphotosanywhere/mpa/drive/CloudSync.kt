@@ -109,7 +109,7 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
         cloud.savePhoto(CloudPhoto("$binding:${file.id}",binding,file.id,parent,file.name,file.mimeType,file.bytes,file.md5,
             file.version,file.modifiedTime,file.capturedAt,file.latitude,file.longitude,
             thumbnailPath,if(oldMatches) old?.thumbnailVersion else null,linkedId,false,generation,file.assetId,file.sourceAssetId,
-            if(oldMatches) old?.thumbnailUpdatedAt ?: 0 else 0))
+            if(oldMatches) old?.thumbnailUpdatedAt ?: 0 else 0,sha256=file.sha256))
     }
     suspend fun thumbnail(api: DriveGateway,binding: String,file: DriveFile) {
         val row=cloud.photo("$binding:${file.id}") ?: return

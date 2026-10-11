@@ -10,8 +10,9 @@ class ImportTransfer(private val api: DriveGateway) {
         keepGoing: suspend () -> Unit): Pair<ImportItem, DriveFile> {
         var item = initial
         val file = File(requireNotNull(item.staged))
-        require(file.isFile && file.length() == item.size && DriveBackupWorker.digest(file,"SHA-256") == item.sha256 &&
-            DriveBackupWorker.digest(file,"MD5") == item.md5) { "Staged bytes changed. Source and checkpoints are preserved." }
+        require(file.isFile && file.length() == item.size) { "Staged file missing or size changed. Source and checkpoints are preserved." }
+        val hashes=MediaFingerprint.read(file,keepGoing)
+        require(hashes.bytes==item.size && hashes.sha256==item.sha256 && hashes.md5==item.md5) { "Staged bytes changed. Source and checkpoints are preserved." }
         keepGoing()
         if(item.remoteId==null) {
             item = item.copy(remoteId = api.generateId(), state = "UPLOADING")
@@ -49,7 +50,7 @@ class ImportTransfer(private val api: DriveGateway) {
 
     companion object {
         fun verify(remote: DriveFile, item: ImportItem, parent: String) {
-            require(!remote.trashed && remote.version!=null && remote.md5==item.md5 && remote.bytes==item.size && parent in remote.parents) {
+            require(!remote.trashed && remote.version!=null && (remote.sha256==null || remote.sha256==item.sha256) && remote.md5==item.md5 && remote.bytes==item.size && parent in remote.parents) {
                 "Remote checksum, size or destination changed. Import paused without overwriting or removing source bytes."
             }
         }

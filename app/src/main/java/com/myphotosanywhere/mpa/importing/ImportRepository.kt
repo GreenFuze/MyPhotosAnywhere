@@ -213,7 +213,7 @@ class ImportRepository(private val context: Context) {
             dao.items(id).filter { it.state=="FAILED" }.forEach { dao.updateItem(it.copy(state="PENDING",error=null)) }
             dao.saveJob(job.copy(state="RUNNING",error=null))
         }
-        schedule(id)
+        schedule(id,ExistingWorkPolicy.REPLACE)
     }
     suspend fun dismissErrors(id: String) {
         if(ImportErrorDismissal(db).dismiss(id)) ImportNotifications(context).clearSummary(id)
@@ -230,10 +230,15 @@ class ImportRepository(private val context: Context) {
         dao.jobs().filter { it.state=="DOWNLOADING" }.forEach { scheduleDownload(it.id) }
         dao.jobs().filter { it.state=="COMPLETE" }.forEach { retryCleanup(it.id) }
     }
-    private suspend fun schedule(id: String, append: Boolean=false) {
+    suspend fun resumeWhenVisible() {
+        ImportForegroundRecovery(dao).resume({ db.drive().source(it)!=null }) { id, legacy ->
+            schedule(id,if(legacy) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE)
+        }
+    }
+    private suspend fun schedule(id: String, policy: ExistingWorkPolicy=ExistingWorkPolicy.KEEP) {
         val job=dao.job(id) ?: return; val source=db.drive().source(job.binding) ?: return
         WorkManager.getInstance(context).enqueueUniqueWork("mpa-import:$id",
-            if(append) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP,
+            policy,
             OneTimeWorkRequestBuilder<ImportWorker>().setInputData(workDataOf("job" to id))
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,java.util.concurrent.TimeUnit.SECONDS)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(if(source.unmeteredOnly) NetworkType.UNMETERED else NetworkType.CONNECTED).build())
@@ -250,8 +255,8 @@ class ImportRepository(private val context: Context) {
         var item=dao.items(id).firstOrNull { it.selected && it.state in listOf("PENDING","STAGING","UPLOADING","VERIFIED") }
         if(item==null) {
             val failed=dao.items(id).any { it.selected && it.state=="FAILED" }
-            dao.saveJob(job.copy(state=if(failed) "FAILED" else "COMPLETE"))
-            if(!failed) cleanCompletedDownload(id)
+            val changed=dao.connectionState(job.id,if(failed) "FAILED" else "COMPLETE",job.error)==1
+            if(changed && !failed) cleanCompletedDownload(id)
             return@withLock false
         }
         val initial=requireNotNull(item)
@@ -262,7 +267,6 @@ class ImportRepository(private val context: Context) {
             require(!folder.trashed && folder.canAddChildren) { "Original import destination is no longer writable." }
             // Fail before another upload when the portable catalogue cannot represent this batch.
             XmpCodec.encode(app.metadata.snapshot(source))
-            require(db.cloud().photos(source.key).count { !it.removed } < 10000) { "MPA's 10,000 asset catalogue limit reached. Split into a new Drive source." }
             var current=initial
             val stage=File(context.filesDir,"migration-stage/${current.id}")
             if(current.staged==null || !File(requireNotNull(current.staged)).isFile) {
@@ -272,11 +276,11 @@ class ImportRepository(private val context: Context) {
                     "Not enough free space to stage this item. Free storage and resume."
                 }
                 current=current.copy(state="STAGING",error=null); dao.updateItem(current)
-                if(job.kind=="PICKER") {
+                val hashes=if(job.kind=="PICKER") {
                     val picker=PhotosPickerGateway(PhotosAuthorization(context).token(job.email))
                     picker.download(picker.find(requireNotNull(job.session),current.path),stage,::keepGoing)
                 } else documents.stage(current,stage,::keepGoing)
-                val sha=DriveBackupWorker.digest(stage,"SHA-256"); val md5=DriveBackupWorker.digest(stage,"MD5")
+                val sha=hashes.sha256; val md5=hashes.md5
                 require(current.sha256==null || current.sha256==sha) { "Source bytes changed since interrupted transfer. Original checkpoint preserved." }
                 current=current.copy(size=stage.length(),staged=stage.absolutePath,sha256=sha,md5=md5,state="UPLOADING")
                 dao.updateItem(current)
@@ -288,18 +292,18 @@ class ImportRepository(private val context: Context) {
                 importThumb.parentFile?.mkdirs()
                 importThumb.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,it)) }
             } finally { bitmap.recycle() }
-            val verifiedItem=current
-            // Exact bytes and scope only. Never reuse an unrelated account or local-only original.
-            val duplicate=db.photos().all().firstOrNull { it.sourceBindingKey==job.binding && it.sha256==verifiedItem.sha256 && it.bytes==verifiedItem.size && it.sourceRemoteId!=null }
-            val duplicateRemote=duplicate?.sourceRemoteId?.let { remote ->
-                try { api.file(remote).takeIf { !it.trashed && it.md5==verifiedItem.md5 && it.bytes==verifiedItem.size && source.folderId in it.parents } }
-                catch(e: DriveHttpException) { if(e.status==404) null else throw e }
-            }
+            val match=ImportDuplicateFinder(db.cloud(),api).find(job.binding,source.folderId,current,::keepGoing)
+            val duplicateRemote=match?.remote
             val remote: DriveFile
             if(duplicateRemote!=null) {
+                val hashes=MediaFingerprint.read(File(requireNotNull(current.staged)),::keepGoing)
+                require(hashes.bytes==current.size && hashes.sha256==current.sha256 && hashes.md5==current.md5) {
+                    "Staged bytes changed. Source and checkpoints are preserved."
+                }
                 remote=duplicateRemote; current=current.copy(remoteId=remote.id,state="VERIFIED",offset=current.size)
                 dao.updateItem(current)
             } else {
+                require(db.cloud().liveCount(source.key) < 10000) { "MPA's 10,000 asset catalogue limit reached. Split into a new Drive source." }
                 val result=ImportTransfer(api).upload(current,source.folderId,{ dao.updateItem(it) },::keepGoing)
                 current=result.first; remote=result.second
             }
@@ -308,12 +312,15 @@ class ImportRepository(private val context: Context) {
                 keepGoing()
                 val key="${source.key}:${remote.id}"
                 val previous=db.cloud().photo(key)
-                val existingPhoto=(duplicate?.takeIf { duplicateRemote!=null } ?: previous?.photoId?.let { db.photos().find(it) })
+                val existingPhoto=previous?.photoId?.let { db.photos().find(it) }?.takeIf {
+                    it.sourceBindingKey==source.key && it.sourceRemoteId==remote.id &&
+                        it.sha256==current.sha256 && it.bytes==current.size
+                }
                 val media=File(requireNotNull(current.staged))
                 val gps=runCatching { androidx.exifinterface.media.ExifInterface(media).latLong }.getOrNull()
-                val photo=existingPhoto ?: Photo(current.id,current.name,"",importThumb.absolutePath,current.mime,current.size,System.currentTimeMillis(),requireNotNull(current.sha256),latitude=gps?.get(0),longitude=gps?.get(1),
+                val photo=existingPhoto?.copy(cachedVersion=remote.version,displayName=remote.name) ?: Photo(current.id,current.name,"",importThumb.absolutePath,current.mime,current.size,System.currentTimeMillis(),requireNotNull(current.sha256),latitude=gps?.get(0),longitude=gps?.get(1),
                     capturedAt=PhotoRepository.captureTime(media),sourceBindingKey=source.key,sourceRemoteId=remote.id,
-                    cachedVersion=remote.version,metadataAssetId=current.id)
+                    cachedVersion=remote.version,metadataAssetId=previous?.assetId ?: remote.assetId ?: current.id)
                 val incoming=if(job.kind=="TAKEOUT" && current.metadata!=null) codec.parse(requireNotNull(current.metadata)) else null
                 val base=if(existingPhoto==null && incoming!=null) photo.copy(capturedAt=incoming.captured ?: photo.capturedAt,
                     latitude=incoming.latitude ?: photo.latitude,longitude=incoming.longitude ?: photo.longitude) else photo
@@ -330,10 +337,10 @@ class ImportRepository(private val context: Context) {
                     if(db.library().allAlbums().none { it.id==albumId }) db.library().saveAlbum(Album(albumId,current.album,System.currentTimeMillis()))
                     db.library().addToAlbum(AlbumPhoto(albumId,annotated.id))
                 }
-                db.cloud().savePhoto(CloudPhoto(key,source.key,remote.id,source.folderId,remote.name,remote.mimeType,remote.bytes,remote.md5,remote.version,
+                db.cloud().savePhoto(CloudPhoto(key,source.key,remote.id,remote.parents.firstOrNull() ?: source.folderId,remote.name,remote.mimeType,remote.bytes,remote.md5,remote.version,
                     remote.modifiedTime,annotated.capturedAt,annotated.latitude,annotated.longitude,
                     thumbnailPath=annotated.thumbnailPath.ifBlank { importThumb.absolutePath },thumbnailVersion=remote.version,
-                    photoId=annotated.id,assetId=annotated.metadataAssetId,thumbnailUpdatedAt=System.currentTimeMillis()))
+                    photoId=annotated.id,assetId=annotated.metadataAssetId,sourceAssetId=previous?.sourceAssetId ?: remote.sourceAssetId,thumbnailUpdatedAt=System.currentTimeMillis(),sha256=current.sha256))
                 dao.updateItem(current.copy(state="COMPLETE",photoId=annotated.id,staged=null,error=null))
                 // Project the candidate before committing: never silently discard annotations at XMP limits.
                 XmpCodec.encode(app.metadata.snapshot(source))
@@ -345,10 +352,9 @@ class ImportRepository(private val context: Context) {
         catch(e: DriveConnectionException) { throw e }
         catch(e: Exception) {
             dao.item(initial.id)?.let { dao.updateItem(it.copy(state="FAILED",error=e.message ?: "Import failed. Source preserved.")) }
-            dao.job(id)?.takeIf { it.state=="RUNNING" }?.let { dao.saveJob(it.copy(state="FAILED",error=e.message)) }
+            dao.connectionState(id,"FAILED",e.message)
             false
         }
     } }
 
-    suspend fun continueJob(id: String) { if(dao.job(id)?.state=="RUNNING") schedule(id,true) }
 }
