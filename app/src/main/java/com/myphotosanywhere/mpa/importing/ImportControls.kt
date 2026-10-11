@@ -40,6 +40,8 @@ class ImportModel(application: Application): AndroidViewModel(application) {
     val sidecars=app.database.imports().observeSidecars().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val sources=app.database.drive().observeSources().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val downloads=app.database.imports().observeDownloads().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
+    val history=ImportHistory(app)
+    val dismissed=history.observeDismissed().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptySet())
     val busy=MutableStateFlow(false)
     val message=MutableStateFlow<String?>(null)
     private var photosEmail: String?=null
@@ -73,7 +75,11 @@ class ImportModel(application: Application): AndroidViewModel(application) {
 @Composable
 fun ImportControls(model: ImportModel=viewModel()) {
     val context=LocalContext.current
-    val jobs by model.jobs.collectAsStateWithLifecycle()
+    val savedJobs by model.jobs.collectAsStateWithLifecycle()
+    val dismissed by model.dismissed.collectAsStateWithLifecycle()
+    var showDismissed by rememberSaveable { mutableStateOf(false) }
+    var historyLimit by rememberSaveable { mutableIntStateOf(10) }
+    val jobs=savedJobs.filter { showDismissed || it.id !in dismissed || !ImportHistory.canDismiss(it.state) }
     val items by model.items.collectAsStateWithLifecycle()
     val sidecars by model.sidecars.collectAsStateWithLifecycle()
     val sources by model.sources.collectAsStateWithLifecycle()
@@ -126,6 +132,12 @@ fun ImportControls(model: ImportModel=viewModel()) {
         if(ImportErrorDismissal.canDismiss(job) && ImportErrorDismissal.hasErrors(job,entries,download))
             TextButton(enabled=!busy,onClick={ model.run { model.app.imports.dismissErrors(job.id) } },
                 modifier=Modifier.testTag("dismiss-import-errors:${job.id}")) { Text("Dismiss errors") }
+        if(ImportHistory.canDismiss(job.state)) {
+            if(job.id in dismissed) TextButton(enabled=!busy,onClick={ model.run { model.history.restore(job.id) } },
+                modifier=Modifier.testTag("restore-import:${job.id}")) { Text("Restore import") }
+            else TextButton(enabled=!busy,onClick={ model.run { model.history.dismiss(model.app.database,job.id) } },
+                modifier=Modifier.testTag("dismiss-import:${job.id}")) { Text("Dismiss import") }
+        }
         download?.let {
             Text(when(it.state) {
                 "CLEANED" -> "Downloaded ZIP removed from this phone."
@@ -187,8 +199,16 @@ fun ImportControls(model: ImportModel=viewModel()) {
         Text("For ZIPs, use local/USB storage. Cloud document providers may download the archive internally. Picker omits location metadata and may transcode videos.",style=MaterialTheme.typography.bodySmall)
         if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let { Text(it,color=MaterialTheme.colorScheme.error); TextButton(onClick={ model.message.value=null }) { Text("Dismiss") } }
-        jobs.filterNot { it.state in activeStates }.take(10).forEach { job ->
+        if(savedJobs.any { it.id in dismissed && ImportHistory.canDismiss(it.state) })
+            TextButton(onClick={ showDismissed=!showDismissed },modifier=Modifier.testTag("toggle-dismissed-imports")) {
+                Text(if(showDismissed) "Hide dismissed imports" else "Show dismissed imports")
+            }
+        val historyJobs=jobs.filterNot { it.state in activeStates }
+        historyJobs.take(historyLimit).forEach { job ->
             key(job.id) { jobControls(job) }
+        }
+        if(historyJobs.size>historyLimit) TextButton(onClick={ historyLimit+=10 },modifier=Modifier.testTag("more-import-history")) {
+            Text("Show more imports")
         }
         if(sidecars.isNotEmpty()) {
             Text("Google metadata found in Drive",style=MaterialTheme.typography.titleMedium)

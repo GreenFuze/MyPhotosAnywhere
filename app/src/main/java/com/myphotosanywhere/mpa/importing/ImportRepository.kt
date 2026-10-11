@@ -247,6 +247,7 @@ class ImportRepository(private val context: Context) {
         val job=dao.job(id) ?: return
         require(job.state !in listOf("PICKING","DOWNLOADING","CANCELLED","COMPLETE"))
         require(db.drive().source(job.binding)!=null) { "Reconnect this import's original Drive source." }
+        ImportHistory(context).restore(id)
         val download=dao.download(id)
         if(download!=null && (download.state !in listOf("READY","CLEANED") || (download.state=="READY" && dao.items(id).isEmpty()))) {
             dao.saveJob(job.copy(state="DOWNLOADING",error=null)); scheduleDownload(id); return

@@ -23,6 +23,21 @@ class OriginalImageGeometryTest {
             assertEquals(1234f,point[0],.01f);assertEquals(2345f,point[1],.01f)
         }
     }
+    @Test fun previewsAndOddSizedRegionsRespectSmallHeapPixelBudgets() {
+        for(heap in listOf(32L,128L,512L)) {
+            val budget=OriginalImageBudget(heap*1024*1024)
+            for((width,height) in listOf(1 to 1,4097 to 2049,200_000 to 100_000,Int.MAX_VALUE to 1)) {
+                val sample=budget.previewSample(width,height)
+                assertTrue(OriginalImageBudget.pixels(width,height,sample)<=budget.previewPixels)
+                assertTrue(maxOf(width,height).toLong()/sample<=2048)
+                val region=Rect(0,0,width,height)
+                val tile=OriginalImageGeometry.sample(1f,region,budget.tilePixels)
+                assertTrue(OriginalImageBudget.pixels(width,height,tile)<=budget.tilePixels)
+            }
+        }
+        assertEquals(4,OriginalImageGeometry.sample(1f,Rect(0,0,3,3),1))
+        assertThrows(IllegalArgumentException::class.java) { OriginalImageGeometry.sample(0f,Rect(0,0,10,10)) }
+    }
     @Test fun zoomedRegionsDecodeNativePixelsAndLargeRegionsStayBounded() {
         assertEquals(1,OriginalImageGeometry.sample(1.5f,Rect(0,0,1080,1920)))
         assertEquals(4,OriginalImageGeometry.sample(.2f,Rect(0,0,4000,3000)))

@@ -15,9 +15,28 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
     private val remoteVerifier: (suspend (Photo, File) -> Boolean)? = null) {
     val lock=Mutex()
     private val readers=mutableMapOf<String,Int>()
-    suspend fun acquireReader(id: String): AutoCloseable = lock.withLock {
+    class OriginalRead(val photo: Photo,val file: File,private val lease: AutoCloseable): AutoCloseable {
+        override fun close()=lease.close()
+    }
+    /** Validate the latest row and protect its file under the same lock as eviction. */
+    suspend fun openOriginal(id: String): OriginalRead? {
+        var opened: OriginalRead?=null
+        try { return withContext(Dispatchers.IO) { lock.withLock {
+            val photo=database.photos().find(id) ?: return@withLock null
+            val file=File(photo.originalPath)
+            if(photo.originalPath.isBlank() || !file.isFile) return@withLock null
+            database.photos().update(photo.copy(lastAccess=System.currentTimeMillis()))
+            OriginalRead(photo,file,reader(id)).also { opened=it }
+        } } } catch(e: kotlinx.coroutines.CancellationException) {
+            // withContext may discard a result when the UI closes during dispatch back.
+            opened?.close();throw e
+        }
+    }
+    suspend fun acquireReader(id: String): AutoCloseable = lock.withLock { reader(id) }
+    private fun reader(id: String): AutoCloseable {
         synchronized(readers) { readers[id]=(readers[id] ?: 0)+1 }
-        AutoCloseable { synchronized(readers) {
+        val released=java.util.concurrent.atomic.AtomicBoolean(false)
+        return AutoCloseable { if(released.compareAndSet(false,true)) synchronized(readers) {
             val remaining=(readers[id] ?: 1)-1
             if(remaining<=0) readers.remove(id) else readers[id]=remaining
         } }

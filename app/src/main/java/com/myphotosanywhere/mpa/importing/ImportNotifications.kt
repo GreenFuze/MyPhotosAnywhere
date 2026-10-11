@@ -83,7 +83,9 @@ class ImportNotifications(private val context: Context) {
     fun finish(job: String, progress: ImportProgress) {
         if(progress.state !in listOf("COMPLETE","FAILED","PAUSED","CANCELLED","WAITING") || !enabled()) return
         // A separate ID survives WorkManager removing its foreground notification.
-        try { manager.notify(job,SUMMARY_ID,notification(progress)) } catch(_: SecurityException) {
+        try { ImportHistory(context).withSummary(job,progress.state) {
+            manager.notify(job,SUMMARY_ID,notification(progress))
+        } } catch(_: SecurityException) {
             // Permission can be revoked between the check and notification. Imports remain valid.
         }
     }

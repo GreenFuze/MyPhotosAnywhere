@@ -22,12 +22,21 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.myphotosanywhere.mpa.data.Photo
+import com.myphotosanywhere.mpa.data.MediaCache
+import kotlinx.coroutines.CancellationException
 import java.io.File
+
+private sealed interface ViewerOriginal {
+    data object Loading: ViewerOriginal
+    data class Ready(val read: MediaCache.OriginalRead): ViewerOriginal
+    data class Unavailable(val message: String): ViewerOriginal
+}
 
 @Composable
 fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesModel,onClose: ()->Unit,
     onCurrent: (String)->Unit,onEdit: (String)->Unit,onDetails: (String)->Unit) {
-    val available=remember(photos) { photos.filter { it.originalPath.isNotBlank() && File(it.originalPath).isFile }.sortedByDescending { it.capturedAt ?: it.importedAt } }
+    // Keep paging stable while an import inserts newer photos into the gallery.
+    val available=remember(selectedId) { photos.filter { it.originalPath.isNotBlank() && File(it.originalPath).isFile }.sortedByDescending { it.capturedAt ?: it.importedAt } }
     if(available.isEmpty()) { LaunchedEffect(Unit) { onClose() }; return }
     val pager=rememberPagerState(initialPage=available.indexOfFirst { it.id==selectedId }.coerceAtLeast(0),pageCount={ available.size })
     val current=available.getOrNull(pager.currentPage) ?: available.first()
@@ -43,17 +52,28 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
                 Text(current.displayName,maxLines=1,modifier=Modifier.padding(horizontal=16.dp))
                 HorizontalPager(state=pager,key={ available[it].id },modifier=Modifier.fillMaxWidth().weight(1f)) { page ->
                     val photo=available[page]
-                    val reader by produceState<AutoCloseable?>(null,photo.id) {
-                        value=model.app.cache.acquireReader(photo.id);awaitDispose { value?.close() }
+                    val original by produceState<ViewerOriginal>(ViewerOriginal.Loading,photo.id) {
+                        var read: MediaCache.OriginalRead?=null
+                        try {
+                            read=model.app.cache.openOriginal(photo.id)
+                            value=read?.let { ViewerOriginal.Ready(it) } ?: ViewerOriginal.Unavailable(
+                                "This downloaded original is no longer on this phone. Close and download it again.")
+                        } catch(e: CancellationException) { throw e }
+                        catch(_: Exception) { value=ViewerOriginal.Unavailable("Cannot open this original. Close and try downloading it again.") }
+                        awaitDispose { read?.close() }
                     }
+                    val reader=(original as? ViewerOriginal.Ready)?.read
                     var quality by remember(photo.id) { mutableStateOf("Loading original…") }
                     var zoom by remember(photo.id) { mutableFloatStateOf(1f) }
                     var x by remember(photo.id) { mutableFloatStateOf(0f) }
                     var y by remember(photo.id) { mutableFloatStateOf(0f) }
                     LaunchedEffect(pager.currentPage) { if(pager.currentPage!=page) { zoom=1f;x=0f;y=0f } }
-                    if(reader==null) Box(Modifier.fillMaxSize()) { CircularProgressIndicator() }
+                    if(original is ViewerOriginal.Unavailable) Box(Modifier.fillMaxSize()) {
+                        Text((original as ViewerOriginal.Unavailable).message,color=Color.White,
+                            modifier=Modifier.align(androidx.compose.ui.Alignment.Center).padding(20.dp))
+                    } else if(reader==null) Box(Modifier.fillMaxSize()) { CircularProgressIndicator() }
                     else if(photo.mimeType.startsWith("video/")) AndroidView(factory={ context -> VideoView(context).apply {
-                        setVideoPath(photo.originalPath)
+                        setVideoPath(reader.file.absolutePath)
                         val controls=android.widget.MediaController(context);controls.setAnchorView(this);setMediaController(controls)
                         setOnPreparedListener { seekTo(1) }
                     } },modifier=Modifier.fillMaxSize(),update={ if(pager.currentPage!=page) it.pause() },onRelease={ it.stopPlayback() })
@@ -77,8 +97,8 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
                         }
                     }) {
                         AndroidView(factory={ context -> OriginalPhotoView(context).apply {
-                            onQuality={ quality=it };load(File(photo.originalPath))
-                        } },modifier=Modifier.fillMaxSize().testTag("original-image"),update={ it.transform(zoom,x,y) },onRelease={ it.close() })
+                            onQuality={ quality=it };setActive(pager.currentPage==page);load(reader.file)
+                        } },modifier=Modifier.fillMaxSize().testTag("original-image"),update={ it.setActive(pager.currentPage==page);it.transform(zoom,x,y) },onRelease={ it.close() })
                         Text(quality,color=Color.White,style=MaterialTheme.typography.bodySmall,
                             modifier=Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(8.dp))
                     }

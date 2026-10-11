@@ -46,6 +46,28 @@ class MediaCacheTest {
             } finally { reader.close() }
         } finally { db.close();files.forEach { it.delete() } }
     }
+    @Test fun validatedReadsProtectTheCurrentFileAndDoubleCloseCannotReleaseAnotherView() = runBlocking<Unit> {
+        val context=RuntimeEnvironment.getApplication()
+        val db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).build()
+        val file=File.createTempFile("validated-cache",".jpg",context.filesDir)
+        try {
+            file.writeText("original")
+            val photo=Photo("validated","photo.jpg",file.absolutePath,"","image/jpeg",8,1,"hash",
+                sourceBindingKey="binding",sourceRemoteId="remote",cachedVersion="1")
+            db.photos().insert(photo)
+            db.cloud().savePhoto(CloudPhoto("binding:remote","binding","remote","folder","photo.jpg","image/jpeg",8,
+                "md5","1",null,null,null,null,photoId=photo.id))
+            val settings=LibrarySettings(context).apply { update(state.value.copy(originalBudget=0,faceIndexing=false,objectIndexing=false)) }
+            val cache=MediaCache(context,db,settings) { _,_ -> true }
+            val first=requireNotNull(cache.openOriginal(photo.id));val second=requireNotNull(cache.openOriginal(photo.id))
+            assertEquals(file,first.file)
+            first.close();first.close();cache.enforce()
+            assertTrue(file.isFile);assertEquals(file.absolutePath,db.photos().find(photo.id)?.originalPath)
+            second.close();cache.enforce()
+            assertFalse(file.exists());assertEquals("",db.photos().find(photo.id)?.originalPath)
+            assertNull(cache.openOriginal(photo.id));assertNull(cache.openOriginal("missing"))
+        } finally { db.close();file.delete() }
+    }
     @Test fun failedRemoteVerificationKeepsAnUnpinnedDownloadAndItsPath() = runBlocking {
         val context=RuntimeEnvironment.getApplication()
         val db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).allowMainThreadQueries().build()

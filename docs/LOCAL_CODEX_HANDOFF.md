@@ -1,3 +1,7 @@
+## In progress: 0.5.9 terminal import dismissal and viewer safety
+
+The owner wants cancelled/completed tasks dismissible and reports an image-viewing crash during import. Add reversible local history dismissal for COMPLETE/CANCELLED/FAILED with terminal-state recheck, durable rows/checkpoints preserved and late summary suppression. Keep active/paused work visible. No phone crash log is available, so do not claim a confirmed cause. Repair identified bitmap lifetime, decode-memory and cache-read risks; freeze viewer paging during import insertions. Version 0.5.9 / code 20 / Room v9. Local checks and immutable-source CI are pending; no 0.5.9 release is claimed yet.
+
 ## Follow-up: 0.5.8 in-app import progress
 
 Add live progress in Storage using the shared Room-backed notification summary: verified-file count/bar, current filename/upload percentage and retry/pause status. Active imports and controls precede setup/history, and active jobs cannot be hidden by the ten-entry history limit. Version 0.5.8 / code 19 / Room v9 preserves checkpoints, scheduling and signing. Local checks and required immutable-source CI passed: 190 unit/integration tests, zero lint errors and 27 native tests each on APIs 29/35. The dedicated 0.5.8 publisher reuses the exact passed APK with the established signer. Real phone acceptance remains pending.
