@@ -2,7 +2,7 @@
 
 Implemented in MPA 0.5.0 / version code 11, Room v7. Local checks and required CI passed on the immutable source recorded in [release evidence](releases/v0.5.0.json). Google Cloud Picker configuration was completed and verified on 2026-10-11 in the existing `myphotosanywhere` project. Real-account phone acceptance remains outstanding.
 
-**0.5.2 / code 13 / Room v8** restores direct ZIP file selection and reads the Android-granted file descriptor without reopening a filesystem path. The sole connected Drive folder remains the automatic import destination. See [validation](VALIDATION.md).
+**0.5.2 / code 13 / Room v8** restores direct ZIP file selection and reads the Android-granted file descriptor without reopening a filesystem path. The sole connected Drive folder remains the automatic import destination. All 144 unit/integration and 36 native checks (18 each on Android 10 and 15) passed. See [validation](VALIDATION.md) and [release evidence](releases/v0.5.2.json).
 
 ## Import destinations and controls
 
