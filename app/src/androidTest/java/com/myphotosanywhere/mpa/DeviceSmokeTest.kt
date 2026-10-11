@@ -124,11 +124,13 @@ class DeviceSmokeTest {
         val b=com.myphotosanywhere.mpa.drive.DriveSource.from(com.myphotosanywhere.mpa.drive.DriveConnection(
             accountId="test-b",email="b@test",mode="APP_FILES",folderId="folder-b",folderName="B"))
         val ids=listOf("source-test-a","source-test-b")
+        // Keep the two subjects ahead of earlier tests' photos on smaller lazy-grid viewports.
+        val fixtureTime=System.currentTimeMillis()
         try {
             app.database.drive().saveSource(a); app.database.drive().saveSource(b)
             app.database.drive().saveConnection(b.connection())
             for((id,source) in ids.zip(listOf(a,b))) app.database.photos().insert(com.myphotosanywhere.mpa.data.Photo(
-                id,"$id.jpg","","","image/jpeg",8,1,"sha-$id",sourceBindingKey=source.key))
+                id,"$id.jpg","","","image/jpeg",8,fixtureTime,"sha-$id",sourceBindingKey=source.key))
             try {
                 compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${ids[0]}").fetchSemanticsNodes().isNotEmpty() &&
                     compose.onAllNodesWithTag("photo:${ids[1]}").fetchSemanticsNodes().isNotEmpty() }
