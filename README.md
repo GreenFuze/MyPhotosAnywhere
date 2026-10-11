@@ -6,6 +6,8 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
+The [0.5.9 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.9) adds dismissal/restoration of completed, cancelled and failed imports, plus image-viewer memory/lifecycle/cache-read fixes during ongoing imports. Media and transfer records are preserved. All 195 unit/integration and 62 native checks passed. The reported phone crash still needs retesting; no exact cause is claimed without its trace. [Import controls](docs/GOOGLE_IMPORTS.md).
+
 The [0.5.8 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.8) adds live import progress in Storage: verified-file bar/count, current filename/upload percentage and retry/pause status. Active imports appear above setup and stopped history. All 190 unit/integration and 54 native checks passed; saved jobs and the established signer are preserved. [Import controls](docs/GOOGLE_IMPORTS.md).
 
 The [0.5.7 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.7) adds Android 14+ user-initiated background imports, stable progress during connection retries, a notification Pause action and direct Takeout ZIP reading from connected Drive folders. Saved imports remain compatible. ZIPs stay in Drive; individual photos still upload into the destination. All 189 unit/integration and 52 native checks passed. Real Samsung/Google-account acceptance remains pending. [Import controls and limits](docs/GOOGLE_IMPORTS.md).

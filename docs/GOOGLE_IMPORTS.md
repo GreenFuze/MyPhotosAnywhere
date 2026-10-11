@@ -1,6 +1,6 @@
-## Finished imports and viewing during imports (0.5.9 candidate)
+## Finished imports and viewing during imports (0.5.9)
 
-Completed, cancelled and failed imports have Dismiss import. Show dismissed imports and Restore import recover hidden history; imported media, source ZIPs and transfer records remain intact. Active and paused jobs stay visible. A resumed failed task clears its dismissal. The viewer uses bounded serialized decoding, protects current cache reads, keeps paging stable during new imports and reports recoverable decode-memory failures. Candidate version 0.5.9 / code 20 / Room v9; local checks and required CI are pending.
+Completed, cancelled and failed imports have Dismiss import. Show dismissed imports and Restore import recover hidden history; imported media, source ZIPs and transfer records remain intact. Active and paused jobs stay visible. A resumed failed task clears its dismissal. The viewer uses bounded serialized decoding, protects current cache reads, keeps paging stable during new imports and reports recoverable decode-memory failures. Version 0.5.9 / code 20 / Room v9 passed all 195 unit/integration and 62 native checks (31 each on Android 10 and 15). See [validation](VALIDATION.md) and [release evidence](releases/v0.5.9.json). The reported phone crash has no trace; retesting the same image remains an acceptance check.
 
 ## In-app progress (0.5.8)
 
