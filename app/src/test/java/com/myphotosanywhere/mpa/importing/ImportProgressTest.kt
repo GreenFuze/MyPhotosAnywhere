@@ -41,4 +41,11 @@ class ImportProgressTest {
         assertFalse(ImportBatch({ calls++; false },{ error("Cannot yield failed work") }).run())
         assertEquals(1,calls)
     }
+    @Test fun connectionErrorOverridesStaleStagingAndUploadStates() {
+        val waiting=job.copy(error="Cannot resolve Google Drive. Retrying automatically (1/3).")
+        val progress=ImportProgress.from(waiting,listOf(item("clip","STAGING")))
+        assertEquals(waiting.error,progress.detail)
+        assertEquals(0,progress.complete)
+        assertEquals(waiting.error,ImportProgress.from(waiting.copy(state="FAILED"),listOf(item("clip","UPLOADING"))).detail)
+    }
 }

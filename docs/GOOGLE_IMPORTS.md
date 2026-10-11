@@ -16,6 +16,16 @@ The owner reports that a real ZIP import is running in 0.5.2. Completion, interr
 
 Official Android contracts: [long-running WorkManager workers](https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/long-running), [notification permission](https://developer.android.com/develop/ui/compose/notifications/notification-permission), [Android 15 data-sync limits](https://developer.android.com/about/versions/15/behavior-changes-15).
 
+## Takeout and Drive connection failures in 0.5.4
+
+Reading the Takeout ZIP does not call the Google Photos API. MPA imports selected media into the captured **Google Drive destination**, so authorization, destination checks and verified uploads require the Drive API at `www.googleapis.com`. A hostname-resolution error means MPA cannot reach that server; it does not establish that the MP4 is unsupported or corrupt. A saved `staging` row can remain from an interrupted attempt while a new attempt fails its initial Drive check.
+
+Version 0.5.4 / code 15 keeps Room v8. DNS, socket timeout and interrupted-connection errors have a clear connection message and receive up to **three automatic retries**, with exponential WorkManager backoff beginning at 30 seconds and respecting the source's network requirements. Waiting/retry messages appear in Storage and a dismissible notification. After the retry limit the job fails visibly; restore connectivity and choose **Import selected / Resume**. Existing reserved IDs, acknowledged offsets, staged files, verified files and original ZIP grants are retained. Pause/cancel cannot be undone by a late connection failure. HTTP permission/authorization, malformed data and local storage errors remain fail-fast rather than being classified as connection failures.
+
+For a current DNS failure, try another working Wi-Fi network and inspect any VPN or Private DNS configuration. If using mobile data, the destination's Wi-Fi-only preference still applies. Resume the same job instead of creating a replacement import. MPA cannot repair phone/network DNS, and retrying does not bypass permissions or guarantee uninterrupted background work. Staging byte progress and read deadlines remain separate follow-up work; this release addresses the reported Drive-resolution error, without claiming a reproduced MP4 decoder defect.
+
+Development and CI checks are pending; no 0.5.4 release is claimed yet. The owner supplied an MP4 `staging` screenshot and a Google API hostname-resolution error on 0.5.2; real-phone recovery remains to be checked.
+
 ## Import destinations and controls
 
 In Storage, connect a writable Drive folder. When exactly one folder is connected, it is automatically the default import destination, even if ordinary backup is paused. With several connected folders, select **Use as default backup destination** on the intended folder. Automatic import destination selection does not enable ordinary local-media backup. Each new import captures this account/folder permanently. Changing the default affects future jobs only. Disconnecting its source pauses an import; reconnect the original source to resume it.

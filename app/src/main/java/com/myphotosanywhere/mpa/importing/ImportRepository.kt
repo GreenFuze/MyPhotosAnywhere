@@ -232,6 +232,7 @@ class ImportRepository(private val context: Context) {
         WorkManager.getInstance(context).enqueueUniqueWork("mpa-import:$id",
             if(append) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<ImportWorker>().setInputData(workDataOf("job" to id))
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,java.util.concurrent.TimeUnit.SECONDS)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(if(source.unmeteredOnly) NetworkType.UNMETERED else NetworkType.CONNECTED).build())
                 .addTag("mpa-import:${job.binding}").build())
     }
@@ -338,6 +339,7 @@ class ImportRepository(private val context: Context) {
             app.metadata.schedule(); app.people.schedule(); app.sync.schedule(source.connection(),true)
             true
         } catch(e: CancellationException) { throw e }
+        catch(e: DriveConnectionException) { throw e }
         catch(e: Exception) {
             dao.item(initial.id)?.let { dao.updateItem(it.copy(state="FAILED",error=e.message ?: "Import failed. Source preserved.")) }
             dao.job(id)?.takeIf { it.state=="RUNNING" }?.let { dao.saveJob(it.copy(state="FAILED",error=e.message)) }

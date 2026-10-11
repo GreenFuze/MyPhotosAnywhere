@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import com.myphotosanywhere.mpa.MpaApplication
+import com.myphotosanywhere.mpa.drive.DriveConnectionException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -65,6 +66,12 @@ class ImportWorker(context: Context, params: WorkerParameters): CoroutineWorker(
             }
             Result.success()
         } catch(e: CancellationException) { throw e }
+        catch(e: DriveConnectionException) {
+            val retry=ImportConnectionRecovery(app.database.imports()).record(job,runAttemptCount,e)
+            val progress=snapshot(job)
+            notices.finish(job,if(retry) progress.copy(state="WAITING") else progress)
+            if(retry) Result.retry() else Result.failure()
+        }
         catch(_: Exception) {
             app.database.imports().job(job)?.takeIf { it.state=="RUNNING" }?.let {
                 app.database.imports().saveJob(it.copy(state="FAILED",error="Background import stopped. Open MPA and resume; transfer checkpoints are preserved."))

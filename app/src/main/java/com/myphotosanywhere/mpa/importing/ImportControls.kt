@@ -117,6 +117,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
     val folder=rememberLauncherForActivityResult(TakeoutSelectionContract(tree=true)) { if(it!=null) model.add(it,true,targetJob) }
     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text("Import Google Photos",style=MaterialTheme.typography.titleMedium)
+        Text("Takeout ZIPs are read locally. Importing uploads the selected files to your Drive destination and requires an internet connection.",style=MaterialTheme.typography.bodySmall)
         Text("Imports continue in the background with verified-file progress in notifications. Android may pause work for network or system limits; checkpoints are preserved.",style=MaterialTheme.typography.bodySmall)
         if(!notificationsEnabled) {
             Text("Background progress notifications are off.")

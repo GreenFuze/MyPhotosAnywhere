@@ -23,10 +23,10 @@ data class ImportProgress(val kind: String, val state: String, val complete: Int
             val current=selected.firstOrNull { it.state in listOf("STAGING","UPLOADING","VERIFIED") }
             val detail=when(job.state) {
                 "COMPLETE" -> "Import complete"
-                "FAILED" -> "Needs attention · Open MPA to resume"
+                "FAILED" -> job.error ?: "Needs attention · Open MPA to resume"
                 "PAUSED" -> "Paused · Open MPA to resume"
                 "CANCELLED" -> "Remaining import cancelled"
-                else -> when(current?.state) {
+                else -> job.error ?: when(current?.state) {
                     "STAGING" -> "Preparing ${current.name}"
                     "UPLOADING" -> "Uploading ${current.name}" + if(current.size>0)
                         " · ${(current.offset.coerceIn(0,current.size)*100/current.size)}%" else ""
@@ -70,7 +70,7 @@ class ImportNotifications(private val context: Context) {
     fun clearSummary(job: String) { manager.cancel(job,SUMMARY_ID) }
 
     fun finish(job: String, progress: ImportProgress) {
-        if(progress.state !in listOf("COMPLETE","FAILED","PAUSED","CANCELLED") || !enabled()) return
+        if(progress.state !in listOf("COMPLETE","FAILED","PAUSED","CANCELLED","WAITING") || !enabled()) return
         // A separate ID survives WorkManager removing its foreground notification.
         try { manager.notify(job,SUMMARY_ID,notification(progress)) } catch(_: SecurityException) {
             // Permission can be revoked between the check and notification. Imports remain valid.

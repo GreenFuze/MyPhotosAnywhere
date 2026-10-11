@@ -7,6 +7,8 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
@@ -234,7 +236,11 @@ class DriveGateway(
     }
 
     private suspend fun <T> execute(builder: Request.Builder, read: (Response) -> T): T = withContext(Dispatchers.IO) {
-        client.newCall(builder.header("Authorization", "Bearer $token").build()).execute().use(read)
+        try { client.newCall(builder.header("Authorization", "Bearer $token").build()).execute().use(read) }
+        catch(e: IOException) {
+            currentCoroutineContext().ensureActive()
+            throw (DriveConnectionException.from(e) ?: e)
+        }
     }
 
     private fun checkSuccess(r: Response) {

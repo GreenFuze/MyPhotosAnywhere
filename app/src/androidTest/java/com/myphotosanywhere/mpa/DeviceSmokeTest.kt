@@ -83,6 +83,41 @@ class DeviceSmokeTest {
         }
     }
 
+    @Test fun driveConnectionRecoveryPreservesCheckpointsAndPostsWaitingStatus() = runBlocking<Unit> {
+        allowImportNotifications()
+        val id="connection-device-test"
+        val dao=app.database.imports()
+        val notices=com.myphotosanywhere.mpa.importing.ImportNotifications(app)
+        val item=com.myphotosanywhere.mpa.importing.ImportItem("connection-video",id,"content://original-zip","clip.mp4","clip.mp4","video/mp4",100,
+            state="UPLOADING",remoteId="reserved",sessionUri="private-session",offset=42,staged="private-stage",sha256="sha",md5="md5")
+        val completed=item.copy(id="connection-complete",state="COMPLETE",offset=100,staged=null,photoId="verified-photo")
+        val failure=requireNotNull(com.myphotosanywhere.mpa.drive.DriveConnectionException.from(java.net.UnknownHostException("fixture")))
+        try {
+            dao.saveJob(com.myphotosanywhere.mpa.importing.ImportJob(id,"original-destination","TAKEOUT",state="RUNNING"))
+            dao.insertItem(item); dao.insertItem(completed)
+            val recovery=com.myphotosanywhere.mpa.importing.ImportConnectionRecovery(dao)
+            assertTrue(recovery.record(id,0,failure))
+            assertEquals(item,dao.item(item.id)); assertEquals(completed,dao.item(completed.id))
+            assertEquals("RUNNING",dao.job(id)?.state)
+            val waiting=com.myphotosanywhere.mpa.importing.ImportProgress.from(requireNotNull(dao.job(id)),dao.items(id)).copy(state="WAITING")
+            notices.finish(id,waiting)
+            val manager=app.getSystemService(android.app.NotificationManager::class.java)
+            withTimeout(5000) { while(manager.activeNotifications.none { it.tag==id }) delay(50) }
+            val notification=manager.activeNotifications.single { it.tag==id }.notification
+            val content=notification.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString()
+            assertTrue(content.contains("1/2 verified")); assertTrue(content.contains("Cannot resolve Google Drive"))
+            assertTrue(content.contains("Retrying automatically"))
+            assertEquals(0,notification.flags and android.app.Notification.FLAG_ONGOING_EVENT)
+            assertFalse(recovery.record(id,3,failure))
+            assertEquals("FAILED",dao.job(id)?.state)
+            assertEquals(item,dao.item(item.id)); assertEquals(completed,dao.item(completed.id))
+        } finally {
+            notices.clearSummary(id)
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM import_items WHERE job=?",arrayOf(id))
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM import_jobs WHERE id=?",arrayOf(id))
+        }
+    }
+
     @Test fun takeoutZipStreamsOneEntryAndKeepsSupplementalMetadata() = runBlocking<Unit> {
         val archive=File(app.cacheDir,"synthetic-takeout.zip")
         val staged=File(app.cacheDir,"synthetic-stage.jpg")
@@ -295,7 +330,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
-        compose.onNodeWithText("MPA 0.5.3 (14)",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.5.4 (15)",substring=true).assertExists()
         val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
         assertEquals("com.myphotosanywhere.mpa",info.packageName)
         assertTrue(info.sha1.isNotEmpty())

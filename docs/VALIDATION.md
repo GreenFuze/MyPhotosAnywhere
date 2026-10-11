@@ -1,5 +1,9 @@
 # Validation status and device checklist
 
+## MPA 0.5.4 Drive connection recovery — 2026-10-11
+
+Development checks are in progress; no 0.5.4 release is claimed yet. Version 0.5.4 / code 15 preserves Room v8 and adds safe Drive DNS/transport errors, three bounded automatic retries with exponential backoff, checkpoint preservation and waiting notifications. Tests cover sanitized DNS errors, timeout classification, local/permission errors staying fail-fast, actual Room recovery transitions, paused/cancelled jobs, and resumable upload reprobe without a new reservation/session. Native checks cover preserved in-flight/verified rows and waiting notifications on Android 10 and 15. The reported hostname-resolution failure explains a Drive connectivity blocker; its phone/network cause is not diagnosed from the screenshot, and live recovery remains pending.
+
 ## MPA 0.5.3 background import progress — 2026-10-11
 
 Source `498659de11a503809a836280bc27977bfa175737` passed **152 unit/integration tests**, lint with **zero errors**, CPU model checks, app assembly and **20 native tests on each of Android 10/API 29 and Android 15/API 35 (40 total)**, with zero failures/errors/skips. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38146814939) · [Android 10 and 15 checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38146815018). Local Windows checks passed all 152 tests, lint and both app/instrumentation APK assembly; local device tests were not run. CI Room v8 matches the committed schema.
