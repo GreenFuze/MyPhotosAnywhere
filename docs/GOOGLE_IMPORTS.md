@@ -1,6 +1,6 @@
 ## Continuous background transfers and Drive ZIPs in 0.5.7
 
-Candidate version 0.5.7 / code 18 / Room v9. Local checks and required CI are pending; no 0.5.7 release is claimed yet.
+Version 0.5.7 / code 18 / Room v9 passed all 189 unit/integration and 52 native checks (26 each on Android 10 and 15). See [validation](VALIDATION.md) and [release evidence](releases/v0.5.7.json). Real Samsung background and Google-account Drive ZIP acceptance remain pending.
 
 On Android 14+ Import/Resume schedules a user-initiated data-transfer job while MPA is visible. Android owns its wake lock, assigned network and notification lifecycle; imports no longer depend on starting a data-sync foreground service from the background. Earlier Android versions retain the foreground WorkManager path. Both paths keep the active progress notification during three bounded connection retries (30/60/120 seconds), with the same durable notification ID and verified-file bar. **Pause import** in the notification preserves reserved remote IDs, upload sessions, offsets, staged files and completed media. Ordinary invalid-data/permission/storage errors still stop visibly. Reopening migrates old running WorkManager imports without changing their transfer checkpoints; paused/cancelled imports stay stopped.
 

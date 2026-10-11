@@ -1,6 +1,8 @@
-## Candidate 0.5.7: continuous import transfers and direct Drive ZIP reading
+## Released 0.5.7: continuous import transfers and direct Drive ZIP reading
 
-Version 0.5.7 / code 18 / Room v9. Local and required immutable-source CI are pending; no 0.5.7 publication is claimed yet.
+Version 0.5.7 / code 18 / Room v9. Source `a375f5af5c880cc3f0d57d40ee1e9c4182e830a4` passed **189 unit/integration tests**, lint with **zero errors**, CPU model checks, app assembly and **26 native tests each on Android 10/API 29 and Android 15/API 35 (52 total)**, with zero failures/errors/skips. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38159501331) · [Android 10 and 15 checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38159501332). Local Windows checks passed all 189 tests, lint and both APK builds; local device tests were not run. Room v9 matches CI.
+
+The exact passed CI APK has SHA-256 `47fba2f7807dee8d5ec2ef5f33baf622e1e4b4f3620afe4b49e3b98346fb3d2c` and established signer `A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`. Immutable references are in `docs/releases/v0.5.7.json`; full results are attached as BUILD_EVIDENCE.json.
 
 Android 14+ imports use user-initiated JobScheduler transfers with an immediate system-associated notification, assigned-network sockets/DNS, stable collision-free IDs, source network preferences, estimated upload bytes and graceful Pause. Earlier APIs retain WorkManager foreground execution. Shared execution retries transport failures in place with bounded backoff, preserving active verified progress and durable checkpoints. Visible reopen migrates existing running work; background initialization never creates UIDT jobs. Pause/cancel remains authoritative across completion/network races. System/user stops and Android 14 notification dismissal remain platform-controlled.
 
