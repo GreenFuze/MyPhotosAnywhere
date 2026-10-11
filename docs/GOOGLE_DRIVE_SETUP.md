@@ -76,3 +76,7 @@ Uploads remain directly in the selected folder and carry private `mpaAssetId`/`m
 The opt-in source-scoped XMP catalogue can back up and restore album/name/recipe/place annotations and reviewed face regions for checksum-matched media. Face embeddings and crop files remain on the phone and are rebuilt locally. See [FEATURES_0_4.md](FEATURES_0_4.md) for recovery/privacy/size limits. Catalogue encryption and adjacent per-image sidecars are future work. No remote deletion is implemented. Imported originals and edited copies remain protected even after backup; only safely verified, unprotected Drive downloads are disposable. Offline verification failures preserve files beyond the soft cache budget. See [FEATURES_0_3.md](FEATURES_0_3.md) for exact behavior.
 
 Disconnect pauses/removes the local connection and cancels workers. It does not revoke Google grants, remove backup-history rows, or delete any local/remote photo. The user can separately revoke grants in Google account settings.
+
+## Google Photos Picker in 0.5.0
+
+Photos authorization is separate from Drive. Enable Google Photos Picker API and its `https://www.googleapis.com/auth/photospicker.mediaitems.readonly` consent scope in the same existing project, preserving Android clients, Drive scopes, testing status and test users. See [import setup and controls](GOOGLE_IMPORTS.md). Browser automation could not initialize during development, so no Cloud configuration changes were made or confirmed.

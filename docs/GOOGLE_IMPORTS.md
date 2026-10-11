@@ -1,6 +1,6 @@
 # Google Photos imports and Takeout metadata conversion
 
-Development on `feature/google-photos-takeout-import`. These features are **not in the published 0.4.4 APK**. Do not publish a new APK until local checks and required CI pass.
+Implemented in MPA 0.5.0 / version code 11, Room v7. Local checks and required CI passed on the immutable source recorded in [release evidence](releases/v0.5.0.json). Real-account phone acceptance and Google Cloud Picker configuration remain unconfirmed.
 
 ## Import destinations and controls
 
@@ -40,7 +40,7 @@ For a cloud-only asset, conversion first queues one verified media download. It 
 - XMP: 2 MiB / 10,000 assets. Catalogue growth fails recoverably rather than silently dropping annotations. Catalogue partitioning and large-video support remain future work.
 - Picker: at most 2,000 selected items per session. API/consent/certificate configuration and real account checks remain required on the owner's phone.
 
-Before release: run Room migration tests, manifest/parser/XMP tests, resumable transfer and cleanup verification tests, full local unit/lint/APK checks and required Android CI. Device tests include a synthetic ZIP round trip and both import controls. Live acceptance uses a small real album, Photos consent/selection, interrupted transfer, repeat import, late JSON, changed default destination, revoked authorization and a Drive sidecar conversion/cleanup round trip. User exports/photos are never committed.
+Release checks passed: 125 unit/integration tests, zero lint errors, CPU model checks, APK assembly and 12 Android emulator tests. Device tests include a synthetic ZIP round trip and both import controls. Live acceptance uses a small real album, Photos consent/selection, interrupted transfer, repeat import, late JSON, changed default destination, revoked authorization and a Drive sidecar conversion/cleanup round trip. User exports/photos are never committed.
 
 Official contracts rechecked during development:
 

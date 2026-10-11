@@ -1,6 +1,6 @@
 # Google Photos imports and Drive storage plan
 
-Agreed direction, 2026-10-10. This is the next implementation plan, not a list of newly shipped features. Baseline: MPA 0.4.3, version code 9, Room v5. Start with reliable bulk Drive synchronization, then Takeout import, then Google Photos Picker. Proposed combined milestone: 0.5.0; smaller verified increments can ship first.
+Agreed direction, 2026-10-10. This is the next implementation plan, not a list of newly shipped features. Baseline: MPA 0.4.3, version code 9, Room v5. Start with reliable bulk Drive synchronization, then Takeout import, then Google Photos Picker. The combined 0.5.0 development release implements these stages and Drive JSON conversion. Its required CI passed; the live acceptance checks below remain outstanding. Smaller verified increments can ship first; 0.4.4 shipped the bounded Drive stage.
 
 ## Storage contract
 
@@ -23,7 +23,7 @@ Already implemented in 0.4.3:
 
 Extend these paths rather than rebuilding sync. The 0.4.4 increment now persists scan generations/folder-page cursors in Room v6, bounds discovery/change pages per worker and adds primary per-source sync progress/actions. It retains authoritative-scan removal gates and rejects incomplete listings. See [the concrete audit](DRIVE_INGESTION_AUDIT.md), [validation](VALIDATION.md) and the new bulk-ingestion phone checklist; live Stage 1 acceptance remains outstanding. Published 0.4.4 uses Room v6; 0.4.3 used Room v5.
 
-A normal local import remains protected even after backup. The 0.5.0 development increment now implements a separate migration transition to Drive-backed disposable media, durable jobs/checkpoints, Takeout ZIP/folder manifests, Photos Picker and opt-in Drive JSON conversion/verified cleanup. See [implemented controls and limits](GOOGLE_IMPORTS.md) and [validation](VALIDATION.md). These implementation changes do not establish the real-account acceptance checks below. Downloads/imports currently reject files above 250 MiB; XMP catalogues are limited to 2 MiB / 10,000 assets. Those limits must be visible and addressed deliberately for large libraries.
+A normal local import remains protected even after backup. The 0.5.0 increment implements a separate migration transition to Drive-backed disposable media, durable jobs/checkpoints, Takeout ZIP/folder manifests, Photos Picker and opt-in Drive JSON conversion/verified cleanup. See [implemented controls and limits](GOOGLE_IMPORTS.md) and [validation](VALIDATION.md). These implementation changes do not establish the real-account acceptance checks below. Downloads/imports currently reject files above 250 MiB; XMP catalogues are limited to 2 MiB / 10,000 assets. Those limits must be visible and addressed deliberately for large libraries.
 
 ## Stage 1: reliable Drive ingestion and reconciliation
 

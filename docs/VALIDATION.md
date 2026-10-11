@@ -1,12 +1,14 @@
 # Validation status and device checklist
 
-## MPA 0.5.0 import development checks — 2026-10-11
+## MPA 0.5.0 Google imports — 2026-10-11
 
-The first local pass completed 124 unit/integration tests, lint (zero errors, 34 warnings), app APK assembly and instrumentation APK assembly. A final pass with version 0.5.0 / code 11 and the additional numbered/truncated-name regression is in progress; required CI is pending. Room is now v7. These are development results, not a published release or proof of real Google account behavior.
+Source `d03eee08e6cdcb65e2be38900e84e0b80546f109` passed **125 unit/integration tests**, lint with **zero errors**, CPU model checks, APK assembly and **12 Android 10 (API 29) emulator tests**, with zero failures, errors or skipped cases. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38116098551) · [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38116098649). The generated CI Room v7 schema matches the committed schema. Local Windows checks independently passed the same 125 tests, lint (zero errors, 34 warnings), app APK and instrumentation APK assembly using JDK 17 / SDK 35. Local device tests were not run.
+
+The publisher reuses this exact passed CI APK rather than rebuilding it. Its SHA-256 is `37ed8cb5666ac2009c403728f1d283606d4303c7790209835a838766a19e3a2d`; the established upgrade/OAuth signer is `A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`. Immutable references are in `docs/releases/v0.5.0.json`; complete totals and checksums are attached as BUILD_EVIDENCE.json. These checks do not prove real Google account behavior.
 
 New disk-backed tests cover released v6 migration preserving photos, reviewed faces, upload reservations/offsets and destination/checkpoints; process restart during and immediately after resumable transfer; mismatched remote identity rejection; Picker response/polling contracts; full unknown-field XMP round trips; and conditional JSON cleanup only after complete backup verification. Native tests add a synthetic seekable Takeout ZIP byte round trip and Storage import controls, alongside the ten prior device checks.
 
-The browser-control helper failed to initialize twice during authorized Cloud setup. No Google Cloud changes were made. Picker API enablement, consent scope and the existing Android client therefore remain unconfirmed. Real Takeout/Picker imports, interrupted/repeated imports and Drive JSON conversion on the S23 Ultra remain live acceptance checks. [Setup, supported limits and phone checklist](GOOGLE_IMPORTS.md).
+Browser control and its computer-use fallback failed to initialize during authorized Cloud setup. No Google Cloud changes were made. Picker API enablement, consent scope and the existing Android client therefore remain unconfirmed. Real Takeout/Picker imports, interrupted/repeated imports and Drive JSON conversion on the S23 Ultra remain live acceptance checks. [Setup, supported limits and phone checklist](GOOGLE_IMPORTS.md).
 
 ## MPA 0.4.4 resumable Drive discovery
 
@@ -26,10 +28,10 @@ source recorded in the attached BUILD_EVIDENCE.json. Immutable run references ar
 recorded in `docs/releases/v0.4.4.json`.
 Live Google Drive, shared-drive permissions, concurrent external mutations and S23 Ultra
 background behavior remain phone acceptance checks. See [the 0.4.4 retest](releases/v0.4.4.md).
-Takeout, Picker and the shared migration engine were subsequent work at this release; see the 0.5.0 development evidence above.
+Takeout, Picker and the shared migration engine were subsequent work at this release; see the 0.5.0 evidence above.
 
 
-## Unreleased local Drive discovery increment — 2026-10-11
+## Historical local Drive discovery checks before 0.4.4 — 2026-10-11
 
 Based on main `15589ca`, branch `feature/durable-drive-discovery`, this increment passed
 **110 unit/integration tests**, Android lint with **zero errors** (29 warnings,
