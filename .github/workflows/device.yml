@@ -43,6 +43,7 @@ jobs:
             ./gradlew connectedDebugAndroidTest --no-daemon
             mkdir -p app/build/reports/androidTests/screenshots
             adb pull /sdcard/Download/MPA/device-preview.png app/build/reports/androidTests/screenshots/mpa-edit.png
+            adb pull /sdcard/Download/MPA/import-preview.png app/build/reports/androidTests/screenshots/mpa-import.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:

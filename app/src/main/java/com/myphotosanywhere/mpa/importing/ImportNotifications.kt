@@ -22,6 +22,10 @@ data class ImportProgress(val kind: String, val state: String, val complete: Int
             val selected=items.filter { it.job==job.id && it.selected }
             val current=selected.firstOrNull { it.state in listOf("STAGING","UPLOADING","VERIFIED") }
             val detail=when(job.state) {
+                "PREVIEW" -> job.error ?: "Review selection, then import selected files"
+                "PICKING" -> job.error ?: "Choose photos in the Google Photos picker"
+                "DOWNLOADING" -> job.error ?: "Downloading Takeout ZIP"
+                "WAITING_FOR_APP" -> job.error ?: "Open MPA to continue import"
                 "COMPLETE" -> "Import complete"
                 "FAILED" -> job.error ?: "Needs attention · Open MPA to resume"
                 "PAUSED" -> "Paused · Open MPA to resume"

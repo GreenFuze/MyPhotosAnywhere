@@ -116,10 +116,54 @@ fun ImportControls(model: ImportModel=viewModel()) {
     }
     val zip=rememberLauncherForActivityResult(TakeoutSelectionContract()) { if(it!=null) model.add(it,false,targetJob) }
     val folder=rememberLauncherForActivityResult(TakeoutSelectionContract(tree=true)) { if(it!=null) model.add(it,true,targetJob) }
+    val jobControls: @Composable (ImportJob) -> Unit = { job ->
+        val entries=items.filter { it.job==job.id }
+        val download=downloads.find { it.job==job.id }
+        val progress=ImportProgress.from(job,entries)
+        ImportJobProgress(job.id,progress)
+        job.error?.takeIf { it!=progress.detail }?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+        Text("Destination: ${sources.find { it.key==job.binding }?.let { "${it.folderName} (${it.email})" } ?: "Disconnected original source"}",style=MaterialTheme.typography.bodySmall)
+        if(ImportErrorDismissal.canDismiss(job) && ImportErrorDismissal.hasErrors(job,entries,download))
+            TextButton(enabled=!busy,onClick={ model.run { model.app.imports.dismissErrors(job.id) } },
+                modifier=Modifier.testTag("dismiss-import-errors:${job.id}")) { Text("Dismiss errors") }
+        download?.let {
+            Text(when(it.state) {
+                "CLEANED" -> "Downloaded ZIP removed from this phone."
+                "CLEANING" -> "Verified import complete; phone ZIP cleanup pending."
+                "READY" -> "ZIP on phone: %.1f MiB. Removed automatically after all media is verified in Drive.".format(it.bytes/(1024.0*1024))
+                else -> "ZIP download: %.1f MiB / %s".format(it.bytes/(1024.0*1024),if(it.total>0) "%.1f MiB".format(it.total/(1024.0*1024)) else "unknown size")
+            },style=MaterialTheme.typography.bodySmall)
+            if(job.state=="DOWNLOADING") LinearProgressIndicator(Modifier.fillMaxWidth())
+            if(it.state!="CLEANED" && job.state=="COMPLETE") {
+                if(TakeoutArchiveStore.canClean(entries)) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.retryCleanup(job.id) } }) { Text("Retry phone ZIP cleanup") }
+                else Text("ZIP retained for skipped or unsupported files. Review them before deleting it.",style=MaterialTheme.typography.bodySmall)
+            }
+            if(it.state!="CLEANED" && job.state !in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP")) {
+                TextButton(enabled=!busy,onClick={ discardZip=job.id }) { Text("Delete downloaded ZIP from phone") }
+            }
+        }
+        if(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP","CANCELLED")) {
+            TextButton(enabled=!busy,onClick={ targetJob=job.id; zip.launch(Unit) }) { Text("Add ZIP parts to this import") }
+            TextButton(enabled=!busy && sources.isNotEmpty(),onClick={ targetJob=job.id; driveZip=true }) { Text("Add Drive ZIP part") }
+        }
+        if(job.state=="PICKING") {
+            Text(job.email)
+            TextButton(enabled=!busy,onClick={ job.pickerUri?.let { open(it) } }) { Text("Open picker") }
+            Button(enabled=!busy,onClick={ model.run { model.app.imports.checkPicker(job.id) } }) { Text("Check completed selection") }
+        } else if(entries.isNotEmpty()) TextButton(enabled=!busy,onClick={ preview=job.id }) { Text("Preview selection and metadata") }
+        if(job.state !in listOf("RUNNING","DOWNLOADING","PICKING","COMPLETE","CANCELLED"))
+            Button(enabled=!busy,onClick={ startImport(job.id) }) { Text("Import selected / Resume") }
+        if(job.state in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id) } }) { Text("Pause import") }
+        if(job.state !in listOf("COMPLETE","CANCELLED")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id,true) } }) { Text("Cancel remaining import") }
+    }
+    val activeStates=listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP")
     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text("Import Google Photos",style=MaterialTheme.typography.titleMedium)
+        jobs.filter { it.state in activeStates }.forEach { job ->
+            key(job.id) { jobControls(job) }
+        }
         Text("Takeout ZIPs are read locally. Importing uploads the selected files to your Drive destination and requires an internet connection.",style=MaterialTheme.typography.bodySmall)
-        Text("Imports continue in the background with verified-file progress in notifications. Android may pause work for network or system limits; checkpoints are preserved.",style=MaterialTheme.typography.bodySmall)
+        Text("Imports continue in the background with live progress here and in notifications. Android may pause work for network or system limits; checkpoints are preserved.",style=MaterialTheme.typography.bodySmall)
         if(!notificationsEnabled) {
             Text("Background progress notifications are off.")
             if(Build.VERSION.SDK_INT>=33 && ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)
@@ -143,44 +187,8 @@ fun ImportControls(model: ImportModel=viewModel()) {
         Text("For ZIPs, use local/USB storage. Cloud document providers may download the archive internally. Picker omits location metadata and may transcode videos.",style=MaterialTheme.typography.bodySmall)
         if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let { Text(it,color=MaterialTheme.colorScheme.error); TextButton(onClick={ model.message.value=null }) { Text("Dismiss") } }
-        jobs.take(10).forEach { job ->
-            val entries=items.filter { it.job==job.id }
-            val download=downloads.find { it.job==job.id }
-            Text("${if(job.kind=="TAKEOUT") "Takeout" else "Photos Picker"}: ${if(job.state=="WAITING_FOR_APP") "waiting for MPA" else job.state.lowercase()} · ${entries.count { it.state=="COMPLETE" }}/${entries.count { it.selected }} imported")
-            Text("Destination: ${sources.find { it.key==job.binding }?.let { "${it.folderName} (${it.email})" } ?: "Disconnected original source"}",style=MaterialTheme.typography.bodySmall)
-            job.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-            if(ImportErrorDismissal.canDismiss(job) && ImportErrorDismissal.hasErrors(job,entries,download))
-                TextButton(enabled=!busy,onClick={ model.run { model.app.imports.dismissErrors(job.id) } },
-                    modifier=Modifier.testTag("dismiss-import-errors:${job.id}")) { Text("Dismiss errors") }
-            download?.let {
-                Text(when(it.state) {
-                    "CLEANED" -> "Downloaded ZIP removed from this phone."
-                    "CLEANING" -> "Verified import complete; phone ZIP cleanup pending."
-                    "READY" -> "ZIP on phone: %.1f MiB. Removed automatically after all media is verified in Drive.".format(it.bytes/(1024.0*1024))
-                    else -> "ZIP download: %.1f MiB / %s".format(it.bytes/(1024.0*1024),if(it.total>0) "%.1f MiB".format(it.total/(1024.0*1024)) else "unknown size")
-                },style=MaterialTheme.typography.bodySmall)
-                if(job.state=="DOWNLOADING") LinearProgressIndicator(Modifier.fillMaxWidth())
-                if(it.state!="CLEANED" && job.state=="COMPLETE") {
-                    if(TakeoutArchiveStore.canClean(entries)) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.retryCleanup(job.id) } }) { Text("Retry phone ZIP cleanup") }
-                    else Text("ZIP retained for skipped or unsupported files. Review them before deleting it.",style=MaterialTheme.typography.bodySmall)
-                }
-                if(it.state!="CLEANED" && job.state !in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP")) {
-                    TextButton(enabled=!busy,onClick={ discardZip=job.id }) { Text("Delete downloaded ZIP from phone") }
-                }
-            }
-            if(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP","CANCELLED")) {
-                TextButton(enabled=!busy,onClick={ targetJob=job.id; zip.launch(Unit) }) { Text("Add ZIP parts to this import") }
-                TextButton(enabled=!busy && sources.isNotEmpty(),onClick={ targetJob=job.id; driveZip=true }) { Text("Add Drive ZIP part") }
-            }
-            if(job.state=="PICKING") {
-                Text(job.email)
-                TextButton(enabled=!busy,onClick={ job.pickerUri?.let { open(it) } }) { Text("Open picker") }
-                Button(enabled=!busy,onClick={ model.run { model.app.imports.checkPicker(job.id) } }) { Text("Check completed selection") }
-            } else if(entries.isNotEmpty()) TextButton(enabled=!busy,onClick={ preview=job.id }) { Text("Preview selection and metadata") }
-            if(job.state !in listOf("RUNNING","DOWNLOADING","PICKING","COMPLETE","CANCELLED"))
-                Button(enabled=!busy,onClick={ startImport(job.id) }) { Text("Import selected / Resume") }
-            if(job.state in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id) } }) { Text("Pause import") }
-            if(job.state !in listOf("COMPLETE","CANCELLED")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id,true) } }) { Text("Cancel remaining import") }
+        jobs.filterNot { it.state in activeStates }.take(10).forEach { job ->
+            key(job.id) { jobControls(job) }
         }
         if(sidecars.isNotEmpty()) {
             Text("Google metadata found in Drive",style=MaterialTheme.typography.titleMedium)

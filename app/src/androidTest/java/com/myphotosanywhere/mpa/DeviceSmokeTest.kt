@@ -55,6 +55,64 @@ class DeviceSmokeTest {
         } finally { manager.cancel(id) }
     }
 
+    @Test fun storageImportProgressFollowsRoomCheckpointsAheadOfOlderHistory() {
+        val id="in-app-progress-device"
+        val dao=app.database.imports()
+        val job=com.myphotosanywhere.mpa.importing.ImportJob(id,"synthetic","TAKEOUT",state="RUNNING",created=1)
+        val item=com.myphotosanywhere.mpa.importing.ImportItem("$id-video",id,"content://fixture","clip.mp4","clip.mp4","video/mp4",100,
+            state="UPLOADING",offset=25)
+        val history=(1..11).map { job.copy(id="$id-history-$it",state="CANCELLED",created=100L+it) }
+        fun waitText(tag: String,text: String) {
+            compose.waitUntil(10000) { compose.onAllNodes(hasTestTag(tag) and hasText(text)).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag(tag).performScrollTo().assertTextEquals(text).assertIsDisplayed()
+        }
+        try {
+            // Insert after Activity resume: fixtures observe Room without scheduling real transfers.
+            runBlocking { dao.saveJob(job); history.forEach { dao.saveJob(it) } }
+            compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+            waitText("import-count:$id","0/0 verified in Drive")
+            compose.onNodeWithTag("import-bar:$id").assertRangeInfoEquals(androidx.compose.ui.semantics.ProgressBarRangeInfo.Indeterminate)
+            runBlocking {
+                dao.insertItem(item)
+                dao.insertItem(item.copy(id="$id-pending",state="PENDING",offset=0))
+                dao.insertItem(item.copy(id="$id-unselected",state="COMPLETE",selected=false))
+            }
+            waitText("import-detail:$id","Uploading clip.mp4 · 25%")
+            waitText("import-count:$id","0/2 verified in Drive")
+            runBlocking { dao.updateItem(item.copy(offset=75)) }
+            waitText("import-detail:$id","Uploading clip.mp4 · 75%")
+            runBlocking { dao.updateItem(item.copy(state="COMPLETE",offset=100)) }
+            waitText("import-count:$id","1/2 verified in Drive")
+            compose.onNodeWithTag("import-bar:$id").assertRangeInfoEquals(androidx.compose.ui.semantics.ProgressBarRangeInfo(0.5f,0f..1f))
+            runBlocking { dao.updateItem(item.copy(id="$id-pending",name="next.mp4",state="UPLOADING",offset=50)) }
+            waitText("import-detail:$id","Uploading next.mp4 · 50%")
+            compose.onNodeWithTag("import-progress:$id").performScrollTo().assertIsDisplayed()
+            val screenshot=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+            try {
+                if(android.os.Build.VERSION.SDK_INT>=29) {
+                    val values=android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"import-preview.png")
+                        put(android.provider.MediaStore.MediaColumns.MIME_TYPE,"image/png")
+                        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA")
+                    }
+                    val uri=requireNotNull(app.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,values))
+                    app.contentResolver.openOutputStream(uri)?.use { check(screenshot.compress(Bitmap.CompressFormat.PNG,100,it)) }
+                        ?: error("Cannot save import progress screenshot.")
+                }
+            } finally { screenshot.recycle() }
+            runBlocking { dao.saveJob(job.copy(error="Connection interrupted · Retrying automatically")) }
+            waitText("import-detail:$id","Connection interrupted · Retrying automatically")
+            runBlocking { dao.saveJob(job.copy(state="PAUSED",created=Long.MAX_VALUE)) }
+            waitText("import-detail:$id","Paused · Open MPA to resume")
+            waitText("import-count:$id","1/2 verified in Drive")
+        } finally {
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM import_items WHERE job=?",arrayOf(id))
+            (history.map { it.id }+id).forEach {
+                app.database.openHelper.writableDatabase.execSQL("DELETE FROM import_jobs WHERE id=?",arrayOf(it))
+            }
+        }
+    }
+
     @Test fun foregroundImportWorkerCommitsCompletionAndLeavesDismissibleSummary() = runBlocking<Unit> {
         allowImportNotifications()
         val id="notification-device-test"
@@ -373,7 +431,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
-        compose.onNodeWithText("MPA 0.5.7 (18)",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.5.8 (19)",substring=true).assertExists()
         val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
         assertEquals("com.myphotosanywhere.mpa",info.packageName)
         assertTrue(info.sha1.isNotEmpty())

@@ -21,6 +21,14 @@ class ImportProgressTest {
         assertTrue(ImportProgress.from(job,listOf(item("photo","UPLOADING").copy(offset=101))).detail.endsWith("100%"))
         assertEquals("Preparing photo.jpg",ImportProgress.from(job,listOf(item("photo","STAGING"))).detail)
     }
+    @Test fun selectionAndBlockedStatesDoNotClaimTransferIsRunning() {
+        val stale=listOf(item("photo","UPLOADING").copy(offset=50))
+        assertEquals("Review selection, then import selected files",ImportProgress.from(job.copy(state="PREVIEW"),stale).detail)
+        assertEquals("Choose photos in the Google Photos picker",ImportProgress.from(job.copy(state="PICKING"),emptyList()).detail)
+        assertEquals("Downloading Takeout ZIP",ImportProgress.from(job.copy(state="DOWNLOADING"),emptyList()).detail)
+        assertEquals("Open MPA to continue import",ImportProgress.from(job.copy(state="WAITING_FOR_APP"),stale).detail)
+        assertEquals("Saved error",ImportProgress.from(job.copy(state="PREVIEW",error="Saved error"),stale).detail)
+    }
     @Test fun terminalStateOverridesStaleTransferAndZeroTotalsAreValid() {
         assertEquals("Needs attention · Open MPA to resume",ImportProgress.from(job.copy(state="FAILED"),listOf(item("photo","UPLOADING"))).detail)
         assertEquals("Paused · Open MPA to resume",ImportProgress.from(job.copy(state="PAUSED"),emptyList()).detail)

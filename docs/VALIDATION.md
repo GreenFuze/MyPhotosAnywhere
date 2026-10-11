@@ -1,3 +1,7 @@
+## Candidate 0.5.8: in-app import progress
+
+Storage observes durable Room checkpoints and uses the same ImportProgress model as notifications. A native fixture exercises zero-total preparation, upload offset updates, selected-only verified counts, overall accessibility progress, retry detail and pause, including an active job older than eleven stopped jobs. Local and required immutable-source CI are pending; no 0.5.8 publication is claimed yet.
+
 ## Released 0.5.7: continuous import transfers and direct Drive ZIP reading
 
 Version 0.5.7 / code 18 / Room v9. Source `a375f5af5c880cc3f0d57d40ee1e9c4182e830a4` passed **189 unit/integration tests**, lint with **zero errors**, CPU model checks, app assembly and **26 native tests each on Android 10/API 29 and Android 15/API 35 (52 total)**, with zero failures/errors/skips. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38159501331) · [Android 10 and 15 checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38159501332). Local Windows checks passed all 189 tests, lint and both APK builds; local device tests were not run. Room v9 matches CI.

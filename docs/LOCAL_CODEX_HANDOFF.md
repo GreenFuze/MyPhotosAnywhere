@@ -1,3 +1,7 @@
+## In progress: 0.5.8 in-app import progress
+
+Add live progress in Storage using the shared Room-backed notification summary: verified-file count/bar, current filename/upload percentage and retry/pause status. Active imports and controls precede setup/history, and active jobs cannot be hidden by the ten-entry history limit. Version 0.5.8 / code 19 / Room v9 preserves checkpoints, scheduling and signing. Local checks and immutable-source CI are pending; no 0.5.8 release is claimed yet.
+
 ## Follow-up: 0.5.7 background transfers and Drive ZIP source
 
 The owner requests continued background importing, stable notification progress and Takeout exports delivered to Drive. Version 0.5.7 / code 18 / Room v9 uses Android 14+ user-initiated transfer jobs, retains WorkManager FGS on older APIs, keeps bounded connection retries inside active work and provides stable IDs/Pause. Schedule UIDT only from visible Import/Resume/reopen, use its assigned network, and preserve the shared checkpoint engine. Android 14 ordinary ongoing notifications remain swipe-dismissible; never fake media/call styles or claim immunity to user/system stops.
