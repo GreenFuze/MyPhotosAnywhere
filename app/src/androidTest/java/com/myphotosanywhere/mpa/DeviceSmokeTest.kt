@@ -41,7 +41,7 @@ class DeviceSmokeTest {
             assertTrue(notices.enabled())
             if(android.os.Build.VERSION.SDK_INT>=29) assertEquals(android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
                 notices.foreground(id,com.myphotosanywhere.mpa.importing.ImportProgress("TAKEOUT","RUNNING",1,3,"Preparing")).foregroundServiceType)
-            manager.notify(id,notices.notification(com.myphotosanywhere.mpa.importing.ImportProgress("TAKEOUT","RUNNING",1,3,"Uploading photo Â· 50%")))
+            manager.notify(id,notices.notification(com.myphotosanywhere.mpa.importing.ImportProgress("TAKEOUT","RUNNING",1,3,"Uploading photo · 50%")))
             compose.waitUntil(5000) { manager.activeNotifications.any { it.id==id } }
             val active=manager.activeNotifications.single { it.id==id }.notification
             assertEquals(R.drawable.ic_import_notification,active.smallIcon.resId)
@@ -77,15 +77,15 @@ class DeviceSmokeTest {
                 dao.insertItem(item.copy(id="$id-pending",state="PENDING",offset=0))
                 dao.insertItem(item.copy(id="$id-unselected",state="COMPLETE",selected=false))
             }
-            waitText("import-detail:$id","Uploading clip.mp4 Â· 25%")
+            waitText("import-detail:$id","Uploading clip.mp4 · 25%")
             waitText("import-count:$id","0/2 verified in Drive")
             runBlocking { dao.updateItem(item.copy(offset=75)) }
-            waitText("import-detail:$id","Uploading clip.mp4 Â· 75%")
+            waitText("import-detail:$id","Uploading clip.mp4 · 75%")
             runBlocking { dao.updateItem(item.copy(state="COMPLETE",offset=100)) }
             waitText("import-count:$id","1/2 verified in Drive")
             compose.onNodeWithTag("import-bar:$id").assertRangeInfoEquals(androidx.compose.ui.semantics.ProgressBarRangeInfo(0.5f,0f..1f))
             runBlocking { dao.updateItem(item.copy(id="$id-pending",name="next.mp4",state="UPLOADING",offset=50)) }
-            waitText("import-detail:$id","Uploading next.mp4 Â· 50%")
+            waitText("import-detail:$id","Uploading next.mp4 · 50%")
             compose.onNodeWithTag("import-progress:$id").performScrollTo().assertIsDisplayed()
             val screenshot=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
             try {
@@ -100,10 +100,10 @@ class DeviceSmokeTest {
                         ?: error("Cannot save import progress screenshot.")
                 }
             } finally { screenshot.recycle() }
-            runBlocking { dao.saveJob(job.copy(error="Connection interrupted Â· Retrying automatically")) }
-            waitText("import-detail:$id","Connection interrupted Â· Retrying automatically")
+            runBlocking { dao.saveJob(job.copy(error="Connection interrupted · Retrying automatically")) }
+            waitText("import-detail:$id","Connection interrupted · Retrying automatically")
             runBlocking { dao.saveJob(job.copy(state="PAUSED",created=Long.MAX_VALUE)) }
-            waitText("import-detail:$id","Paused Â· Open MPA to resume")
+            waitText("import-detail:$id","Paused · Open MPA to resume")
             waitText("import-count:$id","1/2 verified in Drive")
         } finally {
             app.database.openHelper.writableDatabase.execSQL("DELETE FROM import_items WHERE job=?",arrayOf(id))
@@ -332,10 +332,10 @@ class DeviceSmokeTest {
                 compose.onRoot(useUnmergedTree=true).printToLog("GalleryFixture")
                 throw e
             }
-            compose.onNodeWithText("A Â· a@test").performScrollTo().performClick()
+            compose.onNodeWithText("A · a@test").performScrollTo().performClick()
             compose.onNodeWithTag("photo:${ids[0]}").assertExists()
             compose.onNodeWithTag("photo:${ids[1]}").assertDoesNotExist()
-            compose.onNodeWithText("B Â· b@test").performScrollTo().performClick()
+            compose.onNodeWithText("B · b@test").performScrollTo().performClick()
             compose.onNodeWithTag("photo:${ids[1]}").assertExists()
             compose.onNodeWithTag("photo:${ids[0]}").assertDoesNotExist()
             compose.onNodeWithText("All sources").performScrollTo().performClick()
@@ -408,7 +408,7 @@ class DeviceSmokeTest {
             app.database.cloud().savePhoto(com.myphotosanywhere.mpa.drive.CloudPhoto("${source.key}:remote",source.key,"remote","xmp-folder",
                 "xmp-fixture.jpg","image/jpeg",10,"md5","1",null,null,null,null,photoId=id))
             val original=app.metadata.snapshot(source)
-            val asset=original.assets.single().copy(favorite=true,place="Home & cafÃ©",faces=listOf(
+            val asset=original.assets.single().copy(favorite=true,place="Home & café",faces=listOf(
                 com.myphotosanywhere.mpa.metadata.PortableFace("xmp-device-face","xmp-device-person",true,
                     com.myphotosanywhere.mpa.people.FaceRegion(.1f,.2f,.5f,.6f),1600,1200,"test-model")))
             val catalog=original.copy(assets=listOf(asset),people=listOf(com.myphotosanywhere.mpa.metadata.PortablePerson("xmp-device-person","Sam")))
@@ -416,7 +416,7 @@ class DeviceSmokeTest {
             assertEquals(catalog,com.myphotosanywhere.mpa.metadata.XmpCodec.decode(xml))
             app.metadata.applyCatalog(source,com.myphotosanywhere.mpa.metadata.XmpCodec.decode(xml),1)
             assertTrue(requireNotNull(app.database.photos().find(id)).favorite)
-            assertEquals("Home & cafÃ©",app.database.photos().find(id)?.placeLabel)
+            assertEquals("Home & café",app.database.photos().find(id)?.placeLabel)
             assertEquals(id,app.database.library().face("xmp-device-face")?.photoId)
             assertEquals("xmp-device-person",app.database.library().face("xmp-device-face")?.personId)
             assertEquals("a".repeat(64),app.database.photos().find(id)?.sha256)
