@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,7 @@ fun ShellTopBar(title: String,canGoBack: Boolean,onBack: ()->Unit,canAddPhotos: 
     onStorage: ()->Unit,onActivity: ()->Unit,onFilters: ()->Unit,showFilters: Boolean,
     filtersActive: Boolean,needsAttention: Boolean) {
     var add by remember { mutableStateOf(false) }
+    val compact=LocalConfiguration.current.screenWidthDp<360
     TopAppBar(title={ Text(title,maxLines=1,overflow=TextOverflow.Ellipsis) },navigationIcon={
         if(canGoBack) IconButton(onClick=onBack) { ShellIcon(R.drawable.ic_shell_back,"Back") }
         else Image(painterResource(R.drawable.ic_launcher_foreground),"MyPhotosAnywhere",Modifier.size(48.dp))
@@ -45,10 +47,11 @@ fun ShellTopBar(title: String,canGoBack: Boolean,onBack: ()->Unit,canAddPhotos: 
             DropdownMenu(expanded=add,onDismissRequest={ add=false }) {
                 DropdownMenuItem(text={ Text("Add photos") },enabled=canAddPhotos,onClick={ add=false;onAddPhotos() })
                 DropdownMenuItem(text={ Text("Import photos") },onClick={ add=false;onStorage() })
+                if(compact) DropdownMenuItem(text={ Text("Imports and activity") },onClick={ add=false;onActivity() })
                 DropdownMenuItem(text={ Text("Connect Google Drive") },onClick={ add=false;onStorage() })
             }
         }
-        IconButton(onClick=onActivity,modifier=Modifier.testTag("shell:activity")) {
+        if(!compact) IconButton(onClick=onActivity,modifier=Modifier.testTag("shell:activity")) {
             BadgedBox(badge={ if(needsAttention) Badge { Text("!") } }) {
                 ShellIcon(R.drawable.ic_shell_activity,"Imports and sync activity")
             }

@@ -29,3 +29,7 @@ Before that increment, define canonical projection keys, deterministic timestamp
 Run existing unit/lint/build checks and the API 29/35 native matrix on one immutable source revision. New native coverage checks child navigation, saved Search state, first-viewport media, viewer return, tab scroll restoration and preservation of synthetic originals. Existing source-filter tests now enter the sheet; all underlying assertions remain. CI captures a synthetic shell screenshot for visual review. These emulator screenshots do not establish Samsung S23 Ultra acceptance or real Google-account behavior.
 
 Before extending scope, review the first increment visually and test the existing JPEG while importing. Do not require cancelling an ongoing import, clearing app data or uninstalling to bypass signing. No new release is published as part of the shell review.
+
+### First CI review
+
+The first revision passed all 200 unit tests, lint with zero errors, and all 35 Android 10 native tests. Android 15 passed the four new shell tests but an existing People diagnostics check timed out before scrolling to the diagnostic message. The test now explicitly scrolls to and asserts that same message rather than assuming it is in the initial semantics viewport. No recognition code or data contract changes are involved. The 320dp screenshot also exposed an overfull app bar; at widths below 360dp the separate activity button moves into the Add menu while the compact import indicator and source controls remain accessible. Repeat the full matrix on this corrected revision.

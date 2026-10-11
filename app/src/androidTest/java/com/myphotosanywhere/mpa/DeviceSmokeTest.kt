@@ -477,7 +477,10 @@ class DeviceSmokeTest {
                 modelVersion=com.myphotosanywhere.mpa.people.PeopleRepository.MODEL_VERSION))
             compose.onNodeWithTag("nav:Collections").performClick()
             compose.onNode(hasText("People") and hasClickAction()).performClick()
-            compose.waitUntil(30000) { compose.onAllNodesWithText("unassigned faces lack usable matching data",substring=true).fetchSemanticsNodes().isNotEmpty() }
+            // Diagnostics can be below the fold when schedule controls expand on compact devices.
+            // Scroll to the actual content rather than assuming the whole header is in the semantics viewport.
+            compose.onNodeWithTag("people-list").performScrollToNode(hasText("unassigned faces lack usable matching data",substring=true))
+            compose.onNodeWithText("unassigned faces lack usable matching data",substring=true).assertIsDisplayed()
             compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("face-why:$face"))
             compose.onNodeWithTag("face-why:$face").performScrollTo().performClick()
             compose.waitUntil(30000) { compose.onAllNodesWithText("Face detected, but no usable recognition data",substring=true).fetchSemanticsNodes().isNotEmpty() }
