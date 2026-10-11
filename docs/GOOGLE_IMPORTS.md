@@ -24,7 +24,7 @@ Version 0.5.4 / code 15 keeps Room v8. DNS, socket timeout and interrupted-conne
 
 For a current DNS failure, try another working Wi-Fi network and inspect any VPN or Private DNS configuration. If using mobile data, the destination's Wi-Fi-only preference still applies. Resume the same job instead of creating a replacement import. MPA cannot repair phone/network DNS, and retrying does not bypass permissions or guarantee uninterrupted background work. Staging byte progress and read deadlines remain separate follow-up work; this release addresses the reported Drive-resolution error, without claiming a reproduced MP4 decoder defect.
 
-Development and CI checks are pending; no 0.5.4 release is claimed yet. The owner supplied an MP4 `staging` screenshot and a Google API hostname-resolution error on 0.5.2; real-phone recovery remains to be checked.
+All 160 unit/integration and 42 native checks (21 each on Android 10 and 15) passed. See [validation](VALIDATION.md) and [release evidence](releases/v0.5.4.json). The owner supplied an MP4 `staging` screenshot and a Google API hostname-resolution error on 0.5.2; real-phone recovery remains to be checked.
 
 ## Import destinations and controls
 

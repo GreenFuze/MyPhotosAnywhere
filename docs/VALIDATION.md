@@ -2,7 +2,11 @@
 
 ## MPA 0.5.4 Drive connection recovery — 2026-10-11
 
-Development checks are in progress; no 0.5.4 release is claimed yet. Version 0.5.4 / code 15 preserves Room v8 and adds safe Drive DNS/transport errors, three bounded automatic retries with exponential backoff, checkpoint preservation and waiting notifications. Tests cover sanitized DNS errors, timeout classification, local/permission errors staying fail-fast, actual Room recovery transitions, paused/cancelled jobs, and resumable upload reprobe without a new reservation/session. Native checks cover preserved in-flight/verified rows and waiting notifications on Android 10 and 15. The reported hostname-resolution failure explains a Drive connectivity blocker; its phone/network cause is not diagnosed from the screenshot, and live recovery remains pending.
+Source `280783727321a207323f39c60876891fe8f50d7c` passed **160 unit/integration tests**, lint with **zero errors**, CPU model checks, app assembly and **21 native tests on each of Android 10/API 29 and Android 15/API 35 (42 total)**, with zero failures/errors/skips. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38149409109) · [Android 10 and 15 checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38149409106). Local Windows checks passed all 160 tests, lint and both APK builds; local device tests were not run. CI Room v8 matches the committed schema.
+
+The exact passed CI APK has SHA-256 `b6529b18b622ef8b4b32632966701c85c5fbdfd52d93aeecaaaeea90ac6ec3b6` and established signer `A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`. Immutable references are in `docs/releases/v0.5.4.json`; complete results are attached as BUILD_EVIDENCE.json.
+
+ Version 0.5.4 / code 15 preserves Room v8 and adds safe Drive DNS/transport errors, three bounded automatic retries with exponential backoff, checkpoint preservation and waiting notifications. Tests cover sanitized DNS errors, timeout classification, local/permission errors staying fail-fast, actual Room recovery transitions, paused/cancelled jobs, and resumable upload reprobe without a new reservation/session. Native checks cover preserved in-flight/verified rows and waiting notifications on Android 10 and 15. The reported hostname-resolution failure explains a Drive connectivity blocker; its phone/network cause is not diagnosed from the screenshot, and live recovery remains pending.
 
 ## MPA 0.5.3 background import progress — 2026-10-11
 
