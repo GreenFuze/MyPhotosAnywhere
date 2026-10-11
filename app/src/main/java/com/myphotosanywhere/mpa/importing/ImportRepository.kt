@@ -271,13 +271,13 @@ class ImportRepository(private val context: Context) {
             }
         }
         dao.job(id)?.let { ImportNotifications(context).finish(id,ImportProgress.from(it,dao.items(id))) }
-        if(ImportTransferScheduler.supported) ImportTransferScheduler(context).cancel(id)
+        if(android.os.Build.VERSION.SDK_INT>=34) ImportTransferScheduler(context).cancel(id)
         WorkManager.getInstance(context).cancelUniqueWork("mpa-import:$id")
         WorkManager.getInstance(context).cancelUniqueWork("mpa-takeout-download:$id")
     }
     suspend fun resumePending() {
         // UIDT creation requires a visible Activity. Existing system jobs resume themselves.
-        if(!ImportTransferScheduler.supported) dao.jobs().filter { it.state=="RUNNING" }.forEach { schedule(it.id) }
+        if(android.os.Build.VERSION.SDK_INT<34) dao.jobs().filter { it.state=="RUNNING" }.forEach { schedule(it.id) }
         dao.jobs().filter { it.state=="DOWNLOADING" }.forEach { scheduleDownload(it.id) }
         dao.jobs().filter { it.state=="COMPLETE" }.forEach { retryCleanup(it.id) }
     }
@@ -285,13 +285,13 @@ class ImportRepository(private val context: Context) {
         ImportForegroundRecovery(dao).resume({ db.drive().source(it)!=null }) { id, legacy ->
             schedule(id,if(legacy) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE,visible=true)
         }
-        if(ImportTransferScheduler.supported) dao.jobs().filter { it.state=="RUNNING" }.forEach {
+        if(android.os.Build.VERSION.SDK_INT>=34) dao.jobs().filter { it.state=="RUNNING" }.forEach {
             schedule(it.id,visible=true)
         }
     }
     private suspend fun schedule(id: String, policy: ExistingWorkPolicy=ExistingWorkPolicy.KEEP, visible: Boolean=false) {
         val job=dao.job(id) ?: return; val source=db.drive().source(job.binding) ?: return
-        if(ImportTransferScheduler.supported) {
+        if(android.os.Build.VERSION.SDK_INT>=34) {
             val transfers=ImportTransferScheduler(context)
             if(transfers.pending(id)) return
             if(!visible) { ImportForegroundRecovery(dao).record(id); return }

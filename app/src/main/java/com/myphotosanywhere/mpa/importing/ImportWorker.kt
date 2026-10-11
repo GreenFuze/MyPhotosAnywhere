@@ -34,7 +34,7 @@ class ImportWorker(context: Context, params: WorkerParameters): CoroutineWorker(
     override suspend fun doWork(): Result {
         val job=inputData.getString("job") ?: return Result.failure()
         if(app.database.imports().job(job)?.state!="RUNNING") return Result.success()
-        if(ImportTransferScheduler.supported && ImportTransferScheduler(applicationContext).pending(job)) return Result.success()
+        if(android.os.Build.VERSION.SDK_INT>=34 && ImportTransferScheduler(applicationContext).pending(job)) return Result.success()
         return try {
             try { setForeground(getForegroundInfo()) } catch(e: IllegalStateException) {
                 if(!ImportForegroundRecovery.isStartRefused(e)) throw e

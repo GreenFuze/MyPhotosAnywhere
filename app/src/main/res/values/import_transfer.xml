@@ -1,0 +1,3 @@
+<resources>
+    <bool name="user_initiated_imports">false</bool>
+</resources>

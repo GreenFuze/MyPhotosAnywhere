@@ -6,7 +6,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.os.Build
 import android.os.PersistableBundle
 import androidx.annotation.RequiresApi
 
@@ -52,7 +51,5 @@ class ImportTransferScheduler(private val context: Context) {
                 .setEstimatedNetworkBytes(JobInfo.NETWORK_BYTES_UNKNOWN.toLong(),bytes)
                 .setExtras(PersistableBundle().apply { putString("job",job); putString("kind",kind) }).build()
         }
-        @get:androidx.annotation.ChecksSdkIntAtLeast(api=34)
-        val supported get()=Build.VERSION.SDK_INT>=34
     }
 }

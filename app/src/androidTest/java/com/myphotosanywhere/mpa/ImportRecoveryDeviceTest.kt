@@ -62,7 +62,10 @@ class ImportRecoveryDeviceTest {
             assertTrue(requireNotNull(info.requiredNetwork).hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED))
             assertEquals(android.content.pm.PackageManager.PERMISSION_GRANTED,
                 context.checkSelfPermission(android.Manifest.permission.RUN_USER_INITIATED_JOBS))
-        } else assertFalse(ImportTransferScheduler.supported)
+        }
+        @Suppress("DEPRECATION")
+        val service=context.packageManager.getServiceInfo(android.content.ComponentName(context,ImportTransferService::class.java),android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS)
+        assertEquals(android.os.Build.VERSION.SDK_INT>=34,service.enabled)
     }
     @Test fun nativeEngineRetainsCheckpointAndActiveProgressThroughConnectionRetry() = runBlocking<Unit> {
         val db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).build()
