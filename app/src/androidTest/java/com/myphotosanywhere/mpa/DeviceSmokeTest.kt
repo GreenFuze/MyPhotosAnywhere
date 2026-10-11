@@ -136,7 +136,7 @@ class DeviceSmokeTest {
             compose.waitUntil(5000) { notifications.activeNotifications.any { it.tag==id } }
             compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
             compose.onNodeWithTag("dismiss-import-errors:$id").performScrollTo().performClick()
-            compose.waitUntil(5000) { runBlocking { dao.job(id)?.error==null } }
+            compose.waitUntil(5000) { compose.onAllNodesWithTag("dismiss-import-errors:$id").fetchSemanticsNodes().isEmpty() }
             compose.onNodeWithTag("dismiss-import-errors:$id").assertDoesNotExist()
             compose.waitUntil(5000) { notifications.activeNotifications.none { it.tag==id } }
             runBlocking {
