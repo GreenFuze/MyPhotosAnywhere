@@ -11,7 +11,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 /** Read the granted descriptor directly; reopening its proc path can fail under Android scoped storage. */
-class TakeoutDocuments(private val context: Context) {
+class TakeoutDocuments(private val context: Context, private val openRemote: (suspend (Uri)->ZipFile)?=null) {
     private val resolver get() = context.contentResolver
     private val codec = TakeoutCodec()
 
@@ -114,6 +114,7 @@ class TakeoutDocuments(private val context: Context) {
     }
 
     private suspend fun <T> archive(uri: Uri, block: suspend (ZipFile) -> T): T {
+        if(uri.scheme==DriveTakeoutArchive.SCHEME) return requireNotNull(openRemote) { "Reconnect this Drive ZIP source." }(uri).use { block(it) }
         if (uri.scheme == "file") {
             val file = File(requireNotNull(uri.path)).canonicalFile
             val root = File(context.filesDir, "takeout-downloads").canonicalFile

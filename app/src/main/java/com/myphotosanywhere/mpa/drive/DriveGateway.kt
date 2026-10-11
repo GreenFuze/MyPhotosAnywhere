@@ -83,6 +83,34 @@ class DriveGateway(
     suspend fun file(id: String): DriveFile = parseFile(json(Request.Builder()
         .url(url("files/$id", "fields" to FILE_FIELDS, "supportsAllDrives" to "true"))))
 
+    /** Explicit archive browser; ZIPs remain excluded from ordinary gallery discovery. */
+    suspend fun archiveChildren(parent: String, page: String?=null): DrivePage = list(
+        "'${literal(parent)}' in parents and trashed = false and (mimeType = '$FOLDER_MIME' or name contains '.zip')",page)
+
+    /** Reject ignored, shifted, truncated or changed ranges instead of silently downloading the whole ZIP. */
+    suspend fun readRange(id: String, offset: Long, count: Int, total: Long, etag: String?): Pair<ByteArray,String> {
+        require(offset>=0 && count in 1..(256*1024) && total>0 && offset<=total-count)
+        val end=offset+count-1
+        return execute(Request.Builder().url(url("files/$id","alt" to "media","supportsAllDrives" to "true"))
+            .header("Range","bytes=$offset-$end").header("Accept-Encoding","identity")
+            .apply { if(etag!=null) header("If-Match",etag) }) { response ->
+            checkSuccess(response)
+            require(response.code==206 && response.header("Content-Range")=="bytes $offset-$end/$total") {
+                "Drive did not return the requested ZIP range. Source preserved; use a local ZIP instead."
+            }
+            val revision=response.header("ETag") ?: error("Drive ZIP revision missing. Source preserved.")
+            require(etag==null || revision==etag) { "Drive ZIP changed during import. Source preserved." }
+            val body=response.body ?: error("Empty Drive ZIP range.")
+            require(body.contentLength()==-1L || body.contentLength()==count.toLong()) { "Drive ZIP range length mismatch." }
+            val bytes=body.byteStream().use { input ->
+                val data=ByteArray(count); var read=0
+                while(read<count) { val n=input.read(data,read,count-read); require(n>0) { "Truncated Drive ZIP range." }; read+=n }
+                require(input.read()==-1) { "Excess Drive ZIP range data." }; data
+            }
+            bytes to revision
+        }
+    }
+
     suspend fun generateId(): String = json(Request.Builder().url(url("files/generateIds", "count" to "1", "space" to "drive")))
         .getAsJsonArray("ids")?.firstOrNull()?.asString ?: error("Drive did not reserve a file ID.")
 

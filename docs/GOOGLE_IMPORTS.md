@@ -1,3 +1,19 @@
+## Continuous background transfers and Drive ZIPs in 0.5.7
+
+Candidate version 0.5.7 / code 18 / Room v9. Local checks and required CI are pending; no 0.5.7 release is claimed yet.
+
+On Android 14+ Import/Resume schedules a user-initiated data-transfer job while MPA is visible. Android owns its wake lock, assigned network and notification lifecycle; imports no longer depend on starting a data-sync foreground service from the background. Earlier Android versions retain the foreground WorkManager path. Both paths keep the active progress notification during three bounded connection retries (30/60/120 seconds), with the same durable notification ID and verified-file bar. **Pause import** in the notification preserves reserved remote IDs, upload sessions, offsets, staged files and completed media. Ordinary invalid-data/permission/storage errors still stop visibly. Reopening migrates old running WorkManager imports without changing their transfer checkpoints; paused/cancelled imports stay stopped.
+
+Allow MPA notifications in Android Settings to see progress. Android 14+ permits users to swipe away ordinary ongoing transfer notifications; MPA cannot force an undismissible box. Explicit Android Stop/force-stop, lost network constraints, low memory or thermal limits can still interrupt work and remove its active notification. The system may retry eligible stopped jobs; reopen MPA if recovery is deferred. Phone lock/background reliability and Samsung notification behavior require real-device acceptance; native fixtures do not prove uninterrupted overnight execution.
+
+For Takeout **Add to Drive**, connect its export folder in Storage using **Existing photo collection**, then choose **Import Takeout ZIP from Drive**. Browse connected folders and select a ZIP; add more parts using **Add Drive ZIP part** on a stopped import. Source and import destination can differ, but both original account/folder bindings remain fixed. ZIPs remain excluded from gallery discovery. MPA reads authenticated checked byte ranges, previews metadata and stages one selected media file at a time, without saving the complete ZIP to the phone. Source ZIPs are never deleted or modified. A missing/replaced/moved archive or lost authorization stops safely; reconnect the original source or start a preview for the new archive revision.
+
+This mode saves full-archive phone storage/download setup. It still extracts and uploads individual media into the destination, subject to exact-byte duplicate reuse. Takeout creates ZIP archives in Drive, not standalone photo files; no server-side unzip or zero-upload conversion is claimed. Already-extracted media in a connected folder continues to use ordinary Drive sync without re-upload. Permanent ZIP-backed originals require a separate storage/read/cache design and remain future work.
+
+Range reads require exact HTTP 206 ranges, matching lengths/ETags and the captured live Drive version/size and selected-folder ancestry. One 256 KiB range cache bounds memory; preview range traffic is capped at 64 MiB and per-item range traffic at 512 MiB, failing visibly with smaller-part/local-ZIP recovery advice. Existing 250 MiB media, 10,000 entries/assets, ZIP ratio/expanded-size and JSON limits remain.
+
+Official contracts: [Android user-initiated transfers](https://developer.android.com/develop/background-work/background-tasks/uidt), [ongoing notification dismissal](https://developer.android.com/about/versions/14/behavior-changes-all#non-dismissable-notifications), [Takeout delivery](https://support.google.com/accounts/answer/3024190) and [Drive partial downloads](https://developers.google.com/workspace/drive/api/guides/manage-downloads).
+
 ## Import recovery and exact duplicate index in 0.5.6
 
 All 175 unit/integration and 48 native checks (24 each on Android 10 and 15) passed. See [validation](VALIDATION.md) and [release evidence](releases/v0.5.6.json). Real Samsung background/import acceptance remains pending.

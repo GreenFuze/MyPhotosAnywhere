@@ -101,6 +101,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
     }
     var preview by remember { mutableStateOf<String?>(null) }
     var targetJob by rememberSaveable { mutableStateOf<String?>(null) }
+    var driveZip by rememberSaveable { mutableStateOf(false) }
     var discardZip by rememberSaveable { mutableStateOf<String?>(null) }
     fun open(uri: String) {
         try { context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(uri))) }
@@ -137,6 +138,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
             catch(_: Exception) { model.message.value="Google account selection requires Google Play services." }
         },modifier=Modifier.testTag("import-photos-picker")) { Text("Choose from Google Photos") }
         OutlinedButton(enabled=!busy,onClick={ targetJob=null; zip.launch(Unit) },modifier=Modifier.testTag("import-takeout")) { Text("Import Takeout ZIP parts") }
+        TextButton(enabled=!busy && sources.isNotEmpty(),onClick={ targetJob=null; driveZip=true }) { Text("Import Takeout ZIP from Drive") }
         TextButton(enabled=!busy,onClick={ targetJob=null; folder.launch(Unit) }) { Text("Import extracted Takeout folder") }
         Text("For ZIPs, use local/USB storage. Cloud document providers may download the archive internally. Picker omits location metadata and may transcode videos.",style=MaterialTheme.typography.bodySmall)
         if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -166,8 +168,10 @@ fun ImportControls(model: ImportModel=viewModel()) {
                     TextButton(enabled=!busy,onClick={ discardZip=job.id }) { Text("Delete downloaded ZIP from phone") }
                 }
             }
-            if(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP","CANCELLED"))
+            if(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP","CANCELLED")) {
                 TextButton(enabled=!busy,onClick={ targetJob=job.id; zip.launch(Unit) }) { Text("Add ZIP parts to this import") }
+                TextButton(enabled=!busy && sources.isNotEmpty(),onClick={ targetJob=job.id; driveZip=true }) { Text("Add Drive ZIP part") }
+            }
             if(job.state=="PICKING") {
                 Text(job.email)
                 TextButton(enabled=!busy,onClick={ job.pickerUri?.let { open(it) } }) { Text("Open picker") }
@@ -193,6 +197,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
             }
         }
     } }
+    if(driveZip) DriveTakeoutBrowser(model,targetJob) { driveZip=false }
     discardZip?.let { id -> AlertDialog(onDismissRequest={ discardZip=null },title={ Text("Delete downloaded ZIP?") },text={
         Text("This removes MPA's downloaded ZIP and unfinished transfer copies from this phone. Verified imports remain in Drive. Skipped or unfinished files will need the source ZIP again; an expired link may require a new export.")
     },confirmButton={ TextButton(onClick={ discardZip=null; model.run { model.app.imports.discardDownloadedZip(id) } }) { Text("Delete phone ZIP") } },

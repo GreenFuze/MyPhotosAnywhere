@@ -150,6 +150,51 @@ class ImportRepository(private val context: Context) {
         job.id
     } }
 
+    /** Browse only inside an explicitly connected Drive source, separate from the import destination. */
+    suspend fun driveArchives(binding: String, parent: String?=null, page: String?=null): DrivePage = withContext(Dispatchers.IO) {
+        val source=db.drive().source(binding) ?: error("Reconnect the Drive ZIP source.")
+        val api=app.sync.api(source.connection())
+        val folder=parent ?: source.folderId
+        // Browser parent IDs originate from the scoped list, but recheck ancestry before listing.
+        if(folder!=source.folderId) {
+            var current=api.file(folder); val seen=mutableSetOf<String>()
+            require(!current.trashed && current.mimeType==DriveGateway.FOLDER_MIME) { "Select a Drive folder." }
+            while(source.folderId !in current.parents) {
+                require(!current.trashed && current.mimeType==DriveGateway.FOLDER_MIME && seen.add(current.id) && seen.size<=64) { "Folder is outside the connected Drive source." }
+                current=api.file(current.parents.singleOrNull() ?: error("Folder ancestry unavailable."))
+            }
+        }
+        api.archiveChildren(folder,page).also { require(!it.incompleteSearch) { "Drive ZIP listing is incomplete. Retry." } }
+    }
+
+    suspend fun addDriveTakeout(binding: String, remoteId: String, existing: String?=null): String = withContext(Dispatchers.IO) { lock.withLock {
+        val source=db.drive().source(binding) ?: error("Reconnect the Drive ZIP source.")
+        val job=existing?.let { dao.job(it) } ?: ImportJob(UUID.randomUUID().toString(),destination().key,"TAKEOUT")
+        require(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","DOWNLOADING","CANCELLED")) { "Pause before adding ZIP parts." }
+        val archive=DriveTakeoutArchive(app.sync.api(source.connection()),binding,source.folderId)
+        val uri=archive.capture(remoteId)
+        val reader=TakeoutDocuments(context) { archive.open(it,64L*1024*1024) }
+        val manifest=reader.manifest(job.id,uri,false)
+        require(manifest.isNotEmpty() && manifest.size+dao.items(job.id).size<=10000) { "Empty ZIP or batch exceeds 10,000 entries." }
+        db.withTransaction {
+            dao.saveJob(job.copy(state="PREVIEW",error=null))
+            manifest.forEach { dao.insertItem(it) }
+            documents.match(dao.items(job.id)).forEach { dao.updateItem(it) }
+            for(item in dao.items(job.id).filter { it.state=="COMPLETE" && it.metadata!=null && it.photoId!=null })
+                db.photos().find(requireNotNull(item.photoId))?.let { db.photos().update(codec.apply(it,codec.parse(requireNotNull(item.metadata)))) }
+        }
+        job.id
+    } }
+
+    private suspend fun stageTakeout(item: ImportItem, stage: File, client: okhttp3.OkHttpClient?, keepGoing: suspend ()->Unit): MediaFingerprint {
+        val uri=Uri.parse(item.uri)
+        if(uri.scheme!=DriveTakeoutArchive.SCHEME) return documents.stage(item,stage,keepGoing)
+        val binding=requireNotNull(uri.authority)
+        val source=db.drive().source(binding) ?: error("Reconnect this import's original Drive ZIP source.")
+        val archive=DriveTakeoutArchive(app.sync.api(source.connection(),client),binding,source.folderId)
+        return TakeoutDocuments(context) { archive.open(it,512L*1024*1024) }.stage(item,stage,keepGoing)
+    }
+
     suspend fun createPicker(email: String): ImportJob = withContext(Dispatchers.IO) {
         val destination=destination()
         val session=PhotosPickerGateway(PhotosAuthorization(context).token(email)).create()
@@ -213,30 +258,48 @@ class ImportRepository(private val context: Context) {
             dao.items(id).filter { it.state=="FAILED" }.forEach { dao.updateItem(it.copy(state="PENDING",error=null)) }
             dao.saveJob(job.copy(state="RUNNING",error=null))
         }
-        schedule(id,ExistingWorkPolicy.REPLACE)
+        schedule(id,ExistingWorkPolicy.REPLACE,visible=true)
     }
     suspend fun dismissErrors(id: String) {
         if(ImportErrorDismissal(db).dismiss(id)) ImportNotifications(context).clearSummary(id)
     }
     suspend fun pause(id: String, cancel: Boolean=false) {
-        dao.job(id)?.let { dao.saveJob(it.copy(state=if(cancel) "CANCELLED" else "PAUSED",
-            error=if(cancel) "Verified imports remain in Drive. Unfinished source files and any staged bytes are preserved." else null)) }
+        db.withTransaction {
+            dao.job(id)?.takeIf { it.state !in listOf("COMPLETE","CANCELLED") }?.let {
+                dao.saveJob(it.copy(state=if(cancel) "CANCELLED" else "PAUSED",
+                    error=if(cancel) "Verified imports remain in Drive. Unfinished source files and any staged bytes are preserved." else null))
+            }
+        }
         dao.job(id)?.let { ImportNotifications(context).finish(id,ImportProgress.from(it,dao.items(id))) }
+        if(ImportTransferScheduler.supported) ImportTransferScheduler(context).cancel(id)
         WorkManager.getInstance(context).cancelUniqueWork("mpa-import:$id")
         WorkManager.getInstance(context).cancelUniqueWork("mpa-takeout-download:$id")
     }
     suspend fun resumePending() {
-        dao.jobs().filter { it.state=="RUNNING" }.forEach { schedule(it.id) }
+        // UIDT creation requires a visible Activity. Existing system jobs resume themselves.
+        if(!ImportTransferScheduler.supported) dao.jobs().filter { it.state=="RUNNING" }.forEach { schedule(it.id) }
         dao.jobs().filter { it.state=="DOWNLOADING" }.forEach { scheduleDownload(it.id) }
         dao.jobs().filter { it.state=="COMPLETE" }.forEach { retryCleanup(it.id) }
     }
     suspend fun resumeWhenVisible() {
         ImportForegroundRecovery(dao).resume({ db.drive().source(it)!=null }) { id, legacy ->
-            schedule(id,if(legacy) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE)
+            schedule(id,if(legacy) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE,visible=true)
+        }
+        if(ImportTransferScheduler.supported) dao.jobs().filter { it.state=="RUNNING" }.forEach {
+            schedule(it.id,visible=true)
         }
     }
-    private suspend fun schedule(id: String, policy: ExistingWorkPolicy=ExistingWorkPolicy.KEEP) {
+    private suspend fun schedule(id: String, policy: ExistingWorkPolicy=ExistingWorkPolicy.KEEP, visible: Boolean=false) {
         val job=dao.job(id) ?: return; val source=db.drive().source(job.binding) ?: return
+        if(ImportTransferScheduler.supported) {
+            val transfers=ImportTransferScheduler(context)
+            if(transfers.pending(id)) return
+            if(!visible) { ImportForegroundRecovery(dao).record(id); return }
+            // Await cancellation registration before replacing a legacy WorkManager import.
+            withContext(Dispatchers.IO) { WorkManager.getInstance(context).cancelUniqueWork("mpa-import:$id").result.get() }
+            if(!transfers.schedule(id,source.unmeteredOnly,dao.items(id),job.kind)) ImportForegroundRecovery(dao).record(id)
+            return
+        }
         WorkManager.getInstance(context).enqueueUniqueWork("mpa-import:$id",
             policy,
             OneTimeWorkRequestBuilder<ImportWorker>().setInputData(workDataOf("job" to id))
@@ -245,12 +308,13 @@ class ImportRepository(private val context: Context) {
                 .addTag("mpa-import:${job.binding}").build())
     }
 
-    suspend fun runOne(id: String): Boolean = withContext(Dispatchers.IO) { lock.withLock {
+    suspend fun runOne(id: String, client: okhttp3.OkHttpClient?=null): Boolean = withContext(Dispatchers.IO) { lock.withLock {
         val job=dao.job(id) ?: return@withLock false
         if(job.state!="RUNNING") return@withLock false
         suspend fun keepGoing() {
             currentCoroutineContext().ensureActive()
-            require(dao.job(id)?.state=="RUNNING" && db.drive().source(job.binding)!=null) { "Import paused or Drive source disconnected." }
+            if(dao.job(id)?.state!="RUNNING") throw CancellationException("Import stopped.")
+            require(db.drive().source(job.binding)!=null) { "Import Drive source disconnected." }
         }
         var item=dao.items(id).firstOrNull { it.selected && it.state in listOf("PENDING","STAGING","UPLOADING","VERIFIED") }
         if(item==null) {
@@ -262,7 +326,7 @@ class ImportRepository(private val context: Context) {
         val initial=requireNotNull(item)
         try {
             val source=db.drive().source(job.binding) ?: error("Reconnect the original Drive source.")
-            val api=app.sync.api(source.connection())
+            val api=app.sync.api(source.connection(),client)
             val folder=api.file(source.folderId)
             require(!folder.trashed && folder.canAddChildren) { "Original import destination is no longer writable." }
             // Fail before another upload when the portable catalogue cannot represent this batch.
@@ -277,9 +341,10 @@ class ImportRepository(private val context: Context) {
                 }
                 current=current.copy(state="STAGING",error=null); dao.updateItem(current)
                 val hashes=if(job.kind=="PICKER") {
-                    val picker=PhotosPickerGateway(PhotosAuthorization(context).token(job.email))
+                    val token=PhotosAuthorization(context).token(job.email)
+                    val picker=if(client==null) PhotosPickerGateway(token) else PhotosPickerGateway(token,client)
                     picker.download(picker.find(requireNotNull(job.session),current.path),stage,::keepGoing)
-                } else documents.stage(current,stage,::keepGoing)
+                } else stageTakeout(current,stage,client,::keepGoing)
                 val sha=hashes.sha256; val md5=hashes.md5
                 require(current.sha256==null || current.sha256==sha) { "Source bytes changed since interrupted transfer. Original checkpoint preserved." }
                 current=current.copy(size=stage.length(),staged=stage.absolutePath,sha256=sha,md5=md5,state="UPLOADING")

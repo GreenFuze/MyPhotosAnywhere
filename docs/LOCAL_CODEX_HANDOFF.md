@@ -1,3 +1,9 @@
+## In progress: 0.5.7 background transfers and Drive ZIP source
+
+The owner requests continued background importing, stable notification progress and Takeout exports delivered to Drive. Candidate 0.5.7 / code 18 / Room v9 uses Android 14+ user-initiated transfer jobs, retains WorkManager FGS on older APIs, keeps bounded connection retries inside active work and provides stable IDs/Pause. Schedule UIDT only from visible Import/Resume/reopen, use its assigned network, and preserve the shared checkpoint engine. Android 14 ordinary ongoing notifications remain swipe-dismissible; never fake media/call styles or claim immunity to user/system stops.
+
+A scoped authenticated Drive ZIP browser/checked range adapter avoids saving the complete archive on the phone. It retains the agreed individual-file destination layout, so entries still upload (or reuse exact verified duplicates). Source ZIPs remain untouched. Permanent ZIP-backed originals, no-reupload archive storage and perceptual duplicate review are future work. Local builds and required immutable-source CI must pass before publishing 0.5.7 with the established signer; no candidate release is claimed yet.
+
 ## Follow-up: 0.5.6 background recovery and exact-byte index
 
 The owner's screenshot shows a running 17/1647 Takeout job with the old foreground-start waiting message. Opening MPA and stopping/resuming helped. That message was emitted for every IllegalStateException, so the screenshot does not identify a precise Android quota or device cause. The candidate removes eight-minute foreground-service handoffs, handles recognized Android foreground-start refusals as durable WAITING_FOR_APP work, and resumes blocked jobs on Activity ON_RESUME without changing transfer checkpoints or resurrecting paused/cancelled work. Legacy waiting retries are replaced on reopen. Unexpected service/programming errors still fail fast. Android may still defer or stop long-running work.

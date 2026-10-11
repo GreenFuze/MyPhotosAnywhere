@@ -5,7 +5,6 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import com.myphotosanywhere.mpa.MpaApplication
-import com.myphotosanywhere.mpa.drive.DriveConnectionException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -20,10 +19,10 @@ class ImportBatch(private val runOne: suspend () -> Boolean, private val shouldY
 class ImportWorker(context: Context, params: WorkerParameters): CoroutineWorker(context,params) {
     private val app get()=applicationContext as MpaApplication
     private val notices=ImportNotifications(context)
-    private val notificationId=(id.hashCode() and Int.MAX_VALUE).coerceAtLeast(2)
+    private val notificationId get()=ImportTransferIds(applicationContext).id(requireNotNull(inputData.getString("job")))
     override suspend fun getForegroundInfo(): ForegroundInfo {
         val job=inputData.getString("job") ?: error("Missing import job")
-        return notices.foreground(notificationId,snapshot(job))
+        return notices.foreground(notificationId,snapshot(job),job)
     }
 
     private suspend fun snapshot(id: String): ImportProgress {
@@ -35,6 +34,7 @@ class ImportWorker(context: Context, params: WorkerParameters): CoroutineWorker(
     override suspend fun doWork(): Result {
         val job=inputData.getString("job") ?: return Result.failure()
         if(app.database.imports().job(job)?.state!="RUNNING") return Result.success()
+        if(ImportTransferScheduler.supported && ImportTransferScheduler(applicationContext).pending(job)) return Result.success()
         return try {
             try { setForeground(getForegroundInfo()) } catch(e: IllegalStateException) {
                 if(!ImportForegroundRecovery.isStartRefused(e)) throw e
@@ -45,30 +45,13 @@ class ImportWorker(context: Context, params: WorkerParameters): CoroutineWorker(
             }
             app.database.imports().clearRunningError(job)
             notices.clearSummary(job)
-            coroutineScope {
-                val dao=app.database.imports()
-                val updates=launch {
-                    combine(dao.observeJob(job),dao.observeJobItems(job)) { record, items ->
-                        record?.let { ImportProgress.from(it,items) }
-                    }.filterNotNull().distinctUntilChanged().sample(1000).collect {
-                        setForeground(notices.foreground(notificationId,it))
-                    }
-                }
-                try {
-                    // Foreground WorkManager supports long-running work. Avoid restarting the service
-                    // between timed batches while the Activity is no longer visible.
-                    ImportBatch({ app.imports.runOne(job) },{ false }).run()
-                } finally { updates.cancelAndJoin() }
-                notices.finish(job,snapshot(job))
-            }
-            Result.success()
+            val execution=ImportExecution(app.database.imports(),{ app.imports.runOne(job) },{
+                setForeground(notices.foreground(notificationId,it,job))
+            })
+            val success=execution.run(job)
+            notices.finish(job,snapshot(job))
+            if(success) Result.success() else Result.failure()
         } catch(e: CancellationException) { throw e }
-        catch(e: DriveConnectionException) {
-            val retry=ImportConnectionRecovery(app.database.imports()).record(job,runAttemptCount,e)
-            val progress=snapshot(job)
-            notices.finish(job,if(retry) progress.copy(state="WAITING") else progress)
-            if(retry) Result.retry() else Result.failure()
-        }
         catch(_: Exception) {
             app.database.imports().connectionState(job,"FAILED",
                 "Background import stopped. Open MPA and resume; transfer checkpoints are preserved.")

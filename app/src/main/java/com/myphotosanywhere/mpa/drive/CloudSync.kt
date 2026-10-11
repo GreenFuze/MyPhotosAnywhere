@@ -33,10 +33,10 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
         if(now) manager.enqueueUniqueWork("mpa-scan:${binding.key}",ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<CloudSyncWorker>().setConstraints(constraints).setInputData(data).addTag(SYNC_TAG).addTag("$SYNC_TAG:${binding.key}").build())
     }
-    suspend fun api(active: DriveConnection): DriveGateway {
+    suspend fun api(active: DriveConnection, client: okhttp3.OkHttpClient?=null): DriveGateway {
         val auth=DriveAuthorization(context)
         val token=auth.token(active.email,DriveMode.valueOf(active.mode))
-        val api=DriveGateway(token)
+        val api=if(client==null) DriveGateway(token) else DriveGateway(token,client)
         try { val user=api.user(); if(user.id!=active.accountId || !user.email.equals(active.email,true)) throw DriveAuthorizationNeeded() }
         catch(e: DriveHttpException) { if(e.status==401) auth.invalidate(token); throw e }
         return api

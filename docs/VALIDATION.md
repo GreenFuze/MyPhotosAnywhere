@@ -1,3 +1,13 @@
+## Candidate 0.5.7: continuous import transfers and direct Drive ZIP reading
+
+Version 0.5.7 / code 18 / Room v9. Local and required immutable-source CI are pending; no 0.5.7 publication is claimed yet.
+
+Android 14+ imports use user-initiated JobScheduler transfers with an immediate system-associated notification, assigned-network sockets/DNS, stable collision-free IDs, source network preferences, estimated upload bytes and graceful Pause. Earlier APIs retain WorkManager foreground execution. Shared execution retries transport failures in place with bounded backoff, preserving active verified progress and durable checkpoints. Visible reopen migrates existing running work; background initialization never creates UIDT jobs. Pause/cancel remains authoritative across completion/network races. System/user stops and Android 14 notification dismissal remain platform-controlled.
+
+Drive Takeout browsing is source-scoped and paginated. Its seekable ZIP adapter requests bounded exact ranges with pinned ETags and live version/size/ancestry checks, reads JSON and stages selected media through the existing verified import pipeline. Source archives remain untouched and are never copied wholesale to phone storage. Individual media is still uploaded; permanent archive-backed originals are not implemented. Room v9 and existing jobs remain compatible.
+
+Regression fixtures cover scheduler ID collisions/recreation, required network/bytes/permission, progress/Pause, retry/cancellation/fail-fast behavior and checkpoint retention, remote ZIP metadata/media streaming, distant seeks/cache budgets, ignored/shifted/truncated/changed HTTP ranges and replaced/moved archives. Native coverage checks the transfer contract and Room retry checkpoint preservation on both API 29 and 35. It does not reproduce live Samsung power management, exercise a real Google-account archive, prove swipe prevention or long-running JobService execution. Those remain phone acceptance checks.
+
 ## Released 0.5.6: background recovery and exact duplicate index
 
 Version 0.5.6 / code 17 / Room v9. Source `6a1d23f17e8fb6eb404bc9fca314200e3e54ec0f` passed **175 unit/integration tests**, lint with **zero errors**, CPU model checks, app assembly and **24 native tests on each of Android 10/API 29 and Android 15/API 35 (48 total)**, with zero failures/errors/skips. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38156043758) · [Android 10 and 15 checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38156043815). Local Windows checks passed all 175 tests, lint and both APK builds; local device tests were not run. CI Room v9 matches the committed schema.

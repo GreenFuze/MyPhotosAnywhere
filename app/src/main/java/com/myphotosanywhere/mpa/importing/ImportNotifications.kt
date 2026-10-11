@@ -46,7 +46,7 @@ class ImportNotifications(private val context: Context) {
     fun enabled(): Boolean = NotificationManagerCompat.from(context).areNotificationsEnabled() &&
         manager.getNotificationChannel(CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE
 
-    fun notification(progress: ImportProgress): Notification {
+    fun notification(progress: ImportProgress, job: String?=null): Notification {
         val open=PendingIntent.getActivity(context,0,Intent(context,MainActivity::class.java)
             .setAction(ACTION_OPEN).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -59,13 +59,20 @@ class ImportNotifications(private val context: Context) {
             .setContentIntent(open).setOnlyAlertOnce(true).setSilent(true)
             .setOngoing(running).setAutoCancel(!running).setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-            .apply { if(running) setProgress(progress.total.coerceAtLeast(1),progress.complete,progress.total==0) }
+            .apply {
+                if(running) {
+                    setProgress(progress.total.coerceAtLeast(1),progress.complete,progress.total==0)
+                    if(job!=null) addAction(0,"Pause import",PendingIntent.getBroadcast(context,
+                        ImportTransferIds(context).id(job),Intent(context,ImportPauseReceiver::class.java).putExtra("job",job),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+                }
+            }
             .build()
     }
 
-    fun foreground(id: Int, progress: ImportProgress): ForegroundInfo = if(Build.VERSION.SDK_INT>=29)
-        ForegroundInfo(id,notification(progress),ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        else ForegroundInfo(id,notification(progress))
+    fun foreground(id: Int, progress: ImportProgress, job: String?=null): ForegroundInfo = if(Build.VERSION.SDK_INT>=29)
+        ForegroundInfo(id,notification(progress,job),ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        else ForegroundInfo(id,notification(progress,job))
 
     fun clearSummary(job: String) { manager.cancel(job,SUMMARY_ID) }
 
