@@ -1,5 +1,9 @@
 # Validation status and device checklist
 
+## MPA 0.5.3 background import progress — 2026-10-11
+
+Development checks are in progress; no 0.5.3 release is claimed yet. Version 0.5.3 / code 14 preserves Room v8 and upload checkpoints, adds foreground import progress, notification permission controls, MPA monochrome status icon, Storage navigation and terminal summaries. Regressions cover verified counts versus uploaded bytes, batch completion/yield, denied notifications, actual Android notification updates/navigation and a real foreground WorkManager completion. The owner reports a real ZIP import running in 0.5.2; its completion and other Google account round trips remain phone acceptance checks.
+
 ## MPA 0.5.2 ZIP file access fix — 2026-10-11
 
 Source `96ce1b6972f8d7bf404cb3b29df130bb57d9bfea` passed **144 unit/integration tests**, lint with **zero errors**, CPU model checks, app assembly and **18 native tests on each of Android 10/API 29 and Android 15/API 35 (36 total)**, with zero failures/errors/skips. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38136233885) · [Android 10 and 15 checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38136233947). Local Windows checks passed all 144 tests, lint and both app/instrumentation APK assembly. CI Room v8 schema matches the committed schema. Local device tests were not run.

@@ -26,6 +26,63 @@ class DeviceSmokeTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
 
+    private fun allowImportNotifications() {
+        if(android.os.Build.VERSION.SDK_INT>=33) InstrumentationRegistry.getInstrumentation().uiAutomation
+            .grantRuntimePermission(app.packageName,android.Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    @Test fun backgroundImportNotificationUpdatesVerifiedProgressAndOpensStorage() {
+        allowImportNotifications()
+        val notices=com.myphotosanywhere.mpa.importing.ImportNotifications(app)
+        val manager=app.getSystemService(android.app.NotificationManager::class.java)
+        val id=89101
+        try {
+            assertTrue(notices.enabled())
+            if(android.os.Build.VERSION.SDK_INT>=29) assertEquals(android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+                notices.foreground(id,com.myphotosanywhere.mpa.importing.ImportProgress("TAKEOUT","RUNNING",1,3,"Preparing")).foregroundServiceType)
+            manager.notify(id,notices.notification(com.myphotosanywhere.mpa.importing.ImportProgress("TAKEOUT","RUNNING",1,3,"Uploading photo · 50%")))
+            compose.waitUntil(5000) { manager.activeNotifications.any { it.id==id } }
+            val active=manager.activeNotifications.single { it.id==id }.notification
+            assertEquals(R.drawable.ic_import_notification,active.smallIcon.resId)
+            assertEquals(1,active.extras.getInt(android.app.Notification.EXTRA_PROGRESS))
+            assertEquals(3,active.extras.getInt(android.app.Notification.EXTRA_PROGRESS_MAX))
+            assertTrue(active.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0)
+            manager.notify(id,notices.notification(com.myphotosanywhere.mpa.importing.ImportProgress("TAKEOUT","RUNNING",2,3,"Preparing")))
+            compose.waitUntil(5000) { manager.activeNotifications.single { it.id==id }.notification.extras.getInt(android.app.Notification.EXTRA_PROGRESS)==2 }
+            active.contentIntent.send()
+            compose.waitUntil(10000) { compose.onAllNodesWithText("Import Google Photos").fetchSemanticsNodes().isNotEmpty() }
+        } finally { manager.cancel(id) }
+    }
+
+    @Test fun foregroundImportWorkerCommitsCompletionAndLeavesDismissibleSummary() = runBlocking<Unit> {
+        allowImportNotifications()
+        val id="notification-device-test"
+        val dao=app.database.imports()
+        val notices=com.myphotosanywhere.mpa.importing.ImportNotifications(app)
+        val work=androidx.work.OneTimeWorkRequestBuilder<com.myphotosanywhere.mpa.importing.ImportWorker>()
+            .setInputData(androidx.work.workDataOf("job" to id)).build()
+        val manager=androidx.work.WorkManager.getInstance(app)
+        try {
+            dao.saveJob(com.myphotosanywhere.mpa.importing.ImportJob(id,"synthetic","TAKEOUT",state="RUNNING"))
+            manager.enqueue(work).result.get()
+            withTimeout(30000) {
+                while(manager.getWorkInfoById(work.id).get()?.state?.isFinished!=true) delay(100)
+            }
+            assertEquals(androidx.work.WorkInfo.State.SUCCEEDED,manager.getWorkInfoById(work.id).get()?.state)
+            assertEquals("COMPLETE",dao.job(id)?.state)
+            val notifications=app.getSystemService(android.app.NotificationManager::class.java)
+            withTimeout(5000) { while(notifications.activeNotifications.none { it.tag==id }) delay(50) }
+            val summary=notifications.activeNotifications.single { it.tag==id }.notification
+            assertTrue(summary.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString().contains("Import complete"))
+            assertEquals(0,summary.flags and android.app.Notification.FLAG_ONGOING_EVENT)
+        } finally {
+            manager.cancelWorkById(work.id).result.get()
+            notices.clearSummary(id)
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM import_jobs WHERE id=?",arrayOf(id))
+        }
+    }
+
     @Test fun takeoutZipStreamsOneEntryAndKeepsSupplementalMetadata() = runBlocking<Unit> {
         val archive=File(app.cacheDir,"synthetic-takeout.zip")
         val staged=File(app.cacheDir,"synthetic-stage.jpg")
@@ -238,7 +295,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
-        compose.onNodeWithText("MPA 0.5.2 (13)",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.5.3 (14)",substring=true).assertExists()
         val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
         assertEquals("com.myphotosanywhere.mpa",info.packageName)
         assertTrue(info.sha1.isNotEmpty())

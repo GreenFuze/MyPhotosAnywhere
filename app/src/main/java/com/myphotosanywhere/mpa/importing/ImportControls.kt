@@ -3,6 +3,11 @@ package com.myphotosanywhere.mpa.importing
 import android.accounts.AccountManager
 import android.app.Activity
 import android.app.Application
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
+import androidx.core.content.ContextCompat
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -76,6 +81,24 @@ fun ImportControls(model: ImportModel=viewModel()) {
     val busy by model.busy.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
     val settings by model.app.settings.state.collectAsStateWithLifecycle()
+    val notices=remember(context) { ImportNotifications(context) }
+    var notificationsEnabled by remember { mutableStateOf(notices.enabled()) }
+    var startAfterPermission by rememberSaveable { mutableStateOf<String?>(null) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        notificationsEnabled=notices.enabled()
+    }
+    val notificationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        notificationsEnabled=notices.enabled()
+        if(!granted) model.message.value="Import continues. Allow MPA notifications in Android Settings to see background progress."
+        startAfterPermission?.let { id -> model.run { model.app.imports.start(id) } }
+        startAfterPermission=null
+    }
+    fun requestNotifications() { if(Build.VERSION.SDK_INT>=33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }
+    fun startImport(id: String) {
+        if(Build.VERSION.SDK_INT>=33 && ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) {
+            startAfterPermission=id; requestNotifications()
+        } else model.run { model.app.imports.start(id) }
+    }
     var preview by remember { mutableStateOf<String?>(null) }
     var targetJob by rememberSaveable { mutableStateOf<String?>(null) }
     var discardZip by rememberSaveable { mutableStateOf<String?>(null) }
@@ -94,6 +117,14 @@ fun ImportControls(model: ImportModel=viewModel()) {
     val folder=rememberLauncherForActivityResult(TakeoutSelectionContract(tree=true)) { if(it!=null) model.add(it,true,targetJob) }
     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text("Import Google Photos",style=MaterialTheme.typography.titleMedium)
+        Text("Imports continue in the background with verified-file progress in notifications. Android may pause work for network or system limits; checkpoints are preserved.",style=MaterialTheme.typography.bodySmall)
+        if(!notificationsEnabled) {
+            Text("Background progress notifications are off.")
+            if(Build.VERSION.SDK_INT>=33 && ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)
+                TextButton(onClick={ requestNotifications() }) { Text("Allow import notifications") }
+            TextButton(onClick={ context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE,context.packageName)) }) { Text("Open notification settings") }
+        }
         Text("Imports go to the default Drive destination. Your only connected folder is chosen automatically. User-selected source files remain untouched. Media limit: 250 MiB per file; catalogue: 10,000 assets / 2 MiB.")
         val destination=sources.find { it.backupEnabled } ?: sources.singleOrNull()
         Text(destination?.let { "New import destination: ${it.folderName} (${it.email})" }
@@ -139,7 +170,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
                 Button(enabled=!busy,onClick={ model.run { model.app.imports.checkPicker(job.id) } }) { Text("Check completed selection") }
             } else if(entries.isNotEmpty()) TextButton(enabled=!busy,onClick={ preview=job.id }) { Text("Preview selection and metadata") }
             if(job.state !in listOf("RUNNING","DOWNLOADING","PICKING","COMPLETE","CANCELLED"))
-                Button(enabled=!busy,onClick={ model.run { model.app.imports.start(job.id) } }) { Text("Import selected / Resume") }
+                Button(enabled=!busy,onClick={ startImport(job.id) }) { Text("Import selected / Resume") }
             if(job.state in listOf("RUNNING","DOWNLOADING")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id) } }) { Text("Pause import") }
             if(job.state !in listOf("COMPLETE","CANCELLED")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id,true) } }) { Text("Cancel remaining import") }
         }

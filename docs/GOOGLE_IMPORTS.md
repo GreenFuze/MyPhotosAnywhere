@@ -4,6 +4,18 @@ Implemented in MPA 0.5.0 / version code 11, Room v7. Local checks and required C
 
 **0.5.2 / code 13 / Room v8** restores direct ZIP file selection and reads the Android-granted file descriptor without reopening a filesystem path. The sole connected Drive folder remains the automatic import destination. All 144 unit/integration and 36 native checks (18 each on Android 10 and 15) passed. See [validation](VALIDATION.md) and [release evidence](releases/v0.5.2.json).
 
+## Background progress in 0.5.3
+
+Takeout and Photos Picker media imports run through WorkManager when you leave MPA. Version 0.5.3 promotes active import work to a data-sync foreground service with the monochrome MPA status-bar icon and a silent **Photo imports** notification. It shows verified files / selected files and the current file's preparation, upload percentage or metadata commit. Uploading bytes count as imported only after remote verification and the metadata/link transaction. Tap the notification to open Storage. Completion, pause, cancellation and failures leave a dismissible summary.
+
+On Android 13 or later, allow notifications when starting/resuming an import. Refusing notification permission does not block the import. For an already running import, open Storage and choose **Allow import notifications** or **Open notification settings**; enable MPA and its **Photo imports** channel. Android hides the status-bar/drawer notification when permission or the channel is disabled.
+
+The foreground worker keeps one notification across files and yields between files after an eight-minute batch. Existing durable staging, reserved upload IDs and acknowledged offsets remain unchanged. WorkManager reschedules with the captured destination's network requirements. Android can stop/defer work, including foreground-service or job quotas, loss of the required connection and force-stop. This is resumable background work, not an uninterrupted-transfer guarantee. A summary is not an ongoing service after work stops. Pending/waiting jobs appear in Storage; a progress icon is shown while work is active.
+
+The owner reports that a real ZIP import is running in 0.5.2. Completion, interrupted-import recovery, Picker and Google metadata cleanup still require phone acceptance. Notification development/CI checks are pending; no 0.5.3 release is claimed yet.
+
+Official Android contracts: [long-running WorkManager workers](https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/long-running), [notification permission](https://developer.android.com/develop/ui/compose/notifications/notification-permission), [Android 15 data-sync limits](https://developer.android.com/about/versions/15/behavior-changes-15).
+
 ## Import destinations and controls
 
 In Storage, connect a writable Drive folder. When exactly one folder is connected, it is automatically the default import destination, even if ordinary backup is paused. With several connected folders, select **Use as default backup destination** on the intended folder. Automatic import destination selection does not enable ordinary local-media backup. Each new import captures this account/folder permanently. Changing the default affects future jobs only. Disconnecting its source pauses an import; reconnect the original source to resume it.

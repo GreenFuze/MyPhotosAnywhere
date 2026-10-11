@@ -33,6 +33,8 @@ data class TakeoutDownload(@PrimaryKey val job: String, val sealedLink: String,
 
 @Dao
 interface ImportDao {
+    @Query("SELECT * FROM import_jobs WHERE id=:id") fun observeJob(id: String): Flow<ImportJob?>
+    @Query("SELECT * FROM import_items WHERE job=:id ORDER BY path,id") fun observeJobItems(id: String): Flow<List<ImportItem>>
     @Query("SELECT * FROM takeout_downloads") fun observeDownloads(): Flow<List<TakeoutDownload>>
     @Query("SELECT * FROM takeout_downloads WHERE job=:id") suspend fun download(id: String): TakeoutDownload?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun saveDownload(download: TakeoutDownload)

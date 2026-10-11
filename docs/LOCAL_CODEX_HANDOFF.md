@@ -52,6 +52,10 @@ Continue implementing the agreed plan on a suitable feature branch, starting wit
 - Phone inference is preferred, on demand or scheduled while charging at night; respect pause, opt-in, heat, battery and network preferences. Individual pet recognition is still future work.
 - AI uses official ChatGPT/Gemini/Claude subscription app handoffs, without AI API keys, provider cookies/passwords or a mandatory server. Edits are linked copies.
 
+## Follow-up: 0.5.3 background import notification
+
+The owner confirms a ZIP import is running in 0.5.2 and requests a background status-bar icon and progress in notifications. Version 0.5.3 / code 14 keeps Room v8 and the shared durable migration engine. Takeout and Picker workers use a data-sync foreground notification with the MPA monochrome icon, verified counts and current transfer percentage. Tap opens Storage; Android 13 notification consent is requested at import start/resume, with controls for already running imports. Batch workers yield between files after eight minutes, preserving destination/network constraints and upload checkpoints. Development/CI checks are pending. Preserve prior releases and the established signer.
+
 ## Follow-up fix: 0.5.2
 
 The owner reports URL import failing and a downloaded ZIP returning access denied. Restore the direct Android Files picker, remove URL/fresh-link forms and read ZIPs through the granted descriptor rather than reopening `/proc/self/fd`. Retain actual read/persistable grants or fail with local-file recovery advice before creating durable work. Version 0.5.2 / code 13 keeps Room v8 and all historical jobs/checkpoints/cleanup; user-selected archives remain untouched. Preserve the automatic sole-folder destination. Local checks and required CI passed: 144 unit/integration tests, zero lint errors and 18 native tests on each of Android API 29 and 35. The dedicated 0.5.2 publisher reuses the exact passed APK with the established signer. See current validation for completed evidence; real S23 Ultra acceptance remains outstanding.

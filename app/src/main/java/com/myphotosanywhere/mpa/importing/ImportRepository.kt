@@ -218,6 +218,7 @@ class ImportRepository(private val context: Context) {
     suspend fun pause(id: String, cancel: Boolean=false) {
         dao.job(id)?.let { dao.saveJob(it.copy(state=if(cancel) "CANCELLED" else "PAUSED",
             error=if(cancel) "Verified imports remain in Drive. Unfinished source files and any staged bytes are preserved." else null)) }
+        dao.job(id)?.let { ImportNotifications(context).finish(id,ImportProgress.from(it,dao.items(id))) }
         WorkManager.getInstance(context).cancelUniqueWork("mpa-import:$id")
         WorkManager.getInstance(context).cancelUniqueWork("mpa-takeout-download:$id")
     }
@@ -345,13 +346,4 @@ class ImportRepository(private val context: Context) {
     } }
 
     suspend fun continueJob(id: String) { if(dao.job(id)?.state=="RUNNING") schedule(id,true) }
-}
-
-class ImportWorker(context: Context,params: WorkerParameters): CoroutineWorker(context,params) {
-    override suspend fun doWork(): Result {
-        val app=applicationContext as MpaApplication
-        val job=inputData.getString("job") ?: return Result.failure()
-        if(app.imports.runOne(job)) app.imports.continueJob(job)
-        return Result.success()
-    }
 }

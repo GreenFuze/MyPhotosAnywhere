@@ -43,15 +43,21 @@ import java.text.DateFormat
 import java.util.Date
 
 class MainActivity: ComponentActivity() {
+    private var importNavigation by mutableIntStateOf(0)
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if(intent.action==com.myphotosanywhere.mpa.importing.ImportNotifications.ACTION_OPEN) importNavigation++
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if(intent.action==com.myphotosanywhere.mpa.importing.ImportNotifications.ACTION_OPEN) importNavigation++
         setContent { MaterialTheme(colorScheme=lightColorScheme(primary=Color(0xFF166D5B),secondary=Color(0xFF49675F),
-            background=Color(0xFFF8FAF7),surface=Color(0xFFF8FAF7))) { LibraryScreen() } }
+            background=Color(0xFFF8FAF7),surface=Color(0xFFF8FAF7))) { LibraryScreen(importNavigation=importNavigation) } }
     }
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: LibraryFeaturesModel = viewModel()) {
+private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = viewModel(),features: LibraryFeaturesModel = viewModel()) {
     val photos by model.photos.collectAsStateWithLifecycle()
     val handoffs by model.handoffs.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
@@ -68,6 +74,7 @@ private fun LibraryScreen(model: LibraryViewModel = viewModel(),features: Librar
     val downloads by features.downloads.collectAsStateWithLifecycle()
     val settings by features.settings.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(0) }
+    LaunchedEffect(importNavigation) { if(importNavigation>0) tab=4 }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var resultHandoffId by rememberSaveable { mutableStateOf<String?>(null) }
     var showShare by rememberSaveable { mutableStateOf(false) }
