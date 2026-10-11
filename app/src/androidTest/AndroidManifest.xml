@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider android:name="com.myphotosanywhere.mpa.TakeoutTestProvider"
+            android:authorities="com.myphotosanywhere.mpa.test.takeout"
+            android:exported="true" android:grantUriPermissions="true" />
+    </application>
+</manifest>

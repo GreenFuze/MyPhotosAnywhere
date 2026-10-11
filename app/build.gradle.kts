@@ -12,8 +12,8 @@ android {
         applicationId = "com.myphotosanywhere.mpa"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.5.1"
+        versionCode = 13
+        versionName = "0.5.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
@@ -47,6 +47,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:22.0.0")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.mlkit:image-labeling:17.0.9")

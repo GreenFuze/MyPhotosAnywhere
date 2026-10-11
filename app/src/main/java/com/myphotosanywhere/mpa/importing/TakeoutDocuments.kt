@@ -3,15 +3,14 @@ package com.myphotosanywhere.mpa.importing
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
-import android.system.Os
-import android.system.OsConstants
+import android.os.ParcelFileDescriptor
 import java.io.File
 import java.io.InputStream
-import java.util.zip.ZipFile
+import org.apache.commons.compress.archivers.zip.ZipFile
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
-/** Seekable archives stay in place. A non-seekable provider must be copied by the user to local/USB storage. */
+/** Read the granted descriptor directly; reopening its proc path can fail under Android scoped storage. */
 class TakeoutDocuments(private val context: Context) {
     private val resolver get() = context.contentResolver
     private val codec = TakeoutCodec()
@@ -58,7 +57,7 @@ class TakeoutDocuments(private val context: Context) {
             }
         } else archive(uri) { zip ->
             val paths = mutableSetOf<String>()
-            val entries = zip.entries()
+            val entries = zip.entries
             var count = 0
             while (entries.hasMoreElements()) {
                 val entry = entries.nextElement()
@@ -66,6 +65,9 @@ class TakeoutDocuments(private val context: Context) {
                 TakeoutCodec.safePath(entry.name.removeSuffix("/"))
                 require(paths.add(entry.name)) { "Archive contains duplicate paths." }
                 if (entry.isDirectory) continue
+                require(entry.method in listOf(0, 8) && zip.canReadEntryData(entry)) {
+                    "Unsupported or encrypted ZIP entry. Use an ordinary Google Takeout ZIP."
+                }
                 require(entry.size >= 0 && (entry.compressedSize <= 0 || entry.size / maxOf(1, entry.compressedSize) <= 200)) {
                     "Archive has an unsafe compression ratio. Source is preserved."
                 }
@@ -121,14 +123,20 @@ class TakeoutDocuments(private val context: Context) {
             val file = File(requireNotNull(uri.path)).canonicalFile
             val root = File(context.filesDir, "takeout-downloads").canonicalFile
             if(file.parentFile == root && file.name.matches(Regex("[a-zA-Z0-9-]+\\.zip")))
-                return ZipFile(file).use { block(it) }
+                return ZipFile.builder().setFile(file).get().use { block(it) }
         }
-        val descriptor = resolver.openFileDescriptor(uri, "r") ?: error("Cannot open Takeout ZIP.")
-        return descriptor.use {
-            try { Os.lseek(it.fileDescriptor, 0, OsConstants.SEEK_CUR) } catch (_: Exception) {
-                error("This provider cannot seek the ZIP. Save it to local or USB storage, then select it again.")
+        val descriptor = try {
+            resolver.openFileDescriptor(uri, "r") ?: error("Cannot open Takeout ZIP. Select it again using Files.")
+        } catch (e: SecurityException) {
+            throw IllegalStateException("Read access to the ZIP was lost. Select it again using Files; keep the source in Downloads or USB storage.", e)
+        }
+        // AutoCloseInputStream owns the descriptor, including failure while opening/parsing the archive.
+        return ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
+            val channel = input.channel
+            try { channel.position(0); channel.size() } catch (e: java.io.IOException) {
+                throw IllegalStateException("This provider cannot seek the ZIP. Save it in Downloads or USB storage, then select it again using Files.", e)
             }
-            ZipFile("/proc/self/fd/${it.fd}").use { zip -> block(zip) }
+            ZipFile.builder().setSeekableByteChannel(channel).get().use { zip -> block(zip) }
         }
     }
 

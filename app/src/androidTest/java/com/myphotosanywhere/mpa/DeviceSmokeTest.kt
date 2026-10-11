@@ -55,15 +55,17 @@ class DeviceSmokeTest {
         compose.onNodeWithTag("import-takeout").performScrollTo().assertIsDisplayed()
     }
 
-    @Test fun takeoutOffersLocalZipAndDirectUrlWithAutomaticImport() {
+    @Test fun takeoutUsesDirectDocumentSelectionWithoutUrlForm() {
+        val contract=com.myphotosanywhere.mpa.importing.TakeoutSelectionContract()
+        val intent=contract.createIntent(app,Unit)
+        assertEquals(android.content.Intent.ACTION_OPEN_DOCUMENT,intent.action)
+        assertTrue(intent.hasCategory(android.content.Intent.CATEGORY_OPENABLE))
+        assertTrue(intent.getBooleanExtra(android.content.Intent.EXTRA_ALLOW_MULTIPLE,false))
+        assertTrue(intent.flags and android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+        assertTrue(intent.flags and android.content.Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION != 0)
         compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
-        compose.onNodeWithTag("import-takeout").performScrollTo().performClick()
-        compose.onNodeWithTag("takeout-local-zip").assertExists()
-        compose.onNodeWithTag("takeout-url").performClick()
-        compose.onNodeWithTag("takeout-url-input").assertExists().performTextInput("https://example.test/export.zip")
-        compose.onNodeWithText("Import automatically after download").assertExists()
-        compose.onNodeWithTag("takeout-url-submit").assertIsEnabled()
-        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithTag("import-takeout").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("takeout-url").assertDoesNotExist()
         compose.onNodeWithTag("takeout-url-input").assertDoesNotExist()
     }
 
@@ -228,7 +230,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
-        compose.onNodeWithText("MPA 0.5.1 (12)",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.5.2 (13)",substring=true).assertExists()
         val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
         assertEquals("com.myphotosanywhere.mpa",info.packageName)
         assertTrue(info.sha1.isNotEmpty())

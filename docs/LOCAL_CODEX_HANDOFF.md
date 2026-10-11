@@ -52,6 +52,10 @@ Continue implementing the agreed plan on a suitable feature branch, starting wit
 - Phone inference is preferred, on demand or scheduled while charging at night; respect pause, opt-in, heat, battery and network preferences. Individual pet recognition is still future work.
 - AI uses official ChatGPT/Gemini/Claude subscription app handoffs, without AI API keys, provider cookies/passwords or a mandatory server. Edits are linked copies.
 
+## Follow-up fix: 0.5.2
+
+The owner reports URL import failing and a downloaded ZIP returning access denied. Restore the direct Android Files picker, remove URL/fresh-link forms and read ZIPs through the granted descriptor rather than reopening `/proc/self/fd`. Retain actual read/persistable grants or fail with local-file recovery advice before creating durable work. Version 0.5.2 / code 13 keeps Room v8 and all historical jobs/checkpoints/cleanup; user-selected archives remain untouched. Preserve the automatic sole-folder destination. Run local checks and required CI, including provider-owned ZIP and permission regression tests on Android API 29 and 35, before publishing the exact tested APK with the established signer. See current validation for completed evidence; real S23 Ultra acceptance remains outstanding.
+
 ## Follow-up increment: 0.5.1
 
 The owner's next requests are automatic default selection when only one Drive folder is connected, and Takeout ZIP download by URL with processing and phone cleanup. Implemented in version 0.5.1 / code 12 / Room v8; local checks and required CI passed. Publication reuses the tested immutable APK. See `docs/GOOGLE_IMPORTS.md` and the top of `docs/VALIDATION.md`. A sole source is an import default without unpausing ordinary backups. URL downloads require direct HTTPS ZIP bytes; Google's browser-authenticated Takeout page is not a direct ZIP URL. Never promise cookie/sign-in automation. Remove only MPA-owned downloaded archives after verified media commits; preserve local/USB source files and incomplete/unsupported items for review. Existing released APKs and signers must remain unchanged.
