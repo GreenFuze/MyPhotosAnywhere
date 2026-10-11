@@ -1,6 +1,8 @@
-## Candidate 0.5.6: background recovery and exact duplicate index
+## Released 0.5.6: background recovery and exact duplicate index
 
-Version 0.5.6 / code 17 / Room v9. Local and required CI checks are pending; no 0.5.6 release is claimed yet.
+Version 0.5.6 / code 17 / Room v9. Source `6a1d23f17e8fb6eb404bc9fca314200e3e54ec0f` passed **175 unit/integration tests**, lint with **zero errors**, CPU model checks, app assembly and **24 native tests on each of Android 10/API 29 and Android 15/API 35 (48 total)**, with zero failures/errors/skips. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38156043758) · [Android 10 and 15 checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38156043815). Local Windows checks passed all 175 tests, lint and both APK builds; local device tests were not run. CI Room v9 matches the committed schema.
+
+The exact passed CI APK has SHA-256 `f925519bbac1ddfe57b1252ebfa528ddbff174a4859f861eeecb54f2df829cf2` and established signer `A9:09:D0:BC:00:22:09:7F:9C:9F:B8:6F:E9:BC:E6:EF:60:44:C0:DD`. Immutable references are in `docs/releases/v0.5.6.json`; complete results are attached as BUILD_EVIDENCE.json.
 
 The owner reports 17/1647 imported with the old foreground-start waiting message; opening MPA then stopping/resuming helped. This message previously covered all IllegalStateException instances and does not establish an exact Android/device cause. Recognized Android start refusals now persist WAITING_FOR_APP, with immediate recovery requested from Activity ON_RESUME. Paused, cancelled, failed and disconnected jobs are not auto-resurrected. Legacy waiting retry work is replaced so old backoff cannot block reopen recovery. Eight-minute foreground-service restarts are removed; real Android limits remain.
 

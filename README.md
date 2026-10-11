@@ -6,6 +6,8 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
+The [0.5.6 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.6) improves background import recovery on reopen, removes eight-minute service restarts and adds a verified, destination-scoped exact-duplicate hash index with fewer staging reads. Saved import checkpoints are preserved. All 175 unit/integration and 48 native checks passed on Android 10 and 15. Real Samsung acceptance remains pending; visual duplicate review and quality decisions are later stages. [Import controls](docs/GOOGLE_IMPORTS.md).
+
 The [0.5.5 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.5) adds **Dismiss errors** for stopped imports, clearing persisted job/file/download messages and summary notifications while retaining history, Resume and every source/upload checkpoint. New failures remain visible. All 162 unit/integration and 44 native checks passed across Android 10 and 15. Phone acceptance remains pending. [Import controls](docs/GOOGLE_IMPORTS.md).
 
 The [0.5.4 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.4) explains local Takeout reading versus Drive uploads and adds clear Drive connection errors, up to three automatic retries and waiting notifications. Import checkpoints and the established upgrade signer are preserved. All 160 unit/integration and 42 native checks passed across Android 10 and 15. Recovery from the owner's real-phone DNS failure and completed migration remain acceptance checks. [Import controls](docs/GOOGLE_IMPORTS.md).

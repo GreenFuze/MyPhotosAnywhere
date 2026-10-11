@@ -1,6 +1,6 @@
 ## Import recovery and exact duplicate index in 0.5.6
 
-Development and CI checks are pending; no 0.5.6 release is claimed yet.
+All 175 unit/integration and 48 native checks (24 each on Android 10 and 15) passed. See [validation](VALIDATION.md) and [release evidence](releases/v0.5.6.json). Real Samsung background/import acceptance remains pending.
 
 Version 0.5.6 / code 17 / Room v9 stops restarting the foreground service between eight-minute batches. If Android explicitly refuses a foreground-service start, Storage shows **waiting for MPA** with a reopening message and a summary notification when notifications are allowed. Reopen MPA to queue recovery automatically, or choose **Import selected / Resume**. Existing upload IDs, acknowledged offsets, staged bytes and verified files remain. Paused/cancelled imports stay stopped; disconnected destinations must be reconnected. Old versions' saved foreground waiting retries are replaced on reopen. Other unexpected service errors still fail visibly. Android may still defer/stop foreground work; long-running imports are not guaranteed uninterrupted.
 
