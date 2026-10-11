@@ -1,6 +1,6 @@
-## In-app progress (0.5.8 candidate)
+## In-app progress (0.5.8)
 
-Storage shows active imports above setup controls, with a live verified-file bar/count and current filename/upload percentage. Preparing files has no invented byte percentage; the overall bar counts only completed, verified files. Retry/wait/pause status uses the same saved progress as notifications. Stopped history remains below import actions. Candidate version 0.5.8 / code 19 / Room v9; local checks and required CI are pending.
+Storage shows active imports above setup controls, with a live verified-file bar/count and current filename/upload percentage. Preparing files has no invented byte percentage; the overall bar counts only completed, verified files. Retry/wait/pause status uses the same saved progress as notifications. Stopped history remains below import actions. Version 0.5.8 / code 19 / Room v9 passed all 190 unit/integration and 54 native checks (27 each on Android 10 and 15). See [validation](VALIDATION.md) and [release evidence](releases/v0.5.8.json). Real phone import/background acceptance remains pending.
 
 ## Continuous background transfers and Drive ZIPs in 0.5.7
 
