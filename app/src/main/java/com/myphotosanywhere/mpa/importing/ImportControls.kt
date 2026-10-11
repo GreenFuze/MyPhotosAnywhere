@@ -204,7 +204,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
                 }
                 items(entries,key={ it.id }) { item ->
                     Row { Checkbox(item.selected,{ selected -> model.run { model.app.imports.select(item.id,selected) } },
-                        enabled=!busy && job?.state in listOf("PREVIEW","PAUSED","FAILED") && item.state !in listOf("COMPLETE","UNSUPPORTED","MATCHED","UNRESOLVED"))
+                        enabled=!busy && job?.state in listOf("PREVIEW","PAUSED","FAILED") && item.state !in listOf("COMPLETE","UNSUPPORTED","MATCHED","UNRESOLVED","INFORMATION"))
                         Column { Text(item.path.take(250)); Text("${item.state.lowercase()} · ${if(item.metadata!=null) "metadata present" else "no supplemental metadata"}",style=MaterialTheme.typography.bodySmall) }
                     }
                     item.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }

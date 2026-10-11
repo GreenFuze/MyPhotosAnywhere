@@ -196,7 +196,7 @@ class ImportRepository(private val context: Context) {
     suspend fun select(id: String, selected: Boolean) {
         val item=dao.item(id) ?: return; val job=dao.job(item.job) ?: return
         require(job.state in listOf("PREVIEW","PAUSED","FAILED")) { "Pause the import before changing selection." }
-        if(item.state !in listOf("COMPLETE","UNSUPPORTED","MATCHED","UNRESOLVED")) dao.updateItem(item.copy(selected=selected))
+        if(item.state !in listOf("COMPLETE","UNSUPPORTED","MATCHED","UNRESOLVED","INFORMATION")) dao.updateItem(item.copy(selected=selected))
     }
     suspend fun start(id: String) {
         val job=dao.job(id) ?: return
