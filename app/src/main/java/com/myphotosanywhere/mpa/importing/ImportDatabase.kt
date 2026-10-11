@@ -26,8 +26,16 @@ data class TakeoutSidecar(@PrimaryKey val key: String, val binding: String, val 
     val state: String = "PENDING", val json: String? = null, val photoId: String? = null,
     val error: String? = null)
 
+@Entity(tableName = "takeout_downloads")
+data class TakeoutDownload(@PrimaryKey val job: String, val sealedLink: String,
+    val bytes: Long = 0, val total: Long = -1, val etag: String? = null,
+    val state: String = "DOWNLOADING", val autoStart: Boolean = true, val error: String? = null)
+
 @Dao
 interface ImportDao {
+    @Query("SELECT * FROM takeout_downloads") fun observeDownloads(): Flow<List<TakeoutDownload>>
+    @Query("SELECT * FROM takeout_downloads WHERE job=:id") suspend fun download(id: String): TakeoutDownload?
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun saveDownload(download: TakeoutDownload)
     @Query("SELECT * FROM import_jobs ORDER BY created DESC") fun observeJobs(): Flow<List<ImportJob>>
     @Query("SELECT * FROM import_jobs ORDER BY created") suspend fun jobs(): List<ImportJob>
     @Query("SELECT * FROM import_jobs WHERE id=:id") suspend fun job(id: String): ImportJob?
@@ -42,6 +50,14 @@ interface ImportDao {
     @Query("SELECT * FROM takeout_sidecars WHERE key=:key") suspend fun sidecar(key: String): TakeoutSidecar?
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertSidecar(item: TakeoutSidecar)
     @Update suspend fun updateSidecar(item: TakeoutSidecar)
+}
+
+val TAKEOUT_DOWNLOAD_MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""CREATE TABLE IF NOT EXISTS takeout_downloads (job TEXT NOT NULL PRIMARY KEY,
+            sealedLink TEXT NOT NULL, bytes INTEGER NOT NULL, total INTEGER NOT NULL, etag TEXT,
+            state TEXT NOT NULL, autoStart INTEGER NOT NULL, error TEXT)""")
+    }
 }
 
 val IMPORT_MIGRATION_6_7 = object : Migration(6, 7) {

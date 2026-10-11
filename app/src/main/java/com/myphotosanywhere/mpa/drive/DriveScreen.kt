@@ -94,6 +94,7 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
                         Text(source.folderName)
                         Text(source.email,style=MaterialTheme.typography.bodySmall)
                         if(source.backupEnabled) Text("Default backup destination",style=MaterialTheme.typography.labelMedium)
+                        else if(sources.size==1) Text("Default import destination (only connected folder)",style=MaterialTheme.typography.labelMedium)
                         TextButton(enabled=!busy,onClick={ model.selectSource(source) }) { Text("Manage source") }
                     }
                 }

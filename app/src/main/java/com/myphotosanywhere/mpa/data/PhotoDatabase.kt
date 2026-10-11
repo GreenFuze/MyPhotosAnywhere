@@ -98,7 +98,8 @@ interface PhotoDao {
     CloudPhoto::class, CloudFolder::class, SyncState::class, DownloadTask::class, DriveSource::class,
     com.myphotosanywhere.mpa.drive.ScanFolder::class, com.myphotosanywhere.mpa.metadata.MetadataState::class,
     com.myphotosanywhere.mpa.importing.ImportJob::class, com.myphotosanywhere.mpa.importing.ImportItem::class,
-    com.myphotosanywhere.mpa.importing.TakeoutSidecar::class], version = 7, exportSchema = true)
+    com.myphotosanywhere.mpa.importing.TakeoutSidecar::class,
+    com.myphotosanywhere.mpa.importing.TakeoutDownload::class], version = 8, exportSchema = true)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photos(): PhotoDao
     abstract fun drive(): DriveDao

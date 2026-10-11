@@ -55,6 +55,9 @@ interface DriveDao {
     suspend fun source(key: String): DriveSource?
     @Query("SELECT * FROM drive_sources WHERE enabled = 1 AND backupEnabled = 1 LIMIT 1")
     suspend fun backupDestination(): DriveSource?
+    /** A sole connected folder is unambiguous, even when ordinary backup is paused. */
+    @Transaction
+    suspend fun importDestination(): DriveSource? = backupDestination() ?: sources().singleOrNull()
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveSource(source: DriveSource)
     @Query("UPDATE drive_sources SET backupEnabled = 0")

@@ -116,6 +116,12 @@ class TakeoutDocuments(private val context: Context) {
     }
 
     private suspend fun <T> archive(uri: Uri, block: suspend (ZipFile) -> T): T {
+        if (uri.scheme == "file") {
+            val file = File(requireNotNull(uri.path)).canonicalFile
+            val root = File(context.filesDir, "takeout-downloads").canonicalFile
+            if(file.parentFile == root && file.name.matches(Regex("[a-zA-Z0-9-]+\\.zip")))
+                return ZipFile(file).use { block(it) }
+        }
         val descriptor = resolver.openFileDescriptor(uri, "r") ?: error("Cannot open Takeout ZIP.")
         return descriptor.use {
             try { Os.lseek(it.fileDescriptor, 0, OsConstants.SEEK_CUR) } catch (_: Exception) {

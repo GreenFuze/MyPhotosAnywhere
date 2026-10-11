@@ -1,5 +1,9 @@
 # Validation status and device checklist
 
+## MPA 0.5.1 automatic destination and Takeout URL imports — in validation
+
+The feature uses Room v8, preserving v7 import jobs, upload checkpoints and existing media. New tests cover sole-folder destination without unpausing ordinary backup or retargeting existing jobs; HTTPS and redirect validation; durable HTTP range resume, changed revisions/ignored ranges, interrupted downloads, low space and size gates; HTML/expired links; and cleanup only after media commits. Android checks cover the ZIP URL chooser, Keystore link persistence and downloaded ZIP metadata/staging. Required local and CI evidence is recorded below once complete; no real-account phone result is implied.
+
 ## MPA 0.5.0 Google imports — 2026-10-11
 
 Source `d03eee08e6cdcb65e2be38900e84e0b80546f109` passed **125 unit/integration tests**, lint with **zero errors**, CPU model checks, APK assembly and **12 Android 10 (API 29) emulator tests**, with zero failures, errors or skipped cases. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38116098551) · [Device checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38116098649). The generated CI Room v7 schema matches the committed schema. Local Windows checks independently passed the same 125 tests, lint (zero errors, 34 warnings), app APK and instrumentation APK assembly using JDK 17 / SDK 35. Local device tests were not run.

@@ -26,6 +26,24 @@ class MultiSourceTest {
     @Before fun open() { db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).allowMainThreadQueries().build() }
     @After fun close() { db.close() }
 
+    @Test fun soleFolderIsAutomaticImportDestinationWithoutUnpausingOrdinaryBackup() = runBlocking<Unit> {
+        assertNull(db.drive().importDestination())
+        val a=source("alice","family"); val b=source("bob","travel")
+        db.drive().saveSource(a)
+        assertEquals(a.key,db.drive().importDestination()?.key)
+        assertNull(db.drive().backupDestination())
+        assertFalse(db.drive().source(a.key)!!.backupEnabled)
+        db.imports().saveJob(com.myphotosanywhere.mpa.importing.ImportJob("captured",a.key,"TAKEOUT"))
+        db.drive().saveSource(b)
+        assertNull(db.drive().importDestination()) // Several folders require a choice.
+        db.drive().chooseBackupDestination(b.key)
+        assertEquals(b.key,db.drive().importDestination()?.key)
+        assertEquals(a.key,db.imports().job("captured")?.binding)
+        db.drive().disconnectSource(b.key)
+        assertEquals(a.key,db.drive().importDestination()?.key)
+        assertFalse(db.drive().source(a.key)!!.backupEnabled)
+    }
+
     @Test fun browserSelectionDoesNotChangeTheSingleBackupDestinationOrExistingCheckpoint() = runBlocking {
         val a=source("alice","family"); val b=source("bob","travel")
         db.drive().saveSource(a); db.drive().saveSource(b)

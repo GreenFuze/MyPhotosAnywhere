@@ -55,6 +55,47 @@ class DeviceSmokeTest {
         compose.onNodeWithTag("import-takeout").performScrollTo().assertIsDisplayed()
     }
 
+    @Test fun takeoutOffersLocalZipAndDirectUrlWithAutomaticImport() {
+        compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+        compose.onNodeWithTag("import-takeout").performScrollTo().performClick()
+        compose.onNodeWithTag("takeout-local-zip").assertExists()
+        compose.onNodeWithTag("takeout-url").performClick()
+        compose.onNodeWithTag("takeout-url-input").assertExists().performTextInput("https://example.test/export.zip")
+        compose.onNodeWithText("Import automatically after download").assertExists()
+        compose.onNodeWithTag("takeout-url-submit").assertIsEnabled()
+        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithTag("takeout-url-input").assertDoesNotExist()
+    }
+
+    @Test fun downloadedZipUsesExistingMetadataPipelineAndKeystoreSurvivesRecreation() = runBlocking<Unit> {
+        val store=com.myphotosanywhere.mpa.importing.TakeoutArchiveStore(app)
+        val archive=store.file("owned-device").apply { parentFile!!.mkdirs() }
+        val stage=File(app.cacheDir,"owned-stage.jpg")
+        val userSource=File(app.cacheDir,"unrelated-source.zip").apply { writeBytes(byteArrayOf(7,8,9)) }
+        val vault=com.myphotosanywhere.mpa.importing.TakeoutLinkVault()
+        val link="https://example.test/export.zip?signature=secret"
+        val sealed=vault.seal(link)
+        assertFalse(sealed.contains("secret"))
+        assertEquals(link,com.myphotosanywhere.mpa.importing.TakeoutLinkVault().open(sealed))
+        try {
+            java.util.zip.ZipOutputStream(archive.outputStream()).use { zip ->
+                zip.putNextEntry(java.util.zip.ZipEntry("Album/p.jpg")); zip.write(byteArrayOf(1,2,3,4)); zip.closeEntry()
+                zip.putNextEntry(java.util.zip.ZipEntry("Album/p.jpg.json")); zip.write("{\"title\":\"p.jpg\",\"description\":\"Kept\"}".toByteArray()); zip.closeEntry()
+            }
+            val documents=com.myphotosanywhere.mpa.importing.TakeoutDocuments(app)
+            val manifest=documents.manifest("owned-device",Uri.fromFile(archive),false)
+            val media=manifest.single { it.mime=="image/jpeg" }
+            assertTrue(requireNotNull(media.metadata).contains("Kept"))
+            documents.stage(media,stage,{})
+            assertArrayEquals(byteArrayOf(1,2,3,4),stage.readBytes())
+            assertFalse(com.myphotosanywhere.mpa.importing.TakeoutArchiveStore.canClean(manifest))
+            assertTrue(com.myphotosanywhere.mpa.importing.TakeoutArchiveStore.canClean(manifest.map { if(it.id==media.id) it.copy(state="COMPLETE") else it }))
+            store.delete("owned-device"); assertFalse(archive.exists())
+            assertArrayEquals(byteArrayOf(7,8,9),userSource.readBytes())
+            try { store.file("../outside"); fail() } catch(_: IllegalArgumentException) { }
+        } finally { archive.delete(); stage.delete(); userSource.delete() }
+    }
+
     @Test fun storageShowsSavedDriveDiscoveryAndRefreshAboveSettings() = runBlocking<Unit> {
         val source=com.myphotosanywhere.mpa.drive.DriveSource.from(com.myphotosanywhere.mpa.drive.DriveConnection(
             accountId="progress-device",email="progress@test",mode="EXISTING_LIBRARY",folderId="progress-folder",folderName="Progress"))
@@ -185,7 +226,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
-        compose.onNodeWithText("MPA 0.5.0 (11)",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.5.1 (12)",substring=true).assertExists()
         val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
         assertEquals("com.myphotosanywhere.mpa",info.packageName)
         assertTrue(info.sha1.isNotEmpty())

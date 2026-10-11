@@ -36,6 +36,7 @@ class ImportModel(application: Application): AndroidViewModel(application) {
     val items=app.database.imports().observeItems().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val sidecars=app.database.imports().observeSidecars().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val sources=app.database.drive().observeSources().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
+    val downloads=app.database.imports().observeDownloads().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val busy=MutableStateFlow(false)
     val message=MutableStateFlow<String?>(null)
     private var photosEmail: String?=null
@@ -73,11 +74,19 @@ fun ImportControls(model: ImportModel=viewModel()) {
     val items by model.items.collectAsStateWithLifecycle()
     val sidecars by model.sidecars.collectAsStateWithLifecycle()
     val sources by model.sources.collectAsStateWithLifecycle()
+    val downloads by model.downloads.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
     val settings by model.app.settings.state.collectAsStateWithLifecycle()
     var preview by remember { mutableStateOf<String?>(null) }
     var targetJob by rememberSaveable { mutableStateOf<String?>(null) }
+    var chooseZip by rememberSaveable { mutableStateOf(false) }
+    var showUrl by rememberSaveable { mutableStateOf(false) }
+    // Signed download links must not enter Android's saved-state bundle.
+    var downloadUrl by remember { mutableStateOf("") }
+    var replaceLink by rememberSaveable { mutableStateOf<String?>(null) }
+    var autoImport by rememberSaveable { mutableStateOf(true) }
+    var discardZip by rememberSaveable { mutableStateOf<String?>(null) }
     fun open(uri: String) {
         try { context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(uri))) }
         catch(_: Exception) { model.message.value="Install a browser to open Google Photos, then use Open picker below." }
@@ -93,33 +102,54 @@ fun ImportControls(model: ImportModel=viewModel()) {
     val folder=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { if(it!=null) model.add(listOf(it),true,targetJob) }
     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text("Import Google Photos",style=MaterialTheme.typography.titleMedium)
-        Text("Imports go to the current default Drive destination. Sources remain untouched. Media limit: 250 MiB per file; catalogue: 10,000 assets / 2 MiB.")
+        Text("Imports go to the default Drive destination. Your only connected folder is chosen automatically. User-selected source files remain untouched. Media limit: 250 MiB per file; catalogue: 10,000 assets / 2 MiB.")
+        val destination=sources.find { it.backupEnabled } ?: sources.singleOrNull()
+        Text(destination?.let { "New import destination: ${it.folderName} (${it.email})" }
+            ?: "Connect a Drive folder, or choose a default when several folders are connected.",style=MaterialTheme.typography.bodySmall)
         Text(if(settings.sidecarBackup) "Imported metadata uses XMP annotation backup; check its backup status below."
             else "Imported metadata is local only until you enable XMP annotation backup below.",style=MaterialTheme.typography.bodySmall)
         Button(enabled=!busy,onClick={
             try { account.launch(AccountPicker.newChooseAccountIntent(AccountPicker.AccountChooserOptions.Builder().setAllowableAccountsTypes(listOf("com.google")).build())) }
             catch(_: Exception) { model.message.value="Google account selection requires Google Play services." }
         },modifier=Modifier.testTag("import-photos-picker")) { Text("Choose from Google Photos") }
-        OutlinedButton(enabled=!busy,onClick={ targetJob=null; zip.launch(arrayOf("application/zip","application/x-zip-compressed")) },modifier=Modifier.testTag("import-takeout")) { Text("Import Takeout ZIP parts") }
+        OutlinedButton(enabled=!busy,onClick={ targetJob=null; chooseZip=true },modifier=Modifier.testTag("import-takeout")) { Text("Import Takeout ZIP parts") }
         TextButton(enabled=!busy,onClick={ targetJob=null; folder.launch(null) }) { Text("Import extracted Takeout folder") }
         Text("For ZIPs, use local/USB storage. Cloud document providers may download the archive internally. Picker omits location metadata and may transcode videos.",style=MaterialTheme.typography.bodySmall)
         if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let { Text(it,color=MaterialTheme.colorScheme.error); TextButton(onClick={ model.message.value=null }) { Text("Dismiss") } }
         jobs.take(10).forEach { job ->
             val entries=items.filter { it.job==job.id }
+            val download=downloads.find { it.job==job.id }
             Text("${if(job.kind=="TAKEOUT") "Takeout" else "Photos Picker"}: ${job.state.lowercase()} · ${entries.count { it.state=="COMPLETE" }}/${entries.count { it.selected }} imported")
             Text("Destination: ${sources.find { it.key==job.binding }?.let { "${it.folderName} (${it.email})" } ?: "Disconnected original source"}",style=MaterialTheme.typography.bodySmall)
             job.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-            if(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","CANCELLED"))
+            download?.let {
+                Text(when(it.state) {
+                    "CLEANED" -> "Downloaded ZIP removed from this phone."
+                    "CLEANING" -> "Verified import complete; phone ZIP cleanup pending."
+                    "READY" -> "ZIP on phone: %.1f MiB. Removed automatically after all media is verified in Drive.".format(it.bytes/(1024.0*1024))
+                    else -> "ZIP download: %.1f MiB / %s".format(it.bytes/(1024.0*1024),if(it.total>0) "%.1f MiB".format(it.total/(1024.0*1024)) else "unknown size")
+                },style=MaterialTheme.typography.bodySmall)
+                if(job.state=="DOWNLOADING") LinearProgressIndicator(Modifier.fillMaxWidth())
+                if(it.state!="CLEANED" && job.state=="COMPLETE") {
+                    if(TakeoutArchiveStore.canClean(entries)) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.retryCleanup(job.id) } }) { Text("Retry phone ZIP cleanup") }
+                    else Text("ZIP retained for skipped or unsupported files. Review them before deleting it.",style=MaterialTheme.typography.bodySmall)
+                }
+                if(it.state!="CLEANED" && job.state !in listOf("RUNNING","DOWNLOADING")) {
+                    if(entries.isEmpty() && job.state!="CANCELLED") TextButton(enabled=!busy,onClick={ replaceLink=job.id; downloadUrl=""; showUrl=true }) { Text("Paste a fresh download link") }
+                    TextButton(enabled=!busy,onClick={ discardZip=job.id }) { Text("Delete downloaded ZIP from phone") }
+                }
+            }
+            if(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","DOWNLOADING","CANCELLED"))
                 TextButton(enabled=!busy,onClick={ targetJob=job.id; zip.launch(arrayOf("application/zip","application/x-zip-compressed")) }) { Text("Add ZIP parts to this import") }
             if(job.state=="PICKING") {
                 Text(job.email)
                 TextButton(enabled=!busy,onClick={ job.pickerUri?.let { open(it) } }) { Text("Open picker") }
                 Button(enabled=!busy,onClick={ model.run { model.app.imports.checkPicker(job.id) } }) { Text("Check completed selection") }
-            } else TextButton(enabled=!busy,onClick={ preview=job.id }) { Text("Preview selection and metadata") }
-            if(job.state !in listOf("RUNNING","PICKING","COMPLETE","CANCELLED"))
+            } else if(entries.isNotEmpty()) TextButton(enabled=!busy,onClick={ preview=job.id }) { Text("Preview selection and metadata") }
+            if(job.state !in listOf("RUNNING","DOWNLOADING","PICKING","COMPLETE","CANCELLED"))
                 Button(enabled=!busy,onClick={ model.run { model.app.imports.start(job.id) } }) { Text("Import selected / Resume") }
-            if(job.state=="RUNNING") TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id) } }) { Text("Pause import") }
+            if(job.state in listOf("RUNNING","DOWNLOADING")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id) } }) { Text("Pause import") }
             if(job.state !in listOf("COMPLETE","CANCELLED")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id,true) } }) { Text("Cancel remaining import") }
         }
         if(sidecars.isNotEmpty()) {
@@ -137,6 +167,32 @@ fun ImportControls(model: ImportModel=viewModel()) {
             }
         }
     } }
+    if(chooseZip) AlertDialog(onDismissRequest={ chooseZip=false },title={ Text("Import Takeout ZIP") },text={
+        Column {
+            Text("Choose ZIP files on your phone or USB, or let MPA download a ZIP from a URL.")
+            TextButton(onClick={ chooseZip=false; zip.launch(arrayOf("application/zip","application/x-zip-compressed")) },modifier=Modifier.testTag("takeout-local-zip")) { Text("Choose local / USB ZIP files") }
+            TextButton(onClick={ chooseZip=false; replaceLink=null; downloadUrl=""; showUrl=true },modifier=Modifier.testTag("takeout-url")) { Text("Download ZIP from URL") }
+        }
+    },confirmButton={ TextButton(onClick={ chooseZip=false }) { Text("Close") } })
+    if(showUrl) AlertDialog(onDismissRequest={ showUrl=false; downloadUrl="" },title={ Text("Download Takeout ZIP") },text={
+        Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(downloadUrl,{ downloadUrl=it },label={ Text("Direct HTTPS ZIP URL") },singleLine=true,modifier=Modifier.testTag("takeout-url-input"))
+            Text("Use a link that downloads ZIP bytes directly. Google's emailed Takeout page may need browser sign-in; download that in your browser and choose the local ZIP instead.")
+            Text("MPA needs space for the entire ZIP plus one media file. Maximum ZIP: 50 GiB. Your Drive source's network preference applies.")
+            if(replaceLink==null) Row { Checkbox(autoImport,{ autoImport=it }); Text("Import automatically after download") }
+            Text("MPA removes its downloaded ZIP after all media is verified in Drive. Skipped or unsupported media keeps the ZIP for review. Google Photos and user-selected ZIP files stay untouched.")
+        }
+    },confirmButton={
+        Button(enabled=downloadUrl.isNotBlank() && !busy,onClick={
+            val link=downloadUrl; val replacing=replaceLink; val start=autoImport
+            downloadUrl=""; showUrl=false
+            model.run { if(replacing==null) model.app.imports.addTakeoutUrl(link,start) else model.app.imports.replaceDownloadLink(replacing,link) }
+        },modifier=Modifier.testTag("takeout-url-submit")) { Text(if(replaceLink!=null) "Restart download" else if(autoImport) "Download and import" else "Download and preview") }
+    },dismissButton={ TextButton(onClick={ showUrl=false; downloadUrl="" }) { Text("Cancel") } })
+    discardZip?.let { id -> AlertDialog(onDismissRequest={ discardZip=null },title={ Text("Delete downloaded ZIP?") },text={
+        Text("This removes MPA's downloaded ZIP and unfinished transfer copies from this phone. Verified imports remain in Drive. Skipped or unfinished files will need the source ZIP again; an expired link may require a new export.")
+    },confirmButton={ TextButton(onClick={ discardZip=null; model.run { model.app.imports.discardDownloadedZip(id) } }) { Text("Delete phone ZIP") } },
+        dismissButton={ TextButton(onClick={ discardZip=null }) { Text("Keep ZIP") } }) }
     preview?.let { jobId ->
         val job=jobs.find { it.id==jobId }
         val entries=items.filter { it.job==jobId }

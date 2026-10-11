@@ -52,6 +52,10 @@ Continue implementing the agreed plan on a suitable feature branch, starting wit
 - Phone inference is preferred, on demand or scheduled while charging at night; respect pause, opt-in, heat, battery and network preferences. Individual pet recognition is still future work.
 - AI uses official ChatGPT/Gemini/Claude subscription app handoffs, without AI API keys, provider cookies/passwords or a mandatory server. Edits are linked copies.
 
+## Follow-up increment: 0.5.1
+
+The owner's next requests are automatic default selection when only one Drive folder is connected, and Takeout ZIP download by URL with processing and phone cleanup. Implemented on `feature/takeout-url-import`, version 0.5.1 / code 12 / Room v8; validation and release evidence must pass before publication. See `docs/GOOGLE_IMPORTS.md` and the top of `docs/VALIDATION.md`. A sole source is an import default without unpausing ordinary backups. URL downloads require direct HTTPS ZIP bytes; Google's browser-authenticated Takeout page is not a direct ZIP URL. Never promise cookie/sign-in automation. Remove only MPA-owned downloaded archives after verified media commits; preserve local/USB source files and incomplete/unsupported items for review. Existing released APKs and signers must remain unchanged.
+
 ## Baseline and important context
 
 Latest release: [v0.5.0](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.0), version name 0.5.0 / code 11, Room v7. Tested source `d03eee08e6cdcb65e2be38900e84e0b80546f109` passed 125 unit/integration tests, lint/model/build checks and 12 Android emulator tests. Read `docs/GOOGLE_IMPORTS.md`, `docs/releases/v0.5.0.md` and `docs/VALIDATION.md`; Picker Cloud setup was completed and verified on 2026-10-11; real-account phone acceptance remains outstanding.

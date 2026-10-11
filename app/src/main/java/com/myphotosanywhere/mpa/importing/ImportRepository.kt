@@ -22,10 +22,121 @@ class ImportRepository(private val context: Context) {
     private val lock=Mutex() // One staged media file across jobs, including retries.
     private val documents=TakeoutDocuments(context)
     private val codec=TakeoutCodec()
+    private val archives=TakeoutArchiveStore(context)
+    private val links=TakeoutLinkVault()
+
+    suspend fun addTakeoutUrl(link: String, autoStart: Boolean=true): String = withContext(Dispatchers.IO) { lock.withLock {
+        val url=link.trim(); TakeoutZipDownloader.validateLink(url)
+        val job=ImportJob(UUID.randomUUID().toString(),destination().key,"TAKEOUT",state="DOWNLOADING")
+        val sealed=links.seal(url)
+        db.withTransaction {
+            dao.saveJob(job); dao.saveDownload(TakeoutDownload(job.id,sealed,autoStart=autoStart))
+        }
+        scheduleDownload(job.id); job.id
+    } }
+
+    suspend fun replaceDownloadLink(id: String, link: String) = withContext(Dispatchers.IO) { lock.withLock {
+        val job=dao.job(id) ?: error("Import missing.")
+        val download=dao.download(id) ?: error("Download missing.")
+        require(job.state !in listOf("RUNNING","DOWNLOADING","CANCELLED") && download.state!="CLEANED" && dao.items(id).isEmpty()) {
+            "Pause the download before replacing its link. An imported archive cannot be replaced."
+        }
+        val url=link.trim(); TakeoutZipDownloader.validateLink(url)
+        // A fresh URL may serve different bytes: restart this archive before manifest creation.
+        val sealed=links.seal(url)
+        archives.delete(id)
+        db.withTransaction {
+            dao.saveDownload(TakeoutDownload(id,sealed,autoStart=download.autoStart))
+            dao.saveJob(job.copy(state="DOWNLOADING",error=null))
+        }
+        scheduleDownload(id)
+    } }
+
+    private suspend fun scheduleDownload(id: String) {
+        val job=dao.job(id) ?: return
+        val source=db.drive().source(job.binding) ?: return
+        WorkManager.getInstance(context).enqueueUniqueWork("mpa-takeout-download:$id",ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<TakeoutDownloadWorker>().setInputData(workDataOf("job" to id))
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(if(source.unmeteredOnly) NetworkType.UNMETERED else NetworkType.CONNECTED).build())
+                .addTag("mpa-import:${job.binding}").build())
+    }
+
+    suspend fun runDownload(id: String, notify: suspend (TakeoutDownload) -> Unit) = withContext(Dispatchers.IO) { lock.withLock {
+        val job=dao.job(id) ?: return@withLock
+        if(job.state!="DOWNLOADING") return@withLock
+        try {
+            suspend fun keepGoing() {
+                currentCoroutineContext().ensureActive()
+                require(dao.job(id)?.state=="DOWNLOADING" && db.drive().source(job.binding)!=null) { "Download paused or original Drive source disconnected." }
+            }
+            keepGoing()
+            var download=dao.download(id) ?: error("Download record missing.")
+            val file=archives.file(id)
+            if(download.state!="READY") download=TakeoutZipDownloader().download(links.open(download.sealedLink),file,download,
+                { dao.saveDownload(it); notify(it) },::keepGoing)
+            keepGoing()
+            val manifest=documents.manifest(id,Uri.fromFile(file),false)
+            require(manifest.isNotEmpty()) { "ZIP contains no importable entries." }
+            db.withTransaction {
+                keepGoing()
+                manifest.forEach { dao.insertItem(it) }
+                documents.match(dao.items(id)).forEach { dao.updateItem(it) }
+                dao.saveJob(job.copy(state=if(download.autoStart) "RUNNING" else "PREVIEW",error=null))
+            }
+            if(download.autoStart) schedule(id)
+        } catch(e: CancellationException) { throw e }
+        catch(e: Exception) {
+            // Network/crypto exceptions can contain signed URLs. Never persist arbitrary exception messages.
+            val message=if(e is IllegalArgumentException && !e.message.orEmpty().contains(Regex("https?://"))) e.message
+                else "ZIP download or validation failed. Resume to retry, paste a fresh direct ZIP link, or select a local ZIP."
+            dao.job(id)?.takeIf { it.state=="DOWNLOADING" }?.let { dao.saveJob(it.copy(state="FAILED",error=message)) }
+        }
+    } }
+
+    /** Called only after durable verified media commits. Metadata JSON is retained in Room. */
+    private suspend fun cleanCompletedDownload(id: String) {
+        val download=dao.download(id) ?: return
+        if(download.state=="CLEANED" || !TakeoutArchiveStore.canClean(dao.items(id))) return
+        dao.saveDownload(download.copy(state="CLEANING"))
+        try {
+            for(item in dao.items(id).filter { it.state=="COMPLETE" }) {
+                val stage=File(context.filesDir,"migration-stage/${item.id}")
+                check(!stage.exists() || stage.delete()) { "Could not remove transfer staging." }
+            }
+            archives.delete(id)
+            dao.saveDownload(download.copy(state="CLEANED",sealedLink="",error=null))
+        } catch(e: CancellationException) { throw e
+        } catch(e: Exception) {
+            dao.saveDownload(download.copy(state="CLEANING",error="Phone ZIP cleanup failed. Retry cleanup."))
+        }
+    }
+
+    suspend fun retryCleanup(id: String) = withContext(Dispatchers.IO) { lock.withLock {
+        require(dao.job(id)?.state=="COMPLETE") { "Finish this import before cleanup." }
+        cleanCompletedDownload(id)
+    } }
+
+    suspend fun discardDownloadedZip(id: String) = withContext(Dispatchers.IO) { lock.withLock {
+        val job=dao.job(id) ?: return@withLock
+        val download=dao.download(id) ?: return@withLock
+        require(job.state !in listOf("RUNNING","DOWNLOADING")) { "Pause this import before deleting its ZIP." }
+        for(item in dao.items(id)) {
+            // These are MPA's own disposable transfer copies, never local/USB source documents.
+            val stage=File(context.filesDir,"migration-stage/${item.id}")
+            check(!stage.exists() || stage.delete()) { "Could not remove unfinished transfer copy. Retry phone ZIP deletion." }
+            if(item.staged!=null) dao.updateItem(item.copy(staged=null))
+        }
+        archives.delete(id)
+        db.withTransaction {
+            dao.saveDownload(download.copy(state="CLEANED",sealedLink="",error=null))
+            dao.saveJob(job.copy(state=if(job.state=="COMPLETE") "COMPLETE" else "CANCELLED",
+                error="Downloaded ZIP removed from this phone. Verified media remains in Drive. To import remaining media, add the source ZIP again."))
+        }
+    } }
 
     suspend fun addTakeout(uris: List<Uri>, tree: Boolean=false, existing: String?=null): String = withContext(Dispatchers.IO) { lock.withLock {
         val job=existing?.let { dao.job(it) } ?: ImportJob(UUID.randomUUID().toString(),destination().key,"TAKEOUT")
-        require(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","CANCELLED")) { "Pause the existing import before adding parts." }
+        require(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","DOWNLOADING","CANCELLED")) { "Pause the existing import before adding parts." }
         val manifest=uris.flatMap { documents.manifest(job.id,it,tree) }
         require(manifest.size + dao.items(job.id).size <= 10000) { "Batch exceeds 10,000 entries." }
         db.withTransaction {
@@ -79,7 +190,7 @@ class ImportRepository(private val context: Context) {
         }
     }
 
-    private suspend fun destination() = db.drive().backupDestination()
+    private suspend fun destination() = db.drive().importDestination()
         ?: error("Choose a default Drive backup destination in Storage before importing.")
 
     suspend fun select(id: String, selected: Boolean) {
@@ -89,8 +200,15 @@ class ImportRepository(private val context: Context) {
     }
     suspend fun start(id: String) {
         val job=dao.job(id) ?: return
-        require(job.state !in listOf("PICKING","CANCELLED"))
+        require(job.state !in listOf("PICKING","DOWNLOADING","CANCELLED","COMPLETE"))
         require(db.drive().source(job.binding)!=null) { "Reconnect this import's original Drive source." }
+        val download=dao.download(id)
+        if(download!=null && (download.state !in listOf("READY","CLEANED") || (download.state=="READY" && dao.items(id).isEmpty()))) {
+            dao.saveJob(job.copy(state="DOWNLOADING",error=null)); scheduleDownload(id); return
+        }
+        if(download?.state=="CLEANED") require(dao.items(id).none {
+            it.selected && it.state!="COMPLETE" && it.uri==Uri.fromFile(archives.file(id)).toString()
+        }) { "Downloaded ZIP was removed. Start a new import for its unfinished files." }
         db.withTransaction {
             dao.items(id).filter { it.state=="FAILED" }.forEach { dao.updateItem(it.copy(state="PENDING",error=null)) }
             dao.saveJob(job.copy(state="RUNNING",error=null))
@@ -101,9 +219,12 @@ class ImportRepository(private val context: Context) {
         dao.job(id)?.let { dao.saveJob(it.copy(state=if(cancel) "CANCELLED" else "PAUSED",
             error=if(cancel) "Verified imports remain in Drive. Unfinished source files and any staged bytes are preserved." else null)) }
         WorkManager.getInstance(context).cancelUniqueWork("mpa-import:$id")
+        WorkManager.getInstance(context).cancelUniqueWork("mpa-takeout-download:$id")
     }
     suspend fun resumePending() {
         dao.jobs().filter { it.state=="RUNNING" }.forEach { schedule(it.id) }
+        dao.jobs().filter { it.state=="DOWNLOADING" }.forEach { scheduleDownload(it.id) }
+        dao.jobs().filter { it.state=="COMPLETE" }.forEach { retryCleanup(it.id) }
     }
     private suspend fun schedule(id: String, append: Boolean=false) {
         val job=dao.job(id) ?: return; val source=db.drive().source(job.binding) ?: return
@@ -123,7 +244,9 @@ class ImportRepository(private val context: Context) {
         }
         var item=dao.items(id).firstOrNull { it.selected && it.state in listOf("PENDING","STAGING","UPLOADING","VERIFIED") }
         if(item==null) {
-            dao.saveJob(job.copy(state=if(dao.items(id).any { it.selected && it.state=="FAILED" }) "FAILED" else "COMPLETE"))
+            val failed=dao.items(id).any { it.selected && it.state=="FAILED" }
+            dao.saveJob(job.copy(state=if(failed) "FAILED" else "COMPLETE"))
+            if(!failed) cleanCompletedDownload(id)
             return@withLock false
         }
         val initial=requireNotNull(item)
