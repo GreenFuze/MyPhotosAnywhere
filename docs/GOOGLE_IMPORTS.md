@@ -26,6 +26,14 @@ For a current DNS failure, try another working Wi-Fi network and inspect any VPN
 
 All 160 unit/integration and 42 native checks (21 each on Android 10 and 15) passed. See [validation](VALIDATION.md) and [release evidence](releases/v0.5.4.json). The owner supplied an MP4 `staging` screenshot and a Google API hostname-resolution error on 0.5.2; real-phone recovery remains to be checked.
 
+## Dismissing previous import errors in 0.5.5
+
+Stopped imports with saved job, file or historical download errors offer **Dismiss errors** in Storage. This clears those saved messages and the import's summary notification, including messages in its preview. The dismissal survives app restarts. It retains import history/status, selection, destination, source ZIP access, staged files, reserved IDs, upload sessions, acknowledged offsets and verified media. A failed import stays failed and **Import selected / Resume** remains available; dismissal does not retry, cancel or delete anything. A later failure is shown again.
+
+Active imports and downloads keep their current messages; pause first to dismiss them. The database transaction rechecks the state so a job resumed since the button appeared cannot have its current errors cleared. Drive metadata-conversion review messages are separate from import-job errors.
+
+Development and CI checks are pending; no 0.5.5 release is claimed yet. Real-phone acceptance remains pending.
+
 ## Import destinations and controls
 
 In Storage, connect a writable Drive folder. When exactly one folder is connected, it is automatically the default import destination, even if ordinary backup is paused. With several connected folders, select **Use as default backup destination** on the intended folder. Automatic import destination selection does not enable ordinary local-media backup. Each new import captures this account/folder permanently. Changing the default affects future jobs only. Disconnecting its source pauses an import; reconnect the original source to resume it.

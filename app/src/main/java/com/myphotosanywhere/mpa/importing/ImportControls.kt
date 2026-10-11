@@ -147,6 +147,9 @@ fun ImportControls(model: ImportModel=viewModel()) {
             Text("${if(job.kind=="TAKEOUT") "Takeout" else "Photos Picker"}: ${job.state.lowercase()} · ${entries.count { it.state=="COMPLETE" }}/${entries.count { it.selected }} imported")
             Text("Destination: ${sources.find { it.key==job.binding }?.let { "${it.folderName} (${it.email})" } ?: "Disconnected original source"}",style=MaterialTheme.typography.bodySmall)
             job.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+            if(ImportErrorDismissal.canDismiss(job) && ImportErrorDismissal.hasErrors(job,entries,download))
+                TextButton(enabled=!busy,onClick={ model.run { model.app.imports.dismissErrors(job.id) } },
+                    modifier=Modifier.testTag("dismiss-import-errors:${job.id}")) { Text("Dismiss errors") }
             download?.let {
                 Text(when(it.state) {
                     "CLEANED" -> "Downloaded ZIP removed from this phone."

@@ -1,5 +1,9 @@
 # Validation status and device checklist
 
+## MPA 0.5.5 dismiss previous import errors — 2026-10-11
+
+Development checks are in progress; no 0.5.5 release is claimed yet. Version 0.5.5 / code 16 preserves Room v8. Stopped imports can dismiss persisted job/item/download error messages and their summary notification without altering status or any upload/source checkpoint. Database regressions cover actual database reopen, exact checkpoint retention, other-job isolation, active-job protection and fresh errors. Native UI checks exercise the Storage button, notification dismissal, activity recreation, preserved source/staging files and fresh errors returning on both API 29 and 35. Real-phone acceptance remains pending.
+
 ## MPA 0.5.4 Drive connection recovery — 2026-10-11
 
 Source `280783727321a207323f39c60876891fe8f50d7c` passed **160 unit/integration tests**, lint with **zero errors**, CPU model checks, app assembly and **21 native tests on each of Android 10/API 29 and Android 15/API 35 (42 total)**, with zero failures/errors/skips. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38149409109) · [Android 10 and 15 checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38149409106). Local Windows checks passed all 160 tests, lint and both APK builds; local device tests were not run. CI Room v8 matches the committed schema.

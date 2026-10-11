@@ -118,6 +118,49 @@ class DeviceSmokeTest {
         }
     }
 
+    @Test fun stoppedImportErrorsCanBeDismissedAndFreshFailuresReappear() {
+        allowImportNotifications()
+        val id="dismiss-device-test"
+        val dao=app.database.imports()
+        val stage=File(app.cacheDir,"dismiss-device-stage").apply { writeBytes(byteArrayOf(1,2,3)) }
+        val source=File(app.cacheDir,"dismiss-device-source.zip").apply { writeBytes(byteArrayOf(4,5,6)) }
+        val job=com.myphotosanywhere.mpa.importing.ImportJob(id,"original-destination","TAKEOUT",state="FAILED",error="Old import error")
+        val item=com.myphotosanywhere.mpa.importing.ImportItem("dismiss-device-item",id,Uri.fromFile(source).toString(),"clip.mp4","clip.mp4","video/mp4",100,
+            state="FAILED",error="Old item error",remoteId="reserved",sessionUri="session",offset=42,staged=stage.absolutePath,sha256="sha",md5="md5")
+        val download=com.myphotosanywhere.mpa.importing.TakeoutDownload(id,"encrypted-link",bytes=100,total=500,state="READY",error="Old download error")
+        val notices=com.myphotosanywhere.mpa.importing.ImportNotifications(app)
+        val notifications=app.getSystemService(android.app.NotificationManager::class.java)
+        try {
+            runBlocking { dao.saveJob(job); dao.insertItem(item); dao.saveDownload(download) }
+            notices.finish(id,com.myphotosanywhere.mpa.importing.ImportProgress.from(job,listOf(item)))
+            compose.waitUntil(5000) { notifications.activeNotifications.any { it.tag==id } }
+            compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+            compose.onNodeWithTag("dismiss-import-errors:$id").performScrollTo().performClick()
+            compose.waitUntil(5000) { runBlocking { dao.job(id)?.error==null } }
+            compose.onNodeWithTag("dismiss-import-errors:$id").assertDoesNotExist()
+            compose.waitUntil(5000) { notifications.activeNotifications.none { it.tag==id } }
+            runBlocking {
+                assertEquals(job.copy(error=null),dao.job(id))
+                assertEquals(item.copy(error=null),dao.item(item.id))
+                assertEquals(download.copy(error=null),dao.download(id))
+            }
+            assertTrue(source.isFile); assertTrue(stage.isFile)
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithText("Storage",useUnmergedTree=true).performClick()
+            compose.onNodeWithTag("dismiss-import-errors:$id").assertDoesNotExist()
+            runBlocking { dao.saveJob(job.copy(error="Fresh import error")) }
+            compose.waitUntil(5000) { compose.onAllNodesWithTag("dismiss-import-errors:$id").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("dismiss-import-errors:$id").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Fresh import error").assertIsDisplayed()
+        } finally {
+            notices.clearSummary(id)
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM import_items WHERE job=?",arrayOf(id))
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM takeout_downloads WHERE job=?",arrayOf(id))
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM import_jobs WHERE id=?",arrayOf(id))
+            source.delete(); stage.delete()
+        }
+    }
+
     @Test fun takeoutZipStreamsOneEntryAndKeepsSupplementalMetadata() = runBlocking<Unit> {
         val archive=File(app.cacheDir,"synthetic-takeout.zip")
         val staged=File(app.cacheDir,"synthetic-stage.jpg")
@@ -330,7 +373,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
-        compose.onNodeWithText("MPA 0.5.4 (15)",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.5.5 (16)",substring=true).assertExists()
         val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
         assertEquals("com.myphotosanywhere.mpa",info.packageName)
         assertTrue(info.sha1.isNotEmpty())

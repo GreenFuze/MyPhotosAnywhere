@@ -215,6 +215,9 @@ class ImportRepository(private val context: Context) {
         }
         schedule(id)
     }
+    suspend fun dismissErrors(id: String) {
+        if(ImportErrorDismissal(db).dismiss(id)) ImportNotifications(context).clearSummary(id)
+    }
     suspend fun pause(id: String, cancel: Boolean=false) {
         dao.job(id)?.let { dao.saveJob(it.copy(state=if(cancel) "CANCELLED" else "PAUSED",
             error=if(cancel) "Verified imports remain in Drive. Unfinished source files and any staged bytes are preserved." else null)) }

@@ -33,6 +33,9 @@ data class TakeoutDownload(@PrimaryKey val job: String, val sealedLink: String,
 
 @Dao
 interface ImportDao {
+    @Query("UPDATE import_jobs SET error=NULL WHERE id=:id") suspend fun clearJobError(id: String)
+    @Query("UPDATE import_items SET error=NULL WHERE job=:id") suspend fun clearItemErrors(id: String)
+    @Query("UPDATE takeout_downloads SET error=NULL WHERE job=:id") suspend fun clearDownloadError(id: String)
     @Query("UPDATE import_jobs SET state=:state,error=:message WHERE id=:id AND state='RUNNING'")
     suspend fun connectionState(id: String, state: String, message: String): Int
     @Query("SELECT * FROM import_jobs WHERE id=:id") fun observeJob(id: String): Flow<ImportJob?>
