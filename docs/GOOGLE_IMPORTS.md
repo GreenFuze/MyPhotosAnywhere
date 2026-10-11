@@ -1,6 +1,6 @@
 # Google Photos imports and Takeout metadata conversion
 
-Implemented in MPA 0.5.0 / version code 11, Room v7. Local checks and required CI passed on the immutable source recorded in [release evidence](releases/v0.5.0.json). Real-account phone acceptance and Google Cloud Picker configuration remain unconfirmed.
+Implemented in MPA 0.5.0 / version code 11, Room v7. Local checks and required CI passed on the immutable source recorded in [release evidence](releases/v0.5.0.json). Google Cloud Picker configuration was completed and verified on 2026-10-11 in the existing `myphotosanywhere` project. Real-account phone acceptance remains outstanding.
 
 ## Import destinations and controls
 
@@ -14,7 +14,9 @@ The staging path holds one active media transfer. SHA-256 and length identify ex
 
 ## Google Photos Picker setup and use
 
-In the existing Google Cloud project:
+Verified on 2026-10-11: Google Photos Picker API is enabled, the Picker scope below is saved, and the existing Android client matches the released package/certificate. The app remains External / Testing with its existing test user. Drive scopes and both Android clients were preserved. This setup applies to the existing 0.5.0 APK.
+
+For another project or a future setup:
 
 1. Enable **Google Photos Picker API** alongside Drive API.
 2. Add `https://www.googleapis.com/auth/photospicker.mediaitems.readonly` to the app's consent/data access setup. Keep development users in the test-user list.
