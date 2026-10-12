@@ -111,7 +111,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val timelineMessage by timeline.message.collectAsStateWithLifecycle()
     LaunchedEffect(tab,selectedId,viewerId,pendingViewKey,editorId) {
         val legacy=tab!=0 || selectedId!=null || viewerId!=null || pendingViewKey!=null || editorId!=null
-        model.legacyLoading(legacy);features.legacyLoading(legacy)
+        model.legacyLoading(tab!=0 || viewerId!=null || pendingViewKey!=null);features.legacyLoading(legacy)
     }
     var jumpToDate by rememberSaveable { mutableStateOf(false) }
     val photosGrid=rememberLazyGridState()
@@ -140,7 +140,27 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { features.resumeForegroundImports(); features.refreshCloudAutomatically() }
     LaunchedEffect(sources.map { it.key }) { if(sources.isNotEmpty()) features.refreshCloudAutomatically() }
     val presence=remember(cloud,sources,sourceKey) { GalleryVisibility.Index(cloud.filter { sourceKey==null || it.bindingKey==sourceKey },sources.map { it.key }.toSet()) }
-    val selected=photos.find { it.id==selectedId }
+    var selectedAttempt by remember(selectedId) { mutableIntStateOf(0) }
+    var selectedProblem by remember(selectedId) { mutableStateOf<String?>(null) }
+    val selected by produceState<Photo?>(null,selectedId,selectedAttempt) {
+        val id=selectedId
+        selectedProblem=null
+        if(id!=null) try {
+            features.app.timeline.photo(id).collect {
+                value=it
+                selectedProblem=if(it==null) "This photo is no longer available." else null
+            }
+        } catch(cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch(error: android.database.sqlite.SQLiteException) {
+            selectedProblem=error.message ?: "Cannot read this photo. Retry."
+        }
+    }
+    if(selectedId!=null && selected==null && editorId==null && viewerId==null && pendingViewKey==null) {
+        AlertDialog(onDismissRequest={ selectedId=null },title={ Text("Photo details") },
+            text={ Text(selectedProblem ?: "Loading photo details…") },
+            confirmButton={ if(selectedProblem!=null) TextButton(onClick={ selectedAttempt++ }) { Text("Retry") } },
+            dismissButton={ TextButton(onClick={ selectedId=null }) { Text("Close") } })
+    }
     val localIds=remember(photos) { photos.map { it.id }.toSet() }
     val cloudByPhoto=remember(cloud,sources,sourceKey) {
         val enabled=sources.map { it.key }.toSet()

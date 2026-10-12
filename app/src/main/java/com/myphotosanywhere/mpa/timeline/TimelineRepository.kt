@@ -98,11 +98,14 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
 
     internal fun accepts(query: TimelineQuery,entry: TimelineEntry)=query.filter!="Offline" || originalExists(entry.originalPath)
 
-    fun media(entry: TimelineEntry)=callbackFlow {
+    private fun changes()=callbackFlow {
         val observation=observe { trySend(Unit) }
         trySend(Unit)
         awaitClose { observation.close() }
-    }.conflate().map { resolve(entry) }
+    }.conflate()
+
+    fun media(entry: TimelineEntry)=changes().map { resolve(entry) }
+    fun photo(id: String)=changes().map { withContext(Dispatchers.IO) { database.photos().find(id) } }
 
     suspend fun originalAvailable(media: TimelineMedia)=withContext(Dispatchers.IO) {
         media.photo?.originalPath?.let(originalExists) ?: false
