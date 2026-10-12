@@ -2,7 +2,7 @@ package com.myphotosanywhere.mpa.library
 
 import kotlin.math.abs
 
-/** One-finger downward details drag; a zoom, horizontal page swipe or second pointer owns its gesture. */
+/** One-finger upward details drag; a zoom, horizontal page swipe or second pointer owns its gesture. */
 internal class ViewerDetailsGesture(private val distance: Float,private val slop: Float) {
     private enum class Owner { UNDECIDED, DETAILS, OTHER }
     private var owner=Owner.UNDECIDED
@@ -16,9 +16,9 @@ internal class ViewerDetailsGesture(private val distance: Float,private val slop
         if(owner==Owner.OTHER) return false
         x+=dx;y+=dy
         if(owner==Owner.UNDECIDED && maxOf(abs(x),abs(y))>slop) {
-            owner=if(y>0 && abs(y)>abs(x)) Owner.DETAILS else Owner.OTHER
+            owner=if(y<0 && abs(y)>abs(x)) Owner.DETAILS else Owner.OTHER
         }
         return owner==Owner.DETAILS
     }
-    fun finish()=owner==Owner.DETAILS && y>=distance
+    fun finish()=owner==Owner.DETAILS && -y>=distance
 }

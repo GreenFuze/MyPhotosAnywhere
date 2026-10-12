@@ -88,10 +88,12 @@ class ViewerDetailsDeviceTest {
         }
     }
 
-    @Test fun downwardDetailsGestureDoesNotStealHorizontalPagingOrZoomedPan() {
+    @Test fun upwardDetailsGestureDoesNotStealHorizontalPagingOrZoomedPan() {
         Fixture("gesture").use { fixture ->
             fixture.open()
             currentImage().performTouchInput { swipeDown() }
+            compose.onNodeWithTag("photo-details").assertDoesNotExist()
+            currentImage().performTouchInput { swipeUp() }
             waitTag("photo-details")
             compose.onNodeWithTag("photo-details-close").performClick();waitGone("photo-details")
             currentImage().performTouchInput { swipeLeft() }
@@ -100,11 +102,11 @@ class ViewerDetailsDeviceTest {
             currentImage().performTouchInput {
                 pinch(Offset(center.x-30,center.y),Offset(center.x+30,center.y),Offset(center.x-100,center.y),Offset(center.x+100,center.y))
             }
-            currentImage().performTouchInput { swipeDown() }
+            currentImage().performTouchInput { swipeUp() }
             compose.onNodeWithTag("photo-details").assertDoesNotExist()
             compose.onNodeWithText(fixture.photos[1].displayName).assertExists()
             currentImage().performTouchInput { doubleClick() }
-            currentImage().performTouchInput { swipeDown() }
+            currentImage().performTouchInput { swipeUp() }
             waitTag("photo-details")
             compose.onNodeWithTag("viewer-screen").assertExists()
             compose.onNodeWithTag("photo-details-close").performClick();waitGone("photo-details")
