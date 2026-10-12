@@ -142,7 +142,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val presence=remember(cloud,sources,sourceKey) { GalleryVisibility.Index(cloud.filter { sourceKey==null || it.bindingKey==sourceKey },sources.map { it.key }.toSet()) }
     var selectedAttempt by remember(selectedId) { mutableIntStateOf(0) }
     var selectedProblem by remember(selectedId) { mutableStateOf<String?>(null) }
-    val selected by produceState<Photo?>(null,selectedId,selectedAttempt) {
+    val selectedState=produceState<Photo?>(null,selectedId,selectedAttempt) {
         val id=selectedId
         selectedProblem=null
         if(id!=null) try {
@@ -155,6 +155,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             selectedProblem=error.message ?: "Cannot read this photo. Retry."
         }
     }
+    val selected=selectedState.value
     if(selectedId!=null && selected==null && editorId==null && viewerId==null && pendingViewKey==null) {
         AlertDialog(onDismissRequest={ selectedId=null },title={ Text("Photo details") },
             text={ Text(selectedProblem ?: "Loading photo details…") },
