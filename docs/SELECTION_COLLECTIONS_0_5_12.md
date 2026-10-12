@@ -1,4 +1,4 @@
-# MPA 0.5.12 — selection and Collections
+# MPA 0.5.12 - selection and Collections
 
 This increment corrects Photo Details to open with **swipe up**. Swipe down does not open Details. The visible Details button remains available; zoomed pan, horizontal paging, decoding limits and lifecycle protections are preserved.
 
@@ -16,3 +16,7 @@ This increment corrects Photo Details to open with **swipe up**. Swipe down does
 Room schema remains 9. No import, download, recognition, map, editor, original-decoder or source-removal engine is rewritten. Recoverable IO/database failures have explicit results; invalid internal identities and impossible action combinations fail fast.
 
 Regression coverage includes mixed remote/local results, source-scoped identity, representation transitions, rotations/import insertions, album removal without deletion, archive/restore, offline queue provenance, share bytes/missing files/cancellation, bounded covers, accessible selection, contextual clearance and large-font light/dark/RTL controls. Existing full CI, API 29/35/37 native checks and 10k/100k timeline benchmarks gate publication of one immutable application revision. S23 Ultra acceptance and the previously reported JPEG crash remain unverified.
+
+## Final publication evidence
+
+The immutable application and exact signed CI APK passed the release gates. [0.5.12 evidence and remaining phone acceptance](releases/v0.5.12.md). Release metadata changes no application, toolchain or workflow files.
