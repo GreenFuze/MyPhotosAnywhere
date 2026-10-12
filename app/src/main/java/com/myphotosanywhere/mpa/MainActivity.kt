@@ -14,6 +14,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
@@ -124,6 +125,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val snackbar=remember { SnackbarHostState() }
     val context=LocalContext.current
     val keyboard=LocalSoftwareKeyboardController.current
+    val focusManager=LocalFocusManager.current
     val addPhotos=rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(100)) { model.importPhotos(it) }
     val importResult=rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if(uri!=null) resultHandoffId?.let { model.importResult(uri,it) }; resultHandoffId=null
@@ -134,6 +136,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     fun pickResult(handoff: Handoff) { resultHandoffId=handoff.id; importResult.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
     fun selectPhoto(id: String) { selectedId=id; showShare=false }
     fun viewPhoto(photo: Photo) {
+        focusManager.clearFocus(force=true);keyboard?.hide()
         selectedId=photo.id;showShare=false
         if(photo.originalPath.isNotBlank() && File(photo.originalPath).isFile) viewerId=photo.id
         else cloud.find { it.photoId==photo.id && !it.removed && sources.any { source -> source.key==it.bindingKey } }?.let {
@@ -219,7 +222,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                 5 -> {
                     val galleryQuery=if(tab==5) query else ""
                     if(tab==5) OutlinedTextField(query,{ query=it },label={ Text("Search your photos") },singleLine=true,
-                        keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={ keyboard?.hide() }),
+                        keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={ focusManager.clearFocus(force=true);keyboard?.hide() }),
                         modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp).testTag("search:query"))
                     ShellImportActivity(onOpen={ navigation.open(ShellDestination.STORAGE) })
                     val sourcesByKey=sources.associateBy { it.key }

@@ -26,3 +26,5 @@ CI requires the existing strict compiler/lint/build gates and native checks on A
 The already approved AGP/Gradle deprecation and documented emulator infrastructure diagnostics remain the only tooling exceptions. No lint baseline or warning suppression is added.
 
 Samsung Galaxy S23 Ultra acceptance and the previously reported JPEG crash remain unverified. Emulator tests do not establish the cause or resolution of that real-device crash.
+
+Release gate follow-up: Paging is pinned to stable 3.5.3 (October 12 patch, page-retention/separator fixes), after CI correctly rejected the newly superseded 3.5.2. Search clears input focus when submitting/opening a viewer; its Back regression waits for the asynchronous IME dismissal before asserting sheet dismissal. No warning severity changes.

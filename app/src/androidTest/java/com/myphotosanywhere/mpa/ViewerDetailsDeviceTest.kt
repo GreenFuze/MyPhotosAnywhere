@@ -119,6 +119,12 @@ class ViewerDetailsDeviceTest {
             compose.onNodeWithTag("search:query").performImeAction()
             waitTag("photo:${fixture.photos[0].id}")
             compose.onNodeWithTag("photo:${fixture.photos[0].id}").performClick();waitTag("viewer-screen")
+            // IME hide is asynchronous; Back must reach Details after the search
+            // keyboard has actually left the window, rather than dismiss the IME.
+            compose.waitUntil(10000) {
+                !androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+                    .let { it?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())==true }
+            }
             compose.onNodeWithTag("viewer-details").performClick();waitTag("photo-details")
             compose.onNodeWithTag("details:source").assertExists()
             Espresso.pressBack();waitGone("photo-details")
