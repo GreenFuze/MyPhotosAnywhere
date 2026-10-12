@@ -9,7 +9,12 @@ import com.myphotosanywhere.mpa.timeline.TimelineEntry
 internal data class SelectionTarget(val key: String,val name: String,val photoId: String?,val cloudKey: String?,
     val bytes: Long,val sha256: String?,val md5: String?,val version: String?) {
     init { require(key==photoId?.let { "photo:$it" } || photoId==null && key==cloudKey?.let { "cloud:$it" }) }
-    fun matches(other: SelectionTarget)=key==other.key || cloudKey!=null && cloudKey==other.cloudKey
+    fun matches(other: SelectionTarget)=key==other.key || (photoId==null || other.photoId==null) &&
+        cloudKey!=null && cloudKey==other.cloudKey && bytes==other.bytes && when {
+            !sha256.isNullOrBlank() && !other.sha256.isNullOrBlank() -> sha256==other.sha256
+            md5!=null && other.md5!=null -> md5==other.md5
+            else -> version==other.version
+        }
     fun accepts(row: CloudPhoto)=!row.removed && row.bytes==bytes && when {
         !sha256.isNullOrBlank() && !row.sha256.isNullOrBlank() -> sha256==row.sha256
         md5!=null && row.md5!=null -> md5==row.md5

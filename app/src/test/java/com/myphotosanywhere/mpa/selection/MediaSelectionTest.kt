@@ -14,12 +14,16 @@ class MediaSelectionTest {
     }
     @Test fun verifiedRepresentationChangeDoesNotDuplicateSelection() {
         val selected=MediaSelection(listOf(remote()))
-        val linked=local("downloaded").copy(cloudKey="a:b")
+        val linked=local("downloaded").copy(cloudKey="a:b",md5="md5",version="1")
         assertTrue(selected.contains(linked));selected.toggle(linked);assertTrue(selected.snapshot().isEmpty())
     }
     @Test fun sourcesWithSameRemoteIdRemainDistinct() {
         val selected=MediaSelection(listOf(remote()))
         selected.toggle(remote().copy(key="cloud:other:b",cloudKey="other:b"));assertEquals(2,selected.snapshot().size)
+    }
+    @Test fun differentLocalIdentitiesDoNotMatchThroughAReboundCloudKey() {
+        assertFalse(local("one").copy(cloudKey="a:b").matches(local("two").copy(cloudKey="a:b")))
+        assertFalse(remote().matches(local("changed").copy(cloudKey="a:b",md5="different",version="2")))
     }
     @Test fun retainedSelectionIsBoundedAndLimitIsExplicit() {
         val selected=MediaSelection((0 until MediaSelection.MAX_ITEMS).map { local("$it") })
