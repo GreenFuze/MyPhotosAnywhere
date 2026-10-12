@@ -335,16 +335,22 @@ class DeviceSmokeTest {
             compose.onNodeWithTag("shell:filters").performClick()
             compose.onNodeWithText("A · a@test").performScrollTo().performClick()
             compose.onNodeWithText("Done").performScrollTo().performClick()
+            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${ids[0]}").fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodesWithTag("photo:${ids[1]}").fetchSemanticsNodes().isEmpty() }
             compose.onNodeWithTag("photo:${ids[0]}").assertExists()
             compose.onNodeWithTag("photo:${ids[1]}").assertDoesNotExist()
             compose.onNodeWithTag("shell:filters").performClick()
             compose.onNodeWithText("B · b@test").performScrollTo().performClick()
             compose.onNodeWithText("Done").performScrollTo().performClick()
+            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${ids[1]}").fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodesWithTag("photo:${ids[0]}").fetchSemanticsNodes().isEmpty() }
             compose.onNodeWithTag("photo:${ids[1]}").assertExists()
             compose.onNodeWithTag("photo:${ids[0]}").assertDoesNotExist()
             compose.onNodeWithTag("shell:filters").performClick()
             compose.onNodeWithText("All sources").performScrollTo().performClick()
             compose.onNodeWithText("Done").performScrollTo().performClick()
+            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${ids[0]}").fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodesWithTag("photo:${ids[1]}").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("photo:${ids[0]}").assertExists()
             compose.onNodeWithTag("photo:${ids[1]}").assertExists()
         } finally {

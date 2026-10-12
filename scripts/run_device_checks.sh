@@ -25,4 +25,8 @@ if adb pull /sdcard/Download/MPA "$mpa_screenshots/raw"; then
 elif [[ "$mpa_test_status" == 0 ]]; then
   exit 1
 fi
+if [[ "$mpa_test_status" == 0 && ! -f "$mpa_screenshots/raw/timeline-benchmark.json" ]]; then
+  printf 'Missing required native timeline benchmark evidence\n' >&2
+  exit 1
+fi
 exit "$mpa_test_status"
