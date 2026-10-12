@@ -1,7 +1,8 @@
 package com.myphotosanywhere.mpa.timeline
 
 import android.database.sqlite.SQLiteDatabase
-import androidx.room.withTransaction
+import androidx.room.useReaderConnection
+import androidx.room.Transactor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -57,7 +58,8 @@ internal class ViewerSessionStore(private val directory: File,private val reposi
                 thumbnailUpdatedAt INTEGER NOT NULL,bytes INTEGER NOT NULL,sha256 TEXT,md5 TEXT,version TEXT,bindingKey TEXT,remoteId TEXT)""")
             var count=0
             var initial=-1
-            repository.database.withTransaction {
+            repository.database.useReaderConnection { reader ->
+                reader.withTransaction(Transactor.SQLiteTransactionType.DEFERRED) {
                 // Capture a verified representation transition before reading the same source snapshot.
                 val currentCloud=selected.cloudKey?.let { repository.database.cloud().photo(it) }
                 val replacement=if(selected.photoId==null && currentCloud?.photoId!=null &&
@@ -101,6 +103,7 @@ internal class ViewerSessionStore(private val directory: File,private val reposi
                         } finally { if(transaction) index.endTransaction() }
                     }
                 }
+            }
             }
             currentCoroutineContext().ensureActive()
             if(initial<0) throw ViewerPreparationException("This photo is no longer in the selected view. Its preview remains available; return to the gallery or retry.")

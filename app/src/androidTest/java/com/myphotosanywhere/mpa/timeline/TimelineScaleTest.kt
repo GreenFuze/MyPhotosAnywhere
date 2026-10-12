@@ -64,8 +64,24 @@ class TimelineScaleTest {
                 val aroundMillis=(System.nanoTime()-started)/1000000.0
                 assertEquals(90,around.size);assertEquals(90,around.map { it.key }.toSet().size)
                 started=System.nanoTime()
-                val session=ViewerSessionStore(directory,repository).prepare(query,around[45])
+                val preparation=async(Dispatchers.IO) { ViewerSessionStore(directory,repository).prepare(query,around[45]) }
+                var snapshotImportMillis=0.0
+                if(size==100000) {
+                    // A written index page proves the source snapshot has begun.
+                    withTimeout(30000) {
+                        while(directory.listFiles().orEmpty().sumOf { it.length() }<128*1024L && !preparation.isCompleted) delay(5)
+                    }
+                    assertFalse("Scale fixture must exercise an active source snapshot",preparation.isCompleted)
+                    val writeStarted=System.nanoTime()
+                    withContext(Dispatchers.IO) {
+                        database.openHelper.writableDatabase.execSQL("UPDATE cloud_photos SET capturedAt=? WHERE `key`=?",arrayOf<Any>(size+2,"scale:scale-000003"))
+                    }
+                    snapshotImportMillis=(System.nanoTime()-writeStarted)/1000000.0
+                    assertFalse("A read snapshot must not hold the import writer until indexing finishes",preparation.isCompleted)
+                }
+                val session=preparation.await()
                 val snapshotMillis=(System.nanoTime()-started)/1000000.0
+                assertEquals("Snapshot must retain the order before the concurrent import",first.first().key,session.entry(0).key)
                 val selected=session.entry(session.initialPage)
                 assertEquals(around[45].key,selected.key);assertEquals(size,session.count)
                 val import=async(Dispatchers.IO) {
@@ -80,7 +96,7 @@ class TimelineScaleTest {
                 assertEquals(9,database.openHelper.readableDatabase.version)
                 val memoryAfter=Debug.getPss()
                 results.put(JSONObject().put("items",size).put("firstPageMs",firstMillis).put("seekMs",seekMillis)
-                    .put("aroundPageMs",aroundMillis).put("snapshotMs",snapshotMillis).put("duringImportMs",duringImportMillis)
+                    .put("aroundPageMs",aroundMillis).put("snapshotMs",snapshotMillis).put("duringImportMs",duringImportMillis).put("snapshotImportMs",snapshotImportMillis)
                     .put("pssBeforeKb",memoryBefore).put("pssAfterKb",memoryAfter)
                     .put("pageBudget",TimelinePagingSource.CONFIG.maxSize).put("pageRows",90)
                     .put("indexBytes",directory.listFiles().orEmpty().sumOf { it.length() }))
