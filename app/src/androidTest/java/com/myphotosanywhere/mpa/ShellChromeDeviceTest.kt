@@ -64,12 +64,13 @@ class ShellChromeDeviceTest {
             val target=compose.onNodeWithTag("nav:${destination.title}")
             target.assertIsDisplayed().performClick().assertIsSelected()
             compose.waitForIdle()
+            saveScreenshot(name)
             assertEquals(destination,selected.value)
             for(label in listOf("Photos","Collections")) {
                 val layouts=mutableListOf<TextLayoutResult>()
                 compose.onNodeWithText(label).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
                 assertEquals("Navigation label stays on one line",1,layouts.single().lineCount)
-                assertFalse("Navigation label is not clipped",layouts.single().hasVisualOverflow)
+                assertFalse("Navigation label is not clipped: selected=$destination label=$label size=${layouts.single().size} width=${layouts.single().didOverflowWidth} height=${layouts.single().didOverflowHeight} lineWidth=${layouts.single().getLineRight(0)-layouts.single().getLineLeft(0)}",layouts.single().hasVisualOverflow)
             }
             val bounds=listOf("Photos","Collections","Search").map { label ->
                 compose.onNodeWithTag("nav:$label").assertIsDisplayed().fetchSemanticsNode().boundsInRoot

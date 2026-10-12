@@ -40,7 +40,8 @@ jobs:
             # Keep offline browsing checks independent of authentication/network error timing.
             adb shell svc wifi disable
             adb shell svc data disable
-            ./gradlew connectedDebugAndroidTest --no-daemon
+            test_status=0
+            ./gradlew connectedDebugAndroidTest --no-daemon || test_status=$?
             mkdir -p app/build/reports/androidTests/screenshots
             adb pull /sdcard/Download/MPA/device-preview.png app/build/reports/androidTests/screenshots/mpa-edit.png
             adb pull /sdcard/Download/MPA/import-preview.png app/build/reports/androidTests/screenshots/mpa-import.png
@@ -48,6 +49,7 @@ jobs:
             for variant in light dark large rtl; do
               adb pull /sdcard/Download/MPA/shell-navigation-$variant.png app/build/reports/androidTests/screenshots/mpa-navigation-$variant.png
             done
+            exit "$test_status"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
