@@ -243,6 +243,20 @@ class SelectionDeviceTest {
         }
     }
 
+
+    @Test fun offlineCoverSamplingIsBoundedEvenWhenEveryRecordedOriginalIsMissing()=runBlocking {
+        Fixture("offline-covers").use { fixture ->
+            val missing=(0..99).map { fixture.photos[0].copy(id="missing-cover-$it",originalPath="/missing/$it",capturedAt=2_200_000_000_000L+it) }
+            try {
+                missing.forEach { app.database.photos().insert(it) }
+                var checks=0
+                val timeline=TimelineRepository(app.database) { checks++;false }
+                val preview=CollectionsRepository(app.database,timeline).preview(TimelineQuery("Offline",source=fixture.source.key)).first()
+                assertEquals(24,checks);assertTrue(preview.entries.isEmpty());assertEquals(-1,preview.count)
+            } finally { missing.forEach { app.database.photos().find(it.id)?.let { photo -> app.database.photos().update(photo.copy(archived=true)) } } }
+        }
+    }
+
     private fun saveScreenshot(name: String) {
         val image=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         try {

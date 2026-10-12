@@ -20,7 +20,15 @@ internal class CollectionsRepository(private val database: PhotoDatabase,private
         awaitClose { database.invalidationTracker.removeObserver(observer) }
     }.conflate()
     fun preview(query: TimelineQuery): Flow<CollectionPreview> = changes().map { withContext(Dispatchers.IO) {
-        val entries=timeline.page(query,null,TimelineDirection.AFTER,4)
+        val entries=if(query.filter=="Offline") {
+            // A cover is an optional sample. Never walk an archive of stale paths to fill four cells.
+            database.openHelper.readableDatabase.query(TimelineSql(query).page(null,TimelineDirection.AFTER,24)).use { rows ->
+                buildList { while(rows.moveToNext()) {
+                    val entry=timeline.read(rows)
+                    if(size<4 && timeline.accepts(query,entry)) add(entry)
+                } }
+            }
+        } else timeline.page(query,null,TimelineDirection.AFTER,4)
         // Offline availability is a filesystem property: do not invent a SQL count from cached paths.
         val count=if(query.album==null) -1 else database.openHelper.readableDatabase.query(
             "SELECT COUNT(*) FROM album_photos WHERE albumId=?",arrayOf(query.album)).use { rows -> check(rows.moveToFirst());rows.getInt(0) }
