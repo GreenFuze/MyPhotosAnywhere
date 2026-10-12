@@ -11,16 +11,23 @@ import com.myphotosanywhere.mpa.core.EditPrompt
 import com.myphotosanywhere.mpa.data.Handoff
 import com.myphotosanywhere.mpa.data.Photo
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as MpaApplication).repository
     private val drive = (application as MpaApplication).drive
-    val photos = repository.photos.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val legacyActive=MutableStateFlow(false)
+    fun legacyLoading(enabled: Boolean) { legacyActive.value=enabled }
+    val photos = legacyActive.flatMapLatest { if(it) repository.photos else flowOf(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0,0), emptyList())
     val handoffs = repository.handoffs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()

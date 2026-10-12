@@ -26,6 +26,9 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.myphotosanywhere.mpa.ui.*
+import com.myphotosanywhere.mpa.timeline.*
+import java.time.Instant
+import java.time.ZoneOffset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -73,7 +76,7 @@ class MainActivity: ComponentActivity() {
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = viewModel(),features: LibraryFeaturesModel = viewModel()) {
+private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = viewModel(),features: LibraryFeaturesModel = viewModel(),timeline: TimelineViewModel = viewModel()) {
     val photos by model.photos.collectAsStateWithLifecycle()
     val handoffs by model.handoffs.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
@@ -104,6 +107,13 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     var sourceKey by rememberSaveable { mutableStateOf<String?>(null) }
     var personId by rememberSaveable { mutableStateOf<String?>(null) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
+    val timelineViewer by timeline.viewer.collectAsStateWithLifecycle()
+    val timelineMessage by timeline.message.collectAsStateWithLifecycle()
+    LaunchedEffect(tab,selectedId,viewerId,pendingViewKey,editorId) {
+        val legacy=tab!=0 || selectedId!=null || viewerId!=null || pendingViewKey!=null || editorId!=null
+        model.legacyLoading(legacy);features.legacyLoading(legacy)
+    }
+    var jumpToDate by rememberSaveable { mutableStateOf(false) }
     val photosGrid=rememberLazyGridState()
     val searchGrid=rememberLazyGridState()
     val collectionGrid=rememberLazyGridState()
@@ -143,6 +153,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     }
     val albumPhotoIds=remember(memberships,albumId) { memberships.filter { it.albumId==albumId }.map { it.photoId }.toSet() }
     val personPhotoIds=remember(faces,personId) { faces.filter { it.personId==personId }.map { it.photoId }.toSet() }
+    LaunchedEffect(timelineMessage) { timelineMessage?.let { snackbar.showSnackbar(it);timeline.clearMessage() } }
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); model.clearMessage() } }
     LaunchedEffect(featureMessage) { featureMessage?.let { snackbar.showSnackbar(it); features.clearMessage() } }
     fun back() {
@@ -173,7 +184,21 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         Column(Modifier.fillMaxSize().then(if(tab !in listOf(0,1,5)) Modifier.padding(bottom=navigationClearance) else Modifier)) {
             if(busy || featureBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
             when(tab) {
-                0,5 -> {
+                0 -> {
+                    ShellImportActivity(onOpen={ navigation.open(ShellDestination.STORAGE) })
+                    val activeSync=sync.filter { sourceKey==null || it.bindingKey==sourceKey }
+                    if(activeSync.any { it.running || it.error!=null }) TextButton(
+                        onClick={ navigation.open(ShellDestination.STORAGE) },modifier=Modifier.fillMaxWidth().testTag("shell:sync")) {
+                        Text(if(activeSync.any { it.error!=null }) "Drive sync needs attention" else "Updating photo library…",
+                            maxLines=1,overflow=TextOverflow.Ellipsis)
+                    }
+                    TimelineGrid(TimelineQuery(filter,sourceKey,albumId,personId),timeline,features,
+                        if(albumId!=null || personId!=null) collectionGrid else photosGrid,navigationClearance,
+                        modifier=Modifier.weight(1f).fillMaxWidth(),hasSources=sources.isNotEmpty(),
+                        onConnect={ navigation.open(ShellDestination.STORAGE) },
+                        onClearFilters={ filter="All";sourceKey=null;albumId=null;personId=null },onRefresh=features::refreshCloud)
+                }
+                5 -> {
                     val galleryQuery=if(tab==5) query else ""
                     if(tab==5) OutlinedTextField(query,{ query=it },label={ Text("Search your photos") },singleLine=true,
                         keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={ keyboard?.hide() }),
@@ -274,6 +299,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     if(showFilters) ModalBottomSheet(onDismissRequest={ showFilters=false }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("Filter photos",style=MaterialTheme.typography.titleLarge)
+            if(tab==0) TextButton(onClick={ showFilters=false;jumpToDate=true },modifier=Modifier.heightIn(min=48.dp).testTag("timeline:jump")) { Text("Jump to date") }
             listOf("All","Favorites","Offline","Videos","Edits","Archive").forEach { option ->
                 FilterChip(selected=filter==option,onClick={ filter=option },label={ Text(option) })
             }
@@ -284,6 +310,19 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             Button(onClick={ showFilters=false },modifier=Modifier.align(Alignment.End)) { Text("Done") }
         }
     }
+    if(jumpToDate) {
+        val date=rememberDatePickerState()
+        DatePickerDialog(onDismissRequest={ jumpToDate=false },confirmButton={
+            TextButton(enabled=date.selectedDateMillis!=null,onClick={
+                date.selectedDateMillis?.let { timeline.jump(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate(),java.time.ZoneId.systemDefault()) }
+                jumpToDate=false
+            }) { Text("Jump") }
+        },dismissButton={ TextButton(onClick={ jumpToDate=false }) { Text("Cancel") } }) { DatePicker(date) }
+    }
+    timelineViewer?.let { session -> TimelineViewer(session,timeline,features,
+        onEdit={ timeline.closeViewer();selectedId=it;editorId=it },
+        onDetails={ timeline.closeViewer();selectedId=it },
+        onSource={ timeline.closeViewer();navigation.open(ShellDestination.STORAGE) }) }
     pendingViewKey?.let { key -> DriveOriginalDialog(cloud.find { it.key==key },features,onClose={ pendingViewKey=null;selectedId=null },onReady={
         pendingViewKey=null;selectedId=it;viewerId=it
     }) }

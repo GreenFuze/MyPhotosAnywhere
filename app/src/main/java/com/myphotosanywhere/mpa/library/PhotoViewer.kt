@@ -52,60 +52,69 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
                 Text(current.displayName,maxLines=1,modifier=Modifier.padding(horizontal=16.dp))
                 HorizontalPager(state=pager,key={ available[it].id },modifier=Modifier.fillMaxWidth().weight(1f)) { page ->
                     val photo=available[page]
-                    val original by produceState<ViewerOriginal>(ViewerOriginal.Loading,photo.id) {
-                        var read: MediaCache.OriginalRead?=null
-                        try {
-                            read=model.app.cache.openOriginal(photo.id)
-                            value=read?.let { ViewerOriginal.Ready(it) } ?: ViewerOriginal.Unavailable(
-                                "This downloaded original is no longer on this phone. Close and download it again.")
-                        } catch(e: CancellationException) { throw e }
-                        catch(_: Exception) { value=ViewerOriginal.Unavailable("Cannot open this original. Close and try downloading it again.") }
-                        awaitDispose { read?.close() }
-                    }
-                    val reader=(original as? ViewerOriginal.Ready)?.read
-                    var quality by remember(photo.id) { mutableStateOf("Loading original…") }
-                    var zoom by remember(photo.id) { mutableFloatStateOf(1f) }
-                    var x by remember(photo.id) { mutableFloatStateOf(0f) }
-                    var y by remember(photo.id) { mutableFloatStateOf(0f) }
-                    LaunchedEffect(pager.currentPage) { if(pager.currentPage!=page) { zoom=1f;x=0f;y=0f } }
-                    if(original is ViewerOriginal.Unavailable) Box(Modifier.fillMaxSize()) {
-                        Text((original as ViewerOriginal.Unavailable).message,color=Color.White,
-                            modifier=Modifier.align(androidx.compose.ui.Alignment.Center).padding(20.dp))
-                    } else if(reader==null) Box(Modifier.fillMaxSize()) { CircularProgressIndicator() }
-                    else if(photo.mimeType.startsWith("video/")) AndroidView(factory={ context -> VideoView(context).apply {
-                        setVideoPath(reader.file.absolutePath)
-                        val controls=android.widget.MediaController(context);controls.setAnchorView(this);setMediaController(controls)
-                        setOnPreparedListener { seekTo(1) }
-                    } },modifier=Modifier.fillMaxSize(),update={ if(pager.currentPage!=page) it.pause() },onRelease={ it.stopPlayback() })
-                    else Box(Modifier.fillMaxSize().clipToBounds().pointerInput(photo.id) {
-                        detectTapGestures(onDoubleTap={ zoom=if(zoom>1f) 1f else 2.5f;x=0f;y=0f })
-                    }.pointerInput(photo.id) {
-                        awaitEachGesture {
-                            awaitFirstDown(requireUnconsumed=false)
-                            var transforming=zoom>1f
-                            do {
-                                val event=awaitPointerEvent(PointerEventPass.Initial)
-                                if(event.changes.count { it.pressed }>=2) transforming=true
-                                if(transforming) {
-                                    val pan=event.calculatePan();val scale=event.calculateZoom()
-                                    zoom=(zoom*scale).coerceIn(1f,32f)
-                                    x=(x+pan.x).coerceIn(-size.width*(zoom-1)/2,size.width*(zoom-1)/2)
-                                    y=(y+pan.y).coerceIn(-size.height*(zoom-1)/2,size.height*(zoom-1)/2)
-                                    event.changes.forEach { it.consume() }
-                                }
-                            } while(event.changes.any { it.pressed })
-                        }
-                    }) {
-                        AndroidView(factory={ context -> OriginalPhotoView(context).apply {
-                            onQuality={ quality=it };setActive(pager.currentPage==page);load(reader.file)
-                        } },modifier=Modifier.fillMaxSize().testTag("original-image"),update={ it.setActive(pager.currentPage==page);it.transform(zoom,x,y) },onRelease={ it.close() })
-                        Text(quality,color=Color.White,style=MaterialTheme.typography.bodySmall,
-                            modifier=Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(8.dp))
-                    }
+                    ViewerMediaContent(photo,model,pager.currentPage==page)
                 }
                 Text("${pager.currentPage+1} / ${available.size} · Swipe to browse · Pinch or double-tap to zoom",
                     style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(16.dp))
             }
         }
+    }
+}
+
+/** The existing bounded renderer and gesture/lifecycle contract is shared by both viewer adapters. */
+@Composable
+internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active: Boolean,preview: File?=null) {
+    Box(Modifier.fillMaxSize()) {
+        if(preview!=null) coil.compose.AsyncImage(preview,"Preview",Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
+    val original by produceState<ViewerOriginal>(ViewerOriginal.Loading,photo.id,photo.originalPath,photo.cachedVersion) {
+        var read: MediaCache.OriginalRead?=null
+        try {
+            read=model.app.cache.openOriginal(photo.id)
+            value=read?.let { ViewerOriginal.Ready(it) } ?: ViewerOriginal.Unavailable(
+                "This downloaded original is no longer on this phone. Close and download it again.")
+        } catch(e: CancellationException) { throw e }
+        catch(_: Exception) { value=ViewerOriginal.Unavailable("Cannot open this original. Close and try downloading it again.") }
+        awaitDispose { read?.close() }
+    }
+    val reader=(original as? ViewerOriginal.Ready)?.read
+    var quality by remember(photo.id) { mutableStateOf("Loading original…") }
+    var zoom by remember(photo.id) { mutableFloatStateOf(1f) }
+    var x by remember(photo.id) { mutableFloatStateOf(0f) }
+    var y by remember(photo.id) { mutableFloatStateOf(0f) }
+    LaunchedEffect(active) { if(!active) { zoom=1f;x=0f;y=0f } }
+    if(original is ViewerOriginal.Unavailable) Box(Modifier.fillMaxSize()) {
+        Text((original as ViewerOriginal.Unavailable).message,color=Color.White,
+            modifier=Modifier.align(androidx.compose.ui.Alignment.Center).padding(20.dp))
+    } else if(reader==null) Box(Modifier.fillMaxSize()) { CircularProgressIndicator() }
+    else if(photo.mimeType.startsWith("video/")) AndroidView(factory={ context -> VideoView(context).apply {
+        setVideoPath(reader.file.absolutePath)
+        val controls=android.widget.MediaController(context);controls.setAnchorView(this);setMediaController(controls)
+        setOnPreparedListener { seekTo(1) }
+    } },modifier=Modifier.fillMaxSize(),update={ if(!active) it.pause() },onRelease={ it.stopPlayback() })
+    else Box(Modifier.fillMaxSize().clipToBounds().pointerInput(photo.id) {
+        detectTapGestures(onDoubleTap={ zoom=if(zoom>1f) 1f else 2.5f;x=0f;y=0f })
+    }.pointerInput(photo.id) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed=false)
+            var transforming=zoom>1f
+            do {
+                val event=awaitPointerEvent(PointerEventPass.Initial)
+                if(event.changes.count { it.pressed }>=2) transforming=true
+                if(transforming) {
+                    val pan=event.calculatePan();val scale=event.calculateZoom()
+                    zoom=(zoom*scale).coerceIn(1f,32f)
+                    x=(x+pan.x).coerceIn(-size.width*(zoom-1)/2,size.width*(zoom-1)/2)
+                    y=(y+pan.y).coerceIn(-size.height*(zoom-1)/2,size.height*(zoom-1)/2)
+                    event.changes.forEach { it.consume() }
+                }
+            } while(event.changes.any { it.pressed })
+        }
+    }) {
+        AndroidView(factory={ context -> OriginalPhotoView(context).apply {
+            onQuality={ quality=it };setActive(active);load(reader.file)
+        } },modifier=Modifier.fillMaxSize().testTag("original-image"),update={ it.setActive(active);it.transform(zoom,x,y) },onRelease={ it.close() })
+        Text(quality,color=Color.White,style=MaterialTheme.typography.bodySmall,
+            modifier=Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(8.dp))
+    }
     }
 }

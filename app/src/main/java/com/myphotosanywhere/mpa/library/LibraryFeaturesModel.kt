@@ -17,14 +17,17 @@ import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.util.UUID
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LibraryFeaturesModel(application: Application): AndroidViewModel(application) {
     val app=application as MpaApplication
     private val db=app.database
+    private val legacyActive=MutableStateFlow(false)
+    fun legacyLoading(enabled: Boolean) { legacyActive.value=enabled }
     val albums=db.library().albums().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
-    val memberships=db.library().memberships().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
+    val memberships=legacyActive.flatMapLatest { if(it) db.library().memberships() else flowOf(emptyList()) }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(0,0),emptyList())
     val people=db.library().people().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
-    val faces=db.library().faces().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
-    val cloud=db.cloud().observePhotos().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
+    val faces=legacyActive.flatMapLatest { if(it) db.library().faces() else flowOf(emptyList()) }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(0,0),emptyList())
+    val cloud=legacyActive.flatMapLatest { if(it) db.cloud().observePhotos() else flowOf(emptyList()) }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(0,0),emptyList())
     val sync=db.cloud().observeSync().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val downloads=db.cloud().observeDownloads().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val connection=app.drive.connection.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),null)
