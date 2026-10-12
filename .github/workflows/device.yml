@@ -35,21 +35,7 @@ jobs:
           arch: x86_64
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: |
-            # Native fixtures use synthetic accounts and cached data, never live Google services.
-            # Keep offline browsing checks independent of authentication/network error timing.
-            adb shell svc wifi disable
-            adb shell svc data disable
-            test_status=0
-            ./gradlew connectedDebugAndroidTest --no-daemon || test_status=$?
-            mkdir -p app/build/reports/androidTests/screenshots
-            adb pull /sdcard/Download/MPA/device-preview.png app/build/reports/androidTests/screenshots/mpa-edit.png
-            adb pull /sdcard/Download/MPA/import-preview.png app/build/reports/androidTests/screenshots/mpa-import.png
-            adb pull /sdcard/Download/MPA/shell-preview.png app/build/reports/androidTests/screenshots/mpa-shell.png
-            for variant in light dark large rtl; do
-              adb pull /sdcard/Download/MPA/shell-navigation-$variant.png app/build/reports/androidTests/screenshots/mpa-navigation-$variant.png
-            done
-            exit "$test_status"
+          script: bash scripts/run_device_checks.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:

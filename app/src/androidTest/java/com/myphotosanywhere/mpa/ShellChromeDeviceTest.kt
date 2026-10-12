@@ -70,7 +70,18 @@ class ShellChromeDeviceTest {
                 val layouts=mutableListOf<TextLayoutResult>()
                 compose.onNodeWithText(label).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
                 assertEquals("Navigation label stays on one line",1,layouts.single().lineCount)
-                assertFalse("Navigation label is not clipped: selected=$destination label=$label size=${layouts.single().size} width=${layouts.single().didOverflowWidth} height=${layouts.single().didOverflowHeight} lineWidth=${layouts.single().getLineRight(0)-layouts.single().getLineLeft(0)}",layouts.single().hasVisualOverflow)
+                val layout=layouts.single()
+                assertFalse("Navigation label is not ellipsized",layout.isLineEllipsized(0))
+                assertEquals("Complete label is visible",label.length,layout.getLineEnd(0,visibleEnd=true))
+                // Paragraph width can exceed integer layout size even when the complete text fits.
+                // Check every character against the actual drawing area instead of that flag.
+                for(index in label.indices) {
+                    val character=layout.getBoundingBox(index)
+                    assertTrue("Character fits horizontally: $label/$index $character in ${layout.size}",
+                        character.left>=-0.5f && character.right<=layout.size.width+0.5f)
+                    assertTrue("Character fits vertically: $label/$index $character in ${layout.size}",
+                        character.top>=-0.5f && character.bottom<=layout.size.height+0.5f)
+                }
             }
             val bounds=listOf("Photos","Collections","Search").map { label ->
                 compose.onNodeWithTag("nav:$label").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
