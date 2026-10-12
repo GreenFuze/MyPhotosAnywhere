@@ -4,9 +4,14 @@ on:
   pull_request:
 permissions:
   contents: read
+# Push and PR events for the same branch share one validation slot.
+# A newer revision cancels superseded work; every retained run executes all checks.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
