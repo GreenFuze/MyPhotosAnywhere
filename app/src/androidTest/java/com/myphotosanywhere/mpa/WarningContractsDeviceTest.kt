@@ -39,8 +39,12 @@ class WarningContractsDeviceTest {
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()).build()
         try {
             manager.enqueueUniqueWork(name,ExistingWorkPolicy.REPLACE,work).result.get(15,TimeUnit.SECONDS)
-            val jobs=app.getSystemService(JobScheduler::class.java).allPendingJobs.filter {
-                it.service.className=="androidx.work.impl.background.systemjob.SystemJobService"
+            val scheduler=app.getSystemService(JobScheduler::class.java)
+            val deadline=android.os.SystemClock.elapsedRealtime()+15_000
+            var jobs=scheduler.allPendingJobs.filter { it.service.className=="androidx.work.impl.background.systemjob.SystemJobService" }
+            while(jobs.isEmpty() && android.os.SystemClock.elapsedRealtime()<deadline) {
+                Thread.sleep(50)
+                jobs=scheduler.allPendingJobs.filter { it.service.className=="androidx.work.impl.background.systemjob.SystemJobService" }
             }
             assertTrue("WorkManager must schedule a constrained native job",jobs.isNotEmpty())
             assertTrue(jobs.all { it.id in 1..999_999 })

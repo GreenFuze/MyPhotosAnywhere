@@ -364,6 +364,7 @@ class DeviceSmokeTest {
             compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${photo.id}").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("photo:${photo.id}").performClick()
             compose.onNodeWithTag("viewer-screen").assertIsDisplayed()
+            compose.waitUntil(30000) { compose.onAllNodesWithTag("original-image").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("original-image").assertExists()
             compose.onNodeWithTag("viewer-details").performClick()
             compose.onNodeWithTag("photo-edit").performClick()
