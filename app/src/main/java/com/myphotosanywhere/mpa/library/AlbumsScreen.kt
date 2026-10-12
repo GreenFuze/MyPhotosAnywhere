@@ -80,7 +80,7 @@ private fun CollectionCard(title: String,icon: Int,repository: CollectionsReposi
         catch(_: java.io.IOException) { failure=true }
     }
     Column {
-        Card(Modifier.fillMaxWidth().testTag(tag).clickable(role=Role.Button,onClick=onClick).semantics(mergeDescendants=true) { contentDescription=title },shape=RoundedCornerShape(24.dp)) {
+        Card(Modifier.fillMaxWidth().testTag(tag).clickable(role=Role.Button,onClick=onClick),shape=RoundedCornerShape(24.dp)) {
             Box(Modifier.fillMaxWidth().aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceContainerHigh),contentAlignment=Alignment.Center) {
                 val covers=preview?.paths.orEmpty()
                 com.myphotosanywhere.mpa.ui.ShellIcon(icon)

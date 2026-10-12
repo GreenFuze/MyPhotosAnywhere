@@ -128,6 +128,8 @@ class SelectionDeviceTest {
         Fixture("search").use { fixture ->
             compose.onNodeWithTag("nav:Search").performClick();compose.onNodeWithTag("search:query").performTextInput("selection-search")
             compose.onNodeWithTag("search:query").performImeAction();waitTag("photo:${fixture.photos[0].id}")
+            val description=compose.onNodeWithTag("photo:${fixture.photos[0].id}").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription]
+            assertEquals(1,description.size);assertTrue(description.single().contains(fixture.photos[0].displayName))
             longPress("photo:${fixture.photos[0].id}");compose.onNodeWithTag("photo:${fixture.photos[1].id}").performClick()
             compose.onNodeWithText("2 selected").assertIsDisplayed();compose.onNodeWithTag("viewer-screen").assertDoesNotExist()
             compose.onNodeWithTag("selection:close").performClick();waitGone("selection:bar")

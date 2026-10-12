@@ -292,12 +292,12 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                             Card(Modifier.aspectRatio(1f).testTag("cloud:${row.key}").combinedClickable(enabled=!selectionLocked,
                                 onClick={ if(selecting) selection.toggle(target) else { pendingViewKey=row.key;features.download(row) } },
                                 onLongClickLabel="Select photo",onLongClick={ selection.toggle(target) }).semantics(mergeDescendants=true) {
-                                    contentDescription=row.name;if(selecting) this.selected=chosen
+                                    contentDescription="${if(row.mimeType.startsWith("video/")) "Video" else "Photo"}, ${row.capturedAt?.let { DateFormat.getDateInstance().format(Date(it)) } ?: "Unknown date"}, ${row.name}";if(selecting) this.selected=chosen
                                     customActions=listOf(CustomAccessibilityAction(if(chosen) "Deselect photo" else "Select photo") { if(!selectionLocked) selection.toggle(target);!selectionLocked })
                                 },shape=RoundedCornerShape(0.dp)) {
                                 Box(Modifier.fillMaxSize()) {
                                     AsyncImage(coil.request.ImageRequest.Builder(context).data(File(row.thumbnailPath))
-                                        .memoryCacheKey("${row.key}:${row.thumbnailUpdatedAt}").build(),row.name,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+                                        .memoryCacheKey("${row.key}:${row.thumbnailUpdatedAt}").build(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
                                     if(downloads.any { it.key==row.key && it.state in listOf("PENDING","DOWNLOADING","RETRYING") })
                                         Surface(Modifier.align(Alignment.BottomStart),color=MaterialTheme.colorScheme.surface.copy(alpha=.85f)) {
                                             Text("Downloading…",modifier=Modifier.padding(4.dp),style=MaterialTheme.typography.labelSmall)
@@ -409,12 +409,12 @@ private fun PhotoTile(photo: Photo,features: LibraryFeaturesModel,thumbnailVersi
     Card(Modifier.aspectRatio(1f).testTag("photo:${photo.id}").combinedClickable(enabled=!selectionLocked,role=Role.Button,
         onClick={ if(selecting) onToggle(target) else onClick() },onLongClickLabel="Select photo",onLongClick={ onToggle(target) })
         .semantics(mergeDescendants=true) {
-            contentDescription=photo.displayName;if(selecting) this.selected=chosen
+            contentDescription="${if(photo.mimeType.startsWith("video/")) "Video" else "Photo"}, ${DateFormat.getDateInstance().format(Date(photo.capturedAt ?: photo.importedAt))}, ${photo.displayName}";if(selecting) this.selected=chosen
             customActions=listOf(CustomAccessibilityAction(if(chosen) "Deselect photo" else "Select photo") { if(!selectionLocked) onToggle(target);!selectionLocked })
         },shape=RoundedCornerShape(0.dp)) {
         Box(Modifier.fillMaxSize()) {
             AsyncImage(coil.request.ImageRequest.Builder(features.app).data(thumb ?: File(photo.thumbnailPath))
-                .memoryCacheKey("${photo.id}:$thumbnailVersion:${photo.originalPath}").build(),photo.displayName,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+                .memoryCacheKey("${photo.id}:$thumbnailVersion:${photo.originalPath}").build(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
             if(selecting) SelectionMark(chosen)
             if(photo.mimeType.startsWith("video/")) Surface(Modifier.align(Alignment.BottomEnd).padding(4.dp),
                 color=MaterialTheme.colorScheme.surface.copy(alpha=.85f)) {
