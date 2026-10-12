@@ -39,7 +39,10 @@ class WarningContractsDeviceTest {
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()).build()
         try {
             manager.enqueueUniqueWork(name,ExistingWorkPolicy.REPLACE,work).result.get(15,TimeUnit.SECONDS)
-            val scheduler=app.getSystemService(JobScheduler::class.java)
+            val defaultScheduler=app.getSystemService(JobScheduler::class.java)
+            // WorkManager uses a separate platform namespace starting with Android 14.
+            val scheduler=if(android.os.Build.VERSION.SDK_INT>=34)
+                defaultScheduler.forNamespace("androidx.work.systemjobscheduler") else defaultScheduler
             val deadline=android.os.SystemClock.elapsedRealtime()+15_000
             var jobs=scheduler.allPendingJobs.filter { it.service.className=="androidx.work.impl.background.systemjob.SystemJobService" }
             while(jobs.isEmpty() && android.os.SystemClock.elapsedRealtime()<deadline) {
