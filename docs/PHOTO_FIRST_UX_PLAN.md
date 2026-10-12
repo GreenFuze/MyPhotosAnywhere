@@ -41,3 +41,6 @@ The owner supplied Google Photos Android screenshots and authorized the next pla
 The chronological query, original downloads, viewer internals, database and import workers are unchanged. Search remains in the shared shell until its focused-screen increment. There is no release/version/schema change, and outstanding 0.5.9 phone testing is not presumed complete. Owner authorization permits this presentation increment; acceptance on the S23 Ultra is still required before the next visible increment.
 
 Native checks cover overlay geometry, the last photo scrolling clear of controls and opening correctly, 48dp targets, state changes, large fonts, RTL and light/dark navigation fixtures. CI captures the full synthetic gallery plus component fixtures. Local and immutable-source CI results must be recorded before describing this increment as verified.
+## Final 0.5.10 publication decision
+
+The completed shell and unified chronological projection passed the immutable-source API 29/35/37 matrix and independent upgrade-signing verification. The owner approved publication with the documented emulator diagnostics. Earlier billing/review blocks above are historical. [Final release scope, evidence and remaining phone acceptance](releases/v0.5.10.md).
