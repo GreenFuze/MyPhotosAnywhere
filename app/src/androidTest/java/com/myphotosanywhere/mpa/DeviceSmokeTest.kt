@@ -373,6 +373,7 @@ class DeviceSmokeTest {
             compose.waitUntil(30000) { compose.onAllNodesWithTag("original-image").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("original-image").assertExists()
             compose.onNodeWithTag("viewer-details").performClick()
+            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo-edit").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("photo-edit").performClick()
             compose.waitUntil(30000) {
                 compose.onAllNodes(hasTestTag("editor-save") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
@@ -452,7 +453,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Copy setup details").performClick()
         val clipboard=app.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         // Clipboard publication crosses a system-service boundary; await the actual value.
-        compose.waitUntil(5000) {
+        compose.waitUntil(15000) {
             compose.runOnUiThread { clipboard.primaryClip?.getItemAt(0)?.text?.toString() }==info.text()
         }
         assertEquals(info.text(),compose.runOnUiThread { clipboard.primaryClip?.getItemAt(0)?.text?.toString() })

@@ -48,6 +48,9 @@ internal class ViewerSessionStore(private val directory: File,private val reposi
             var capacityCheckAt=4L*1024*1024
             // This disposable index is never recovered after a crash; persisted media is untouched.
             index.execSQL("PRAGMA synchronous=OFF")
+            // Only this disposable index uses an in-memory rollback journal.
+            // Avoid opening/deleting a disk journal for every bounded write batch.
+            index.rawQuery("PRAGMA journal_mode=MEMORY",null).use { check(it.moveToFirst() && it.getString(0).equals("memory",true)) }
             index.execSQL("""CREATE TABLE entries(ordinal INTEGER PRIMARY KEY,canonicalKey TEXT NOT NULL UNIQUE,
                 photoId TEXT,cloudKey TEXT,effectiveMillis INTEGER,timestampSource TEXT NOT NULL,
                 displayName TEXT NOT NULL,mimeType TEXT NOT NULL,originalPath TEXT NOT NULL,thumbnailPath TEXT NOT NULL,

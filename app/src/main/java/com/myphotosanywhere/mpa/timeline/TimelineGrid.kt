@@ -95,6 +95,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 if(nearest!=null) state.scrollToItem(nearest.first,anchor.offset)
             }
         }
+        model.restored(restoration)
         restoring=false
     }
     LaunchedEffect(query,restoring,viewer) {
@@ -104,7 +105,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 (if(visible.index in 0 until rows.itemCount) rows.peek(visible.index) as? TimelineRow.Media else null)
                     ?.takeIf { it.generation==restoration }?.entry?.let { it to -visible.offset.y }
             }
-        }.filterNotNull().distinctUntilChanged().collect { (entry,offset) -> model.rememberAnchor(entry,offset) }
+        }.filterNotNull().distinctUntilChanged().collect { (entry,offset) -> model.rememberVisibleAnchor(entry,offset,restoration) }
     }
     Column(modifier) {
         val refresh=rows.loadState.refresh

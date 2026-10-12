@@ -24,6 +24,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
     private data class Request(val query: TimelineQuery,val cursor: TimelineCursor?,val generation: Long=0)
     private val request=MutableStateFlow(Request(TimelineQuery(),null))
     private var configured=false
+    private var observingAnchor=false
     private var viewerJob: Job?=null
     private val _viewer=MutableStateFlow<TimelineViewerState?>(null)
     val viewer=_viewer.asStateFlow()
@@ -46,7 +47,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
         if(configured && request.value.query==query) return
         configured=true
         val anchor=anchor(query)
-        request.value=Request(query,anchor?.cursor,request.value.generation+1)
+        updateRequest(Request(query,anchor?.cursor,request.value.generation+1))
         reconcileAnchor(request.value,anchor)
     }
 
@@ -57,7 +58,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
                 val cursor=repository.reanchor(current.query,anchor.cursor)
                 if(cursor!=anchor.cursor && request.value==current && anchor(current.query)==anchor) {
                     saved[anchorName(current.query)]=anchorBundle(cursor,anchor.offset)
-                    request.value=current.copy(cursor=cursor,generation=current.generation+1)
+                    updateRequest(current.copy(cursor=cursor,generation=current.generation+1))
                 }
             } catch(cancelled: CancellationException) { throw cancelled }
             catch(error: android.database.sqlite.SQLiteException) { _message.value=error.message ?: "Cannot restore this position. Retry." }
@@ -82,6 +83,12 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
         }
     }
 
+    private fun updateRequest(value: Request) { observingAnchor=false;request.value=value }
+    fun restored(generation: Long) { if(request.value.generation==generation) observingAnchor=true }
+    fun rememberVisibleAnchor(entry: TimelineEntry,offset: Int,generation: Long) {
+        if(observingAnchor && _viewer.value==null && request.value.generation==generation) rememberAnchor(entry,offset)
+    }
+
     fun jump(date: LocalDate,zone: ZoneId) {
         viewModelScope.launch {
             try {
@@ -90,7 +97,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
                 if(cursor==null) _message.value="No photos on or before this date."
                 else if(request.value.query==current.query) {
                     saved[anchorName(current.query)]=Bundle().apply { putString("key",cursor.key);cursor.millis?.let { putLong("millis",it) };putInt("offset",0) }
-                    request.value=current.copy(cursor=cursor,generation=current.generation+1)
+                    updateRequest(current.copy(cursor=cursor,generation=current.generation+1))
                 }
             } catch(cancelled: CancellationException) { throw cancelled }
             catch(error: android.database.sqlite.SQLiteException) { _message.value=error.message ?: "Cannot jump to this date. Retry." }
@@ -99,7 +106,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
 
     fun restoreAnchor() {
         val current=request.value
-        request.value=current.copy(cursor=anchor()?.cursor,generation=current.generation+1)
+        updateRequest(current.copy(cursor=anchor()?.cursor,generation=current.generation+1))
         reconcileAnchor(request.value,anchor())
     }
 
@@ -132,6 +139,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
     fun current(entry: TimelineEntry) { rememberAnchor(entry,anchor()?.offset ?: 0) }
     fun clearMessage() { _message.value=null }
     fun closeViewer(restore: Boolean=true) {
+        observingAnchor=false
         viewerJob?.cancel();viewerJob=null
         val session=_viewer.value?.session
         _viewer.value=null
