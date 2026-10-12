@@ -28,3 +28,5 @@ The already approved AGP/Gradle deprecation and documented emulator infrastructu
 Samsung Galaxy S23 Ultra acceptance and the previously reported JPEG crash remain unverified. Emulator tests do not establish the cause or resolution of that real-device crash.
 
 Release gate follow-up: Paging is pinned to stable 3.5.3 (October 12 patch, page-retention/separator fixes), after CI correctly rejected the newly superseded 3.5.2. Search clears input focus when submitting/opening a viewer; its Back regression waits for the asynchronous IME dismissal before asserting sheet dismissal. No warning severity changes.
+
+CI retains each API evidence archive directly. The redundant artifact-merge action was removed after its Node Buffer deprecation appeared in complete logs; this resolves the warning without suppressing diagnostics or changing application behavior.

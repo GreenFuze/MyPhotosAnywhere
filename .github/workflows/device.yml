@@ -53,12 +53,3 @@ jobs:
             app/build/outputs/androidTest-results/
             build/diagnostics/
             build/reports/problems/
-  evidence:
-    needs: device
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/upload-artifact/merge@v7.0.2
-        with:
-          name: MPA-device-checks
-          pattern: MPA-device-checks-*
-          separate-directories: true
