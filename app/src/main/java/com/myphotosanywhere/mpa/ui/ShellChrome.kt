@@ -82,9 +82,9 @@ fun ShellBottomBar(selected: ShellDestination,onSelect: (ShellDestination)->Unit
                 if(expanded) Column(Modifier.padding(4.dp)) {
                     ShellTab(ShellDestination.PHOTOS,R.drawable.ic_shell_photos,selected,onSelect,Modifier.fillMaxWidth())
                     ShellTab(ShellDestination.COLLECTIONS,R.drawable.ic_shell_collections,selected,onSelect,Modifier.fillMaxWidth())
-                } else Row(Modifier.padding(4.dp)) {
-                    ShellTab(ShellDestination.PHOTOS,R.drawable.ic_shell_photos,selected,onSelect,Modifier.weight(1f))
-                    ShellTab(ShellDestination.COLLECTIONS,R.drawable.ic_shell_collections,selected,onSelect,Modifier.weight(1f))
+                } else Row(Modifier.padding(4.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
+                    ShellTab(ShellDestination.PHOTOS,R.drawable.ic_shell_photos,selected,onSelect,Modifier.widthIn(min=48.dp))
+                    ShellTab(ShellDestination.COLLECTIONS,R.drawable.ic_shell_collections,selected,onSelect,Modifier.widthIn(min=48.dp))
                 }
             }
             val searchActive=selected==ShellDestination.SEARCH

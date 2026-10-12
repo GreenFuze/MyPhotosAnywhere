@@ -13,6 +13,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
@@ -63,6 +65,12 @@ class ShellChromeDeviceTest {
             target.assertIsDisplayed().performClick().assertIsSelected()
             compose.waitForIdle()
             assertEquals(destination,selected.value)
+            for(label in listOf("Photos","Collections")) {
+                val layouts=mutableListOf<TextLayoutResult>()
+                compose.onNodeWithText(label).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                assertEquals("Navigation label stays on one line",1,layouts.single().lineCount)
+                assertFalse("Navigation label is not clipped",layouts.single().hasVisualOverflow)
+            }
             val bounds=listOf("Photos","Collections","Search").map { label ->
                 compose.onNodeWithTag("nav:$label").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             }
