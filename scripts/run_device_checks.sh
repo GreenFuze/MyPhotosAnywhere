@@ -12,7 +12,7 @@ python3 scripts/gradle_checks.py --log build/diagnostics/device.log -- connected
 mpa_screenshots=app/build/reports/androidTests/screenshots
 mkdir -p "$mpa_screenshots"
 if adb pull /sdcard/Download/MPA "$mpa_screenshots/raw"; then
-  for pair in device-preview:mpa-edit import-preview:mpa-import shell-preview:mpa-shell shell-navigation-light:mpa-navigation-light shell-navigation-dark:mpa-navigation-dark shell-navigation-large:mpa-navigation-large shell-navigation-rtl:mpa-navigation-rtl; do
+  for pair in device-preview:mpa-edit import-preview:mpa-import shell-preview:mpa-shell shell-navigation-light:mpa-navigation-light shell-navigation-dark:mpa-navigation-dark shell-navigation-large:mpa-navigation-large shell-navigation-rtl:mpa-navigation-rtl viewer-details:mpa-viewer-details viewer-remote-details:mpa-viewer-remote-details viewer-details-light-large:mpa-details-light-large viewer-details-dark-rtl-large:mpa-details-dark-rtl-large; do
     mpa_source=${pair%%:*}
     mpa_target=${pair#*:}
     if [[ -f "$mpa_screenshots/raw/$mpa_source.png" ]]; then
