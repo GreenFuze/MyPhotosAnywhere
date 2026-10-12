@@ -209,6 +209,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     }
     var navigationHeight by remember { mutableIntStateOf(0) }
     val navigationClearance=with(LocalDensity.current) { navigationHeight.toDp() }
+    val scrollClearance=if(selecting) 0.dp else navigationClearance
     val primaryBrand=navigation.destination==navigation.primary && tab in listOf(0,1)
     Scaffold(topBar={ if(selecting) SelectionTopBar(selectedTargets.size,selectionBusy,selection::clear) else ShellTopBar(title,navigation.canGoBack && !primaryBrand,::back,canAddPhotos=!busy,
         onAddPhotos={ if(!busy) addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
@@ -218,8 +219,8 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         showTitle=!primaryBrand || filter!="All" || albumId!=null || personId!=null)
     },snackbarHost={ SnackbarHost(snackbar,Modifier.padding(bottom=navigationClearance)) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
-        // Grids and Collections scroll beneath the navigation, with measured clearance at their end.
-        Column(Modifier.fillMaxSize().then(if(tab !in listOf(0,1,5)) Modifier.padding(bottom=navigationClearance) else Modifier)) {
+        // Browsing scrolls beneath floating navigation. Selection reserves the opaque toolbar viewport.
+        Column(Modifier.fillMaxSize().then(if(selecting || tab !in listOf(0,1,5)) Modifier.padding(bottom=navigationClearance) else Modifier)) {
             if(busy || featureBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
             when(tab) {
                 0 -> {
@@ -231,7 +232,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                             maxLines=1,overflow=TextOverflow.Ellipsis)
                     }
                     TimelineGrid(TimelineQuery(filter,sourceKey,albumId,personId),timeline,features,
-                        if(albumId!=null || personId!=null) collectionGrid else photosGrid,navigationClearance,
+                        if(albumId!=null || personId!=null) collectionGrid else photosGrid,scrollClearance,
                         modifier=Modifier.weight(1f).fillMaxWidth(),selection=selectedTargets,onToggle=selection::toggle,selectionLocked=selectionLocked,hasSources=sources.isNotEmpty(),
                         onConnect={ navigation.open(ShellDestination.STORAGE) },
                         onClearFilters={ filter="All";sourceKey=null;albumId=null;personId=null },onRefresh=features::refreshCloud)
@@ -274,7 +275,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                             else if(galleryQuery.isNotBlank() || filter!="All" || sourceKey!=null) TextButton(onClick={ query="";filter="All";sourceKey=null }) { Text("Clear filters") }
                             else TextButton(onClick=features::refreshCloud) { Text("Refresh library") }
                         }
-                    } else LazyVerticalGrid(columns=GridCells.Fixed(3),contentPadding=PaddingValues(start=2.dp,top=2.dp,end=2.dp,bottom=navigationClearance+2.dp),
+                    } else LazyVerticalGrid(columns=GridCells.Fixed(3),contentPadding=PaddingValues(start=2.dp,top=2.dp,end=2.dp,bottom=scrollClearance+2.dp),
                         state=if(tab==5) searchGrid else if(albumId!=null || personId!=null) collectionGrid else photosGrid,
                         horizontalArrangement=Arrangement.spacedBy(2.dp),verticalArrangement=Arrangement.spacedBy(2.dp),
                         modifier=Modifier.weight(1f).testTag("photos:grid")) {
