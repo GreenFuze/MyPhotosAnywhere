@@ -28,7 +28,7 @@ internal fun SelectionMark(selected: Boolean) {
 
 @Composable
 internal fun SelectionTopBar(count: Int,busy: Boolean,onClose: ()->Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min=56.dp).padding(horizontal=8.dp).testTag("selection:bar"),verticalAlignment=Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().statusBarsPadding().heightIn(min=56.dp).padding(horizontal=8.dp).testTag("selection:bar"),verticalAlignment=Alignment.CenterVertically) {
         IconButton(onClick=onClose,enabled=!busy,modifier=Modifier.size(48.dp).testTag("selection:close")) { ShellIcon(R.drawable.ic_shell_back,"Exit selection") }
         Text("$count selected",Modifier.weight(1f).semantics { heading();liveRegion=LiveRegionMode.Polite },style=MaterialTheme.typography.titleLarge)
     }

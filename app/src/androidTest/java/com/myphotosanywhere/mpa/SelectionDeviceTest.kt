@@ -235,6 +235,12 @@ class SelectionDeviceTest {
                 val actions=compose.onNodeWithTag("photo:${fixture.photos[0].id}").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.CustomActions]
                 compose.runOnIdle { assertTrue(actions.single { it.label=="Select photo" }.action()) }
                 compose.onNodeWithTag("photo:${fixture.photos[0].id}").assertIsSelected()
+                val statusInset=compose.runOnIdle {
+                    requireNotNull(androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView))
+                        .getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top
+                }
+                val close=compose.onNodeWithTag("selection:close").fetchSemanticsNode().boundsInRoot
+                assertTrue("Selection controls clear the status bar",close.top>=statusInset-1)
                 compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:${added.last().id}"))
                 val tile=compose.onNodeWithTag("photo:${added.last().id}").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
                 val action=compose.onNodeWithTag("selection:SHARE").fetchSemanticsNode().boundsInRoot
