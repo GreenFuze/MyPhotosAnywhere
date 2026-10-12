@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -65,6 +66,7 @@ class MainActivity: ComponentActivity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         if(intent.action==com.myphotosanywhere.mpa.importing.ImportNotifications.ACTION_OPEN) importNavigation++
         setContent {
             val colors=if(isSystemInDarkTheme()) darkColorScheme(primary=Color(0xFF8BD5BE),secondary=Color(0xFFB1CCC3),

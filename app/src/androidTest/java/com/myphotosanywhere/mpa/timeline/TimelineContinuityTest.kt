@@ -47,6 +47,7 @@ class TimelineContinuityTest {
             compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:timeline-ui-70"))
             waitTag("photo:timeline-ui-70")
             val before=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInRoot.top
+            val beforeGridTop=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInRoot.top
             compose.onNodeWithTag("photo:timeline-ui-70").performClick()
             waitTag("viewer-screen");waitTag("original-image")
             compose.waitUntil(30000) { compose.onAllNodesWithText("71 / 120",substring=true).fetchSemanticsNodes().isNotEmpty() }
@@ -65,7 +66,8 @@ class TimelineContinuityTest {
             waitTag("photo:timeline-ui-70")
             compose.waitForIdle()
             val after=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInRoot.top
-            assertEquals("Viewer return must restore the same pixel offset",before,after,3f)
+            val afterGridTop=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInRoot.top
+            assertEquals("Viewer return must restore the same pixel offset (grid origin $beforeGridTop -> $afterGridTop)",before,after,3f)
             compose.onNodeWithTag("nav:Collections").performClick()
             compose.onNodeWithTag("nav:Photos").performClick()
             // Source filtering and its anchor survive a primary-destination round trip.

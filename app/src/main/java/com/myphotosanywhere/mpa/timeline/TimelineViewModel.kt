@@ -110,9 +110,14 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
         reconcileAnchor(request.value,anchor())
     }
 
-    fun open(entry: TimelineEntry,offset: Int?=null) {
+    fun open(entry: TimelineEntry,offset: Int?=null,viewport: TimelineAnchor?=null) {
         closeViewer(restore=false)
-        rememberAnchor(entry,offset ?: anchor()?.offset ?: 0)
+        // Gallery position and viewer page are independent. Preserve the first
+        // visible media and its measured offset, rather than positioning a later
+        // tapped tile with a large negative scroll offset.
+        val origin=viewport ?: anchor()
+        if(origin!=null) saved[anchorName(request.value.query)]=anchorBundle(origin.cursor,origin.offset)
+        else rememberAnchor(entry,offset ?: 0)
         _viewer.value=TimelineViewerState(entry)
         val query=request.value.query
         viewerJob=viewModelScope.launch {
@@ -136,7 +141,6 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
         }
     }
 
-    fun current(entry: TimelineEntry) { rememberAnchor(entry,anchor()?.offset ?: 0) }
     fun clearMessage() { _message.value=null }
     fun closeViewer(restore: Boolean=true) {
         observingAnchor=false

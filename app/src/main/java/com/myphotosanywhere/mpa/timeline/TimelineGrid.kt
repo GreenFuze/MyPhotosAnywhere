@@ -149,7 +149,11 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                         .semantics { heading() }.testTag("timeline:date:${row.date}"),style=MaterialTheme.typography.titleSmall)
                     is TimelineRow.Media -> TimelineThumbnail(row.entry,model,features) {
                         val offset=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==row.entry.key }?.offset?.y
-                        model.open(row.entry,offset?.let { -it })
+                        val viewport=state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
+                            (if(visible.index in 0 until rows.itemCount) rows.peek(visible.index) as? TimelineRow.Media else null)
+                                ?.entry?.let { TimelineAnchor(it.cursor,-visible.offset.y) }
+                        }
+                        model.open(row.entry,offset?.let { -it },viewport)
                     }
                     null -> Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant))
                 }

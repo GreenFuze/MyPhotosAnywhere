@@ -51,7 +51,7 @@ internal fun TimelineViewer(state: TimelineViewerState,model: TimelineViewModel,
                         val entry by produceState<TimelineEntry?>(null,session.id,page) { value=session.entry(page) }
                         val item=entry
                         LaunchedEffect(item,pager.currentPage) {
-                            if(item!=null && pager.currentPage==page) { current=item;model.current(item) }
+                            if(item!=null && pager.currentPage==page) { current=item }
                         }
                         if(item!=null) TimelineViewerPage(item,pager.currentPage==page,model,features,onSource)
                     }
