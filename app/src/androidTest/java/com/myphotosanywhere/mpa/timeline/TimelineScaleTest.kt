@@ -69,7 +69,7 @@ class TimelineScaleTest {
                 val selected=session.entry(session.initialPage)
                 assertEquals(around[45].key,selected.key);assertEquals(size,session.count)
                 val import=async(Dispatchers.IO) {
-                    database.openHelper.writableDatabase.execSQL("UPDATE cloud_photos SET capturedAt=? WHERE `key`=?",arrayOf(size+1,"scale:scale-000001"))
+                    database.openHelper.writableDatabase.execSQL("UPDATE cloud_photos SET capturedAt=? WHERE `key`=?",arrayOf<Any>(size+1,"scale:scale-000001"))
                 }
                 started=System.nanoTime()
                 val updated=repository.page(query,null,TimelineDirection.AFTER,60)

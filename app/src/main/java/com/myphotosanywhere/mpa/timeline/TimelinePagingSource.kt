@@ -24,6 +24,7 @@ internal class TimelinePagingSource(private val repository: TimelineRepository,p
             val last=entries.lastOrNull()?.cursor
             val previous=first?.takeIf { repository.page(query,it,TimelineDirection.BEFORE,1).isNotEmpty() }
             val next=last?.takeIf { repository.page(query,it,TimelineDirection.AFTER,1).isNotEmpty() }
+            if(invalid) return LoadResult.Invalid()
             if(params is LoadParams.Refresh) onRefresh()
             return LoadResult.Page(entries,previous,next)
         } catch(cancelled: CancellationException) { throw cancelled }

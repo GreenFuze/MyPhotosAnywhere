@@ -18,6 +18,7 @@ import coil.compose.AsyncImage
 import com.myphotosanywhere.mpa.library.LibraryFeaturesModel
 import com.myphotosanywhere.mpa.library.ViewerMediaContent
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -26,11 +27,7 @@ import java.io.File
 internal fun TimelineViewer(state: TimelineViewerState,model: TimelineViewModel,features: LibraryFeaturesModel,
     onEdit: (String)->Unit,onDetails: (String)->Unit,onSource: ()->Unit) {
     var current by remember(state.session?.id) { mutableStateOf(state.selected) }
-    val currentMedia by produceState<TimelineMedia?>(null,current) {
-        try { model.repository.media(current).collect { value=it } }
-        catch(cancelled: CancellationException) { throw cancelled }
-        catch(_: android.database.sqlite.SQLiteException) { value=null }
-    }
+    val currentMedia=rememberTimelineMedia(current,model.repository).media
     Dialog(onDismissRequest={ model.closeViewer() },properties=DialogProperties(usePlatformDefaultWidth=false)) {
         Surface(Modifier.fillMaxSize().testTag("viewer-screen"),color=Color.Black,contentColor=Color.White) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -75,13 +72,31 @@ private fun kotlinx.coroutines.CoroutineScope.launchPage(pager: androidx.compose
     launch { pager.animateScrollToPage(page) }
 }
 
+private class TimelineMediaState {
+    var media by mutableStateOf<TimelineMedia?>(null)
+    var problem by mutableStateOf<String?>(null)
+    var attempt by mutableIntStateOf(0)
+}
+
+@Composable
+private fun rememberTimelineMedia(entry: TimelineEntry,repository: TimelineRepository): TimelineMediaState {
+    val state=remember(entry) { TimelineMediaState() }
+    LaunchedEffect(entry,state.attempt) {
+        state.problem=null
+        try { repository.media(entry).collect { state.media=it } }
+        catch(cancelled: CancellationException) { throw cancelled }
+        catch(error: android.database.sqlite.SQLiteException) {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            state.problem=error.message ?: "Cannot read photo availability. Retry; the preview remains visible."
+        }
+    }
+    return state
+}
+
 @Composable
 private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: TimelineViewModel,features: LibraryFeaturesModel,onSource: ()->Unit) {
-    val media by produceState<TimelineMedia?>(null,entry) {
-        try { model.repository.media(entry).collect { value=it } }
-        catch(cancelled: CancellationException) { throw cancelled }
-        catch(_: android.database.sqlite.SQLiteException) { value=null }
-    }
+    val resolution=rememberTimelineMedia(entry,model.repository)
+    val media=resolution.media
     val busy by features.busy.collectAsStateWithLifecycle()
     val tasks by features.downloads.collectAsStateWithLifecycle()
     val task=tasks.find { it.key==entry.cloudKey }
@@ -91,7 +106,10 @@ private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: Timel
     LaunchedEffect(media?.cloud?.key,active,busy) {
         val value=media
         if(value!=null && active && !busy && !attempted && !model.repository.originalAvailable(value) && value.cloud!=null) {
-            attempted=true;features.download(value.cloud)
+            attempted=true
+            // Preserve durable failure/authentication states until the user chooses recovery.
+            val existing=model.repository.database.cloud().download(value.cloud.key)
+            if(existing?.state !in setOf("AUTH_REQUIRED","FAILED","PENDING","DOWNLOADING")) features.download(value.cloud)
         }
     }
     val preview=entry.thumbnailPath.takeIf { it.isNotBlank() }?.let(::File)
@@ -101,12 +119,14 @@ private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: Timel
         if(photo!=null) ViewerMediaContent(photo,features,active,preview)
         if(!available) Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),horizontalAlignment=Alignment.CenterHorizontally) {
             Text(when {
+                resolution.problem!=null -> requireNotNull(resolution.problem)
                 task?.state=="AUTH_REQUIRED" -> "Preview only — reconnect this Drive source."
                 task?.state=="FAILED" -> task.error ?: "Original download failed. Preview remains available."
                 media?.cloud==null -> "Preview only — this original is unavailable."
                 else -> "Preview only — waiting for a verified original. Network preference applies."
             },color=Color.White,style=MaterialTheme.typography.bodySmall)
-            if(task?.state=="AUTH_REQUIRED") TextButton(onClick=onSource) { Text("Manage source") }
+            if(resolution.problem!=null) TextButton(onClick={ resolution.attempt++ }) { Text("Retry availability") }
+            else if(task?.state=="AUTH_REQUIRED") TextButton(onClick=onSource) { Text("Manage source") }
             else media?.cloud?.let { cloud -> TextButton(enabled=!busy,onClick={ features.download(cloud,retry=true) }) { Text("Retry original") } }
         }
     }

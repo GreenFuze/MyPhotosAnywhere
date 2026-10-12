@@ -55,7 +55,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
         viewModelScope.launch {
             try {
                 val cursor=repository.reanchor(current.query,anchor.cursor)
-                if(cursor!=anchor.cursor && request.value==current) {
+                if(cursor!=anchor.cursor && request.value==current && anchor(current.query)==anchor) {
                     saved[anchorName(current.query)]=anchorBundle(cursor,anchor.offset)
                     request.value=current.copy(cursor=cursor,generation=current.generation+1)
                 }
@@ -117,8 +117,14 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
                     _viewer.value=TimelineViewerState(entry,session);handedOff=true
                 }
             } catch(cancelled: CancellationException) { throw cancelled }
-            catch(error: java.io.IOException) { _viewer.value=TimelineViewerState(entry,problem=error.message ?: "Cannot prepare browsing. Retry or return to the gallery.") }
-            catch(error: android.database.sqlite.SQLiteException) { _viewer.value=TimelineViewerState(entry,problem=error.message ?: "Cannot prepare browsing. Retry or return to the gallery.") }
+            catch(error: java.io.IOException) {
+                currentCoroutineContext().ensureActive()
+                _viewer.value=TimelineViewerState(entry,problem=error.message ?: "Cannot prepare browsing. Retry or return to the gallery.")
+            }
+            catch(error: android.database.sqlite.SQLiteException) {
+                currentCoroutineContext().ensureActive()
+                _viewer.value=TimelineViewerState(entry,problem=error.message ?: "Cannot prepare browsing. Retry or return to the gallery.")
+            }
             finally { if(!handedOff) withContext(NonCancellable+Dispatchers.IO) { session?.close() } }
         }
     }

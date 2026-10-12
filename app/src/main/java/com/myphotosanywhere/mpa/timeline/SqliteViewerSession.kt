@@ -38,7 +38,10 @@ internal class ViewerSessionStore(private val directory: File,private val reposi
         }
         val id=UUID.randomUUID().toString()
         val file=File(directory,"viewer-$id.db")
-        val index=SQLiteDatabase.openOrCreateDatabase(file,null)
+        // SQLite's native path parser also runs in host tests. Forward separators are
+        // accepted on both Android and Windows, unlike Windows File.toString paths.
+        val index=try { SQLiteDatabase.openOrCreateDatabase(file.absolutePath.replace('\\','/'),null) }
+        catch(error: android.database.sqlite.SQLiteException) { deleteIndex(file);throw error }
         var complete=false
         try {
             requireCapacity()
