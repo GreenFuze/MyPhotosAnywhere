@@ -64,6 +64,12 @@ internal class ViewerSessionStore(private val directory: File,private val reposi
                     currentCloud.bytes==selected.bytes && currentCloud.md5==selected.md5 && currentCloud.version==selected.version)
                     "photo:${currentCloud.photoId}" else selected.key
                 repository.database.openHelper.readableDatabase.query(TimelineSql(query).ordered()).use { cursor ->
+                    // Sequential snapshot traversal needs no backwards window padding.
+                    // Keep memory bounded while avoiding repeated full-query refills.
+                    if(android.os.Build.VERSION.SDK_INT>=28 && cursor is android.database.sqlite.SQLiteCursor) {
+                        cursor.window=android.database.CursorWindow("MPA viewer snapshot",8L*1024*1024)
+                        cursor.setFillWindowForwardOnly(true)
+                    }
                     index.compileStatement("INSERT INTO entries VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").use { statement ->
                         var transaction=false
                         try {

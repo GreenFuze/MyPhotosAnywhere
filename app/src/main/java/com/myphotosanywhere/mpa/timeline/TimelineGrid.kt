@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -84,7 +85,15 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 load is LoadState.NotLoading && ((items.isEmpty() && generation==restoration) || items.any { (it as? TimelineRow.Media)?.generation==restoration }) || load is LoadState.Error
             }
             val index=rows.itemSnapshotList.items.indexOfFirst { (it as? TimelineRow.Media)?.entry?.key==anchor.cursor.key }
-            if(index>=0) state.scrollToItem(index,anchor.offset)
+            if(index>=0) {
+                state.scrollToItem(index,anchor.offset)
+                // Full-span date rows can change the line selected by scrollToItem.
+                // Correct against the actual media bounds after measurement.
+                val placed=snapshotFlow {
+                    state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==anchor.cursor.key }
+                }.filterNotNull().first()
+                state.scrollBy((placed.offset.y+anchor.offset).toFloat())
+            }
             else {
                 // A real removal restores the nearest remaining identity, never a mutable old index.
                 val candidates=rows.itemSnapshotList.items.mapIndexedNotNull { position,row ->
