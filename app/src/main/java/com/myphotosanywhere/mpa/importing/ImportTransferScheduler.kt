@@ -18,8 +18,9 @@ class ImportTransferIds(context: Context) {
         if(existing!=0) return@synchronized existing
         val next=preferences.getInt("next",1_000_000)
         check(next in 1_000_000 until Int.MAX_VALUE) { "Import notification ID limit reached." }
-        check(preferences.edit().putInt("job:$job",next).putInt("next",next+1).commit()) {
-            "Cannot save import scheduling identity."
+        com.myphotosanywhere.mpa.core.CheckedPreferences(preferences).commit("Cannot save import scheduling identity.") {
+            putInt("job:$job",next)
+            putInt("next",next+1)
         }
         next
     }

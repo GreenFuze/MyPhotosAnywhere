@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.core
 
+import androidx.core.content.edit
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -17,11 +18,13 @@ class LibrarySettings(context: Context) {
     fun update(value: StorageSettings) {
         require(value.originalBudget>=0 && value.thumbnailBudget>=0)
         require(value.nightStart in 0..1439 && value.nightEnd in 0..1439 && value.nightStart!=value.nightEnd)
-        prefs.edit().putLong("originalBudget",value.originalBudget).putLong("thumbnailBudget",value.thumbnailBudget)
-            .putBoolean("faces",value.faceIndexing).putBoolean("objects",value.objectIndexing).putBoolean("maps",value.onlineMaps)
-            .putBoolean("sidecars",value.sidecarBackup).putBoolean("overnight",value.overnightIndexing)
-            .putInt("nightStart",value.nightStart).putInt("nightEnd",value.nightEnd)
-            .putBoolean("indexCloud",value.indexCloud).putBoolean("indexingPaused",value.indexingPaused).apply()
+        prefs.edit {
+            putLong("originalBudget",value.originalBudget);putLong("thumbnailBudget",value.thumbnailBudget)
+            putBoolean("faces",value.faceIndexing);putBoolean("objects",value.objectIndexing);putBoolean("maps",value.onlineMaps)
+            putBoolean("sidecars",value.sidecarBackup);putBoolean("overnight",value.overnightIndexing)
+            putInt("nightStart",value.nightStart);putInt("nightEnd",value.nightEnd)
+            putBoolean("indexCloud",value.indexCloud);putBoolean("indexingPaused",value.indexingPaused)
+        }
         state.value=value
     }
 }

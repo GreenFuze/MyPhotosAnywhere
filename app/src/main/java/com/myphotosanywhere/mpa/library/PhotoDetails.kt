@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.library
 
+import androidx.core.net.toUri
 import android.content.Intent
 import android.net.Uri
 import android.widget.VideoView
@@ -76,7 +77,7 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
             if(LibrarySearch.validCoordinates(photo.latitude,photo.longitude)) {
                 Text("GPS: %.5f, %.5f".format(photo.latitude,photo.longitude))
                 TextButton(onClick={
-                    try { context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("geo:${photo.latitude},${photo.longitude}?q=${photo.latitude},${photo.longitude}"))) }
+                    try { context.startActivity(Intent(Intent.ACTION_VIEW,"geo:${photo.latitude},${photo.longitude}?q=${photo.latitude},${photo.longitude}".toUri())) }
                     catch(_: android.content.ActivityNotFoundException) { model.message.value="Install a map app to open this location." }
                 }) { Text("Open in Maps") }
             }

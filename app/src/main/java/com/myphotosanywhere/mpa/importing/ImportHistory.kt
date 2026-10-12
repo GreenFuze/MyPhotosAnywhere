@@ -24,13 +24,13 @@ class ImportHistory(private val context: Context) {
         val job=database.imports().job(id) ?: return@withTransaction false
         if(!canDismiss(job.state)) return@withTransaction false
         withContext(Dispatchers.IO) { synchronized(lock) {
-            check(preferences.edit().putBoolean("job:$id",true).commit()) { "Cannot save import dismissal." }
+            com.myphotosanywhere.mpa.core.CheckedPreferences(preferences).commit("Cannot save import dismissal.") { putBoolean("job:$id",true) }
             ImportNotifications(context).clearSummary(id)
         } }
         true
     }
     suspend fun restore(id: String) = withContext(Dispatchers.IO) { synchronized(lock) {
-        check(preferences.edit().remove("job:$id").commit()) { "Cannot restore import history." }
+        com.myphotosanywhere.mpa.core.CheckedPreferences(preferences).commit("Cannot restore import history.") { remove("job:$id") }
     } }
     /** Share a lock with dismissal so a late worker cannot repost a dismissed summary. */
     fun withSummary(job: String,state: String,post: ()->Unit) = synchronized(lock) {

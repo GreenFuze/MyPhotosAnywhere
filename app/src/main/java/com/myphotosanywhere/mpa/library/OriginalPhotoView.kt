@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.library
 
+import androidx.core.graphics.withMatrix
 import android.content.Context
 import android.graphics.*
 import android.view.View
@@ -91,7 +92,11 @@ internal object OriginalImageGeometry {
 }
 
 /** Input gestures belong to Compose so a one-finger swipe can still page between photos. */
-internal class OriginalPhotoView(context: Context,private val openSource: (File)->OriginalImageReader = { OriginalImageSource(it) }): View(context),AutoCloseable {
+internal class OriginalPhotoView private constructor(context: Context,attrs: android.util.AttributeSet?,
+    private val openSource: (File)->OriginalImageReader): View(context,attrs),AutoCloseable {
+    constructor(context: Context): this(context,null,{ OriginalImageSource(it) })
+    constructor(context: Context,attrs: android.util.AttributeSet?): this(context,attrs,{ OriginalImageSource(it) })
+    constructor(context: Context,openSource: (File)->OriginalImageReader): this(context,null,openSource)
     private val worker=OriginalImageDecoding.worker
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private var source: OriginalImageReader?=null
@@ -99,6 +104,9 @@ internal class OriginalPhotoView(context: Context,private val openSource: (File)
     private var preview: Bitmap?=null
     private var tile: Bitmap?=null
     private var tileRect=Rect()
+    private val drawPreviewRect=RectF()
+    private val drawTileRect=RectF()
+    private var drawMatrix=Matrix()
     private var requested: Pair<Rect,Int>?=null
     @Volatile private var generation=0
     @Volatile private var closed=false
@@ -117,7 +125,7 @@ internal class OriginalPhotoView(context: Context,private val openSource: (File)
                 val image=opened.preview();val ready=opened
                 post {
                     if(closed) { image.recycle(); return@post }
-                    source=ready;preview=image
+                    source=ready;preview=image;updateDrawMatrix()
                     onQuality("Original · ${ready.width} × ${ready.height}" + if(!ready.supportsRegions) " · Preview only for this format" else "")
                     invalidate();requestTile()
                 }
@@ -136,10 +144,11 @@ internal class OriginalPhotoView(context: Context,private val openSource: (File)
     }
     fun transform(scale: Float,x: Float,y: Float) {
         if(zoom==scale && offsetX==x && offsetY==y) return
-        zoom=scale;offsetX=x;offsetY=y;invalidate();requestTile()
+        zoom=scale;offsetX=x;offsetY=y;updateDrawMatrix();invalidate();requestTile()
     }
     private fun imageMatrix(s: OriginalImageReader)=OriginalImageGeometry.matrix(s.width,s.height,s.orientation,width,height,zoom,offsetX,offsetY)
-    override fun onSizeChanged(w: Int,h: Int,oldw: Int,oldh: Int) { super.onSizeChanged(w,h,oldw,oldh);requestTile() }
+    private fun updateDrawMatrix() { source?.let { drawMatrix=imageMatrix(it) } }
+    override fun onSizeChanged(w: Int,h: Int,oldw: Int,oldh: Int) { super.onSizeChanged(w,h,oldw,oldh);updateDrawMatrix();requestTile() }
     private fun requestTile() {
         val s=source ?: return
         if(closed || !active || !tilesEnabled || !s.supportsRegions || width==0 || height==0) return
@@ -184,10 +193,12 @@ internal class OriginalPhotoView(context: Context,private val openSource: (File)
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val s=source ?: return
-        val save=canvas.save();canvas.concat(imageMatrix(s))
-        preview?.let { canvas.drawBitmap(it,null,RectF(0f,0f,s.width.toFloat(),s.height.toFloat()),paint) }
-        tile?.let { canvas.drawBitmap(it,null,RectF(tileRect),paint) }
-        canvas.restoreToCount(save)
+        drawPreviewRect.set(0f,0f,s.width.toFloat(),s.height.toFloat())
+        drawTileRect.set(tileRect)
+        canvas.withMatrix(drawMatrix) {
+            preview?.let { drawBitmap(it,null,drawPreviewRect,paint) }
+            tile?.let { drawBitmap(it,null,drawTileRect,paint) }
+        }
     }
     override fun close() {
         if(closed) return;closed=true;generation++

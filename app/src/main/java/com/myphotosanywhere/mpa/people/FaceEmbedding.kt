@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.people
 
+import androidx.core.graphics.createBitmap
 import android.content.Context
 import android.graphics.*
 import com.google.mlkit.vision.face.Face
@@ -41,7 +42,7 @@ class FaceEmbedding(context: Context): AutoCloseable {
         val mouth=floatArrayOf(detected[3].x,detected[3].y,detected[4].x,detected[4].y); matrix.mapPoints(mouth)
         if(kotlin.math.hypot(mouth[0]-target[3].x,mouth[1]-target[3].y)>14 ||
             kotlin.math.hypot(mouth[2]-target[4].x,mouth[3]-target[4].y)>14) return null
-        val bitmap=Bitmap.createBitmap(112,112,Bitmap.Config.ARGB_8888)
+        val bitmap=createBitmap(112,112,Bitmap.Config.ARGB_8888)
         Canvas(bitmap).drawBitmap(source,matrix,Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
         return bitmap
     }

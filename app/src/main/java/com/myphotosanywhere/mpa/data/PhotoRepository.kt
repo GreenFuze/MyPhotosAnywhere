@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.data
 
+import androidx.core.graphics.scale
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -131,7 +132,7 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
                     }
                     val image=retriever.getFrameAtTime(0) ?: error("No video preview.")
                     val scale=minOf(1.0,maximum.toDouble()/maxOf(image.width,image.height))
-                    val small=Bitmap.createScaledBitmap(image,maxOf(1,(image.width*scale).toInt()),maxOf(1,(image.height*scale).toInt()),true)
+                    val small=image.scale(maxOf(1,(image.width*scale).toInt()),maxOf(1,(image.height*scale).toInt()),true)
                     if(image!==small) image.recycle()
                     small
                 }

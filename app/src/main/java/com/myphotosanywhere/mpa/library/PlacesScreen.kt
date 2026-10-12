@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.library
 
+import androidx.core.net.toUri
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.*
@@ -40,7 +41,7 @@ fun PlacesScreen(photos: List<Photo>,online: Boolean,onOnline: (Boolean)->Unit,o
         }
         MapView(context).apply { setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); controller.setZoom(3.0); setUseDataConnection(false) }
     }
-    var zoom by remember { mutableStateOf(3.0) }
+    var zoom by remember { mutableDoubleStateOf(3.0) }
     var cluster by remember { mutableStateOf<List<Photo>>(emptyList()) }
     DisposableEffect(map) {
         val listener=object: MapListener {
@@ -77,7 +78,7 @@ fun PlacesScreen(photos: List<Photo>,online: Boolean,onOnline: (Boolean)->Unit,o
         }
         if(!online) Text("Photo locations work offline. Enable tiles to download the basemap; the tile service receives the viewed area.",style=MaterialTheme.typography.bodySmall)
         AndroidView(factory={ map },modifier=Modifier.fillMaxWidth().weight(1f))
-        TextButton(onClick={ context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://www.openstreetmap.org/copyright"))) }) { Text("© OpenStreetMap contributors · ODbL") }
+        TextButton(onClick={ context.startActivity(Intent(Intent.ACTION_VIEW,"https://www.openstreetmap.org/copyright".toUri())) }) { Text("© OpenStreetMap contributors · ODbL") }
         LazyColumn(Modifier.heightIn(max=140.dp)) { items(visible,key={ it.id }) { photo ->
             TextButton(onClick={ onPhoto(photo.id) }) { Text("${photo.placeLabel.ifBlank { "%.3f, %.3f".format(photo.latitude,photo.longitude) }} · ${photo.displayName}") }
         } }

@@ -18,7 +18,7 @@ class DriveTakeoutMetadata(private val context: Context) {
     private val lock=Mutex()
     fun enabled(binding: String)=preferences.getBoolean(binding,false)
     suspend fun enable(binding: String,value: Boolean) = withContext(Dispatchers.IO) {
-        check(preferences.edit().putBoolean(binding,value).commit())
+        com.myphotosanywhere.mpa.core.CheckedPreferences(preferences).commit("Cannot save Takeout metadata consent.") { putBoolean(binding,value) }
         if(value) db.drive().source(binding)?.let { schedule(binding,it.unmeteredOnly) }
         else WorkManager.getInstance(context).cancelUniqueWork("mpa-takeout:$binding")
     }

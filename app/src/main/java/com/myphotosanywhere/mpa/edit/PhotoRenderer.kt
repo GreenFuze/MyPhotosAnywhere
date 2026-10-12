@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.edit
 
+import androidx.core.graphics.createBitmap
 import android.graphics.*
 import com.myphotosanywhere.mpa.data.PhotoRepository
 import java.io.File
@@ -32,7 +33,7 @@ object PhotoRenderer {
                 val trimmed = Bitmap.createBitmap(current,(current.width-cw)/2,(current.height-ch)/2,cw,ch)
                 if(trimmed !== current) { current.recycle(); current=trimmed }
             }
-            val output = Bitmap.createBitmap(current.width,current.height,Bitmap.Config.ARGB_8888)
+            val output = createBitmap(current.width,current.height,Bitmap.Config.ARGB_8888)
             try {
                 val canvas=Canvas(output); canvas.drawColor(Color.BLACK)
                 canvas.drawBitmap(current,0f,0f,Paint(Paint.ANTI_ALIAS_FLAG).apply{colorFilter=ColorMatrixColorFilter(colors(recipe))})

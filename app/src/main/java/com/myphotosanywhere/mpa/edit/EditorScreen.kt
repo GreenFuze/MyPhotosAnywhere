@@ -29,7 +29,7 @@ fun EditorScreen(photoId: String,onClose: ()->Unit,onSaved: (String)->Unit,model
     val version by model.historyVersion.collectAsStateWithLifecycle()
     var markup by remember { mutableStateOf(false) }
     var stroke by remember { mutableStateOf<List<MarkPoint>>(emptyList()) }
-    var color by remember { mutableStateOf(0xFFFF5252.toInt()) }
+    var color by remember { mutableIntStateOf(0xFFFF5252.toInt()) }
     LaunchedEffect(photoId) { model.open(photoId) }
     LaunchedEffect(saved) { saved?.let(onSaved) }
     DisposableEffect(photoId) { onDispose { model.close() } }

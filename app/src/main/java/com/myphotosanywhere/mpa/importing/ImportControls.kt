@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.importing
 
+import androidx.core.net.toUri
 import android.accounts.AccountManager
 import android.app.Activity
 import android.app.Application
@@ -110,7 +111,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
     var driveZip by rememberSaveable { mutableStateOf(false) }
     var discardZip by rememberSaveable { mutableStateOf<String?>(null) }
     fun open(uri: String) {
-        try { context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(uri))) }
+        try { context.startActivity(Intent(Intent.ACTION_VIEW,uri.toUri())) }
         catch(_: Exception) { model.message.value="Install a browser to open Google Photos, then use Open picker below." }
     }
     val resolution=rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
