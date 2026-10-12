@@ -46,8 +46,11 @@ class TimelineContinuityTest {
             waitTag("photo:timeline-ui-0")
             compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:timeline-ui-70"))
             waitTag("photo:timeline-ui-70")
-            val before=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInRoot.top
-            val beforeGridTop=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInRoot.top
+            // Activity recreation can relocate the Compose root by a system inset.
+            // Window coordinates describe the actual visible position across roots.
+            val before=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInWindow.top
+            val beforeGridTop=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow.top
+            recordViewport("before")
             compose.onNodeWithTag("photo:timeline-ui-70").performClick()
             waitTag("viewer-screen");waitTag("original-image")
             compose.waitUntil(30000) { compose.onAllNodesWithText("71 / 120",substring=true).fetchSemanticsNodes().isNotEmpty() }
@@ -65,9 +68,11 @@ class TimelineContinuityTest {
             compose.onNodeWithTag("viewer-close").performClick()
             waitTag("photo:timeline-ui-70")
             compose.waitForIdle()
-            val after=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInRoot.top
-            val afterGridTop=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInRoot.top
+            val after=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInWindow.top
+            val afterGridTop=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow.top
+            recordViewport("after")
             assertEquals("Viewer return must restore the same pixel offset (grid origin $beforeGridTop -> $afterGridTop)",before,after,3f)
+            assertEquals("Viewer return must preserve the offset within the grid",before-beforeGridTop,after-afterGridTop,3f)
             compose.onNodeWithTag("nav:Collections").performClick()
             compose.onNodeWithTag("nav:Photos").performClick()
             // Source filtering and its anchor survive a primary-destination round trip.
@@ -86,5 +91,22 @@ class TimelineContinuityTest {
             app.database.drive().disconnectSource(source.key)
             file.delete()
         }
+    }
+
+    private fun recordViewport(name: String) {
+        val photo=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode()
+        val grid=compose.onNodeWithTag("photos:grid").fetchSemanticsNode()
+        android.util.Log.i("TimelineViewport","$name photo root=${photo.boundsInRoot} window=${photo.boundsInWindow}; grid root=${grid.boundsInRoot} window=${grid.boundsInWindow}")
+        if(android.os.Build.VERSION.SDK_INT<29) return
+        val bitmap=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+        try {
+            val values=android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"timeline-$name.png")
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE,"image/png")
+                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA")
+            }
+            val uri=requireNotNull(app.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,values))
+            requireNotNull(app.contentResolver.openOutputStream(uri)).use { check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it)) }
+        } finally { bitmap.recycle() }
     }
 }

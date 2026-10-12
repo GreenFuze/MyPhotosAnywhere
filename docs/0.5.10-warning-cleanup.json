@@ -1,7 +1,7 @@
 {
-  "status": "warning cleanup host validation passed; native validation pending",
+  "status": "local full regression passed; final CI matrix and release verification blocked by GitHub Actions billing",
   "unitTests": {
-    "tests": 208,
+    "tests": 226,
     "failures": 0,
     "errors": 0,
     "skipped": 0
@@ -22,5 +22,50 @@
   ],
   "distribution": "Local staging APKs are validation artifacts only; CI signer verification is required before release.",
   "S23UltraAcceptance": "unverified",
-  "reportedJpegCrash": "unverified"
+  "reportedJpegCrash": "unverified",
+  "localNative": {
+    "api": 35,
+    "tests": 43,
+    "failures": 0,
+    "errors": 0,
+    "emulator": "34.2.16; existing API 35 Google Play image; synthetic fixtures only",
+    "releaseEvidence": false,
+    "note": "Debugging coverage does not replace the pinned CI API 29/35/37 matrix."
+  },
+  "localBenchmarks": {
+    "api": 35,
+    "measurements": [
+      {
+        "items": 10000,
+        "firstPageMs": 144.102,
+        "seekMs": 89.4416,
+        "aroundPageMs": 170.5767,
+        "snapshotMs": 4818.9337,
+        "duringImportMs": 132.0498,
+        "snapshotImportMs": 0,
+        "pssBeforeKb": 268825,
+        "pssAfterKb": 279153,
+        "pageBudget": 300,
+        "pageRows": 90,
+        "indexBytes": 1908736
+      },
+      {
+        "items": 100000,
+        "firstPageMs": 1368.8092,
+        "seekMs": 967.2364,
+        "aroundPageMs": 2969.4719,
+        "snapshotMs": 54734.3465,
+        "duringImportMs": 1442.4565,
+        "snapshotImportMs": 14.6646,
+        "pssBeforeKb": 219125,
+        "pssAfterKb": 231805,
+        "pageBudget": 300,
+        "pageRows": 90,
+        "indexBytes": 19271680
+      }
+    ]
+  },
+  "localBenchmarkArtifact": "timeline-benchmark (1).json",
+  "releaseGate": "Passing final CI host/native checks and independent established-signer APK verification remain required.",
+  "ciBlocker": "GitHub Actions refuses to start jobs: recent account payments have failed or the spending limit needs to be increased."
 }
