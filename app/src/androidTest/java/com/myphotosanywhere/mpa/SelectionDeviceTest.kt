@@ -229,9 +229,8 @@ class SelectionDeviceTest {
             try {
                 runBlocking { added.forEach { app.database.photos().insert(it) } }
                 fixture.filter()
-                compose.onNodeWithTag("photo:${fixture.photos[0].id}").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.CustomActions) { actions ->
-                    assertTrue(actions.single { it.label=="Select photo" }.action())
-                }
+                val actions=compose.onNodeWithTag("photo:${fixture.photos[0].id}").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.CustomActions]
+                compose.runOnIdle { assertTrue(actions.single { it.label=="Select photo" }.action()) }
                 compose.onNodeWithTag("photo:${fixture.photos[0].id}").assertIsSelected()
                 compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:${added.last().id}"))
                 val tile=compose.onNodeWithTag("photo:${added.last().id}").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
