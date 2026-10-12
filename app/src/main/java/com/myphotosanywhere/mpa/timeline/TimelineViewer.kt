@@ -63,7 +63,7 @@ internal fun TimelineViewer(state: TimelineViewerState,model: TimelineViewModel,
                     }
                     ViewerActions(currentMedia?.photo,features,onEdit,showStatus=interactive)
                     Text("${pager.currentPage+1} / ${session.count}",
-                        style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(horizontal=16.dp,vertical=8.dp))
+                        style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(horizontal=16.dp,vertical=8.dp).testTag("viewer-position"))
                 }
             }
         }

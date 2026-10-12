@@ -52,7 +52,7 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
                 }
                 ViewerActions(current,model,onEdit,showStatus=!obscured)
                 Text("${pager.currentPage+1} / ${available.size}",
-                    style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(16.dp))
+                    style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(16.dp).testTag("viewer-position"))
             }
         }
     }

@@ -98,7 +98,7 @@ class ImportAndViewerDeviceTest {
             compose.onNodeWithTag("photo:$id").performClick()
             compose.waitUntil(10000) { compose.onAllNodes(hasText("Original · 640 × 480",substring=true)).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(photo.displayName).assertIsDisplayed()
-            fun footer()=compose.onNode(hasText("Swipe to browse",substring=true)).fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
+            fun footer()=compose.onNodeWithTag("viewer-position").fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
             val before=footer()
             for((index,newId) in added.withIndex()) {
                 app.database.photos().insert(photo.copy(id=newId,displayName="$newId.png",importedAt=photo.importedAt+index+1,
