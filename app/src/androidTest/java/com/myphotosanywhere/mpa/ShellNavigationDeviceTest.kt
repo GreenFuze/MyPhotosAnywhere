@@ -30,13 +30,15 @@ class ShellNavigationDeviceTest {
         back()
         compose.onNode(hasText("Places") and hasClickAction()).assertIsDisplayed().performClick()
         back()
-        compose.onNodeWithText("AI activity").performScrollTo().performClick()
+        compose.onNodeWithTag("collections:grid").performScrollToNode(hasText("AI activity"))
+        compose.onNodeWithText("AI activity").performClick()
         compose.onNodeWithText("AI activity").assertIsDisplayed()
         back()
         compose.onNodeWithTag("shell:storage").performClick()
         compose.onNodeWithText("Import Google Photos").assertExists()
         back()
-        compose.onNode(hasText("People") and hasClickAction()).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("collections:grid").performScrollToNode(hasTestTag("collections:People"))
+        compose.onNode(hasText("People") and hasClickAction()).assertIsDisplayed()
         compose.onNodeWithTag("nav:Collections").assertIsSelected()
     }
 

@@ -46,7 +46,7 @@ class SelectionDeviceTest {
         init { runBlocking { app.database.drive().saveSource(source);app.database.library().saveAlbum(album);photos.forEach { app.database.photos().insert(it) } } }
         fun filter() {
             compose.onNodeWithTag("shell:filters").performClick()
-            compose.onNodeWithText("Selection fixture · selection@test").performScrollTo().performClick()
+            compose.onNodeWithText("Selection fixture \u00b7 selection@test").performScrollTo().performClick()
             compose.onNodeWithText("Done").performScrollTo().performClick();waitTag("photo:${photos[0].id}")
         }
         fun verifyPreserved()=runBlocking { photos.forEachIndexed { index,photo ->
@@ -86,7 +86,8 @@ class SelectionDeviceTest {
             compose.onNodeWithTag("selection:album:${fixture.album.id}").performClick();finish()
             assertEquals(2,runBlocking { app.database.library().members(fixture.album.id).size })
             compose.onNodeWithTag("nav:Collections").performClick()
-            compose.onNodeWithTag("album:${fixture.album.id}").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("collections:grid").performScrollToNode(hasTestTag("album:${fixture.album.id}"))
+            compose.onNodeWithTag("album:${fixture.album.id}").assertIsDisplayed()
             saveScreenshot("collections-hub")
             compose.onNodeWithTag("album:${fixture.album.id}").performClick();waitTag("photo:${fixture.photos[0].id}")
             longPress("photo:${fixture.photos[0].id}");compose.onNodeWithText("Remove from album").performClick();finish()
