@@ -112,7 +112,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         if(failure!=null) TextButton(onClick=rows::retry,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("timeline:retry")) {
             Text("Library could not update. Available photos are shown. Retry")
         }
-        if(rows.itemCount==0 && refresh is LoadState.Loading) {
+        if(rows.itemCount==0 && (refresh is LoadState.Loading || refresh is LoadState.NotLoading && refreshedGeneration!=restoration)) {
             LazyVerticalGrid(GridCells.Fixed(3),modifier=Modifier.weight(1f).testTag("timeline:loading"),
                 horizontalArrangement=Arrangement.spacedBy(2.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
                 items(18) { Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant)) }
@@ -154,6 +154,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
 @Composable
 private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,features: LibraryFeaturesModel,onOpen: ()->Unit) {
     val context=LocalContext.current
+    var problem by remember(entry) { mutableStateOf<String?>(null) }
     val thumbnail by produceState<File?>(null,entry) {
         try {
             val media=model.repository.resolve(entry)
@@ -163,8 +164,8 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
                 com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(context,cloud,source?.connection())
             }
         } catch(cancelled: CancellationException) { throw cancelled }
-        catch(_: java.io.IOException) { value=null }
-        catch(_: android.database.sqlite.SQLiteException) { value=null }
+        catch(error: java.io.IOException) { problem=error.message ?: "Thumbnail unavailable" }
+        catch(error: android.database.sqlite.SQLiteException) { problem=error.message ?: "Cannot read thumbnail availability" }
     }
     val date=entry.millis?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toString() } ?: "Unknown date"
     Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant)
@@ -174,7 +175,11 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
         }) {
         AsyncImage(coil.request.ImageRequest.Builder(context).data(thumbnail ?: entry.thumbnailPath.takeIf { it.isNotBlank() }?.let(::File))
             .memoryCacheKey("${entry.key}:${entry.thumbnailRevision}:${entry.originalPath}").build(),null,
-            modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+            modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,
+            onError={ problem="Thumbnail unavailable. Open photo to retry." })
+        problem?.let { message -> Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+            com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_shell_warning,message)
+        } }
         if(entry.mimeType.startsWith("video/")) Box(Modifier.align(Alignment.BottomEnd).padding(4.dp)) {
             com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_shell_video,"Video")
         }
