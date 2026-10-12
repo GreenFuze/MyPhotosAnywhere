@@ -6,7 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.provider.MediaStore
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.myphotosanywhere.mpa.data.Photo

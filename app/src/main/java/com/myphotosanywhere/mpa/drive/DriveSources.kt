@@ -38,7 +38,7 @@ val SOURCES_MIGRATION_3_4 = object : Migration(3,4) {
         db.query("SELECT accountId,email,mode,folderId,folderName,backupEnabled,unmeteredOnly FROM drive_connection WHERE folderId IS NOT NULL").use { cursor ->
             while(cursor.moveToNext()) {
                 val account=cursor.getString(0); val folder=cursor.getString(3)
-                db.execSQL("INSERT INTO drive_sources VALUES (?,?,?,?,?,?,?,?,1)",arrayOf(
+                db.execSQL("INSERT INTO drive_sources VALUES (?,?,?,?,?,?,?,?,1)",arrayOf<Any>(
                     DriveBinding(account,folder).key,account,cursor.getString(1),cursor.getString(2),folder,
                     cursor.getString(4) ?: "Photo folder",cursor.getInt(5),cursor.getInt(6)))
             }

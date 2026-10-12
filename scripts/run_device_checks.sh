@@ -5,7 +5,8 @@ set -euo pipefail
 adb shell svc wifi disable
 adb shell svc data disable
 mpa_test_status=0
-./gradlew connectedDebugAndroidTest --no-daemon || mpa_test_status=$?
+mkdir -p build/diagnostics
+python3 scripts/gradle_checks.py --log build/diagnostics/device.log -- connectedDebugAndroidTest || mpa_test_status=$?
 
 # Keep all images, including intermediate navigation states, when assertions fail.
 mpa_screenshots=app/build/reports/androidTests/screenshots

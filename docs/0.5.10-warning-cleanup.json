@@ -1,0 +1,26 @@
+{
+  "status": "warning cleanup host validation passed; native validation pending",
+  "unitTests": {
+    "tests": 208,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lintFindings": 0,
+  "roomSchema": 9,
+  "roomSchemaSha256": "1cadf4f26de7a75b1caab671be9f8ce385a279e299dcae55f138751940c2df83",
+  "warningGate": {
+    "gradleExitCode": 1,
+    "acceptedUpstreamWarning": true,
+    "warning": "The Configuration.setVisible(boolean) method has been deprecated.",
+    "diagnosticOccurrences": 15
+  },
+  "nativeStripping": "passed with stable NDK 30.0.16248370; no stripping diagnostic",
+  "apkBuilds": [
+    "assembleDebug",
+    "assembleDebugAndroidTest"
+  ],
+  "distribution": "Local staging APKs are validation artifacts only; CI signer verification is required before release.",
+  "S23UltraAcceptance": "unverified",
+  "reportedJpegCrash": "unverified"
+}

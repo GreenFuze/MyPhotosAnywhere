@@ -161,10 +161,10 @@ class DriveIngestionTest {
         assertNotNull(db.cloud().sync(binding)?.scanGeneration)
         assertEquals(0, db.cloud().sync(binding)?.scanPages)
         assertEquals(0L, db.cloud().sync(binding)?.lastScan)
-        val listing = (1..server.requestCount).map { server.takeRequest() }.last().requestUrl
-        assertTrue(requireNotNull(listing?.queryParameter("fields")).contains("incompleteSearch"))
-        assertEquals("true", listing?.queryParameter("supportsAllDrives"))
-        assertEquals("true", listing?.queryParameter("includeItemsFromAllDrives"))
+        val listing = requireNotNull((1..server.requestCount).map { server.takeRequest() }.last().requestUrl)
+        assertTrue(requireNotNull(listing.queryParameter("fields")).contains("incompleteSearch"))
+        assertEquals("true", listing.queryParameter("supportsAllDrives"))
+        assertEquals("true", listing.queryParameter("includeItemsFromAllDrives"))
     }
 
     @Test fun rejectedFileListCursorStartsANewGenerationWithoutTombstones() = runBlocking<Unit> {

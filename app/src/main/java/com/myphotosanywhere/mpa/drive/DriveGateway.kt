@@ -63,7 +63,7 @@ class DriveGateway(
             it.username.isEmpty() && it.password.isEmpty()) { "Invalid Drive thumbnail host." }
     })) { r ->
         checkSuccess(r)
-        val body=r.body ?: error("Drive thumbnail missing.")
+        val body=r.body
         require(body.contentLength()<=2*1024*1024) { "Drive thumbnail too large." }
         body.byteStream().use { input -> target.outputStream().use { output ->
             val data=ByteArray(16384); var total=0
@@ -100,7 +100,7 @@ class DriveGateway(
             }
             val revision=response.header("ETag") ?: error("Drive ZIP revision missing. Source preserved.")
             require(etag==null || revision==etag) { "Drive ZIP changed during import. Source preserved." }
-            val body=response.body ?: error("Empty Drive ZIP range.")
+            val body=response.body
             require(body.contentLength()==-1L || body.contentLength()==count.toLong()) { "Drive ZIP range length mismatch." }
             val bytes=body.byteStream().use { input ->
                 val data=ByteArray(count); var read=0
@@ -170,7 +170,7 @@ class DriveGateway(
     suspend fun download(id: String, target: File, maximumBytes: Long) = execute(Request.Builder()
         .url(url("files/$id", "alt" to "media", "supportsAllDrives" to "true"))) { r ->
             checkSuccess(r)
-            val body = r.body ?: error("Drive returned no image.")
+            val body = r.body
             if (body.contentLength() > maximumBytes) error("This image exceeds the local import limit.")
             body.byteStream().use { input -> target.outputStream().use { output ->
                 val buffer = ByteArray(64 * 1024)
@@ -198,7 +198,7 @@ class DriveGateway(
         .url(url("files/$id", "alt" to "media", "supportsAllDrives" to "true"))) { r ->
         checkSuccess(r)
         val tag=r.header("ETag") ?: error("Drive did not return an annotation revision. Metadata is preserved.")
-        val body=r.body ?: error("Empty metadata file.")
+        val body=r.body
         require(body.contentLength()<=com.myphotosanywhere.mpa.metadata.XmpCodec.MAX_BYTES)
         val bytes=body.byteStream().use { input ->
             val out=java.io.ByteArrayOutputStream(); val buffer=ByteArray(16384)
@@ -260,7 +260,7 @@ class DriveGateway(
 
     private suspend fun json(builder: Request.Builder): JsonObject = execute(builder) { r ->
         checkSuccess(r)
-        JsonParser.parseString(r.body?.string() ?: error("Drive returned no response.")).asJsonObject
+        JsonParser.parseString(r.body.string()).asJsonObject
     }
 
     private suspend fun <T> execute(builder: Request.Builder, read: (Response) -> T): T = withContext(Dispatchers.IO) {
@@ -274,7 +274,7 @@ class DriveGateway(
     private fun checkSuccess(r: Response) {
         if (r.isSuccessful) return
         val reason = runCatching {
-            JsonParser.parseString(r.body?.string()).asJsonObject.getAsJsonObject("error")
+            JsonParser.parseString(r.body.string()).asJsonObject.getAsJsonObject("error")
                 .getAsJsonArray("errors")?.firstOrNull()?.asJsonObject?.string("reason")
         }.getOrNull()
         throw DriveHttpException(r.code, reason)

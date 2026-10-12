@@ -1,5 +1,7 @@
 package com.myphotosanywhere.mpa.people
 
+import androidx.core.content.edit
+import androidx.core.graphics.scale
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.room.withTransaction
@@ -26,7 +28,7 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
     val progress=kotlinx.coroutines.flow.MutableStateFlow(IndexProgress("Ready",prefs.getInt("done",0),prefs.getInt("total",0),prefs.getInt("errors",0)))
     private fun report(status: String,done: Int,total: Int,errors: Int) {
         progress.value=IndexProgress(status,done,total,errors)
-        prefs.edit().putInt("done",done).putInt("total",total).putInt("errors",errors).apply()
+        prefs.edit { putInt("done",done);putInt("total",total);putInt("errors",errors) }
     }
     fun pause() {
         settings.update(settings.state.value.copy(indexingPaused=true))
@@ -109,7 +111,7 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
                 app.downloads.enqueue(rows.removeAt(0)); remaining--; queued++
             } }
         }
-        prefs.edit().putInt("sourceCursor",(cursor+1).mod(sources.size)).apply()
+        prefs.edit { putInt("sourceCursor",(cursor+1).mod(sources.size)) }
         return queued
     }
     /** A per-photo checksum/model checkpoint survives process death; batches cap runtime and heat. */
@@ -159,13 +161,13 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
                                         val x=(region.left*image.width).toInt().coerceIn(0,image.width-1); val y=(region.top*image.height).toInt().coerceIn(0,image.height-1)
                                         val w=((region.right-region.left)*image.width).toInt().coerceIn(1,image.width-x)
                                         val h=((region.bottom-region.top)*image.height).toInt().coerceIn(1,image.height-y)
-                                        val crop=Bitmap.createBitmap(image,x,y,w,h); val small=Bitmap.createScaledBitmap(crop,160,160,true)
+                                        val crop=Bitmap.createBitmap(image,x,y,w,h); val small=crop.scale(160,160,true)
                                         // A new filename avoids destroying a previous crop if this batch is cancelled.
                                         val path=File(context.filesDir,"faces/${UUID.randomUUID()}.jpg"); path.parentFile?.mkdirs(); generated.add(path)
                                         try { path.outputStream().use { check(small.compress(Bitmap.CompressFormat.JPEG,85,it)) } }
                                         finally { if(small!==crop) small.recycle(); if(crop!==image) crop.recycle() }
                                         val aligned=model?.aligned(image,face)
-                                        val embedding=if(aligned==null) null else try { model?.embed(aligned) } finally { aligned.recycle() }
+                                        val embedding=if(aligned==null) null else try { model.embed(aligned) } finally { aligned.recycle() }
                                         val base=old ?: FaceRecord(id,photo.id,"",null)
                                         saved.add(base.copy(cropPath=path.absolutePath,embedding=embedding,left=region.left,top=region.top,
                                             right=region.right,bottom=region.bottom,imageWidth=image.width,imageHeight=image.height,modelVersion=MODEL_VERSION))

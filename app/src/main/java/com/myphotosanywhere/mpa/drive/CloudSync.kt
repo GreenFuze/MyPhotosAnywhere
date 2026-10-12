@@ -97,8 +97,8 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
         val shared=if(account!=null && file.md5!=null) cloud.sameAccountCopy(account,file.id,file.md5,file.bytes) else null
         val oldMatches=file.md5!=null && old?.md5==file.md5 && old.bytes==file.bytes
         val backupMatches=file.md5!=null && backup?.remoteMd5==file.md5 && backup.uploadedBytes==file.bytes
-        val linkedId=(if(oldMatches) old?.photoId else null) ?:
-            (if(backupMatches) backup?.photoId else null) ?: shared?.photoId
+        val linkedId=(if(oldMatches) old.photoId else null) ?:
+            (if(backupMatches) backup.photoId else null) ?: shared?.photoId
         val linked=linkedId?.let { database.photos().find(it) }
         if(linked!=null && linked.sourceRemoteId==file.id && linked.cachedVersion==old?.version && oldMatches)
             database.photos().update(linked.copy(cachedVersion=file.version,displayName=file.name))
@@ -108,8 +108,8 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
         }
         cloud.savePhoto(CloudPhoto("$binding:${file.id}",binding,file.id,parent,file.name,file.mimeType,file.bytes,file.md5,
             file.version,file.modifiedTime,file.capturedAt,file.latitude,file.longitude,
-            thumbnailPath,if(oldMatches) old?.thumbnailVersion else null,linkedId,false,generation,file.assetId,file.sourceAssetId,
-            if(oldMatches) old?.thumbnailUpdatedAt ?: 0 else 0,sha256=file.sha256))
+            thumbnailPath,if(oldMatches) old.thumbnailVersion else null,linkedId,false,generation,file.assetId,file.sourceAssetId,
+            if(oldMatches) old.thumbnailUpdatedAt else 0,sha256=file.sha256))
     }
     suspend fun thumbnail(api: DriveGateway,binding: String,file: DriveFile) {
         val row=cloud.photo("$binding:${file.id}") ?: return
