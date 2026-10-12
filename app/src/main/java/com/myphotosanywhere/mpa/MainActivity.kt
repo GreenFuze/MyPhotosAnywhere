@@ -155,7 +155,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             selectedProblem=error.message ?: "Cannot read this photo. Retry."
         }
     }
-    val selected=selectedState.value
+    val selected=selectedState.value?.takeIf { it.id==selectedId }
     if(selectedId!=null && selected==null && editorId==null && viewerId==null && pendingViewKey==null) {
         AlertDialog(onDismissRequest={ selectedId=null },title={ Text("Photo details") },
             text={ Text(selectedProblem ?: "Loading photo details…") },

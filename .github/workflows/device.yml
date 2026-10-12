@@ -19,6 +19,12 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v6.4.0
+      - name: Reserve emulator disk space
+        run: |
+          # These unrelated preinstalled runtimes are unused by MPA's Java/Python checks.
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost
+          df -h .
+          python3 -c 'import shutil; assert shutil.disk_usage(".").free >= 14 * 1024**3, "Insufficient space for the API 37 image and userdata"'
       - name: Install pinned stable Android SDK
         run: python3 scripts/ci_android_sdk.py ${{ matrix.api }}
       - name: Enable emulator acceleration
