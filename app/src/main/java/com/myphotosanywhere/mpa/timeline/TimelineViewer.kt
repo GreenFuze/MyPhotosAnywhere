@@ -5,6 +5,10 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.myphotosanywhere.mpa.library.ViewerTopBar
+import com.myphotosanywhere.mpa.library.ViewerActions
+import com.myphotosanywhere.mpa.library.viewerDetailsSwipe
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,22 +29,19 @@ import java.io.File
 /** Presentation adapter only: originals, gestures, decoders, leases and video resources remain shared. */
 @Composable
 internal fun TimelineViewer(state: TimelineViewerState,model: TimelineViewModel,features: LibraryFeaturesModel,
-    onEdit: (String)->Unit,onDetails: (String)->Unit,onSource: ()->Unit) {
+    onEdit: (String)->Unit,onDetails: (String)->Unit,onSource: ()->Unit,obscured: Boolean=false) {
     var current by remember(state.session?.id) { mutableStateOf(state.selected) }
     val currentMedia=rememberTimelineMedia(current,model.repository).media
+    var remoteDetailsKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val openDetails: ()->Unit={ currentMedia?.photo?.let { onDetails(it.id) } ?: run { remoteDetailsKey=current.key } }
+    val interactive=!obscured && remoteDetailsKey==null
     Dialog(onDismissRequest={ model.closeViewer() },properties=DialogProperties(usePlatformDefaultWidth=false)) {
         Surface(Modifier.fillMaxSize().testTag("viewer-screen"),color=Color.Black,contentColor=Color.White) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                Row(Modifier.fillMaxWidth().padding(8.dp),horizontalArrangement=Arrangement.SpaceBetween) {
-                    TextButton(modifier=Modifier.testTag("viewer-close"),onClick={ model.closeViewer() }) { Text("Close",color=Color.White) }
-                    val photo=currentMedia?.photo
-                    TextButton(enabled=photo!=null,modifier=Modifier.testTag("viewer-details"),onClick={ photo?.let { onDetails(it.id) } }) { Text("Details",color=Color.White) }
-                    if(current.mimeType.startsWith("image/")) TextButton(enabled=photo!=null,onClick={ photo?.let { onEdit(it.id) } }) { Text("Edit",color=Color.White) }
-                }
-                Text(current.name,maxLines=1,modifier=Modifier.padding(horizontal=16.dp))
+                ViewerTopBar(current.millis,current.name,{ model.closeViewer() },openDetails)
                 val session=state.session
                 if(session==null) {
-                    Box(Modifier.fillMaxWidth().weight(1f)) { TimelineViewerPage(state.selected,true,model,features,onSource) }
+                    Box(Modifier.fillMaxWidth().weight(1f)) { TimelineViewerPage(state.selected,true,model,features,onSource,interactive,openDetails) }
                     if(state.problem!=null) {
                         Text(state.problem,Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall)
                         TextButton(onClick={ model.open(state.selected) },modifier=Modifier.heightIn(min=48.dp)) { Text("Retry browsing") }
@@ -53,18 +54,23 @@ internal fun TimelineViewer(state: TimelineViewerState,model: TimelineViewModel,
                         LaunchedEffect(item,pager.currentPage) {
                             if(item!=null && pager.currentPage==page) { current=item }
                         }
-                        if(item!=null) TimelineViewerPage(item,pager.currentPage==page,model,features,onSource)
+                        if(item!=null) TimelineViewerPage(item,pager.currentPage==page,model,features,onSource,interactive,openDetails)
                     }
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
                         val coroutine=rememberCoroutineScope()
                         TextButton(enabled=pager.currentPage>0,onClick={ coroutine.launchPage(pager,pager.currentPage-1) }) { Text("Previous") }
                         TextButton(enabled=pager.currentPage<session.count-1,onClick={ coroutine.launchPage(pager,pager.currentPage+1) }) { Text("Next") }
                     }
-                    Text("${pager.currentPage+1} / ${session.count} · Swipe to browse · Pinch or double-tap to zoom",
+                    ViewerActions(currentMedia?.photo,features,onEdit,showStatus=interactive)
+                    Text("${pager.currentPage+1} / ${session.count}",
                         style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(horizontal=16.dp,vertical=8.dp))
                 }
             }
         }
+    }
+    remoteDetailsKey?.let { key ->
+        RemotePhotoDetails(current.takeIf { it.key==key },currentMedia.takeIf { current.key==key },features,
+            onClose={ remoteDetailsKey=null },onSource=onSource)
     }
 }
 
@@ -94,7 +100,7 @@ private fun rememberTimelineMedia(entry: TimelineEntry,repository: TimelineRepos
 }
 
 @Composable
-private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: TimelineViewModel,features: LibraryFeaturesModel,onSource: ()->Unit) {
+private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: TimelineViewModel,features: LibraryFeaturesModel,onSource: ()->Unit,interactive: Boolean,onDetails: ()->Unit) {
     val resolution=rememberTimelineMedia(entry,model.repository)
     val media=resolution.media
     val busy by features.busy.collectAsStateWithLifecycle()
@@ -113,10 +119,10 @@ private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: Timel
         }
     }
     val preview=entry.thumbnailPath.takeIf { it.isNotBlank() }?.let(::File)
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().then(if(media?.photo==null) Modifier.viewerDetailsSwipe(entry.key,active && interactive,onDetails=onDetails) else Modifier)) {
         if(preview!=null) AsyncImage(preview,"Preview",Modifier.fillMaxSize(),contentScale=ContentScale.Fit)
         val photo=media?.photo
-        if(photo!=null) ViewerMediaContent(photo,features,active,preview)
+        if(photo!=null) ViewerMediaContent(photo,features,active,preview,interactive,onDetails)
         if(!available) Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),horizontalAlignment=Alignment.CenterHorizontally) {
             Text(when {
                 resolution.problem!=null -> requireNotNull(resolution.problem)

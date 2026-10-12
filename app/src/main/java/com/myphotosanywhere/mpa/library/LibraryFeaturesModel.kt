@@ -158,8 +158,9 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         },"Share photo").apply { addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) })
     }
-    fun export(photo: Photo,uri: Uri) = perform {
-        app.cache.withOriginal(photo.id) { _,original ->
+    fun export(photo: Photo,uri: Uri) = export(photo.id,uri)
+    fun export(id: String,uri: Uri) = perform {
+        app.cache.withOriginal(id) { _,original ->
             app.contentResolver.openOutputStream(uri)?.use { out ->
                 original.inputStream().use { it.copyTo(out) }
             } ?: error("Cannot write the exported photo.")

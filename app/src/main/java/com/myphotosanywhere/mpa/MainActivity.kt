@@ -100,6 +100,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var resultHandoffId by rememberSaveable { mutableStateOf<String?>(null) }
     var showShare by rememberSaveable { mutableStateOf(false) }
+    var viewerDetailsOpen by rememberSaveable { mutableStateOf(false) }
     var viewerId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingViewKey by rememberSaveable { mutableStateOf<String?>(null) }
     var editorId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -128,7 +129,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         if(uri!=null) resultHandoffId?.let { model.importResult(uri,it) }; resultHandoffId=null
     }
     val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
-        if(uri!=null) photos.find { it.id==exportId }?.let { features.export(it,uri) }; exportId=null
+        if(uri!=null) exportId?.let { features.export(it,uri) }; exportId=null
     }
     fun pickResult(handoff: Handoff) { resultHandoffId=handoff.id; importResult.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
     fun selectPhoto(id: String) { selectedId=id; showShare=false }
@@ -158,12 +159,6 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         }
     }
     val selected=selectedState.value?.takeIf { it.id==selectedId }
-    if(selectedId!=null && selected==null && editorId==null && viewerId==null && pendingViewKey==null) {
-        AlertDialog(onDismissRequest={ selectedId=null },title={ Text("Photo details") },
-            text={ Text(selectedProblem ?: "Loading photo details…") },
-            confirmButton={ if(selectedProblem!=null) TextButton(onClick={ selectedAttempt++ }) { Text("Retry") } },
-            dismissButton={ TextButton(onClick={ selectedId=null }) { Text("Close") } })
-    }
     val localIds=remember(photos) { photos.map { it.id }.toSet() }
     val cloudByPhoto=remember(cloud,sources,sourceKey) {
         val enabled=sources.map { it.key }.toSet()
@@ -344,21 +339,27 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     }
     timelineViewer?.let { session -> TimelineViewer(session,timeline,features,
         onEdit={ timeline.closeViewer();selectedId=it;editorId=it },
-        onDetails={ timeline.closeViewer();selectedId=it },
+        onDetails={ selectedId=it;viewerDetailsOpen=true },obscured=viewerDetailsOpen || editorId!=null || showShare,
         onSource={ timeline.closeViewer();navigation.open(ShellDestination.STORAGE) }) }
     pendingViewKey?.let { key -> DriveOriginalDialog(cloud.find { it.key==key },features,onClose={ pendingViewKey=null;selectedId=null },onReady={
         pendingViewKey=null;selectedId=it;viewerId=it
     }) }
-    if(selected!=null && !showShare && editorId==null && viewerId==null && pendingViewKey==null) PhotoDetails(selected,features,albums,memberships,people,faces,
-        onClose={ selectedId=null },onEdit={ editorId=selected.id },onAI={ showShare=true },onExport={
+    viewerId?.let { id -> PhotoViewer(photos.filter { it.id==id || presence.showLocal(it,filter,albumId!=null || personId!=null) },id,features,
+        onClose={ viewerId=null;selectedId=null;viewerDetailsOpen=false },obscured=viewerDetailsOpen || editorId!=null || showShare,onCurrent={ selectedId=it },
+        onEdit={ viewerId=null; selectedId=it; editorId=it },onDetails={ selectedId=it;viewerDetailsOpen=true }) }
+    if(selectedId!=null && selected==null && editorId==null && (viewerId==null || viewerDetailsOpen) && pendingViewKey==null) {
+        AlertDialog(onDismissRequest={ selectedId=null;viewerDetailsOpen=false },title={ Text("Photo details") },
+            text={ Text(selectedProblem ?: "Loading photo details…") },
+            confirmButton={ if(selectedProblem!=null) TextButton(onClick={ selectedAttempt++ }) { Text("Retry") } },
+            dismissButton={ TextButton(onClick={ selectedId=null;viewerDetailsOpen=false }) { Text("Close") } })
+    }
+    if(selected!=null && !showShare && editorId==null && (viewerId==null || viewerDetailsOpen) && pendingViewKey==null && (timelineViewer==null || viewerDetailsOpen)) PhotoDetails(selected,features,albums,memberships,people,faces,
+        onClose={ viewerDetailsOpen=false;if(viewerId==null) selectedId=null },onEdit={ editorId=selected.id },onAI={ showShare=true },onExport={
             exportId=selected.id; export.launch(selected.displayName)
-        },onResult=handoffs.firstOrNull { it.photoId==selected.id }?.let { h -> { pickResult(h) } },onView={ viewerId=selected.id })
+        },onResult=handoffs.firstOrNull { it.photoId==selected.id }?.let { h -> { pickResult(h) } },onView=if(viewerId==null && timelineViewer==null) ({ viewerId=selected.id }) else null,showPreview=viewerId==null && timelineViewer==null)
     if(selected!=null && showShare) ShareDialog(busy,onDismiss={ showShare=false }) { provider,instructions ->
         model.share(selected,provider,instructions) { intent -> context.startActivity(intent); showShare=false }
     }
-    viewerId?.let { id -> PhotoViewer(photos.filter { it.id==id || presence.showLocal(it,filter,albumId!=null || personId!=null) },id,features,
-        onClose={ viewerId=null;selectedId=null },onCurrent={ selectedId=it },
-        onEdit={ viewerId=null; selectedId=it; editorId=it },onDetails={ viewerId=null;selectedId=it }) }
     editorId?.let { id -> EditorScreen(id,onClose={ editorId=null },onSaved={ saved -> editorId=null; selectedId=saved }) }
 }
 
