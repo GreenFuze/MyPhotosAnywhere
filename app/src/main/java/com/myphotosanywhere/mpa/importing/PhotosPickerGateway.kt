@@ -68,7 +68,7 @@ class PhotosPickerGateway(private val token: String,
         }
         error("Photos selection exceeds the supported 2,000 items.")
     }
-    suspend fun download(media: PickedMedia, target: File, keepGoing: suspend () -> Unit) = withContext(Dispatchers.IO) {
+    suspend fun download(media: PickedMedia, target: File, storage: com.myphotosanywhere.mpa.data.StorageBudget, keepGoing: suspend () -> Unit) = withContext(Dispatchers.IO) {
         require(media.videoReady) { "Google is still processing this video. Retry later." }
         val base = media.baseUrl.toHttpUrl()
         require(base.scheme == "https" && (base.host == "googleusercontent.com" || base.host.endsWith(".googleusercontent.com")) &&
@@ -76,16 +76,16 @@ class PhotosPickerGateway(private val token: String,
         val suffix = if(media.mime.startsWith("video/")) "=dv" else "=d"
         client.newCall(Request.Builder().url(media.baseUrl + suffix).header("Authorization", "Bearer $token").build()).execute().use { response ->
             checkResponse(response)
-            val body = response.body ?: error("Photos returned no media.")
+            val body = response.body
             require(body.contentLength() <= TakeoutDocuments.MAX_MEDIA) { "Photos media exceeds 250 MiB. Source is preserved." }
-            body.byteStream().use { TakeoutDocuments.copyBounded(it,target,keepGoing) }
+            body.byteStream().use { TakeoutDocuments.copyBounded(it,target,storage,keepGoing) }
         }
     }
     private fun url(path: String) = api.newBuilder().apply { path.split('/').forEach { addPathSegment(it) } }.build()
     private suspend fun json(request: Request.Builder): JsonObject = withContext(Dispatchers.IO) {
         client.newCall(request.header("Authorization","Bearer $token").build()).execute().use { response ->
             checkResponse(response)
-            JsonParser.parseString(response.body?.string() ?: error("Empty Photos response.")).asJsonObject
+            JsonParser.parseString(response.body.string()).asJsonObject
         }
     }
     private fun checkResponse(response: Response) {

@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.importing
 
+import androidx.core.net.toUri
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -11,9 +12,11 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 /** Read the granted descriptor directly; reopening its proc path can fail under Android scoped storage. */
-class TakeoutDocuments(private val context: Context, private val openRemote: (suspend (Uri)->ZipFile)?=null) {
+class TakeoutDocuments(private val context: Context, storageBudget: com.myphotosanywhere.mpa.data.StorageBudget?=null,
+    private val openRemote: (suspend (Uri)->ZipFile)?=null) {
     private val resolver get() = context.contentResolver
     private val codec = TakeoutCodec()
+    private val storage by lazy { storageBudget ?: com.myphotosanywhere.mpa.data.StorageBudget(context) }
 
     suspend fun manifest(job: String, uri: Uri, tree: Boolean): List<ImportItem> {
         val result = mutableListOf<ImportItem>()
@@ -101,12 +104,12 @@ class TakeoutDocuments(private val context: Context, private val openRemote: (su
     }
 
     suspend fun stage(item: ImportItem, target: File, keepGoing: suspend () -> Unit): MediaFingerprint {
-        val uri = Uri.parse(item.uri)
+        val uri = item.uri.toUri()
         val hashes=if (item.crc >= 0) archive(uri) { zip ->
             val entry = zip.getEntry(item.path) ?: error("Archive entry missing. Reselect the unchanged export.")
             require(entry.crc == item.crc && entry.size == item.size) { "Archive changed since preview." }
-            zip.getInputStream(entry).use { copyBounded(it, target, keepGoing) }
-        } else resolver.openInputStream(uri)?.use { copyBounded(it, target, keepGoing) }
+            zip.getInputStream(entry).use { copyBounded(it, target, storage, keepGoing) }
+        } else resolver.openInputStream(uri)?.use { copyBounded(it, target, storage, keepGoing) }
             ?: error("Document access was lost. Reselect the source.")
         require(item.size <= 0 || target.length() == item.size) { "Document changed since preview." }
         require(item.crc<0 || hashes.crc==item.crc) { "Archive entry checksum failed. Source preserved." }
@@ -152,13 +155,14 @@ class TakeoutDocuments(private val context: Context, private val openRemote: (su
     companion object {
         const val MAX_MEDIA = 250L * 1024 * 1024
         fun stableId(value: String) = java.util.UUID.nameUUIDFromBytes(value.toByteArray(Charsets.UTF_8)).toString()
-        suspend fun copyBounded(input: InputStream, target: File, keepGoing: suspend () -> Unit = {}): MediaFingerprint {
+        suspend fun copyBounded(input: InputStream, target: File, storage: com.myphotosanywhere.mpa.data.StorageBudget, keepGoing: suspend () -> Unit = {}): MediaFingerprint {
             target.parentFile?.mkdirs()
             var bytes = 0L
             val hashes=MediaFingerprint.Accumulator()
             val checkpoint=MediaReadCheckpoint(action={
                 keepGoing()
-                require(target.parentFile!!.usableSpace > 16L * 1024 * 1024) { "Not enough free space. Free storage and resume." }
+                storage.requireBytes(
+                    requireNotNull(target.parentFile),16L*1024*1024,"Not enough free space. Free storage and resume.")
             })
             target.outputStream().use { output ->
                 val buffer = ByteArray(64 * 1024)

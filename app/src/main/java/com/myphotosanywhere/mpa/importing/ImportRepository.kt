@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.importing
 
+import androidx.core.net.toUri
 import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
@@ -72,7 +73,7 @@ class ImportRepository(private val context: Context) {
             keepGoing()
             var download=dao.download(id) ?: error("Download record missing.")
             val file=archives.file(id)
-            if(download.state!="READY") download=TakeoutZipDownloader().download(links.open(download.sealedLink),file,download,
+            if(download.state!="READY") download=TakeoutZipDownloader(budget=app.storage).download(links.open(download.sealedLink),file,download,
                 { dao.saveDownload(it); notify(it) },::keepGoing)
             keepGoing()
             val manifest=documents.manifest(id,Uri.fromFile(file),false)
@@ -187,7 +188,7 @@ class ImportRepository(private val context: Context) {
     } }
 
     private suspend fun stageTakeout(item: ImportItem, stage: File, client: okhttp3.OkHttpClient?, keepGoing: suspend ()->Unit): MediaFingerprint {
-        val uri=Uri.parse(item.uri)
+        val uri=item.uri.toUri()
         if(uri.scheme!=DriveTakeoutArchive.SCHEME) return documents.stage(item,stage,keepGoing)
         val binding=requireNotNull(uri.authority)
         val source=db.drive().source(binding) ?: error("Reconnect this import's original Drive ZIP source.")
@@ -337,14 +338,13 @@ class ImportRepository(private val context: Context) {
             if(current.staged==null || !File(requireNotNull(current.staged)).isFile) {
                 require(current.remoteId==null || current.sha256!=null) { "Upload checkpoint has no byte identity." }
                 val stageDir=requireNotNull(stage.parentFile).apply { mkdirs() }
-                require(stageDir.usableSpace > maxOf(current.size,16L*1024*1024)+16L*1024*1024) {
-                    "Not enough free space to stage this item. Free storage and resume."
-                }
+                app.storage.requireBytes(stageDir,maxOf(current.size,16L*1024*1024)+16L*1024*1024,
+                    "Not enough free space to stage this item. Free storage and resume.")
                 current=current.copy(state="STAGING",error=null); dao.updateItem(current)
                 val hashes=if(job.kind=="PICKER") {
                     val token=PhotosAuthorization(context).token(job.email)
                     val picker=if(client==null) PhotosPickerGateway(token) else PhotosPickerGateway(token,client)
-                    picker.download(picker.find(requireNotNull(job.session),current.path),stage,::keepGoing)
+                    picker.download(picker.find(requireNotNull(job.session),current.path),stage,app.storage,::keepGoing)
                 } else stageTakeout(current,stage,client,::keepGoing)
                 val sha=hashes.sha256; val md5=hashes.md5
                 require(current.sha256==null || current.sha256==sha) { "Source bytes changed since interrupted transfer. Original checkpoint preserved." }

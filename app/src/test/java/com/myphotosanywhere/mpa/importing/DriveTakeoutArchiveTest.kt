@@ -49,7 +49,14 @@ class DriveTakeoutArchiveTest {
         try {
             val api=DriveGateway("test",OkHttpClient(),server.url("/drive/"),server.url("/upload"))
             val archive=DriveTakeoutArchive(api,"binding","root"); val uri=archive.capture("zip")
-            val reader=TakeoutDocuments(RuntimeEnvironment.getApplication()) { archive.open(it,4L*1024*1024) }
+            // Robolectric has no mounted-volume UUIDs. Keep this streaming test independent
+            // of platform capacity; StorageBudgetTest and native checks cover that contract.
+            val storage=com.myphotosanywhere.mpa.data.StorageBudget(object: com.myphotosanywhere.mpa.data.StorageBudget.Capacity {
+                override fun available(directory: File)=Long.MAX_VALUE
+                override fun allocatable(directory: File)=Long.MAX_VALUE
+                override fun allocate(directory: File,bytes: Long)=error("No reclamation expected")
+            })
+            val reader=TakeoutDocuments(RuntimeEnvironment.getApplication(),storage) { archive.open(it,4L*1024*1024) }
             val manifest=reader.manifest("job",uri,false)
             assertEquals(2,manifest.size); assertEquals("MATCHED",manifest.single { it.mime=="application/json" }.state)
             assertTrue(total<bytes.size) // Preview seeks to metadata near the end, not through all media.

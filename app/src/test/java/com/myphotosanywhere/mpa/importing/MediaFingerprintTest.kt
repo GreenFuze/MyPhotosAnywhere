@@ -14,12 +14,17 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[28],application=Application::class)
 class MediaFingerprintTest {
+    private val storage=com.myphotosanywhere.mpa.data.StorageBudget(object: com.myphotosanywhere.mpa.data.StorageBudget.Capacity {
+        override fun available(directory: java.io.File)=Long.MAX_VALUE
+        override fun allocatable(directory: java.io.File)=Long.MAX_VALUE
+        override fun allocate(directory: java.io.File,bytes: Long)=error("Unexpected allocation")
+    })
     @Test fun streamedStagingComputesAllHashesFromTheBytesWritten() = runBlocking<Unit> {
         val bytes=ByteArray(180_000) { (it%251).toByte() }
         val file=java.io.File(RuntimeEnvironment.getApplication().cacheDir,"stream-fingerprint")
         try {
             var checks=0
-            val hashes=TakeoutDocuments.copyBounded(bytes.inputStream(),file) { checks++ }
+            val hashes=TakeoutDocuments.copyBounded(bytes.inputStream(),file,storage) { checks++ }
             assertArrayEquals(bytes,file.readBytes())
             assertEquals(bytes.size.toLong(),hashes.bytes)
             assertEquals(com.myphotosanywhere.mpa.drive.DriveBackupWorker.digest(file,"SHA-256"),hashes.sha256)
@@ -38,7 +43,7 @@ class MediaFingerprintTest {
         checkpoint.check(true); assertEquals(3,calls)
         val file=java.io.File(RuntimeEnvironment.getApplication().cacheDir,"paused-fingerprint")
         try {
-            try { TakeoutDocuments.copyBounded(byteArrayOf(1,2,3).inputStream(),file) { error("paused") }; fail() }
+            try { TakeoutDocuments.copyBounded(byteArrayOf(1,2,3).inputStream(),file,storage) { error("paused") }; fail() }
             catch(e: IllegalStateException) { assertEquals("paused",e.message) }
             assertEquals(0,file.length())
         } finally { file.delete() }

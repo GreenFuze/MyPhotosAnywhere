@@ -45,7 +45,8 @@ class TakeoutZipDownloader(
     private val client: OkHttpClient = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
         .connectTimeout(30, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build(),
     private val validateUrl: (String) -> Unit = ::validateLink,
-    private val availableBytes: (File) -> Long = { requireNotNull(it.parentFile).usableSpace },
+    private val budget: com.myphotosanywhere.mpa.data.StorageBudget? = null,
+    private val availableBytes: (File) -> Long = { requireNotNull(budget) { "Storage budget required." }.available(requireNotNull(it.parentFile)) },
 ) {
     suspend fun download(link: String, file: File, saved: TakeoutDownload,
         checkpoint: suspend (TakeoutDownload) -> Unit, keepGoing: suspend () -> Unit): TakeoutDownload {
@@ -77,7 +78,7 @@ class TakeoutZipDownloader(
                         else "ZIP download failed (HTTP ${response.code}). Resume to retry."
                     }
                     require(response.header("Content-Encoding")?.lowercase().let { it == null || it == "identity" }) { "Server returned encoded bytes; use a direct ZIP link." }
-                    val body = response.body ?: error("Empty ZIP response.")
+                    val body = response.body
                     val type = response.header("Content-Type").orEmpty().substringBefore(';').lowercase()
                     require(type !in listOf("text/html", "application/xhtml+xml", "application/json", "text/plain")) {
                         "This link opens a page, not a ZIP. Sign in using your browser and select the downloaded ZIP, or paste a direct ZIP download link."
