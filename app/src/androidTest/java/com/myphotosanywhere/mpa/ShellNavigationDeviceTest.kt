@@ -100,6 +100,16 @@ class ShellNavigationDeviceTest {
             compose.onNodeWithTag("nav:Collections").performClick()
             compose.onNodeWithTag("nav:Photos").performClick()
             compose.onNodeWithTag("photo:${ids[9]}").assertIsDisplayed()
+            val gridBounds=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInRoot
+            val navigationBounds=compose.onNodeWithTag("shell:navigation").fetchSemanticsNode().boundsInRoot
+            assertTrue("Photos extend beneath floating navigation",gridBounds.bottom>navigationBounds.top)
+            compose.onNodeWithTag("photos:grid").performScrollToIndex(ids.lastIndex)
+            compose.waitForIdle()
+            val lastBounds=compose.onNodeWithTag("photo:${ids.last()}").fetchSemanticsNode().boundsInRoot
+            assertTrue("Final photo can scroll clear of navigation",lastBounds.bottom<=navigationBounds.top+1f)
+            compose.onNodeWithTag("photo:${ids.last()}").performClick()
+            compose.onNodeWithTag("viewer-screen").assertIsDisplayed()
+            compose.onNodeWithTag("viewer-close").performClick()
             compose.onNodeWithTag("photos:grid").performScrollToIndex(0)
             compose.waitForIdle()
             saveScreenshot("shell-preview.png")

@@ -7,17 +7,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import com.myphotosanywhere.mpa.data.*
 
 @Composable
 fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,members: List<AlbumPhoto>,
     onAlbum: (String)->Unit,onFavorites: ()->Unit,onArchive: ()->Unit,onActivity: ()->Unit,
-    onPeople: ()->Unit,onPlaces: ()->Unit,onOffline: ()->Unit,onEdits: ()->Unit) {
+    onPeople: ()->Unit,onPlaces: ()->Unit,onOffline: ()->Unit,onEdits: ()->Unit,bottomClearance: Dp=0.dp) {
     var create by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var manage by remember { mutableStateOf<Album?>(null) }
     var delete by remember { mutableStateOf(false) }
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,top=20.dp,end=20.dp,bottom=20.dp+bottomClearance),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick=onPeople,modifier=Modifier.weight(1f)) {
                 com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_shell_people)

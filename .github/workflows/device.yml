@@ -45,6 +45,9 @@ jobs:
             adb pull /sdcard/Download/MPA/device-preview.png app/build/reports/androidTests/screenshots/mpa-edit.png
             adb pull /sdcard/Download/MPA/import-preview.png app/build/reports/androidTests/screenshots/mpa-import.png
             adb pull /sdcard/Download/MPA/shell-preview.png app/build/reports/androidTests/screenshots/mpa-shell.png
+            for variant in light dark large rtl; do
+              adb pull /sdcard/Download/MPA/shell-navigation-$variant.png app/build/reports/androidTests/screenshots/mpa-navigation-$variant.png
+            done
       - uses: actions/upload-artifact@v4
         if: always()
         with:

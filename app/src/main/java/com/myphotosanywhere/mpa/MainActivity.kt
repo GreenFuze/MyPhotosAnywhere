@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -156,18 +158,19 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             ?: if(filter=="All") "Photos" else filter
         else -> navigation.destination.title
     }
-    Scaffold(topBar={ ShellTopBar(title,navigation.canGoBack,::back,canAddPhotos=!busy,
+    var navigationHeight by remember { mutableIntStateOf(0) }
+    val navigationClearance=with(LocalDensity.current) { navigationHeight.toDp() }
+    val primaryBrand=navigation.destination==navigation.primary && tab in listOf(0,1)
+    Scaffold(topBar={ ShellTopBar(title,navigation.canGoBack && !primaryBrand,::back,canAddPhotos=!busy,
         onAddPhotos={ if(!busy) addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
         onStorage={ navigation.open(ShellDestination.STORAGE) },onActivity={ navigation.open(ShellDestination.STORAGE) },
         onFilters={ showFilters=true },showFilters=tab==0 || tab==5,
-        filtersActive=filter!="All" || sourceKey!=null,needsAttention=sync.any { it.error!=null })
-    },snackbarHost={ SnackbarHost(snackbar) },bottomBar={
-        ShellBottomBar(navigation.primary) { destination ->
-            if(destination.primary) { albumId=null;personId=null;filter="All" }
-            navigation.select(destination)
-        }
-    }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        filtersActive=filter!="All" || sourceKey!=null,needsAttention=sync.any { it.error!=null },
+        showTitle=!primaryBrand || filter!="All" || albumId!=null || personId!=null)
+    },snackbarHost={ SnackbarHost(snackbar,Modifier.padding(bottom=navigationClearance)) }) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
+        // Grids and Collections scroll beneath the navigation, with measured clearance at their end.
+        Column(Modifier.fillMaxSize().then(if(tab !in listOf(0,1,5)) Modifier.padding(bottom=navigationClearance) else Modifier)) {
             if(busy || featureBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
             when(tab) {
                 0,5 -> {
@@ -208,7 +211,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                             else if(galleryQuery.isNotBlank() || filter!="All" || sourceKey!=null) TextButton(onClick={ query="";filter="All";sourceKey=null }) { Text("Clear filters") }
                             else TextButton(onClick=features::refreshCloud) { Text("Refresh library") }
                         }
-                    } else LazyVerticalGrid(columns=GridCells.Fixed(3),contentPadding=PaddingValues(2.dp),
+                    } else LazyVerticalGrid(columns=GridCells.Fixed(3),contentPadding=PaddingValues(start=2.dp,top=2.dp,end=2.dp,bottom=navigationClearance+2.dp),
                         state=if(tab==5) searchGrid else if(albumId!=null || personId!=null) collectionGrid else photosGrid,
                         horizontalArrangement=Arrangement.spacedBy(2.dp),verticalArrangement=Arrangement.spacedBy(2.dp),
                         modifier=Modifier.weight(1f).testTag("photos:grid")) {
@@ -243,7 +246,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                     onActivity={ navigation.open(ShellDestination.AI_ACTIVITY) },
                     onPeople={ navigation.open(ShellDestination.PEOPLE) },onPlaces={ navigation.open(ShellDestination.PLACES) },
                     onOffline={ filter="Offline";albumId=null;personId=null;navigation.open(ShellDestination.PHOTOS) },
-                    onEdits={ filter="Edits";albumId=null;personId=null;navigation.open(ShellDestination.PHOTOS) })
+                    onEdits={ filter="Edits";albumId=null;personId=null;navigation.open(ShellDestination.PHOTOS) },bottomClearance=navigationClearance)
                 6 -> {
                     LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                         if(handoffs.isEmpty()) item { Text("Open a photo and choose Edit with AI. Saved handoffs appear here.") }
@@ -261,6 +264,11 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                 3 -> PlacesScreen(photos,settings.onlineMaps,{ features.updateSettings(settings.copy(onlineMaps=it)) },::selectPhoto)
                 4 -> DriveStorageScreen(photos)
             }
+        }
+        ShellBottomBar(navigation.primary,onSelect={ destination ->
+            if(destination.primary) { albumId=null;personId=null;filter="All" }
+            navigation.select(destination)
+        },modifier=Modifier.align(Alignment.BottomCenter).testTag("shell:navigation").onSizeChanged { navigationHeight=it.height })
         }
     }
     if(showFilters) ModalBottomSheet(onDismissRequest={ showFilters=false }) {

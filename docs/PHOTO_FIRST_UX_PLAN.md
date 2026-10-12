@@ -33,3 +33,11 @@ Before extending scope, review the first increment visually and test the existin
 ### First CI review
 
 The first revision passed all 200 unit tests, lint with zero errors, and all 35 Android 10 native tests. Android 15 passed the four new shell tests but an existing People diagnostics check timed out before scrolling to the diagnostic message. The test now explicitly scrolls to and asserts that same message rather than assuming it is in the initial semantics viewport. No recognition code or data contract changes are involved. The 320dp screenshot also exposed an overfull app bar; at widths below 360dp the separate activity button moves into the Add menu while the compact import indicator and source controls remain accessible. Repeat the full matrix on this corrected revision.
+
+## Reference-driven navigation refinement (October 12)
+
+The owner supplied Google Photos Android screenshots and authorized the next planned increment. Photos/Collections now use a floating navigation overlay, horizontal selected icon/label treatment and a separate labeled-accessibility Search circle. The primary app bars retain the MPA emblem without redundant titles; child/filter titles remain. Photos and Collections scroll under the navigation with measured end clearance so the final items remain fully reachable. Management content retains reserved clearance. Insets are consumed once and the navigation moves above the keyboard. The pill expands to separate full-width rows for enlarged text or narrow content. Snackbar clearance follows the actual navigation height.
+
+The chronological query, original downloads, viewer internals, database and import workers are unchanged. Search remains in the shared shell until its focused-screen increment. There is no release/version/schema change, and outstanding 0.5.9 phone testing is not presumed complete. Owner authorization permits this presentation increment; acceptance on the S23 Ultra is still required before the next visible increment.
+
+Native checks cover overlay geometry, the last photo scrolling clear of controls and opening correctly, 48dp targets, state changes, large fonts, RTL and light/dark navigation fixtures. CI captures the full synthetic gallery plus component fixtures. Local and immutable-source CI results must be recorded before describing this increment as verified.
