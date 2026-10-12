@@ -16,6 +16,15 @@ android {
         versionName = "0.5.10"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    // CI keeps the upgrade key outside every cache and artifact path.
+    System.getenv("MPA_UPGRADE_KEYSTORE_PATH")?.let { keyPath ->
+        signingConfigs.getByName("debug") {
+            storeFile = file(keyPath)
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

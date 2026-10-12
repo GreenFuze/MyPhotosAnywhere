@@ -4,13 +4,13 @@ on:
   pull_request:
 permissions:
   contents: read
-# Push and PR events for the same branch share one validation slot.
-# A newer revision cancels superseded work; every retained run executes all checks.
+# Internal PRs are covered by their trusted push run; external PRs use isolated test signing.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   device:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: true
