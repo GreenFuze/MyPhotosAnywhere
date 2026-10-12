@@ -7,7 +7,8 @@ import android.content.IntentFilter
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import com.myphotosanywhere.mpa.selection.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material3.*
@@ -60,6 +61,7 @@ internal fun deviceTimelineZone(model: TimelineViewModel): ZoneId {
 @Composable
 internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features: LibraryFeaturesModel,
     state: LazyGridState,bottomClearance: Dp,modifier: Modifier=Modifier,
+    selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,
     hasSources: Boolean,onConnect: ()->Unit,onClearFilters: ()->Unit,onRefresh: ()->Unit) {
     val zone=deviceTimelineZone(model)
     val rowsFlow=remember(model,zone) {
@@ -147,7 +149,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 when(val row=rows[index]) {
                     is TimelineRow.Day -> Text(row.label,Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=10.dp)
                         .semantics { heading() }.testTag("timeline:date:${row.date}"),style=MaterialTheme.typography.titleSmall)
-                    is TimelineRow.Media -> TimelineThumbnail(row.entry,model,features) {
+                    is TimelineRow.Media -> TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked) {
                         val offset=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==row.entry.key }?.offset?.y
                         val viewport=state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
                             (if(visible.index in 0 until rows.itemCount) rows.peek(visible.index) as? TimelineRow.Media else null)
@@ -166,7 +168,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
 }
 
 @Composable
-private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,features: LibraryFeaturesModel,onOpen: ()->Unit) {
+private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,features: LibraryFeaturesModel,selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,onOpen: ()->Unit) {
     val context=LocalContext.current
     var problem by remember(entry) { mutableStateOf<String?>(null) }
     val thumbnail by produceState<File?>(null,entry) {
@@ -181,16 +183,23 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
         catch(error: java.io.IOException) { problem=error.message ?: "Thumbnail unavailable" }
         catch(error: android.database.sqlite.SQLiteException) { problem=error.message ?: "Cannot read thumbnail availability" }
     }
+    val target=SelectionTarget.from(entry)
+    val chosen=selection.any { it.matches(target) }
+    val selecting=selection.isNotEmpty()
     val date=entry.millis?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toString() } ?: "Unknown date"
     Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant)
         .testTag(entry.photoId?.let { "photo:$it" } ?: "cloud:${entry.cloudKey}")
-        .clickable(role=Role.Button,onClick=onOpen).semantics(mergeDescendants=true) {
+        .combinedClickable(enabled=!selectionLocked,role=Role.Button,onClick={ if(selecting) onToggle(target) else onOpen() },
+            onLongClickLabel="Select photo",onLongClick={ onToggle(target) }).semantics(mergeDescendants=true) {
+            if(selecting) selected=chosen
+            customActions=listOf(CustomAccessibilityAction(if(chosen) "Deselect photo" else "Select photo") { if(!selectionLocked) onToggle(target);!selectionLocked })
             contentDescription="${if(entry.mimeType.startsWith("video/")) "Video" else "Photo"}, $date, ${entry.name}"
         }) {
         AsyncImage(coil.request.ImageRequest.Builder(context).data(thumbnail ?: entry.thumbnailPath.takeIf { it.isNotBlank() }?.let(::File))
             .memoryCacheKey("${entry.key}:${entry.thumbnailRevision}:${entry.originalPath}").build(),null,
             modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,
             onError={ problem="Thumbnail unavailable. Open photo to retry." })
+        if(selecting) SelectionMark(chosen)
         problem?.let { message -> Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
             com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_shell_warning,message)
         } }

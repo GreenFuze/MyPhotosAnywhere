@@ -18,6 +18,9 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.semantics.*
+import com.myphotosanywhere.mpa.selection.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -79,7 +82,17 @@ class MainActivity: ComponentActivity() {
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = viewModel(),features: LibraryFeaturesModel = viewModel(),timeline: TimelineViewModel = viewModel()) {
+private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = viewModel(),features: LibraryFeaturesModel = viewModel(),timeline: TimelineViewModel = viewModel(),selection: SelectionViewModel = viewModel()) {
+    val selectedTargets by selection.targets.collectAsStateWithLifecycle()
+    val selectionBusy by selection.busy.collectAsStateWithLifecycle()
+    val selectionResult by selection.result.collectAsStateWithLifecycle()
+    val selectionTotal by selection.total.collectAsStateWithLifecycle()
+    val selectionProgress by selection.progress.collectAsStateWithLifecycle()
+    val selectionNotice by selection.notice.collectAsStateWithLifecycle()
+    val shareIntent by selection.share.collectAsStateWithLifecycle()
+    var selectionAlbums by rememberSaveable { mutableStateOf(false) }
+    val selecting=selectedTargets.isNotEmpty()
+    val selectionLocked=selectionBusy || selectionResult!=null
     val photos by model.photos.collectAsStateWithLifecycle()
     val handoffs by model.handoffs.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
@@ -114,13 +127,14 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val timelineViewer by timeline.viewer.collectAsStateWithLifecycle()
     val timelineMessage by timeline.message.collectAsStateWithLifecycle()
     LaunchedEffect(tab,selectedId,viewerId,pendingViewKey,editorId) {
-        val legacy=tab!=0 || selectedId!=null || viewerId!=null || pendingViewKey!=null || editorId!=null
-        model.legacyLoading(tab!=0 || viewerId!=null || pendingViewKey!=null);features.legacyLoading(legacy)
+        val legacy=tab !in listOf(0,1) || selectedId!=null || viewerId!=null || pendingViewKey!=null || editorId!=null
+        model.legacyLoading(tab !in listOf(0,1) || viewerId!=null || pendingViewKey!=null);features.legacyLoading(legacy)
     }
     var jumpToDate by rememberSaveable { mutableStateOf(false) }
     val photosGrid=rememberLazyGridState()
     val searchGrid=rememberLazyGridState()
     val collectionGrid=rememberLazyGridState()
+    val collectionsHubGrid=rememberLazyGridState()
     var exportId by rememberSaveable { mutableStateOf<String?>(null) }
     val snackbar=remember { SnackbarHostState() }
     val context=LocalContext.current
@@ -177,13 +191,16 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     LaunchedEffect(timelineMessage) { timelineMessage?.let { snackbar.showSnackbar(it);timeline.clearMessage() } }
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); model.clearMessage() } }
     LaunchedEffect(featureMessage) { featureMessage?.let { snackbar.showSnackbar(it); features.clearMessage() } }
+    LaunchedEffect(selectionNotice) { selectionNotice?.let { snackbar.showSnackbar(it);selection.clearNotice() } }
+    LaunchedEffect(shareIntent) { shareIntent?.let { context.startActivity(it);selection.shareLaunched() } }
+    BackHandler(enabled=selecting && !selectionBusy && selectionResult==null && !selectionAlbums) { selection.clear() }
     fun back() {
         if(tab==0 && navigation.primary==ShellDestination.COLLECTIONS) {
             albumId=null;personId=null;filter="All"
         }
         navigation.back()
     }
-    BackHandler(enabled=selectedId==null && viewerId==null && editorId==null && pendingViewKey==null &&
+    BackHandler(enabled=!selecting && selectedId==null && viewerId==null && editorId==null && pendingViewKey==null &&
         !showFilters && navigation.canGoBack,onBack=::back)
     val title=when(navigation.destination) {
         ShellDestination.PHOTOS -> albums.find { it.id==albumId }?.name ?: people.find { it.id==personId }?.name
@@ -193,7 +210,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     var navigationHeight by remember { mutableIntStateOf(0) }
     val navigationClearance=with(LocalDensity.current) { navigationHeight.toDp() }
     val primaryBrand=navigation.destination==navigation.primary && tab in listOf(0,1)
-    Scaffold(topBar={ ShellTopBar(title,navigation.canGoBack && !primaryBrand,::back,canAddPhotos=!busy,
+    Scaffold(topBar={ if(selecting) SelectionTopBar(selectedTargets.size,selectionBusy,selection::clear) else ShellTopBar(title,navigation.canGoBack && !primaryBrand,::back,canAddPhotos=!busy,
         onAddPhotos={ if(!busy) addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
         onStorage={ navigation.open(ShellDestination.STORAGE) },onActivity={ navigation.open(ShellDestination.STORAGE) },
         onFilters={ showFilters=true },showFilters=tab==0 || tab==5,
@@ -215,7 +232,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                     }
                     TimelineGrid(TimelineQuery(filter,sourceKey,albumId,personId),timeline,features,
                         if(albumId!=null || personId!=null) collectionGrid else photosGrid,navigationClearance,
-                        modifier=Modifier.weight(1f).fillMaxWidth(),hasSources=sources.isNotEmpty(),
+                        modifier=Modifier.weight(1f).fillMaxWidth(),selection=selectedTargets,onToggle=selection::toggle,selectionLocked=selectionLocked,hasSources=sources.isNotEmpty(),
                         onConnect={ navigation.open(ShellDestination.STORAGE) },
                         onClearFilters={ filter="All";sourceKey=null;albumId=null;personId=null },onRefresh=features::refreshCloud)
                 }
@@ -264,13 +281,20 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                         items(local,key={ it.id }) { photo ->
                             val cloudRow=cloudByPhoto[photo.id]
                             PhotoTile(photo,features,cloudRow?.thumbnailUpdatedAt ?: 0,cloudRow,
-                                sourcesByKey[cloudRow?.bindingKey]?.connection()) { viewPhoto(photo) }
+                                sourcesByKey[cloudRow?.bindingKey]?.connection(),selectedTargets,selection::toggle,selectionLocked) { viewPhoto(photo) }
                         }
                         items(remote,key={ "cloud:${it.key}" }) { row ->
                             LaunchedEffect(row.key,row.version,row.thumbnailUpdatedAt,sourcesByKey[row.bindingKey]) {
                                 com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(context,row,sourcesByKey[row.bindingKey]?.connection())
                             }
-                            Card(Modifier.aspectRatio(1f).clickable { pendingViewKey=row.key;features.download(row) },shape=RoundedCornerShape(0.dp)) {
+                            val target=SelectionTarget.from(row)
+                            val chosen=selectedTargets.any { it.matches(target) }
+                            Card(Modifier.aspectRatio(1f).testTag("cloud:${row.key}").combinedClickable(enabled=!selectionLocked,
+                                onClick={ if(selecting) selection.toggle(target) else { pendingViewKey=row.key;features.download(row) } },
+                                onLongClickLabel="Select photo",onLongClick={ selection.toggle(target) }).semantics(mergeDescendants=true) {
+                                    contentDescription=row.name;if(selecting) this.selected=chosen
+                                    customActions=listOf(CustomAccessibilityAction(if(chosen) "Deselect photo" else "Select photo") { if(!selectionLocked) selection.toggle(target);!selectionLocked })
+                                },shape=RoundedCornerShape(0.dp)) {
                                 Box(Modifier.fillMaxSize()) {
                                     AsyncImage(coil.request.ImageRequest.Builder(context).data(File(row.thumbnailPath))
                                         .memoryCacheKey("${row.key}:${row.thumbnailUpdatedAt}").build(),row.name,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
@@ -278,6 +302,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                                         Surface(Modifier.align(Alignment.BottomStart),color=MaterialTheme.colorScheme.surface.copy(alpha=.85f)) {
                                             Text("Downloading…",modifier=Modifier.padding(4.dp),style=MaterialTheme.typography.labelSmall)
                                         }
+                                    if(selecting) SelectionMark(chosen)
                                     if(row.mimeType.startsWith("video/")) Box(Modifier.align(Alignment.BottomEnd).padding(4.dp)) {
                                         ShellIcon(R.drawable.ic_shell_video,"Video")
                                     }
@@ -286,7 +311,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                         }
                     }
                 }
-                1 -> AlbumsScreen(features,albums,memberships,onAlbum={ albumId=it;personId=null;filter="All";navigation.open(ShellDestination.PHOTOS) },
+                1 -> AlbumsScreen(features,albums,collectionsHubGrid,onAlbum={ albumId=it;personId=null;filter="All";navigation.open(ShellDestination.PHOTOS) },
                     onFavorites={ filter="Favorites";albumId=null;personId=null;navigation.open(ShellDestination.PHOTOS) },
                     onArchive={ filter="Archive";albumId=null;personId=null;navigation.open(ShellDestination.PHOTOS) },
                     onActivity={ navigation.open(ShellDestination.AI_ACTIVITY) },
@@ -311,12 +336,17 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                 4 -> DriveStorageScreen(photos)
             }
         }
-        ShellBottomBar(navigation.primary,onSelect={ destination ->
+        if(selecting) SelectionBottomBar(selectionBusy,filter=="Archive",albumId!=null,onAction={ kind ->
+            if(kind==BulkKind.ALBUM) selectionAlbums=true
+            else selection.execute(BulkAction(kind,if(kind==BulkKind.REMOVE_ALBUM) albumId else null))
+        },modifier=Modifier.align(Alignment.BottomCenter).onSizeChanged { navigationHeight=it.height })
+        else ShellBottomBar(navigation.primary,onSelect={ destination ->
             if(destination.primary) { albumId=null;personId=null;filter="All" }
             navigation.select(destination)
         },modifier=Modifier.align(Alignment.BottomCenter).testTag("shell:navigation").onSizeChanged { navigationHeight=it.height })
         }
     }
+    SelectionDialogs(selection,albums,selectionAlbums,{ selectionAlbums=false },selectionResult,selectionBusy,selectionProgress,selectionTotal)
     if(showFilters) ModalBottomSheet(onDismissRequest={ showFilters=false }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("Filter photos",style=MaterialTheme.typography.titleLarge)
@@ -368,15 +398,24 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
 
 @Composable
 private fun PhotoTile(photo: Photo,features: LibraryFeaturesModel,thumbnailVersion: Long,cloudRow: com.myphotosanywhere.mpa.drive.CloudPhoto?,
-    source: com.myphotosanywhere.mpa.drive.DriveConnection?,onClick: ()->Unit) {
+    source: com.myphotosanywhere.mpa.drive.DriveConnection?,selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,onClick: ()->Unit) {
     val thumb by produceState<File?>(null,photo.id,photo.originalPath,thumbnailVersion) { value=runCatching { features.app.cache.thumbnail(photo) }.getOrNull() }
     LaunchedEffect(photo.id,cloudRow?.version,thumbnailVersion,source) {
         if(cloudRow!=null) com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(features.app,cloudRow,source)
     }
-    Card(Modifier.aspectRatio(1f).testTag("photo:${photo.id}").clickable(onClick=onClick),shape=RoundedCornerShape(0.dp)) {
+    val target=SelectionTarget.from(photo,cloudRow)
+    val chosen=selection.any { it.matches(target) }
+    val selecting=selection.isNotEmpty()
+    Card(Modifier.aspectRatio(1f).testTag("photo:${photo.id}").combinedClickable(enabled=!selectionLocked,role=Role.Button,
+        onClick={ if(selecting) onToggle(target) else onClick() },onLongClickLabel="Select photo",onLongClick={ onToggle(target) })
+        .semantics(mergeDescendants=true) {
+            contentDescription=photo.displayName;if(selecting) this.selected=chosen
+            customActions=listOf(CustomAccessibilityAction(if(chosen) "Deselect photo" else "Select photo") { if(!selectionLocked) onToggle(target);!selectionLocked })
+        },shape=RoundedCornerShape(0.dp)) {
         Box(Modifier.fillMaxSize()) {
             AsyncImage(coil.request.ImageRequest.Builder(features.app).data(thumb ?: File(photo.thumbnailPath))
                 .memoryCacheKey("${photo.id}:$thumbnailVersion:${photo.originalPath}").build(),photo.displayName,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+            if(selecting) SelectionMark(chosen)
             if(photo.mimeType.startsWith("video/")) Surface(Modifier.align(Alignment.BottomEnd).padding(4.dp),
                 color=MaterialTheme.colorScheme.surface.copy(alpha=.85f)) {
                 ShellIcon(R.drawable.ic_shell_video,"Video")
