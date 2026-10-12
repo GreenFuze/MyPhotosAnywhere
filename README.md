@@ -6,6 +6,8 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
+The [0.5.11 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.11) adds downward Photo Details over the retained viewer, compact viewer actions, source/availability details and Search return continuity. All 236 unit/integration tests and 159 native tests passed on API 29/35/37, with zero lint findings. Room schema 9 and the established upgrade signer are preserved. S23 Ultra acceptance and the reported JPEG crash remain unverified. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.11/MPA-0.5.11-debug.apk) · [Release details](docs/releases/v0.5.11.md).
+
 The [0.5.10 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.10) introduces photo-first navigation and one date-grouped, paged timeline across connected sources. It retains Room schema 9, saved work and the established upgrade signer. All 226 unit/integration and 129 native tests passed on API 29/35/37, with zero lint findings. Approved upstream/tooling diagnostics and large-library preparation timings are documented. S23 Ultra acceptance and the reported JPEG crash remain unverified. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.10/MPA-0.5.10-debug.apk) · [Release details](docs/releases/v0.5.10.md).
 
 The [0.5.9 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.9) adds dismissal/restoration of completed, cancelled and failed imports, plus image-viewer memory/lifecycle/cache-read fixes during ongoing imports. Media and transfer records are preserved. All 195 unit/integration and 62 native checks passed. The reported phone crash still needs retesting; no exact cause is claimed without its trace. [Import controls](docs/GOOGLE_IMPORTS.md).
@@ -44,12 +46,12 @@ The agreed import milestone now has an implemented, CI-tested development APK; l
 
 The 0.4.4 increment adds durable, bounded Drive discovery and per-source progress. The 0.5.0 update adds a shared resumable migration engine, Takeout ZIP/folder import, official Google Photos Picker import, and opt-in conversion of Drive Google JSON into verified MPA XMP followed by reversible JSON trash. See [import setup and controls](docs/GOOGLE_IMPORTS.md) and [validation evidence](docs/VALIDATION.md). All 125 unit/integration and 12 Android emulator tests passed; real-account phone acceptance is recorded separately.
 
-Open this folder in Android Studio with JDK 17, Android SDK 35, and Python 3 installed. Gradle fetches and verifies the licensed, pinned face model automatically (set `MPA_PYTHON` to your Python executable if `python3` is unavailable). The project uses Kotlin, Jetpack Compose, Room, Coil, and coroutines. Android 8.0 (API 26) is the minimum supported version.
+Open this folder in Android Studio with JDK 17, Android SDK 37, and Python 3 installed. Gradle fetches and verifies the licensed, pinned face model automatically (set `MPA_PYTHON` to your Python executable if `python3` is unavailable). The project uses Kotlin, Jetpack Compose, Room, Coil, and coroutines. Android 8.0 (API 26) is the minimum supported version.
 
-Build and test using the included Gradle 8.11.1 wrapper (on Windows, use `gradlew.bat`):
+Build and test using the included Gradle 9.8.1 wrapper and strict diagnostic gate (Python 3 required):
 
 ```sh
-./gradlew testDebugUnitTest lintDebug assembleDebug
+python3 scripts/gradle_checks.py --log build/diagnostics/build.log -- testDebugUnitTest lintDebug assembleDebug
 ```
 
 GitHub Actions uses the pinned wrapper and builds an installable debug APK. Signing credentials, OAuth tokens, user photos, and local SDK paths must never be committed. A Google Android OAuth client is configured by package/signing-certificate association, without an AI API key or Android client secret.

@@ -1,3 +1,11 @@
+## MPA 0.5.11: viewer and Photo Details
+
+Application `1f38424a7f3903655b3f00e55d32a518b36412aa` passed 236 unit/integration tests, zero lint findings and 53 native tests each on API 29/35/37 (159 total), with no failures/errors/skips. [Host](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38296583020) · [Native](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38296583052). The exact CI APK has the established upgrade certificate and unchanged schema 9. [Release scope and evidence](releases/v0.5.11.md).
+
+Downward Details, Back/rotation, gesture ownership, current-photo actions, metadata/original preservation, remote authorization, missing files, Search continuity, large fonts and RTL are covered. At 100,000 indexed items, viewer sequence preparation measured 5.9–29.3 seconds across CI emulators. The selected preview opens before sequence preparation completes; this remains a large-library performance limitation. Exact query, seek, memory and concurrent-import measurements are in BUILD_EVIDENCE.json.
+
+Prior approved tooling diagnostics remain documented; all other warnings block. S23 Ultra acceptance and the reported JPEG crash remain unverified. Broader selection and destination redesigns remain later work.
+
 ## MPA 0.5.10: photo-first shell and unified timeline
 
 The application at `4a899d4c655ebc729353fac83d9e1194950a273b` passed 226 host unit/integration tests, zero lint findings, APK assembly and 43 native tests each on API 29/35/37, with no failures/errors/skips. [Build](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38252814319) · [Native checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38252814270). The exact CI APK was independently verified for package/version/code, checksum and the established upgrade certificate. Schema 9 matches the released Git blob byte-for-byte; no migration is added.
