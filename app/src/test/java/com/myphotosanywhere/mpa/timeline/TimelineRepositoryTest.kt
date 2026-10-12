@@ -22,13 +22,17 @@ class TimelineRepositoryTest {
     private lateinit var db: PhotoDatabase
     private lateinit var repository: TimelineRepository
     private lateinit var directory: File
+    private lateinit var temporaryRoot: File
     @Before fun setup()=runBlocking {
         db=Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(),PhotoDatabase::class.java).build()
         repository=TimelineRepository(db) { it.startsWith("/present/") }
-        directory=File(RuntimeEnvironment.getApplication().noBackupFilesDir,"timeline-test-${java.util.UUID.randomUUID()}")
+        // Robolectric embeds long test names in its app-data path, exceeding
+        // Windows native SQLite's path limit. Keep the disposable fixture short.
+        temporaryRoot=java.nio.file.Files.createTempDirectory("mpa-timeline-").toFile()
+        directory=File(temporaryRoot,"sessions")
         source("a");source("b");source("disabled",false)
     }
-    @After fun cleanup() { db.close();directory.deleteRecursively() }
+    @After fun cleanup() { db.close();temporaryRoot.deleteRecursively() }
     private suspend fun source(id: String,enabled: Boolean=true) {
         db.drive().saveSource(DriveSource(id,id,"$id@test","APP_FILES",id,id,enabled=enabled))
     }
