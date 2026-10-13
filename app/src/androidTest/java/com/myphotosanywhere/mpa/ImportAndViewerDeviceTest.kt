@@ -96,7 +96,7 @@ class ImportAndViewerDeviceTest {
             app.database.cloud().savePhoto(com.myphotosanywhere.mpa.drive.CloudPhoto("${source.key}:remote",source.key,"remote",id,photo.displayName,
                 photo.mimeType,photo.bytes,"md5","1",null,null,null,null,photoId=id))
             app.database.imports().saveJob(ImportJob(id,"synthetic-import-source","TAKEOUT",state="RUNNING"))
-            compose.waitUntil(10000) { compose.onAllNodesWithTag("photo:$id").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(10000) { compose.onAllNodes(hasTestTag("photo:$id") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("photo:$id").performClick()
             compose.waitUntil(10000) { compose.onAllNodes(hasText("Original · 640 × 480",substring=true)).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(photo.displayName).assertIsDisplayed()

@@ -91,7 +91,7 @@ class ShellNavigationDeviceTest {
                 ids.forEachIndexed { index,key -> app.database.photos().insert(Photo(key,"$key.png",file.absolutePath,file.absolutePath,
                     "image/png",file.length(),fixtureTime-index,"shell-$index")) }
             }
-            compose.waitUntil(10000) { compose.onAllNodesWithTag("photo:${ids.first()}").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(10000) { compose.onAllNodes(hasTestTag("photo:${ids.first()}") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("Your photos. Your storage.").assertDoesNotExist()
             compose.onNodeWithText("Search names, people, places, dates, objects").assertDoesNotExist()
             compose.onNodeWithText("All sources").assertDoesNotExist()

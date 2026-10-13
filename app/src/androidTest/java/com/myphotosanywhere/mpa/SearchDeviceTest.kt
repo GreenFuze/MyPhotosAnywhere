@@ -24,7 +24,7 @@ import java.time.ZoneId
 class SearchDeviceTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
-    private fun waitTag(tag: String)=compose.waitUntil(30000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitTag(tag: String)=compose.waitUntil(30000) { compose.onAllNodes(if(tag.startsWith("photo:") || tag.startsWith("cloud:")) hasTestTag(tag) and isEnabled() else hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
     private fun waitText(text: String)=compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
     private fun model()=compose.runOnIdle { ViewModelProvider(compose.activity)[SearchViewModel::class.java] }
     private fun search(text: String) {

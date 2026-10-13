@@ -21,7 +21,7 @@ import java.io.File
 class TimelineContinuityTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
-    private fun waitTag(tag: String)=compose.waitUntil(30000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitTag(tag: String)=compose.waitUntil(30000) { compose.onAllNodes(if(tag.startsWith("photo:") || tag.startsWith("cloud:")) hasTestTag(tag) and isEnabled() else hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
 
     @Test fun olderViewerKeepsSequenceDuringImportsAndReturnsToPixelAnchorAfterRotation()=runBlocking<Unit> {
         val source=DriveSource("timeline-ui","timeline-ui","timeline@test","APP_FILES","timeline-ui","Timeline fixture")

@@ -27,7 +27,7 @@ import java.io.File
 class ViewerDetailsDeviceTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
-    private fun waitTag(tag: String)=compose.waitUntil(30000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitTag(tag: String)=compose.waitUntil(30000) { compose.onAllNodes(if(tag.startsWith("photo:") || tag.startsWith("cloud:")) hasTestTag(tag) and isEnabled() else hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
     private fun waitGone(tag: String)=compose.waitUntil(10000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() }
     private fun currentImage(): SemanticsNodeInteraction {
         val matcher=hasTestTag("original-image") and SemanticsMatcher("visible image") { it.boundsInRoot.width>0 && it.boundsInRoot.height>0 }

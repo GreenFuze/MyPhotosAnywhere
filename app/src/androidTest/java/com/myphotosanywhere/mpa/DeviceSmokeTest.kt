@@ -327,8 +327,8 @@ class DeviceSmokeTest {
             for((id,source) in ids.zip(listOf(a,b))) app.database.photos().insert(com.myphotosanywhere.mpa.data.Photo(
                 id,"$id.jpg","","","image/jpeg",8,fixtureTime,"sha-$id",sourceBindingKey=source.key))
             try {
-                compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${ids[0]}").fetchSemanticsNodes().isNotEmpty() &&
-                    compose.onAllNodesWithTag("photo:${ids[1]}").fetchSemanticsNodes().isNotEmpty() }
+                compose.waitUntil(30000) { compose.onAllNodes(hasTestTag("photo:${ids[0]}") and isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
+                    compose.onAllNodes(hasTestTag("photo:${ids[1]}") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             } catch (e: Exception) {
                 android.util.Log.e("GalleryFixture", "Synthetic rows: ${ids.map { app.database.photos().find(it) }}")
                 compose.onRoot(useUnmergedTree=true).printToLog("GalleryFixture")
@@ -337,22 +337,22 @@ class DeviceSmokeTest {
             compose.onNodeWithTag("shell:filters").performClick()
             compose.onNodeWithText("A · a@test").performScrollTo().performClick()
             compose.onNodeWithText("Done").performScrollTo().performClick()
-            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${ids[0]}").fetchSemanticsNodes().isNotEmpty() &&
+            compose.waitUntil(30000) { compose.onAllNodes(hasTestTag("photo:${ids[0]}") and isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
                 compose.onAllNodesWithTag("photo:${ids[1]}").fetchSemanticsNodes().isEmpty() }
             compose.onNodeWithTag("photo:${ids[0]}").assertExists()
             compose.onNodeWithTag("photo:${ids[1]}").assertDoesNotExist()
             compose.onNodeWithTag("shell:filters").performClick()
             compose.onNodeWithText("B · b@test").performScrollTo().performClick()
             compose.onNodeWithText("Done").performScrollTo().performClick()
-            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${ids[1]}").fetchSemanticsNodes().isNotEmpty() &&
+            compose.waitUntil(30000) { compose.onAllNodes(hasTestTag("photo:${ids[1]}") and isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
                 compose.onAllNodesWithTag("photo:${ids[0]}").fetchSemanticsNodes().isEmpty() }
             compose.onNodeWithTag("photo:${ids[1]}").assertExists()
             compose.onNodeWithTag("photo:${ids[0]}").assertDoesNotExist()
             compose.onNodeWithTag("shell:filters").performClick()
             compose.onNodeWithText("All sources").performScrollTo().performClick()
             compose.onNodeWithText("Done").performScrollTo().performClick()
-            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${ids[0]}").fetchSemanticsNodes().isNotEmpty() &&
-                compose.onAllNodesWithTag("photo:${ids[1]}").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(30000) { compose.onAllNodes(hasTestTag("photo:${ids[0]}") and isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodes(hasTestTag("photo:${ids[1]}") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("photo:${ids[0]}").assertExists()
             compose.onNodeWithTag("photo:${ids[1]}").assertExists()
         } finally {
@@ -369,7 +369,7 @@ class DeviceSmokeTest {
         try {
             val photo=app.repository.importPhoto(Uri.fromFile(fixture),nameOverride="device-fixture.png",mimeOverride="image/png")
             val hash=DriveBackupWorker.digest(File(photo.originalPath),"SHA-256")
-            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${photo.id}").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(30000) { compose.onAllNodes(hasTestTag("photo:${photo.id}") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("photo:${photo.id}").performClick()
             compose.onNodeWithTag("viewer-screen").assertIsDisplayed()
             compose.waitUntil(30000) { compose.onAllNodesWithTag("original-image").fetchSemanticsNodes().isNotEmpty() }
