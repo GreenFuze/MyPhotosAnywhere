@@ -83,4 +83,19 @@ class GalleryPresentationTest {
         assertEquals("septembre 2026",value.label(java.util.Locale.FRANCE))
         assertEquals("vendredi 25 septembre 2026",value.description(java.util.Locale.FRANCE))
     }
+    @Test fun layoutDefaultsToMosaicAndPersistsWithoutChangingConsent()=runBlocking<Unit> {
+        val context=RuntimeEnvironment.getApplication();val preferences=context.getSharedPreferences("gallery-presentation",Context.MODE_PRIVATE)
+        check(preferences.edit().clear().commit());val before=com.myphotosanywhere.mpa.core.LibrarySettings(context).state.value
+        try {
+            assertEquals(GalleryLayout.MOSAIC,GalleryPresentation(context).layout.value)
+            GalleryPresentation(context).updateLayout(GalleryLayout.SQUARE)
+            assertEquals(GalleryLayout.SQUARE,GalleryPresentation(context).layout.value)
+            assertEquals(before,com.myphotosanywhere.mpa.core.LibrarySettings(context).state.value)
+        } finally { check(preferences.edit().clear().commit()) }
+    }
+    @Test fun corruptedLayoutFailsFast() {
+        val preferences=RuntimeEnvironment.getApplication().getSharedPreferences("gallery-presentation",Context.MODE_PRIVATE)
+        try { check(preferences.edit().putString("layout","INVALID").commit());assertThrows(IllegalArgumentException::class.java) { GalleryPresentation(RuntimeEnvironment.getApplication()) } }
+        finally { check(preferences.edit().clear().commit()) }
+    }
 }

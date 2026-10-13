@@ -138,17 +138,22 @@ class GalleryPolishChromeDeviceTest {
     @Test fun largeLightControlsHaveAccessibleAlternatives()=verify(false,LayoutDirection.Ltr)
     @Test fun largeDarkRtlControlsHaveAccessibleAlternatives()=verify(true,LayoutDirection.Rtl)
     private fun verify(dark: Boolean,direction: LayoutDirection) {
-        var pixels=0f;var selected=GridDensity.DEFAULT
+        var pixels=0f;var selected=GridDensity.DEFAULT;var selectedLayout=GalleryLayout.MOSAIC
         compose.setContent {
             pixels=LocalDensity.current.density
             CompositionLocalProvider(LocalDensity provides Density(pixels,2f),LocalLayoutDirection provides direction) {
                 MaterialTheme(colorScheme=if(dark) darkColorScheme() else lightColorScheme()) {
                     Surface { Column(Modifier.width(320.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(16.dp)) {
+                        GalleryLayoutControls(selectedLayout) { selectedLayout=it }
                         GridDensityControls(selected) { selected=it }
                         MonthNavigationControls(MonthNavigation(YearMonth.of(1998,1),YearMonth.of(2026,12)),YearMonth.of(2024,2)) { }
                     } }
                 }
             }
+        }
+        for(value in GalleryLayout.entries) {
+            val node=compose.onNodeWithTag("layout:${value.name}").performScrollTo().assertIsDisplayed();val rect=node.fetchSemanticsNode().boundsInRoot
+            assertTrue(rect.width>=48*pixels-1 && rect.height>=48*pixels-1);node.performClick();assertEquals(value,selectedLayout)
         }
         for(value in GridDensity.entries) {
             val node=compose.onNodeWithTag("density:${value.columns}").performScrollTo().assertIsDisplayed();val rect=node.fetchSemanticsNode().boundsInRoot

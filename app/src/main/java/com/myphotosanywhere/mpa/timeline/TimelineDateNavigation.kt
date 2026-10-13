@@ -28,6 +28,19 @@ import java.time.format.TextStyle
 import androidx.compose.ui.platform.LocalConfiguration
 
 @Composable
+internal fun GalleryLayoutControls(selected: GalleryLayout,onSelect: (GalleryLayout)->Unit) {
+    Column {
+        Text("Photo layout",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })
+        FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            GalleryLayout.entries.forEach { value ->
+                FilterChip(selected==value,{ onSelect(value) },label={ Text(value.title) },
+                    modifier=Modifier.heightIn(min=48.dp).testTag("layout:${value.name}"))
+            }
+        }
+    }
+}
+
+@Composable
 internal fun GridDensityControls(selected: GridDensity,onSelect: (GridDensity)->Unit) {
     Column {
         Text("Photo size",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })

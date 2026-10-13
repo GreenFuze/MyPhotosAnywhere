@@ -15,13 +15,25 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 internal data class TimelineViewerState(val selected: TimelineEntry,val session: ViewerSession?=null,val problem: String?=null)
-internal data class TimelineItem(val entry: TimelineEntry,val generation: Long,val query: TimelineQuery)
+internal data class TimelineItem(val entry: TimelineEntry,val generation: Long,val query: TimelineQuery,val aspect: Float)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class TimelineViewModel(application: Application,private val saved: SavedStateHandle): AndroidViewModel(application) {
     private val app=application as MpaApplication
     val repository=app.timeline
     val density=app.galleryPresentation.density
+    val layout=app.galleryPresentation.layout
+    private val geometry=ThumbnailGeometry()
+    fun changeLayout(value: GalleryLayout) {
+        if(value==layout.value) return
+        anchor()?.let { saved[anchorName(request.value.query)]=anchorBundle(it.cursor,it.offset) }
+        observingAnchor=false
+        viewModelScope.launch {
+            try { app.galleryPresentation.updateLayout(value) }
+            catch(cancelled: CancellationException) { throw cancelled }
+            catch(error: java.io.IOException) { _message.value=error.message ?: "Cannot save photo layout.";observingAnchor=true }
+        }
+    }
     fun changeDensity(value: GridDensity,viewport: TimelineAnchor?=anchor()) {
         if(value==density.value) return
         if(viewport!=null) saved[anchorName(request.value.query)]=anchorBundle(viewport.cursor,viewport.offset)
@@ -51,7 +63,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
             TimelinePagingSource(repository,current.query) { _refreshedGeneration.value=current.generation }.also { source ->
                 sources.add(source);source.registerInvalidatedCallback { sources.remove(source) }
             }
-        }.flow.map { data -> data.map { TimelineItem(it,current.generation,current.query) } }
+        }.flow.map { data -> data.map { TimelineItem(it,current.generation,current.query,geometry.aspect(it.key,it.thumbnailPath)) } }
             .onCompletion { synchronized(sources) { sources.toList().forEach { it.invalidate() };sources.clear() } }
     }.cachedIn(viewModelScope)
 

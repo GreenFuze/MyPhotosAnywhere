@@ -43,7 +43,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 internal sealed interface TimelineRow {
-    data class Media(val entry: TimelineEntry,val generation: Long,val query: TimelineQuery): TimelineRow
+    data class Media(val entry: TimelineEntry,val generation: Long,val query: TimelineQuery,val aspect: Float): TimelineRow
     data class Day(val date: LocalDate?,val label: String): TimelineRow
 }
 
@@ -70,9 +70,10 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     hasSources: Boolean,onConnect: ()->Unit,onClearFilters: ()->Unit,onRefresh: ()->Unit,emptyActionLabel: String="Clear filters") {
     val zone=deviceTimelineZone(model)
     val density by model.density.collectAsStateWithLifecycle()
+    val layout by model.layout.collectAsStateWithLifecycle()
     var dateNavigation by remember(query) { mutableStateOf(false) }
     val rowsFlow=remember(model,zone) {
-        model.paging.map { data -> data.map<TimelineItem,TimelineRow> { TimelineRow.Media(it.entry,it.generation,it.query) }.insertSeparators { before,after ->
+        model.paging.map { data -> data.map<TimelineItem,TimelineRow> { TimelineRow.Media(it.entry,it.generation,it.query,it.aspect) }.insertSeparators { before,after ->
             val media=after as? TimelineRow.Media
             if(media==null) null else {
                 val date=media.entry.millis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
@@ -82,12 +83,14 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         } }
     }
     val rows=rowsFlow.collectAsLazyPagingItems()
+    val retained=rows.itemSnapshotList.items
+    val mediaByKey=remember(retained) { retained.filterIsInstance<TimelineRow.Media>().associateBy { it.entry.key } }
     val restoration by model.restoration.collectAsStateWithLifecycle()
     val refreshedGeneration by model.refreshedGeneration.collectAsStateWithLifecycle()
     val viewer by model.viewer.collectAsStateWithLifecycle()
-    var restoring by remember(query,restoration,zone,density) { mutableStateOf(true) }
+    var restoring by remember(query,restoration,zone,density,layout) { mutableStateOf(true) }
     LaunchedEffect(query) { model.configure(query) }
-    LaunchedEffect(query,restoration,zone,density) {
+    LaunchedEffect(query,restoration,zone,density,layout) {
         val anchor=model.anchor(query)
         if(anchor!=null) {
             snapshotFlow { Triple(rows.itemSnapshotList.items,rows.loadState.refresh,refreshedGeneration) }.first { (items,load,generation) ->
@@ -121,17 +124,17 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         model.restored(restoration)
         restoring=false
     }
-    LaunchedEffect(query,restoring,viewer) {
+    LaunchedEffect(query,restoring,viewer,mediaByKey) {
         if(restoring || viewer!=null) return@LaunchedEffect
         snapshotFlow {
             if(rows.loadState.refresh is LoadState.Loading) null else state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-                (if(visible.index in 0 until rows.itemCount) rows.peek(visible.index) as? TimelineRow.Media else null)
+                mediaByKey[visible.key]
                     ?.takeIf { it.generation==restoration }?.entry?.let { it to -visible.offset.y }
             }
         }.filterNotNull().distinctUntilChanged().collect { (entry,offset) -> model.rememberVisibleAnchor(entry,offset,restoration) }
     }
     fun viewport(): TimelineAnchor?=state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-        (if(visible.index in 0 until rows.itemCount) rows.peek(visible.index) as? TimelineRow.Media else null)
+        mediaByKey[visible.key]
             ?.entry?.let { TimelineAnchor(it.cursor,-visible.offset.y) }
     }
     val pinch by rememberUpdatedState<(Float)->Unit> { scale -> model.changeDensity(density.pinch(scale),viewport()) }
@@ -156,9 +159,15 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 else if(!hasSources) Button(onClick=onConnect) { Text("Connect Google Drive") }
                 else TextButton(onClick=onRefresh) { Text("Refresh library") }
             }
-        } else Box(Modifier.weight(1f).fillMaxWidth()) {
-        LazyVerticalGrid(GridCells.Fixed(density.columns),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
-            .semantics { stateDescription="${density.columns} columns" }
+        } else BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        val plan=remember(retained,density,layout,maxWidth) {
+            JustifiedMosaic().plan(retained.map { row -> when(row) {
+                is TimelineRow.Media -> MosaicInput(row.entry.key,row.aspect)
+                is TimelineRow.Day -> MosaicInput("day:${row.date}",heading=true)
+            } },density.columns,(maxWidth.value-4f).coerceAtLeast(1f),layout)
+        }
+        LazyVerticalGrid(GridCells.Fixed(JustifiedMosaic.SLOTS),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
+            .semantics { stateDescription="${density.columns} columns";collectionInfo=CollectionInfo(plan.rowCount,plan.columns) }
             .pointerInput(selection.isEmpty(),selectionLocked,restoring) {
                 if(selectionLocked || restoring) return@pointerInput
                 awaitEachGesture {
@@ -178,24 +187,28 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             },
             contentPadding=PaddingValues(start=2.dp,top=2.dp,end=2.dp,bottom=bottomClearance+2.dp),
             horizontalArrangement=Arrangement.spacedBy(2.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
-            items(rows.itemCount,key={ index -> when(val row=rows.peek(index)) {
+            items(retained.size,key={ index -> when(val row=retained[index]) {
                 is TimelineRow.Media -> row.entry.key
                 is TimelineRow.Day -> "day:${row.date}"
-                null -> "loading:$index"
-            } },span={ index -> if(rows.peek(index) is TimelineRow.Day) GridItemSpan(maxLineSpan) else GridItemSpan(1) },
-                contentType={ index -> if(rows.peek(index) is TimelineRow.Day) "date" else "media" }) { index ->
-                when(val row=rows[index]) {
+            } },span={ index -> GridItemSpan(plan.cells[index].span) },
+                contentType={ index -> if(retained[index] is TimelineRow.Day) "date" else "media" }) { index ->
+                // Signal Paging access, but render one immutable row/geometry snapshot together.
+                // A concurrent prepend must never apply another identity's cell dimensions/actions.
+                if(index<rows.itemCount) rows[index]
+                when(val row=retained[index]) {
                     is TimelineRow.Day -> Text(row.label,Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=10.dp)
-                        .semantics { heading() }.testTag("timeline:date:${row.date}"),style=MaterialTheme.typography.titleSmall)
-                    is TimelineRow.Media -> TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || row.query!=query) {
+                        .semantics { heading();plan.cells.getOrNull(index)?.let { collectionItemInfo=CollectionItemInfo(it.row,1,0,plan.columns) } }.testTag("timeline:date:${row.date}"),style=MaterialTheme.typography.titleSmall)
+                    is TimelineRow.Media -> TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || row.query!=query,
+                        Modifier.height(requireNotNull(plan.cells.getOrNull(index)?.height).dp).semantics {
+                            val cell=plan.cells[index];collectionItemInfo=CollectionItemInfo(cell.row,1,cell.column,1)
+                        }) {
                         val offset=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==row.entry.key }?.offset?.y
                         val viewport=state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-                            (if(visible.index in 0 until rows.itemCount) rows.peek(visible.index) as? TimelineRow.Media else null)
+                            mediaByKey[visible.key]
                                 ?.entry?.let { TimelineAnchor(it.cursor,-visible.offset.y) }
                         }
                         model.open(row.entry,offset?.let { -it },viewport)
                     }
-                    null -> Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant))
                 }
             }
             if(rows.loadState.append is LoadState.Loading) item(span={ GridItemSpan(maxLineSpan) }) {
@@ -203,13 +216,13 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             }
         }
         if(restoring || refresh is LoadState.Loading) LinearProgressIndicator(Modifier.align(Alignment.TopCenter).fillMaxWidth().testTag("timeline:refreshing"))
-        if(selection.isEmpty() && !selectionLocked && !restoring) TimelineDateRail(state,rows.itemSnapshotList.items,query,zone) { dateNavigation=true }
+        if(selection.isEmpty() && !selectionLocked && !restoring) TimelineDateRail(state,retained,query,zone) { dateNavigation=true }
         }
     }
 }
 
 @Composable
-private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,features: LibraryFeaturesModel,selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,onOpen: ()->Unit) {
+private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,features: LibraryFeaturesModel,selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,modifier: Modifier=Modifier,onOpen: ()->Unit) {
     val context=LocalContext.current
     var problem by remember(entry) { mutableStateOf<String?>(null) }
     val thumbnail by produceState<File?>(null,entry) {
@@ -228,7 +241,7 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
     val chosen=selection.any { it.matches(target) }
     val selecting=selection.isNotEmpty()
     val date=entry.millis?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toString() } ?: "Unknown date"
-    Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant)
+    Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)
         .testTag(entry.photoId?.let { "photo:$it" } ?: "cloud:${entry.cloudKey}")
         .combinedClickable(enabled=!selectionLocked,role=Role.Button,onClick={ if(selecting) onToggle(target) else onOpen() },
             onLongClickLabel="Select photo",onLongClick={ onToggle(target) }).semantics(mergeDescendants=true) {

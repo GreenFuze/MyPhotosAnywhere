@@ -50,6 +50,10 @@ class TimelineScaleTest {
                 } }
                 val repository=TimelineRepository(database)
                 val query=TimelineQuery()
+                val mosaicStarted=System.nanoTime()
+                val mosaic=JustifiedMosaic().plan(List(300) { MosaicInput("bounded-$it",listOf(0.67f,1f,1.5f)[it%3]) },3,407f,GalleryLayout.MOSAIC)
+                val mosaicMillis=(System.nanoTime()-mosaicStarted)/1000000.0
+                assertEquals(300,mosaic.cells.size);assertEquals(3,mosaic.columns)
                 val memoryBefore=Debug.getPss()
                 var started=System.nanoTime()
                 val first=repository.page(query,null,TimelineDirection.AFTER,90)
@@ -100,7 +104,7 @@ class TimelineScaleTest {
                 assertEquals(9,database.openHelper.readableDatabase.version)
                 val memoryAfter=Debug.getPss()
                 results.put(JSONObject().put("items",size).put("firstPageMs",firstMillis).put("seekMs",seekMillis)
-                    .put("dateRangeMs",dateRangeMillis).put("aroundPageMs",aroundMillis).put("snapshotMs",snapshotMillis).put("duringImportMs",duringImportMillis).put("snapshotImportMs",snapshotImportMillis)
+                    .put("dateRangeMs",dateRangeMillis).put("mosaicPlanMs",mosaicMillis).put("aroundPageMs",aroundMillis).put("snapshotMs",snapshotMillis).put("duringImportMs",duringImportMillis).put("snapshotImportMs",snapshotImportMillis)
                     .put("pssBeforeKb",memoryBefore).put("pssAfterKb",memoryAfter)
                     .put("pageBudget",TimelinePagingSource.CONFIG.maxSize).put("pageRows",90)
                     .put("indexBytes",directory.listFiles().orEmpty().sumOf { it.length() }))

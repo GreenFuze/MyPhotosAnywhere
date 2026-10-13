@@ -27,7 +27,15 @@ internal class GalleryPresentation(context: Context) {
     private val preferences=context.getSharedPreferences("gallery-presentation",Context.MODE_PRIVATE)
     private val _density=MutableStateFlow(GridDensity.entries.single { it.columns==preferences.getInt("columns",3) })
     val density=_density.asStateFlow()
+    private val _layout=MutableStateFlow(GalleryLayout.valueOf(requireNotNull(preferences.getString("layout",GalleryLayout.MOSAIC.name))))
+    val layout=_layout.asStateFlow()
     private val writes=Mutex()
+    suspend fun updateLayout(value: GalleryLayout)=withContext(Dispatchers.IO) {
+        writes.withLock {
+            CheckedPreferences(preferences).commit("Cannot save photo layout.") { putString("layout",value.name) }
+            _layout.value=value
+        }
+    }
     suspend fun update(value: GridDensity)=withContext(Dispatchers.IO) {
         writes.withLock {
             CheckedPreferences(preferences).commit("Cannot save photo grid density.") { putInt("columns",value.columns) }
