@@ -73,8 +73,10 @@ class ImportModel(application: Application): AndroidViewModel(application) {
     }
 }
 
+enum class ImportSurface { NEW, ACTIVITY, HISTORY }
+
 @Composable
-fun ImportControls(model: ImportModel=viewModel()) {
+fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=viewModel()) {
     val context=LocalContext.current
     val savedJobs by model.jobs.collectAsStateWithLifecycle()
     val dismissed by model.dismissed.collectAsStateWithLifecycle()
@@ -106,6 +108,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
             startAfterPermission=id; requestNotifications()
         } else model.run { model.app.imports.start(id) }
     }
+    var expandedJob by rememberSaveable { mutableStateOf<String?>(null) }
     var preview by remember { mutableStateOf<String?>(null) }
     var targetJob by rememberSaveable { mutableStateOf<String?>(null) }
     var driveZip by rememberSaveable { mutableStateOf(false) }
@@ -130,6 +133,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
         ImportJobProgress(job.id,progress)
         job.error?.takeIf { it!=progress.detail }?.let { Text(it,color=MaterialTheme.colorScheme.error) }
         Text("Destination: ${sources.find { it.key==job.binding }?.let { "${it.folderName} (${it.email})" } ?: "Disconnected original source"}",style=MaterialTheme.typography.bodySmall)
+        TextButton(onClick={ expandedJob=if(expandedJob==job.id) null else job.id },modifier=Modifier.heightIn(min=48.dp).testTag("import:details:${job.id}")) { Text(if(expandedJob==job.id) "Hide details" else "View details") }
         if(ImportErrorDismissal.canDismiss(job) && ImportErrorDismissal.hasErrors(job,entries,download))
             TextButton(enabled=!busy,onClick={ model.run { model.app.imports.dismissErrors(job.id) } },
                 modifier=Modifier.testTag("dismiss-import-errors:${job.id}")) { Text("Dismiss errors") }
@@ -139,6 +143,7 @@ fun ImportControls(model: ImportModel=viewModel()) {
             else TextButton(enabled=!busy,onClick={ model.run { model.history.dismiss(model.app.database,job.id) } },
                 modifier=Modifier.testTag("dismiss-import:${job.id}")) { Text("Dismiss import") }
         }
+        if(expandedJob==job.id) {
         download?.let {
             Text(when(it.state) {
                 "CLEANED" -> "Downloaded ZIP removed from this phone."
@@ -169,12 +174,26 @@ fun ImportControls(model: ImportModel=viewModel()) {
         if(job.state in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id) } }) { Text("Pause import") }
         if(job.state !in listOf("COMPLETE","CANCELLED")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id,true) } }) { Text("Cancel remaining import") }
     }
+    }
     val activeStates=listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP")
     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-        Text("Import Google Photos",style=MaterialTheme.typography.titleMedium)
-        jobs.filter { it.state in activeStates }.forEach { job ->
-            key(job.id) { jobControls(job) }
-        }
+        Text(when(surface) { ImportSurface.NEW -> "Import Google Photos";ImportSurface.ACTIVITY -> "Imports";ImportSurface.HISTORY -> "Import history" },style=MaterialTheme.typography.titleMedium)
+        if(surface==ImportSurface.NEW) {
+        val destination=sources.find { it.backupEnabled } ?: sources.singleOrNull()
+        Text(destination?.let { "New import destination: ${it.folderName} (${it.email})" }
+            ?: "Connect a Drive folder, or choose a default when several folders are connected.",style=MaterialTheme.typography.bodySmall)
+        Button(enabled=!busy,onClick={
+            try { account.launch(AccountPicker.newChooseAccountIntent(AccountPicker.AccountChooserOptions.Builder().setAllowableAccountsTypes(listOf("com.google")).build())) }
+            catch(_: Exception) { model.message.value="Google account selection requires Google Play services." }
+        },modifier=Modifier.testTag("import-photos-picker")) { Text("Choose from Google Photos") }
+        OutlinedButton(enabled=!busy,onClick={ targetJob=null; zip.launch(Unit) },modifier=Modifier.testTag("import-takeout")) { Text("Import Takeout ZIP parts") }
+        TextButton(enabled=!busy && sources.isNotEmpty(),onClick={ targetJob=null; driveZip=true }) { Text("Import Takeout ZIP from Drive") }
+        TextButton(enabled=!busy,onClick={ targetJob=null; folder.launch(Unit) }) { Text("Import extracted Takeout folder") }
+        Text(if(settings.sidecarBackup) "Imported metadata uses XMP annotation backup; check Settings > Backup and metadata."
+            else "Imported metadata is local only until you enable Settings > Backup and metadata.",style=MaterialTheme.typography.bodySmall)
+        var explain by rememberSaveable { mutableStateOf(false) }
+        TextButton(onClick={ explain=!explain },modifier=Modifier.heightIn(min=48.dp)) { Text(if(explain) "Hide import information" else "How imports work") }
+        if(explain) {
         Text("Takeout ZIPs are read locally. Importing uploads the selected files to your Drive destination and requires an internet connection.",style=MaterialTheme.typography.bodySmall)
         Text("Imports continue in the background with live progress here and in notifications. Android may pause work for network or system limits; checkpoints are preserved.",style=MaterialTheme.typography.bodySmall)
         if(!notificationsEnabled) {
@@ -185,42 +204,37 @@ fun ImportControls(model: ImportModel=viewModel()) {
                 .putExtra(Settings.EXTRA_APP_PACKAGE,context.packageName)) }) { Text("Open notification settings") }
         }
         Text("Imports go to the default Drive destination. Your only connected folder is chosen automatically. User-selected source files remain untouched. Media limit: 250 MiB per file; catalogue: 10,000 assets / 2 MiB.")
-        val destination=sources.find { it.backupEnabled } ?: sources.singleOrNull()
-        Text(destination?.let { "New import destination: ${it.folderName} (${it.email})" }
-            ?: "Connect a Drive folder, or choose a default when several folders are connected.",style=MaterialTheme.typography.bodySmall)
-        Text(if(settings.sidecarBackup) "Imported metadata uses XMP annotation backup; check its backup status below."
-            else "Imported metadata is local only until you enable XMP annotation backup below.",style=MaterialTheme.typography.bodySmall)
-        Button(enabled=!busy,onClick={
-            try { account.launch(AccountPicker.newChooseAccountIntent(AccountPicker.AccountChooserOptions.Builder().setAllowableAccountsTypes(listOf("com.google")).build())) }
-            catch(_: Exception) { model.message.value="Google account selection requires Google Play services." }
-        },modifier=Modifier.testTag("import-photos-picker")) { Text("Choose from Google Photos") }
-        OutlinedButton(enabled=!busy,onClick={ targetJob=null; zip.launch(Unit) },modifier=Modifier.testTag("import-takeout")) { Text("Import Takeout ZIP parts") }
-        TextButton(enabled=!busy && sources.isNotEmpty(),onClick={ targetJob=null; driveZip=true }) { Text("Import Takeout ZIP from Drive") }
-        TextButton(enabled=!busy,onClick={ targetJob=null; folder.launch(Unit) }) { Text("Import extracted Takeout folder") }
         Text("For ZIPs, use local/USB storage. Cloud document providers may download the archive internally. Picker omits location metadata and may transcode videos.",style=MaterialTheme.typography.bodySmall)
+        }
+        }
         if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let { Text(it,color=MaterialTheme.colorScheme.error); TextButton(onClick={ model.message.value=null }) { Text("Dismiss") } }
-        if(savedJobs.any { it.id in dismissed && ImportHistory.canDismiss(it.state) })
+        if(surface!=ImportSurface.NEW && savedJobs.any { it.id in dismissed && ImportHistory.canDismiss(it.state) })
             TextButton(onClick={ showDismissed=!showDismissed },modifier=Modifier.testTag("toggle-dismissed-imports")) {
                 Text(if(showDismissed) "Hide dismissed imports" else "Show dismissed imports")
             }
-        val historyJobs=jobs.filterNot { it.state in activeStates }
+        val historyJobs=when(surface) {
+            ImportSurface.NEW -> jobs.filter { it.state in listOf("PREVIEW","PICKING") }
+            ImportSurface.ACTIVITY -> jobs.sortedByDescending { it.state in activeStates }
+            ImportSurface.HISTORY -> jobs.filter { ImportHistory.canDismiss(it.state) }
+        }
+        if(historyJobs.isEmpty()) Text(when(surface) { ImportSurface.NEW -> "Choose a source to start a new import.";ImportSurface.ACTIVITY -> "No imports need attention.";ImportSurface.HISTORY -> "No finished imports." })
         historyJobs.take(historyLimit).forEach { job ->
             key(job.id) { jobControls(job) }
         }
         if(historyJobs.size>historyLimit) TextButton(onClick={ historyLimit+=10 },modifier=Modifier.testTag("more-import-history")) {
             Text("Show more imports")
         }
-        if(sidecars.isNotEmpty()) {
+        if(surface==ImportSurface.NEW && sidecars.isNotEmpty()) {
             Text("Google metadata found in Drive",style=MaterialTheme.typography.titleMedium)
-            Text("Conversion keeps existing MPA values, backs up the full Google record in XMP, then moves verified JSON files to Drive trash. Enable XMP annotation backup below first. Ambiguous or conflicting JSON stays in Drive.")
+            Text("Conversion keeps existing MPA values, backs up the full Google record in XMP, then moves verified JSON files to Drive trash. Enable Settings > Backup and metadata first. Ambiguous or conflicting JSON stays in Drive.")
             sources.filter { source -> sidecars.any { it.binding==source.key } }.forEach { source ->
                 var enabled by remember(source.key) { mutableStateOf(model.app.takeoutMetadata.enabled(source.key)) }
                 Row { Checkbox(enabled,{
                     val value=it; model.run { model.app.takeoutMetadata.enable(source.key,value); enabled=value }
                 }); Text("Convert and clean up Google metadata in ${source.folderName}") }
                 val records=sidecars.filter { it.binding==source.key }
-                Text("${records.count { it.state=="COMPLETE" }} converted · ${records.count { it.state!="COMPLETE" && it.state!="GONE" }} pending/review")
+                Text("${records.count { it.state=="COMPLETE" }} converted Ã‚Â· ${records.count { it.state!="COMPLETE" && it.state!="GONE" }} pending/review")
                 records.filter { it.error!=null }.take(3).forEach { Text("${it.name}: ${it.error}",style=MaterialTheme.typography.bodySmall) }
                 TextButton(enabled=!busy && enabled,onClick={ model.run { model.app.takeoutMetadata.retry(source.key) } }) { Text("Retry metadata conversion") }
             }
@@ -237,13 +251,13 @@ fun ImportControls(model: ImportModel=viewModel()) {
         AlertDialog(onDismissRequest={ preview=null },title={ Text("Import preview") },text={
             LazyColumn(Modifier.heightIn(max=480.dp)) {
                 item {
-                Text("${entries.count { it.selected }} selected · %.1f MiB known media size".format(entries.filter { it.selected }.sumOf { it.size }/(1024.0*1024)))
+                Text("${entries.count { it.selected }} selected Ã‚Â· %.1f MiB known media size".format(entries.filter { it.selected }.sumOf { it.size }/(1024.0*1024)))
                 Text("Picker sizes are unknown until downloaded. Exact duplicates are checked against verified bytes in this destination before upload.")
                 }
                 items(entries,key={ it.id }) { item ->
                     Row { Checkbox(item.selected,{ selected -> model.run { model.app.imports.select(item.id,selected) } },
                         enabled=!busy && job?.state in listOf("PREVIEW","PAUSED","FAILED") && item.state !in listOf("COMPLETE","UNSUPPORTED","MATCHED","UNRESOLVED","INFORMATION"))
-                        Column { Text(item.path.take(250)); Text("${item.state.lowercase()} · ${if(item.metadata!=null) "metadata present" else "no supplemental metadata"}",style=MaterialTheme.typography.bodySmall) }
+                        Column { Text(item.path.take(250)); Text("${item.state.lowercase()} Ã‚Â· ${if(item.metadata!=null) "metadata present" else "no supplemental metadata"}",style=MaterialTheme.typography.bodySmall) }
                     }
                     item.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
                     if(item.mime.startsWith("image/") || item.mime.startsWith("video/")) item.metadata?.let { raw ->

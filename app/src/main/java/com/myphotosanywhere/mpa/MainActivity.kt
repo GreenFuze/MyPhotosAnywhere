@@ -46,7 +46,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.myphotosanywhere.mpa.core.AiProvider
 import com.myphotosanywhere.mpa.data.*
 import com.myphotosanywhere.mpa.drive.binding
-import com.myphotosanywhere.mpa.drive.DriveStorageScreen
 import com.myphotosanywhere.mpa.edit.EditorScreen
 import com.myphotosanywhere.mpa.library.*
 
@@ -103,7 +102,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val settings by features.settings.collectAsStateWithLifecycle()
     val navigation=rememberSaveable(saver=ShellNavigation.Saver) { ShellNavigation() }
     val tab=navigation.destination.id
-    LaunchedEffect(importNavigation) { if(importNavigation>0) navigation.open(ShellDestination.STORAGE) }
+    LaunchedEffect(importNavigation) { if(importNavigation>0) navigation.open(ShellDestination.ACTIVITY) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var resultHandoffId by rememberSaveable { mutableStateOf<String?>(null) }
     var showShare by rememberSaveable { mutableStateOf(false) }
@@ -188,7 +187,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     BackHandler(enabled=tab==5 && imeVisible && !selecting && !showFilters && searchViewer==null && selectedId==null && editorId==null && pendingViewKey==null) { focusManager.clearFocus(force=true);keyboard?.hide() }
     val title=when(navigation.destination) {
         ShellDestination.PHOTOS -> albums.find { it.id==albumId }?.name ?: people.find { it.id==personId }?.name
-            ?: if(filter=="All") "Photos" else filter
+            ?: com.myphotosanywhere.mpa.people.ImportedPersonLabel.fromKey(personId)?.name ?: if(filter=="All") "Photos" else filter
         else -> navigation.destination.title
     }
     var navigationHeight by remember { mutableIntStateOf(0) }
@@ -198,7 +197,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     Scaffold(topBar={ if(selecting) SelectionTopBar(selectedTargets.size,selectionBusy,selection::clear) else if(tab==5) SearchTopBar(searchDraft.text,searchDraft.filtered,search::text,::submitSearch,
         onBack={ if(imeVisible) { focusManager.clearFocus(force=true);keyboard?.hide() } else back() },onFilters={ showFilters=true }) else ShellTopBar(title,navigation.canGoBack && !primaryBrand,::back,canAddPhotos=!busy,
         onAddPhotos={ if(!busy) addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
-        onStorage={ navigation.open(ShellDestination.STORAGE) },onActivity={ navigation.open(ShellDestination.STORAGE) },
+        onStorage={ navigation.open(ShellDestination.STORAGE) },onActivity={ navigation.open(ShellDestination.ACTIVITY) },onImport={ navigation.open(ShellDestination.IMPORTS) },
         onFilters={ showFilters=true },showFilters=tab==0 || tab==5,
         filtersActive=filter!="All" || sourceKey!=null,needsAttention=sync.any { it.error!=null },
         showTitle=!primaryBrand || filter!="All" || albumId!=null || personId!=null)
@@ -209,13 +208,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             if(busy || featureBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
             when(tab) {
                 0 -> {
-                    ShellImportActivity(onOpen={ navigation.open(ShellDestination.STORAGE) })
-                    val activeSync=sync.filter { sourceKey==null || it.bindingKey==sourceKey }
-                    if(activeSync.any { it.running || it.error!=null }) TextButton(
-                        onClick={ navigation.open(ShellDestination.STORAGE) },modifier=Modifier.fillMaxWidth().testTag("shell:sync")) {
-                        Text(if(activeSync.any { it.error!=null }) "Drive sync needs attention" else "Updating photo library…",
-                            maxLines=1,overflow=TextOverflow.Ellipsis)
-                    }
+                    ShellImportActivity(onOpen={ navigation.open(ShellDestination.ACTIVITY) },sync=sync)
                     TimelineGrid(TimelineQuery(filter,sourceKey,albumId,personId),timeline,features,
                         if(albumId!=null || personId!=null) collectionGrid else photosGrid,scrollClearance,
                         modifier=Modifier.weight(1f).fillMaxWidth(),selection=selectedTargets,onToggle=selection::toggle,selectionLocked=selectionLocked,hasSources=sources.isNotEmpty(),
@@ -223,7 +216,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                         onClearFilters={ filter="All";sourceKey=null;albumId=null;personId=null },onRefresh=features::refreshCloud)
                 }
                 5 -> {
-                    ShellImportActivity(onOpen={ navigation.open(ShellDestination.STORAGE) })
+                    ShellImportActivity(onOpen={ navigation.open(ShellDestination.ACTIVITY) },sync=sync)
                     SearchScreen(searchDraft,searchApplied,searchRecents,search,searchTimeline,features,searchGrid,searchSuggestions,
                         albums,sources,scrollClearance,selectedTargets,selection::toggle,selectionLocked,onFilters={ showFilters=true },
                         onPeople={ navigation.open(ShellDestination.PEOPLE) },onPlaces={ navigation.open(ShellDestination.PLACES) },
@@ -250,9 +243,9 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                         } }
                     }
                 }
-                2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; albumId=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto)
+                2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; albumId=null; sourceKey=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto)
                 3 -> PlacesScreen(photos,settings.onlineMaps,{ features.updateSettings(settings.copy(onlineMaps=it)) },::selectPhoto)
-                4 -> DriveStorageScreen(photos)
+                4,7,8,9,10,11,12,13,14,15 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
             }
         }
         if(selecting) SelectionBottomBar(selectionBusy,(if(tab==5) searchApplied.filter else filter)=="Archive",tab==0 && albumId!=null,onAction={ kind ->
@@ -279,7 +272,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             Text("Sources",style=MaterialTheme.typography.titleMedium)
             FilterChip(selected=sourceKey==null,onClick={ sourceKey=null },label={ Text("All sources") })
             sources.forEach { source -> FilterChip(selected=sourceKey==source.key,onClick={ sourceKey=source.key },
-                label={ Text("${source.folderName} · ${source.email}") }) }
+                label={ Text("${source.folderName} Ã‚Â· ${source.email}") }) }
             Button(onClick={ showFilters=false },modifier=Modifier.align(Alignment.End)) { Text("Done") }
         }
     }
@@ -308,7 +301,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         onEdit={ viewerId=null; selectedId=it; editorId=it },onDetails={ selectedId=it;viewerDetailsOpen=true }) }
     if(selectedId!=null && selected==null && editorId==null && (viewerId==null || viewerDetailsOpen) && pendingViewKey==null) {
         AlertDialog(onDismissRequest={ selectedId=null;viewerDetailsOpen=false },title={ Text("Photo details") },
-            text={ Text(selectedProblem ?: "Loading photo details…") },
+            text={ Text(selectedProblem ?: "Loading photo detailsÃ¢â‚¬Â¦") },
             confirmButton={ if(selectedProblem!=null) TextButton(onClick={ selectedAttempt++ }) { Text("Retry") } },
             dismissButton={ TextButton(onClick={ selectedId=null;viewerDetailsOpen=false }) { Text("Close") } })
     }

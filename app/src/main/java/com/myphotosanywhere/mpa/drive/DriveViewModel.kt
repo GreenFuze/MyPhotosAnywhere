@@ -195,7 +195,9 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         }
         app.drive.resume(replace = true)
     }
-    fun disconnect() = perform { app.drive.disconnect(); _browser.value = null; path.clear() }
+    fun disconnect(expectedBinding: String?=null) = perform {
+        require(expectedBinding==null || dao.connection()?.binding()?.key==expectedBinding) { "The selected source changed. Review it before disconnecting." }
+        app.drive.disconnect(); _browser.value = null; path.clear() }
 
     fun importImage(file: DriveFile) = perform {
         val active=dao.connection() ?: error("Connect Drive first.")

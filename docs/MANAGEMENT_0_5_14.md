@@ -1,0 +1,7 @@
+# MPA 0.5.14 — management and imported people
+
+Sources, Activity, new imports, import history and Settings become focused destinations. Settings separates cache, recognition, annotation backup and privacy/permissions. Existing workers, checkpoints, captured destinations, source authorization and original protection remain. The account button opens Sources; Add opens new imports; activity/notifications open Activity. Source removal has an explicit scope confirmation. Metadata controls remain opt-in.
+
+Takeout `people[].name` values already retained in `Photo.importedMetadata.googleTakeout` become browsable provider labels under People and appear in Details. Labels have source-scoped deterministic identities, exact normalized-name membership, normal visibility rules, paged chronological grids and stable viewer snapshots. Existing imports need no upload. They do not create faces, embeddings or confirmed identities; equal names across sources and existing named faces remain distinct. Missing labels cannot be reconstructed from JSON that lacks them. No Room schema change or media/metadata rewrite is required.
+
+Remaining UX batch: optional density/date-navigation gestures, motion and visual polish, followed by full phone acceptance. S23 Ultra acceptance and the reported JPEG crash remain unverified. Release requires strict checks, native API 29/35/37, screenshots, data-preservation checks and exact established-signer APK verification. Previously approved tooling diagnostics remain the only exceptions.

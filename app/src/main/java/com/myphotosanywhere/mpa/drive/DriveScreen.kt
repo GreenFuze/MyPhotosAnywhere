@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,13 +42,14 @@ import com.google.android.gms.common.AccountPicker
 import com.myphotosanywhere.mpa.data.Photo
 
 @Composable
-fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel()) {
+fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->Unit,onSettings: ()->Unit,model: DriveViewModel = viewModel()) {
     val active by model.connection.collectAsStateWithLifecycle()
     val sources by model.sources.collectAsStateWithLifecycle()
     val backups by model.backups.collectAsStateWithLifecycle()
     val browser by model.browser.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
+    var disconnecting by rememberSaveable { mutableStateOf(false) }
     var modeName by rememberSaveable { mutableStateOf(DriveMode.APP_FILES.name) }
     var folderName by rememberSaveable { mutableStateOf("MyPhotosAnywhere") }
     val resolution = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
@@ -71,11 +73,13 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
     val currentBackups = backups.filter { it.bindingKey == current?.binding()?.key }
     Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("Storage & backup", style = MaterialTheme.typography.headlineSmall)
-        com.myphotosanywhere.mpa.library.ScanActions(androidx.lifecycle.viewmodel.compose.viewModel())
-        com.myphotosanywhere.mpa.library.DriveSyncActions()
-        com.myphotosanywhere.mpa.importing.ImportControls()
-        Text("${photos.size} photos · %.1f MiB saved on this device".format(photos.filter { it.originalPath.isNotBlank() }.sumOf { it.bytes } / (1024.0 * 1024)))
+        Text("MyPhotosAnywhere",style=MaterialTheme.typography.headlineSmall)
+        Text("Your gallery combines ${sources.size} connected sources. Managing a source does not filter Photos.",style=MaterialTheme.typography.bodySmall)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick=onActivity,modifier=Modifier.heightIn(min=48.dp).testTag("management:Activity")) { Text("Activity") }
+            TextButton(onClick=onImports,modifier=Modifier.heightIn(min=48.dp).testTag("management:Import photos")) { Text("Import photos") }
+            TextButton(onClick=onSettings,modifier=Modifier.heightIn(min=48.dp).testTag("management:Settings")) { Text("Settings") }
+        }
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let {
             Card(Modifier.fillMaxWidth()) {
@@ -93,8 +97,8 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
                     Column(Modifier.padding(12.dp)) {
                         Text(source.folderName)
                         Text(source.email,style=MaterialTheme.typography.bodySmall)
-                        if(source.backupEnabled) Text("Default backup destination",style=MaterialTheme.typography.labelMedium)
-                        else if(sources.size==1) Text("Default import destination (only connected folder)",style=MaterialTheme.typography.labelMedium)
+                        if(source.backupEnabled) Text("Default for new imports and backups",style=MaterialTheme.typography.labelMedium)
+                        else if(sources.size==1) Text("Default for new imports (only connected folder)",style=MaterialTheme.typography.labelMedium)
                         TextButton(enabled=!busy,onClick={ model.selectSource(source) }) { Text("Manage source") }
                     }
                 }
@@ -125,14 +129,14 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
                     if (current.folderId != null) {
                         OutlinedButton(enabled = !busy, onClick = model::browseSelected) { Text("Browse Drive photos") }
                         Button(enabled = !busy, onClick = if (current.backupEnabled) model::pauseBackup else model::enableBackup) {
-                            Text(if (current.backupEnabled) "Pause backup" else "Use as default backup destination")
+                            Text(if (current.backupEnabled) "Pause backup" else "Use as default import and backup destination")
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(checked = current.unmeteredOnly, enabled = !busy, onCheckedChange = model::unmeteredOnly)
                         Text("Transfer on unmetered networks only", style = MaterialTheme.typography.bodySmall)
                     }
-                    Text("${currentBackups.count { it.state == "COMPLETE" }} backed up · ${currentBackups.count { it.state != "COMPLETE" }} pending")
+                    Text("${currentBackups.count { it.state == "COMPLETE" }} backed up Â· ${currentBackups.count { it.state != "COMPLETE" }} pending")
                     if (current.backupEnabled) TextButton(enabled = !busy, onClick = model::retryBackup) { Text("Retry pending backups") }
                 }
             }
@@ -148,14 +152,16 @@ fun DriveStorageScreen(photos: List<Photo>, model: DriveViewModel = viewModel())
                         resolution.launch(IntentSenderRequest.Builder(pending.intentSender).build())
                     }
                 }) { Text("Reconnect") }
-                TextButton(enabled = !busy, onClick = model::disconnect) { Text("Remove this source") }
+                TextButton(enabled = !busy, onClick = { disconnecting=true }) { Text("Remove this source") }
             }
         }
-        com.myphotosanywhere.mpa.library.StorageControls(photos)
         Text("Removing a source stops its transfers. Other sources continue syncing; local photos and people are preserved. Google permissions can be revoked in your account settings.", style = MaterialTheme.typography.bodySmall)
         Text("Keep your source copies. Uninstalling MPA removes this device's private library.", style = MaterialTheme.typography.bodySmall)
         GoogleSetupDetails()
     }
+    if(disconnecting && current!=null) AlertDialog(onDismissRequest={ disconnecting=false },title={ Text("Disconnect ${current.folderName ?: current.email}?") },text={
+        Text("This stops access and transfers for ${current.email} / ${current.folderName ?: "this source"}. Its remote-only entries leave the connected gallery; existing local photos, annotations and saved import jobs are preserved. Jobs keep this destination and may require reconnection. Drive originals are not deleted. Other sources continue working.")
+    },confirmButton={ TextButton(enabled=!busy,onClick={ disconnecting=false;model.disconnect(current.binding()?.key) }) { Text("Disconnect source") } },dismissButton={ TextButton(onClick={ disconnecting=false }) { Text("Keep source") } })
     val listing = browser
     if (listing != null) {
         AlertDialog(onDismissRequest = model::closeBrowser, title = { Text(listing.parentName) },

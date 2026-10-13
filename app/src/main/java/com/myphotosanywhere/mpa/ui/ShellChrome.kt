@@ -33,7 +33,7 @@ fun ShellIcon(@DrawableRes resource: Int, description: String?=null) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShellTopBar(title: String,canGoBack: Boolean,onBack: ()->Unit,canAddPhotos: Boolean,onAddPhotos: ()->Unit,
-    onStorage: ()->Unit,onActivity: ()->Unit,onFilters: ()->Unit,showFilters: Boolean,
+    onStorage: ()->Unit,onActivity: ()->Unit,onImport: ()->Unit,onFilters: ()->Unit,showFilters: Boolean,
     filtersActive: Boolean,needsAttention: Boolean,showTitle: Boolean=true) {
     var add by remember { mutableStateOf(false) }
     BoxWithConstraints {
@@ -51,7 +51,7 @@ fun ShellTopBar(title: String,canGoBack: Boolean,onBack: ()->Unit,canAddPhotos: 
             IconButton(onClick={ add=true },modifier=Modifier.testTag("shell:add")) { ShellIcon(R.drawable.ic_shell_add,"Add photos or import") }
             DropdownMenu(expanded=add,onDismissRequest={ add=false }) {
                 DropdownMenuItem(text={ Text("Add photos") },enabled=canAddPhotos,onClick={ add=false;onAddPhotos() })
-                DropdownMenuItem(text={ Text("Import photos") },onClick={ add=false;onStorage() })
+                DropdownMenuItem(text={ Text("Import photos") },onClick={ add=false;onImport() })
                 if(compact) DropdownMenuItem(text={ Text("Imports and activity") },onClick={ add=false;onActivity() })
                 DropdownMenuItem(text={ Text("Connect Google Drive") },onClick={ add=false;onStorage() })
             }
@@ -62,7 +62,7 @@ fun ShellTopBar(title: String,canGoBack: Boolean,onBack: ()->Unit,canAddPhotos: 
             }
         }
         IconButton(onClick=onStorage,modifier=Modifier.testTag("shell:storage")) {
-            ShellIcon(R.drawable.ic_shell_account,"Accounts, sources and storage")
+            ShellIcon(R.drawable.ic_shell_account,"Accounts and sources")
         }
     })
     }
@@ -118,19 +118,11 @@ private fun ShellTab(destination: ShellDestination,@DrawableRes icon: Int,select
 
 /** Observe job summaries, not per-item transfer ticks; keep the gallery independent of progress updates. */
 @Composable
-fun ShellImportActivity(onOpen: ()->Unit,model: ImportModel=viewModel()) {
+fun ShellImportActivity(onOpen: ()->Unit,sync: List<com.myphotosanywhere.mpa.drive.SyncState> = emptyList(),model: ImportModel=viewModel()) {
     val jobs by model.jobs.collectAsStateWithLifecycle()
     val dismissed by model.dismissed.collectAsStateWithLifecycle()
     val visible=jobs.filter { it.id !in dismissed || !ImportHistory.canDismiss(it.state) }
-    val running=visible.count { it.state in listOf("RUNNING","DOWNLOADING") }
-    val label=when {
-        running>0 -> if(running==1) "1 import running" else "$running imports running"
-        visible.any { it.state=="WAITING_FOR_APP" } -> "Import waiting to resume"
-        visible.any { it.state=="FAILED" || it.error!=null } -> "Import needs attention"
-        visible.any { it.state=="PAUSED" } -> "Import paused"
-        visible.any { !ImportHistory.canDismiss(it.state) } -> "Import ready to review"
-        else -> null
-    }
+    val label=com.myphotosanywhere.mpa.management.ActivitySummary(visible,sync).label
     if(label!=null) TextButton(onClick=onOpen,modifier=Modifier.fillMaxWidth().testTag("shell:import-activity")) {
         ShellIcon(R.drawable.ic_shell_activity)
         Spacer(Modifier.width(8.dp))

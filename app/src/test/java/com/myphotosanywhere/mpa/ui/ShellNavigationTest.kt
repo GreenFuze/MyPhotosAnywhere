@@ -54,4 +54,16 @@ class ShellNavigationTest {
         nav.back();assertEquals(ShellDestination.SEARCH,nav.destination);nav.back();assertEquals(ShellDestination.PHOTOS,nav.destination)
         assertFalse(nav.canGoBack)
     }
+    @Test fun managementChildrenRestoreSearchOriginAfterRepeatedActivityEntry() {
+        val nav=ShellNavigation();nav.select(ShellDestination.COLLECTIONS);nav.select(ShellDestination.SEARCH)
+        repeat(3) { nav.open(ShellDestination.ACTIVITY) };nav.open(ShellDestination.IMPORT_HISTORY)
+        nav.back();assertEquals(ShellDestination.ACTIVITY,nav.destination);nav.back();assertEquals(ShellDestination.SEARCH,nav.destination)
+        nav.back();assertEquals(ShellDestination.COLLECTIONS,nav.destination)
+    }
+    @Test fun settingsHistorySurvivesRecreationWithTheSameOrigin() {
+        val nav=ShellNavigation();nav.open(ShellDestination.STORAGE);nav.open(ShellDestination.SETTINGS);nav.open(ShellDestination.ANNOTATIONS)
+        val scope=object: SaverScope { override fun canBeSaved(value: Any)=true };val saved=with(ShellNavigation.Saver) { requireNotNull(scope.save(nav)) }
+        val restored=requireNotNull(ShellNavigation.Saver.restore(saved));assertEquals(ShellDestination.ANNOTATIONS,restored.destination)
+        restored.back();assertEquals(ShellDestination.SETTINGS,restored.destination);restored.back();assertEquals(ShellDestination.STORAGE,restored.destination)
+    }
 }

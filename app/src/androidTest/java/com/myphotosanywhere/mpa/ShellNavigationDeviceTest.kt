@@ -35,7 +35,9 @@ class ShellNavigationDeviceTest {
         compose.onNodeWithText("AI activity").assertIsDisplayed()
         back()
         compose.onNodeWithTag("shell:storage").performClick()
+        compose.onNodeWithTag("management:Import photos").performClick()
         compose.onNodeWithText("Import Google Photos").assertExists()
+        back()
         back()
         compose.onNodeWithTag("collections:grid").performScrollToNode(hasTestTag("collections:People"))
         compose.onNode(hasText("People") and hasClickAction()).assertIsDisplayed()
@@ -63,7 +65,7 @@ class ShellNavigationDeviceTest {
             runBlocking { app.database.imports().saveJob(job) }
             compose.waitUntil(10000) { compose.onAllNodesWithTag("shell:import-activity").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("shell:import-activity").assertIsDisplayed().performClick()
-            compose.onNodeWithText("Import Google Photos").assertExists()
+            compose.onNodeWithText("Imports",useUnmergedTree=true).assertExists()
             runBlocking { assertEquals(job,app.database.imports().job(id)) }
             back()
             compose.onNodeWithTag("shell:import-activity").assertIsDisplayed()
