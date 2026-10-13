@@ -110,6 +110,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
             try {
                 val current=request.value
                 val cursor=repository.seek(current.query,date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
+                if(request.value!=current) return@launch
                 if(cursor==null) _message.value="No photos on or before this date."
                 else if(request.value==current) {
                     saved[anchorName(current.query)]=Bundle().apply { putString("query",queryIdentity(current.query));putString("key",cursor.key);cursor.millis?.let { putLong("millis",it) };putInt("offset",0) }

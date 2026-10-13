@@ -36,7 +36,7 @@ class GalleryPolishDeviceTest {
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
     private fun waitTag(tag: String)=compose.waitUntil(30000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
     private fun columns(value: Int)=compose.waitUntil(15000) {
-        compose.onNodeWithTag("photos:grid").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)=="$value columns"
+        compose.onNodeWithTag("photos:grid").fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="$value columns"
     }
     private fun pinch(out: Boolean) {
         compose.onNodeWithTag("photos:grid").performTouchInput {
@@ -64,7 +64,7 @@ class GalleryPolishDeviceTest {
             screenshotPolish("density-large")
             compose.onNodeWithTag("photo:polish-30").performTouchInput { longClick() }
             compose.onNodeWithTag("timeline:date-rail").assertDoesNotExist();pinch(false);assertEquals(GridDensity.LARGE,app.galleryPresentation.density.value)
-            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+            compose.onNodeWithTag("selection:close").performClick()
             waitTag("timeline:date-rail");pinch(false);columns(3)
             compose.onNodeWithTag("photo:polish-30").performClick();waitTag("viewer-screen");compose.onNodeWithTag("viewer-close").performClick();waitTag("photo:polish-30")
             photos.forEach { assertEquals(it,app.database.photos().find(it.id)?.copy(lastAccess=it.lastAccess)) }
@@ -76,6 +76,8 @@ class GalleryPolishDeviceTest {
         try {
             photos.forEach { app.database.photos().insert(it) };waitTag("timeline:date-rail")
             compose.onNodeWithTag("timeline:date-rail").performClick();waitTag("timeline:year")
+            compose.onNodeWithTag("timeline:year").performTextReplacement("999999999")
+            compose.onNodeWithTag("timeline:month-jump").assertIsNotEnabled()
             compose.onNodeWithTag("timeline:year").performTextReplacement("2080")
             compose.onNodeWithTag("timeline:month:1").performScrollTo().performClick();screenshotPolish("date-navigation")
             compose.onNodeWithTag("timeline:month-jump").performClick();waitTag("photo:polish-date-old")

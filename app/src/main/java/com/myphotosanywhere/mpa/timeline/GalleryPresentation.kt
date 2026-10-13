@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -25,9 +27,12 @@ internal class GalleryPresentation(context: Context) {
     private val preferences=context.getSharedPreferences("gallery-presentation",Context.MODE_PRIVATE)
     private val _density=MutableStateFlow(GridDensity.entries.single { it.columns==preferences.getInt("columns",3) })
     val density=_density.asStateFlow()
+    private val writes=Mutex()
     suspend fun update(value: GridDensity)=withContext(Dispatchers.IO) {
-        CheckedPreferences(preferences).commit("Cannot save photo grid density.") { putInt("columns",value.columns) }
-        _density.value=value
+        writes.withLock {
+            CheckedPreferences(preferences).commit("Cannot save photo grid density.") { putInt("columns",value.columns) }
+            _density.value=value
+        }
     }
 }
 

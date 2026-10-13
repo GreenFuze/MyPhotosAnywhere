@@ -71,6 +71,7 @@ internal fun TimelineDateNavigator(query: TimelineQuery,repository: TimelineRepo
         finally { loading=false }
     }
     var selected by rememberSaveable(query.toString(),zone.id) { mutableStateOf(initialMillis?.let { YearMonth.from(Instant.ofEpochMilli(it).atZone(zone)).toString() }) }
+    var yearValid by remember(query,zone) { mutableStateOf(true) }
     val bounds=range
     val month=bounds?.clamp(selected?.let(YearMonth::parse) ?: bounds.last)
     AlertDialog(onDismissRequest=onClose,title={ Text("Jump to month or year") },
@@ -79,16 +80,16 @@ internal fun TimelineDateNavigator(query: TimelineQuery,repository: TimelineRepo
                 loading -> { LinearProgressIndicator(Modifier.fillMaxWidth());Text("Reading available dates…") }
                 problem!=null -> { Text(requireNotNull(problem));TextButton(onClick={ attempt++ }) { Text("Retry dates") } }
                 bounds==null || month==null -> Text("No dated photos match this view. Unknown-date photos remain in the gallery.")
-                else -> MonthNavigationControls(bounds,month) { selected=it.toString() }
+                else -> MonthNavigationControls(bounds,month,onValidityChanged={ yearValid=it },onSelect={ selected=it.toString() })
             }
         } },
-        confirmButton={ TextButton(enabled=!loading && problem==null && month!=null,onClick={ onJump(requireNotNull(bounds).jumpDate(requireNotNull(month))) },
+        confirmButton={ TextButton(enabled=!loading && problem==null && month!=null && yearValid,onClick={ onJump(requireNotNull(bounds).jumpDate(requireNotNull(month))) },
             modifier=Modifier.heightIn(min=48.dp).testTag("timeline:month-jump")) { Text("Jump") } },
         dismissButton={ TextButton(onClick=onClose,modifier=Modifier.heightIn(min=48.dp)) { Text("Cancel") } })
 }
 
 @Composable
-internal fun MonthNavigationControls(bounds: MonthNavigation,month: YearMonth,onSelect: (YearMonth)->Unit) {
+internal fun MonthNavigationControls(bounds: MonthNavigation,month: YearMonth,onValidityChanged: (Boolean)->Unit={},onSelect: (YearMonth)->Unit) {
     Text("${bounds.first} – ${bounds.last}",style=MaterialTheme.typography.bodySmall)
     Text(month.format(DateTimeFormatter.ofPattern("MMMM yyyy")),Modifier.testTag("timeline:month-preview").semantics { liveRegion=LiveRegionMode.Polite },style=MaterialTheme.typography.titleMedium)
     if(bounds.span>0) Slider(value=bounds.fraction(month),onValueChange={ onSelect(bounds.month(it)) },
@@ -97,8 +98,10 @@ internal fun MonthNavigationControls(bounds: MonthNavigation,month: YearMonth,on
     var year by remember(month.year) { mutableStateOf(month.year.toString()) }
     val parsed=year.toIntOrNull()
     val valid=parsed!=null && parsed in bounds.first.year..bounds.last.year
+    val validity by rememberUpdatedState(onValidityChanged)
+    LaunchedEffect(valid) { validity(valid) }
     OutlinedTextField(year,{ value ->
-        if(value.length<=6 && value.all { it.isDigit() || it=='-' }) {
+        if(value.length<=10 && value.all { it.isDigit() || it=='-' }) {
             year=value
             value.toIntOrNull()?.takeIf { it in bounds.first.year..bounds.last.year }?.let { onSelect(bounds.clamp(YearMonth.of(it,month.monthValue))) }
         }
