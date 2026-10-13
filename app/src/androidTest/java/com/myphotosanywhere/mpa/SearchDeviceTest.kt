@@ -129,6 +129,11 @@ class SearchDeviceTest {
                 waitTag("collections:grid")
                 compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
                 waitTag("search:query")
+                compose.onNodeWithTag("search:query").performImeAction()
+                compose.waitUntil(10000) {
+                    androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+                        ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true
+                }
             } finally { runBlocking { app.database.library().clearAlbum(other.id);app.database.library().deleteAlbum(other.id) } }
             compose.onNodeWithTag("search:back").performClick();waitTag("photo:${fixture.photos[0].id}")
             compose.onNodeWithText(fixture.album.name).assertExists();compose.onNodeWithTag("photo:${fixture.photos[2].id}").assertDoesNotExist()
