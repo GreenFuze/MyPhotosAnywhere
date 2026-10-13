@@ -95,7 +95,7 @@ class SearchDeviceTest {
             compose.onNodeWithTag("nav:Photos").performClick();compose.onNodeWithTag("shell:filters").performClick()
             compose.onNodeWithText("All sources").performScrollTo().assertIsSelected();compose.onNodeWithText("Done").performScrollTo().performClick()
             compose.onNodeWithTag("nav:Search").performClick();waitTag("photo:${fixture.photos[1].id}")
-            compose.onNodeWithTag("search:filter-summary").assertTextContains("Videos");fixture.verify()
+            compose.onNodeWithTag("search:filter-summary").assertTextEquals("Videos · Favorites · Search fixture filters");fixture.verify()
         }
     }
     @Test fun recentQueriesCanBeReusedAndClearedWithoutDurableHistory() {
@@ -166,7 +166,12 @@ class SearchDeviceTest {
         compose.onNodeWithTag("nav:Search").performClick();compose.onNodeWithTag("search:query").performImeAction()
         compose.onNodeWithTag("shell:filters").performClick();compose.onNodeWithTag("search:type:VIDEOS").performClick()
         compose.onNodeWithText("Cancel").performScrollTo().performClick();waitTag("search:suggestions")
-        assertFalse(model().draft.value.filtered)
+        val search=model();assertFalse(search.draft.value.filtered)
+        compose.runOnIdle { search.update(SearchCriteria("missing-empty-action",TimelineMediaType.VIDEOS,"Favorites"));search.submit() }
+        waitTag("timeline:empty-action");compose.onNodeWithTag("timeline:empty-action").assertTextContains("Clear filters").performClick()
+        assertEquals("missing-empty-action",search.draft.value.text);assertFalse(search.draft.value.filtered)
+        compose.waitUntil(10000) { compose.onAllNodes(hasTestTag("timeline:empty-action") and hasText("Clear search")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("timeline:empty-action").performClick();waitTag("search:suggestions");assertEquals("",search.draft.value.text)
     }
     private fun screenshot(name: String) {
         val image=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())

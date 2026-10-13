@@ -70,7 +70,9 @@ internal fun SearchScreen(draft: SearchCriteria,applied: SearchCriteria,recents:
                 applied.dates?.let { add("${it.first} – ${it.last}") }
             }.joinToString(" · "),Modifier.padding(horizontal=12.dp,vertical=4.dp).testTag("search:filter-summary"),style=MaterialTheme.typography.bodySmall)
             TimelineGrid(query,timeline,features,state,bottomClearance,Modifier.weight(1f).fillMaxWidth(),selection,onToggle,selectionLocked,
-                sources.isNotEmpty(),onConnect,onClearFilters={ model.update(SearchCriteria());model.submit() },onRefresh=features::refreshCloud)
+                sources.isNotEmpty(),onConnect,onClearFilters={
+                    if(applied.filtered) model.clearFilters() else { model.text("");model.submit() }
+                },onRefresh=features::refreshCloud,emptyActionLabel=if(applied.filtered) "Clear filters" else "Clear search")
         } else {
             val repository=remember(features) { CollectionsRepository(features.app.database,features.app.timeline) }
             LazyVerticalGrid(GridCells.Adaptive(148.dp),state=suggestions,modifier=Modifier.fillMaxSize().testTag("search:suggestions"),
@@ -90,20 +92,20 @@ internal fun SearchScreen(draft: SearchCriteria,applied: SearchCriteria,recents:
                 item(span={ GridItemSpan(maxLineSpan) }) { Text("Explore",Modifier.semantics { heading() },style=MaterialTheme.typography.titleLarge) }
                 item { CollectionCard("Favorites",R.drawable.ic_shell_favorite,repository,TimelineQuery("Favorites"),{
                     model.update(draft.copy(filter="Favorites"));onSubmit()
-                },"search:category:Favorites") }
+                },"search:category:Favorites",compact=true) }
                 item { CollectionCard("Videos",R.drawable.ic_shell_video,repository,TimelineQuery("Videos"),{
                     model.update(draft.copy(type=TimelineMediaType.VIDEOS));onSubmit()
-                },"search:category:Videos") }
+                },"search:category:Videos",compact=true) }
                 item { Column {
-                    CollectionCard("People",R.drawable.ic_shell_people,repository,null,onPeople,"search:category:People")
+                    CollectionCard("People",R.drawable.ic_shell_people,repository,null,onPeople,"search:category:People",compact=true)
                     if(!settings.faceIndexing) Text("Recognition is off",style=MaterialTheme.typography.bodySmall)
                 } }
-                item { CollectionCard("Places",R.drawable.ic_shell_places,repository,null,onPlaces,"search:category:Places") }
-                if(albums.isNotEmpty()) item { CollectionCard("Albums",R.drawable.ic_shell_collections,repository,TimelineQuery(album=albums.first().id),onAlbums,"search:category:Albums") }
-                else item { OutlinedButton(onClick=onAlbums,modifier=Modifier.heightIn(min=48.dp).testTag("search:category:Albums")) { Text("Albums") } }
+                item { CollectionCard("Places",R.drawable.ic_shell_places,repository,null,onPlaces,"search:category:Places",compact=true) }
+                if(albums.isNotEmpty()) item { CollectionCard("Albums",R.drawable.ic_shell_collections,repository,TimelineQuery(album=albums.first().id),onAlbums,"search:category:Albums",compact=true) }
+                else item { OutlinedButton(onClick=onAlbums,modifier=Modifier.heightIn(min=48.dp).testTag("search:category:Albums",compact=true)) { Text("Albums") } }
                 item { CollectionCard("Edited photos",R.drawable.ic_shell_edit,repository,TimelineQuery("Edits"),{
                     model.update(draft.copy(filter="Edits"));onSubmit()
-                },"search:category:Edited") }
+                },"search:category:Edited",compact=true) }
                 item(span={ GridItemSpan(maxLineSpan) }) { OutlinedButton(onClick={
                     val today=LocalDate.now(zone);model.update(draft.copy(dates=SearchDates(today,today)));onSubmit()
                 },modifier=Modifier.heightIn(min=48.dp).testTag("search:today")) { Text("Today") } }

@@ -20,7 +20,8 @@ import java.time.ZoneOffset
 internal fun SearchFilters(initial: SearchCriteria,sources: List<DriveSource>,onApply: (SearchCriteria)->Unit,onClose: ()->Unit) {
     var criteria by remember { mutableStateOf(initial) }
     var dates by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest=onClose) {
+    val sheet=rememberModalBottomSheetState(skipPartiallyExpanded=true)
+    ModalBottomSheet(sheetState=sheet,onDismissRequest=onClose) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp).testTag("search:filters"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("Filter search",Modifier.semantics { heading() },style=MaterialTheme.typography.titleLarge)
             Text("Media type",Modifier.semantics { heading() })

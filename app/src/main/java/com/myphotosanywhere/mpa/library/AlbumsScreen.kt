@@ -69,7 +69,7 @@ fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGrid
 
 
 @Composable
-internal fun CollectionCard(title: String,icon: Int,repository: CollectionsRepository,query: TimelineQuery?,onClick: ()->Unit,tag: String="collections:$title") {
+internal fun CollectionCard(title: String,icon: Int,repository: CollectionsRepository,query: TimelineQuery?,onClick: ()->Unit,tag: String="collections:$title",compact: Boolean=false) {
     var failure by remember(query) { mutableStateOf(false) }
     var retry by remember(query) { mutableIntStateOf(0) }
     val preview by produceState<CollectionPreview?>(null,repository,query,retry) {
@@ -81,17 +81,26 @@ internal fun CollectionCard(title: String,icon: Int,repository: CollectionsRepos
     }
     Column {
         Card(Modifier.fillMaxWidth().testTag(tag).clickable(role=Role.Button,onClick=onClick),shape=RoundedCornerShape(24.dp)) {
-            Box(Modifier.fillMaxWidth().aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceContainerHigh),contentAlignment=Alignment.Center) {
-                val covers=preview?.paths.orEmpty()
-                com.myphotosanywhere.mpa.ui.ShellIcon(icon)
-                if(covers.isNotEmpty()) Column(Modifier.fillMaxSize()) {
-                    covers.chunked(2).forEach { pair -> Row(Modifier.weight(1f)) { pair.forEach { path ->
-                        AsyncImage(path.takeIf { it.isNotBlank() },null,Modifier.weight(1f).fillMaxHeight(),contentScale=ContentScale.Crop)
-                    } } }
+            val covers=preview?.paths.orEmpty()
+            if(compact) Row(Modifier.fillMaxWidth().padding(12.dp).heightIn(min=56.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.size(56.dp),contentAlignment=Alignment.Center) {
+                    val cover=covers.firstOrNull()
+                    if(cover==null) com.myphotosanywhere.mpa.ui.ShellIcon(icon)
+                    else AsyncImage(cover,null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
                 }
+                Text(title,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,maxLines=3,overflow=TextOverflow.Ellipsis)
+            } else {
+                Box(Modifier.fillMaxWidth().aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceContainerHigh),contentAlignment=Alignment.Center) {
+                    com.myphotosanywhere.mpa.ui.ShellIcon(icon)
+                    if(covers.isNotEmpty()) Column(Modifier.fillMaxSize()) {
+                        covers.chunked(2).forEach { pair -> Row(Modifier.weight(1f)) { pair.forEach { path ->
+                            AsyncImage(path.takeIf { it.isNotBlank() },null,Modifier.weight(1f).fillMaxHeight(),contentScale=ContentScale.Crop)
+                        } } }
+                    }
+                }
+                Text(title,Modifier.padding(horizontal=12.dp,vertical=8.dp),style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
+                preview?.count?.takeIf { it>=0 }?.let { Text("$it items",Modifier.padding(start=12.dp,end=12.dp,bottom=12.dp),style=MaterialTheme.typography.bodySmall) }
             }
-            Text(title,Modifier.padding(horizontal=12.dp,vertical=8.dp),style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
-            preview?.count?.takeIf { it>=0 }?.let { Text("$it items",Modifier.padding(start=12.dp,end=12.dp,bottom=12.dp),style=MaterialTheme.typography.bodySmall) }
         }
         if(failure) TextButton(onClick={ retry++ },modifier=Modifier.heightIn(min=48.dp)) { Text("Retry cover") }
     }

@@ -62,7 +62,7 @@ internal fun deviceTimelineZone(model: TimelineViewModel): ZoneId {
 internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features: LibraryFeaturesModel,
     state: LazyGridState,bottomClearance: Dp,modifier: Modifier=Modifier,
     selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,
-    hasSources: Boolean,onConnect: ()->Unit,onClearFilters: ()->Unit,onRefresh: ()->Unit) {
+    hasSources: Boolean,onConnect: ()->Unit,onClearFilters: ()->Unit,onRefresh: ()->Unit,emptyActionLabel: String="Clear filters") {
     val zone=deviceTimelineZone(model)
     val rowsFlow=remember(model,zone) {
         model.paging.map { data -> data.map<TimelineItem,TimelineRow> { TimelineRow.Media(it.entry,it.generation) }.insertSeparators { before,after ->
@@ -134,7 +134,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 val filtered=query!=TimelineQuery()
                 Text(if(filtered) "No matching photos" else if(hasSources) "No photos indexed yet" else "Your photos belong here",style=MaterialTheme.typography.titleMedium)
-                if(filtered) TextButton(onClick=onClearFilters) { Text("Clear filters") }
+                if(filtered) TextButton(onClick=onClearFilters,modifier=Modifier.heightIn(min=48.dp).testTag("timeline:empty-action")) { Text(emptyActionLabel) }
                 else if(!hasSources) Button(onClick=onConnect) { Text("Connect Google Drive") }
                 else TextButton(onClick=onRefresh) { Text("Refresh library") }
             }
