@@ -41,6 +41,10 @@ class SearchChromeDeviceTest {
             assertTrue(bounds.width>=48*pixels-1);assertTrue(bounds.height>=48*pixels-1)
         }
         compose.onNodeWithTag("search:clear").performClick();assertEquals("",text)
+        val label=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        compose.onNodeWithText("Search your photos",useUnmergedTree=true)
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(label) }
+        assertEquals("Search label remains one line at enlarged font scale",1,label.single().lineCount)
         compose.onNodeWithTag("shell:filters").performClick()
         compose.onNodeWithTag("search:type:VIDEOS").performClick().assertIsSelected()
         compose.onNodeWithTag("search:apply").performScrollTo().assertIsDisplayed()

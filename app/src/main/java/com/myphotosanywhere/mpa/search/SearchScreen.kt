@@ -33,7 +33,7 @@ internal fun SearchTopBar(text: String,filtered: Boolean,onText: (String)->Unit,
     Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal=8.dp,vertical=4.dp).testTag("search:header"),verticalAlignment=Alignment.CenterVertically) {
         IconButton(onClick=onBack,modifier=Modifier.size(48.dp).testTag("search:back")) { ShellIcon(R.drawable.ic_shell_back,"Back") }
         OutlinedTextField(text,onText,modifier=Modifier.weight(1f).focusRequester(focus).testTag("search:query"),
-            label={ Text("Search your photos") },singleLine=true,keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),
+            label={ Text("Search your photos",maxLines=1,overflow=TextOverflow.Ellipsis) },singleLine=true,keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),
             keyboardActions=KeyboardActions(onSearch={ onSubmit() }),trailingIcon={
                 if(text.isNotEmpty()) IconButton(onClick={ onText("") },modifier=Modifier.size(48.dp).testTag("search:clear")) {
                     ShellIcon(R.drawable.ic_search_clear,"Clear search")
