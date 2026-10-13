@@ -82,7 +82,10 @@ class GalleryPolishDeviceTest {
     }
     @Test fun dateRailJumpsDirectlyAndCancelLeavesPosition()=runBlocking<Unit> {
         val base=YearMonth.of(2080,1).atDay(15).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val photos=listOf(Photo("polish-date-old","date-old.png","","","image/png",1,base,"old",capturedAt=base),Photo("polish-date-new","date-new.png","","","image/png",1,base+86400000L*366,"new",capturedAt=base+86400000L*366))
+        val photos=listOf(Photo("polish-date-old","date-old.png","","","image/png",1,base,"old",capturedAt=base),Photo("polish-date-new","date-new.png","","","image/png",1,base+86400000L*366,"new",capturedAt=base+86400000L*366))+(0 until 8).map { index ->
+            val time=base-(index+1)*40*86400000L
+            Photo("polish-date-tail-$index","date-tail-$index.png","","","image/png",1,time,"tail-$index",capturedAt=time)
+        }
         try {
             photos.forEach { app.database.photos().insert(it) };waitTag("timeline:date-rail")
             compose.onNodeWithTag("timeline:date-rail").performClick();waitTag("timeline:year")
@@ -95,8 +98,23 @@ class GalleryPolishDeviceTest {
             }
             compose.onNodeWithTag("timeline:month:1").performScrollTo().performClick();screenshotPolish("date-navigation")
             compose.onNodeWithTag("timeline:month-jump").assertIsDisplayed().performClick();waitTag("photo:polish-date-old")
+            val timeline=compose.runOnUiThread { ViewModelProvider(compose.activity)[TimelineViewModel::class.java] }
+            // The selected photo was already visible before Jump. Its presence does not mean that the seek finished.
+            // Enough older fixture rows make zero-offset placement possible without end-of-list clamping.
+            compose.waitUntil(30000) {
+                val anchor=compose.runOnUiThread { timeline.anchor() }
+                val ready=timeline.refreshedGeneration.value==timeline.restoration.value
+                val photoBounds=compose.onNodeWithTag("photo:polish-date-old").fetchSemanticsNode().boundsInWindow
+                val gridBounds=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow
+                ready && anchor?.cursor?.key=="photo:polish-date-old" && anchor.offset==0 && kotlin.math.abs(photoBounds.top-gridBounds.top)<4f
+            }
+            compose.waitForIdle()
             val before=compose.onNodeWithTag("photo:polish-date-old").fetchSemanticsNode().boundsInWindow.top
+            val beforeAnchor=compose.runOnUiThread { timeline.anchor() }
             compose.onNodeWithTag("timeline:date-rail").performClick();waitTag("timeline:year");compose.onNodeWithText("Cancel").performClick();compose.waitForIdle()
+            val afterAnchor=compose.runOnUiThread { timeline.anchor() }
+            android.util.Log.i("DateViewport","before=$beforeAnchor after=$afterAnchor")
+            assertEquals(beforeAnchor,afterAnchor)
             assertEquals(before,compose.onNodeWithTag("photo:polish-date-old").fetchSemanticsNode().boundsInWindow.top,3f)
             photos.forEach { assertEquals(it,app.database.photos().find(it.id)) }
         } finally { photos.forEach { app.database.photos().update(it.copy(archived=true)) } }
