@@ -102,7 +102,7 @@ internal fun SearchScreen(draft: SearchCriteria,applied: SearchCriteria,recents:
                 } }
                 item { CollectionCard("Places",R.drawable.ic_shell_places,repository,null,onPlaces,"search:category:Places",compact=true) }
                 if(albums.isNotEmpty()) item { CollectionCard("Albums",R.drawable.ic_shell_collections,repository,TimelineQuery(album=albums.first().id),onAlbums,"search:category:Albums",compact=true) }
-                else item { OutlinedButton(onClick=onAlbums,modifier=Modifier.heightIn(min=48.dp).testTag("search:category:Albums",compact=true)) { Text("Albums") } }
+                else item { OutlinedButton(onClick=onAlbums,modifier=Modifier.heightIn(min=48.dp).testTag("search:category:Albums")) { Text("Albums") } }
                 item { CollectionCard("Edited photos",R.drawable.ic_shell_edit,repository,TimelineQuery("Edits"),{
                     model.update(draft.copy(filter="Edits"));onSubmit()
                 },"search:category:Edited",compact=true) }
