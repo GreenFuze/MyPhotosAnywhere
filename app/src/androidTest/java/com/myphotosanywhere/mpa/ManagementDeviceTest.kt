@@ -118,7 +118,12 @@ class ManagementDeviceTest {
             }
             back();waitTag("photo:$id")
             compose.activityRule.scenario.recreate();waitTag("photo:$id");back();waitTag("imported-person:${label.key}")
-            runBlocking { assertEquals(photo,app.database.photos().find(id));assertFalse(app.database.library().allFaces().any { it.photoId==id }) }
+            runBlocking {
+                val after=requireNotNull(app.database.photos().find(id))
+                assertTrue("Viewing updates only the existing cache-access checkpoint",after.lastAccess>photo.lastAccess)
+                assertEquals(photo.copy(lastAccess=after.lastAccess),after)
+                assertFalse(app.database.library().allFaces().any { it.photoId==id })
+            }
             assertFalse(app.settings.state.value.faceIndexing);assertTrue(archive.isFile)
         } finally { runBlocking { saved?.let { app.database.photos().update(it.copy(archived=true)) } };file.delete();archive.delete();app.settings.update(originalSettings);app.people.schedule() }
     }
