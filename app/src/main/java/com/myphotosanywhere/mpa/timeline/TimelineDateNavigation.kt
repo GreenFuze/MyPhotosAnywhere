@@ -5,6 +5,10 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -92,9 +96,12 @@ internal fun TimelineDateNavigator(query: TimelineQuery,repository: TimelineRepo
 @Composable
 internal fun MonthNavigationControls(bounds: MonthNavigation,month: YearMonth,onValidityChanged: (Boolean)->Unit={},onSelect: (YearMonth)->Unit) {
     val locale=LocalConfiguration.current.locales[0]
+    val focus=LocalFocusManager.current
+    val keyboard=LocalSoftwareKeyboardController.current
+    fun finishEntry() { focus.clearFocus(force=true);keyboard?.hide() }
     Text("${bounds.first} – ${bounds.last}",style=MaterialTheme.typography.bodySmall)
     Text(month.format(DateTimeFormatter.ofPattern("MMMM yyyy",locale)),Modifier.testTag("timeline:month-preview").semantics { heading() },style=MaterialTheme.typography.titleMedium)
-    if(bounds.span>0) Slider(value=bounds.fraction(month),onValueChange={ onSelect(bounds.month(it)) },
+    if(bounds.span>0) Slider(value=bounds.fraction(month),onValueChange={ onSelect(bounds.month(it)) },onValueChangeFinished={ finishEntry() },
         modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("timeline:month-slider")
             .semantics { contentDescription="Browse months";stateDescription=month.format(DateTimeFormatter.ofPattern("MMMM yyyy",locale)) })
     var year by remember(month.year) { mutableStateOf(month.year.toString()) }
@@ -107,12 +114,12 @@ internal fun MonthNavigationControls(bounds: MonthNavigation,month: YearMonth,on
             year=value
             value.toIntOrNull()?.takeIf { it in bounds.first.year..bounds.last.year }?.let { onSelect(bounds.clamp(YearMonth.of(it,month.monthValue))) }
         }
-    },label={ Text("Year") },singleLine=true,isError=!valid,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),
+    },label={ Text("Year") },singleLine=true,isError=!valid,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number,imeAction=ImeAction.Done),keyboardActions=KeyboardActions(onDone={ finishEntry() }),
         supportingText={ if(!valid) Text("Choose a year from ${bounds.first.year} to ${bounds.last.year}") },modifier=Modifier.fillMaxWidth().testTag("timeline:year"))
     FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         for(number in 1..12) {
             val candidate=YearMonth.of(month.year,number)
-            FilterChip(selected=month.monthValue==number,onClick={ onSelect(candidate) },enabled=candidate in bounds.first..bounds.last,
+            FilterChip(selected=month.monthValue==number,onClick={ onSelect(candidate);finishEntry() },enabled=candidate in bounds.first..bounds.last,
                 label={ Text(candidate.month.getDisplayName(TextStyle.SHORT,locale)) },
                 modifier=Modifier.heightIn(min=48.dp).testTag("timeline:month:$number"))
         }

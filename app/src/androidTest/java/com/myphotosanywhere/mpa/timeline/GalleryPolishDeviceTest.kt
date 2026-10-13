@@ -89,8 +89,12 @@ class GalleryPolishDeviceTest {
             compose.onNodeWithTag("timeline:year").performTextReplacement("999999999")
             compose.onNodeWithTag("timeline:month-jump").assertIsNotEnabled()
             compose.onNodeWithTag("timeline:year").performTextReplacement("2080")
+            compose.onNodeWithTag("timeline:year").performImeAction()
+            compose.waitUntil(10000) {
+                compose.runOnUiThread { androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true }
+            }
             compose.onNodeWithTag("timeline:month:1").performScrollTo().performClick();screenshotPolish("date-navigation")
-            compose.onNodeWithTag("timeline:month-jump").performClick();waitTag("photo:polish-date-old")
+            compose.onNodeWithTag("timeline:month-jump").assertIsDisplayed().performClick();waitTag("photo:polish-date-old")
             val before=compose.onNodeWithTag("photo:polish-date-old").fetchSemanticsNode().boundsInWindow.top
             compose.onNodeWithTag("timeline:date-rail").performClick();waitTag("timeline:year");compose.onNodeWithText("Cancel").performClick();compose.waitForIdle()
             assertEquals(before,compose.onNodeWithTag("photo:polish-date-old").fetchSemanticsNode().boundsInWindow.top,3f)
