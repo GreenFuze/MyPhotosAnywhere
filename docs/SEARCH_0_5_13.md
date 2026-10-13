@@ -9,3 +9,7 @@ Search scans one cancellable cursor per page through the existing read-only proj
 Search state and its most recent anchored query survive recreation. Filters do not mutate Photos. Back returns to Search's originating context. Recent queries are not written to analytics, preferences, backup files or a new persistent table. Selection and preview-first viewing reuse existing components.
 
 Release gates: unit/integration tests, zero lint findings, strict build warnings with previously approved tooling exceptions only, native API 29/35/37 checks, search/timeline 10k/100k measurements, screenshots, exact CI APK and established signer verification. S23 Ultra acceptance and the reported JPEG crash remain unverified.
+
+## Final publication evidence
+
+The immutable application and exact signed CI APK passed all release gates. [0.5.13 evidence and remaining phone acceptance](releases/v0.5.13.md). Release metadata changes no application, toolchain or workflow files.

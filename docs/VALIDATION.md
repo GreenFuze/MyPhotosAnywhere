@@ -1,3 +1,11 @@
+## MPA 0.5.13: dedicated paged Search
+
+Application `be9df5edc9b4ceb4e8199442bf26c2587bb3e2ee` passed 278 unit/integration tests, zero lint findings and 80 native tests each on API 29/35/37 (240 total), with no failures/errors/skips. [Host](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38349866325) · [Native](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38349866291). The exact CI APK preserves the established signer and schema 9. [Scope, benchmarks and acceptance](releases/v0.5.13.md).
+
+At 100,000 indexed items, a sparse first Search page measured 0.59–1.03 seconds and a full no-match scan measured 5.13–7.27 seconds across CI emulators. These are measured fixtures, not phone guarantees. Search remains a linear indexed-metadata scan without a new full-text table; its cursor windows and retained pages are bounded, and matched text payloads are discarded before retention.
+
+Previously approved tooling diagnostics remain documented; other warnings block. S23 Ultra acceptance and the reported JPEG crash remain unverified.
+
 ## MPA 0.5.12: upward Details, selection and Collections
 
 Application `976986a18bd7c8fb19ed06cdd8d0055a87b8a062` passed 247 unit/integration tests, zero lint findings and 68 native tests each on API 29/35/37 (204 total), with no failures/errors/skips. [Host](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38307455339) · [Native](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38307455194). The exact CI APK preserves the established upgrade certificate and schema 9. [Release scope/evidence](releases/v0.5.12.md).
