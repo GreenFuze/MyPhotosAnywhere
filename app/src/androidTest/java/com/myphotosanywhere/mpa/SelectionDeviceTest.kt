@@ -108,7 +108,7 @@ class SelectionDeviceTest {
             compose.onNodeWithText("1 selected").assertIsDisplayed();compose.onNodeWithTag("cloud:${fixture.remote.key}").assertIsSelected()
             assertNull(runBlocking { app.database.cloud().photo(fixture.remote.key)?.photoId })
             assertNull(runBlocking { app.database.cloud().download(fixture.remote.key) })
-            Espresso.pressBack();waitGone("selection:bar");fixture.verifyPreserved()
+            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);waitGone("selection:bar");fixture.verifyPreserved()
         }
     }
 

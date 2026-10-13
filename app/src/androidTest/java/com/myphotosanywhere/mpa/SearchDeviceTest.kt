@@ -168,7 +168,7 @@ class SearchDeviceTest {
             }
             compose.onNodeWithTag("photo:${fixture.photos[0].id}").assertDoesNotExist();compose.onNodeWithTag("photo:${fixture.photos[2].id}").assertDoesNotExist()
             compose.onNodeWithTag("shell:filters").performClick();compose.onNodeWithTag("search:dates").performScrollTo().performClick()
-            compose.onNodeWithText("Use dates").assertExists();androidx.test.espresso.Espresso.pressBack()
+            compose.onNodeWithText("Use dates").assertExists();InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
             compose.onNodeWithTag("search:apply").performScrollTo().performClick();fixture.verify()
         }
     }
