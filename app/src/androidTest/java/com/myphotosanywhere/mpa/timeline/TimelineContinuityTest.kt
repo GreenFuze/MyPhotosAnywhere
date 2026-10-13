@@ -3,6 +3,7 @@ package com.myphotosanywhere.mpa.timeline
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -46,6 +47,15 @@ class TimelineContinuityTest {
             waitTag("photo:timeline-ui-0")
             compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:timeline-ui-70"))
             waitTag("photo:timeline-ui-70")
+            // A mosaic landscape can fit at the viewport bottom while its center remains
+            // covered by floating navigation. Reveal it before measuring and injecting a tap.
+            val tile=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInWindow
+            val nav=compose.onNodeWithTag("shell:navigation").fetchSemanticsNode().boundsInWindow
+            val reveal=tile.bottom-nav.top+8f
+            if(reveal>0) compose.onNodeWithTag("photos:grid").performSemanticsAction(SemanticsActions.ScrollBy) { it(0f,reveal) }
+            compose.waitUntil(10000) {
+                compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInWindow.bottom<=compose.onNodeWithTag("shell:navigation").fetchSemanticsNode().boundsInWindow.top-4f
+            }
             // Activity recreation can relocate the Compose root by a system inset.
             // Window coordinates describe the actual visible position across roots.
             val before=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInWindow.top
