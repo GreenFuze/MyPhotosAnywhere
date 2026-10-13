@@ -54,3 +54,12 @@ internal class MonthNavigation(val first: YearMonth,val last: YearMonth) {
     fun clamp(month: YearMonth)=month.coerceIn(first,last)
     fun jumpDate(month: YearMonth): LocalDate=clamp(month).atEndOfMonth()
 }
+
+/** Visible-date presentation never fills missing dates from neighboring media or guesses a place. */
+internal data class TimelineDateIndicator(val date: LocalDate?) {
+    fun label(locale: java.util.Locale): String=date?.format(java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy",locale)) ?: "Unknown date"
+    fun description(locale: java.util.Locale): String=date?.format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.FULL).withLocale(locale)) ?: "Unknown date"
+    companion object {
+        fun from(millis: Long?,zone: ZoneId)=TimelineDateIndicator(millis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() })
+    }
+}

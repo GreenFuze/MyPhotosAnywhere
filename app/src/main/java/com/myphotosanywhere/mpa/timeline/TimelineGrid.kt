@@ -203,7 +203,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             }
         }
         if(restoring || refresh is LoadState.Loading) LinearProgressIndicator(Modifier.align(Alignment.TopCenter).fillMaxWidth().testTag("timeline:refreshing"))
-        if(selection.isEmpty() && !selectionLocked && !restoring) TimelineDateRail(state,rows.itemSnapshotList.items,zone) { dateNavigation=true }
+        if(selection.isEmpty() && !selectionLocked && !restoring) TimelineDateRail(state,rows.itemSnapshotList.items,query,zone) { dateNavigation=true }
         }
     }
 }

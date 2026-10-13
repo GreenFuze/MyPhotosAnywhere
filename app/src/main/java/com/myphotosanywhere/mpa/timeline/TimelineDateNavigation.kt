@@ -41,22 +41,31 @@ internal fun GridDensityControls(selected: GridDensity,onSelect: (GridDensity)->
 }
 
 @Composable
-internal fun BoxScope.TimelineDateRail(state: LazyGridState,items: List<TimelineRow>,zone: ZoneId,onOpen: ()->Unit) {
-    val locale=LocalConfiguration.current.locales[0]
-    val month by remember(state,items,zone) { derivedStateOf {
-        state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-            (items.getOrNull(visible.index) as? TimelineRow.Media)?.entry?.millis
-                ?.let { YearMonth.from(Instant.ofEpochMilli(it).atZone(zone)) }
-        }
+internal fun BoxScope.TimelineDateRail(state: LazyGridState,items: List<TimelineRow>,query: TimelineQuery,zone: ZoneId,onOpen: ()->Unit) {
+    val indicator by remember(state,items,query,zone) { derivedStateOf {
+        val layout=state.layoutInfo
+        // Choose the first intersecting media row before interpreting its timestamp. Skipping
+        // null timestamps would incorrectly label unknown-date photos with a later photo's date.
+        layout.visibleItemsInfo.firstNotNullOfOrNull { visible ->
+            (items.getOrNull(visible.index) as? TimelineRow.Media)?.takeIf {
+                it.query==query && visible.offset.y+visible.size.height>layout.viewportStartOffset && visible.offset.y<layout.viewportEndOffset
+            }
+        }?.let { TimelineDateIndicator.from(it.entry.millis,zone) }
     } }
-    // Logical end follows RTL. The rail occupies only its touch target and stays clear of bottom navigation.
-    Surface(Modifier.align(Alignment.TopEnd).padding(top=8.dp,end=8.dp),shape=MaterialTheme.shapes.large,
+    TimelineFloatingDateChip(indicator,onOpen,Modifier.align(Alignment.TopCenter).padding(8.dp))
+}
+
+@Composable
+internal fun TimelineFloatingDateChip(indicator: TimelineDateIndicator?,onOpen: ()->Unit,modifier: Modifier=Modifier) {
+    val locale=LocalConfiguration.current.locales[0]
+    Surface(modifier,shape=androidx.compose.foundation.shape.RoundedCornerShape(50),
         color=MaterialTheme.colorScheme.surfaceContainerHigh,shadowElevation=2.dp) {
-        TextButton(onClick=onOpen,modifier=Modifier.heightIn(min=48.dp).widthIn(min=48.dp,max=160.dp)
-            .testTag("timeline:date-rail").semantics { contentDescription="Jump to month or year" }) {
-            com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_shell_date)
-            Spacer(Modifier.width(4.dp))
-            Text(month?.format(DateTimeFormatter.ofPattern("MMM yyyy",locale)) ?: "Jump to date",style=MaterialTheme.typography.labelLarge)
+        TextButton(onClick=onOpen,modifier=Modifier.heightIn(min=48.dp).widthIn(min=48.dp,max=240.dp)
+            .testTag("timeline:date-rail").semantics {
+                contentDescription="Jump to month or year"
+                stateDescription=indicator?.description(locale) ?: "No visible photo date"
+            }) {
+            Text(indicator?.label(locale) ?: "Jump to date",style=MaterialTheme.typography.labelLarge)
         }
     }
 }

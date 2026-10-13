@@ -113,6 +113,12 @@ class GalleryPolishDeviceTest {
                 ready && anchor?.cursor?.key=="photo:polish-date-old" && anchor.offset==0 && kotlin.math.abs(photoBounds.top-gridBounds.top-contentInset)<3f
             } } finally { screenshotPolish("date-after-seek");android.util.Log.i("DateSeekState","last: $lastSeekState") }
             compose.waitForIdle()
+            val floating=compose.onNodeWithTag("timeline:date-rail").assertIsDisplayed().fetchSemanticsNode()
+            val grid=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow
+            assertEquals(grid.center.x,floating.boundsInWindow.center.x,2f)
+            assertTrue("Date must float within the photo viewport",floating.boundsInWindow.top>=grid.top && floating.boundsInWindow.bottom<grid.bottom)
+            compose.onNodeWithTag("timeline:date-rail").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
+                TimelineDateIndicator.from(base,ZoneId.systemDefault()).description(compose.activity.resources.configuration.locales[0])))
             val before=compose.onNodeWithTag("photo:polish-date-old").fetchSemanticsNode().boundsInWindow.top
             val beforeAnchor=compose.runOnUiThread { timeline.anchor() }
             compose.onNodeWithTag("timeline:date-rail").performClick();waitTag("timeline:year");compose.onNodeWithText("Cancel").performClick();compose.waitForIdle()
@@ -150,6 +156,39 @@ class GalleryPolishChromeDeviceTest {
         compose.onNodeWithTag("timeline:year").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("timeline:month:2").performScrollTo().assertIsDisplayed()
         screenshotPolish(if(dark) "polish-dark-rtl-large" else "polish-light-large")
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
+class FloatingDateChromeDeviceTest {
+    @get:Rule val compose=createComposeRule()
+    @Test fun floatingDateLightLarge()=verify(false,LayoutDirection.Ltr)
+    @Test fun floatingDateDarkRtlLarge()=verify(true,LayoutDirection.Rtl)
+    private fun verify(dark: Boolean,direction: LayoutDirection) {
+        var clicks=0;var pixels=0f
+        var indicator by mutableStateOf(TimelineDateIndicator(java.time.LocalDate.of(2026,9,25)))
+        compose.setContent {
+            pixels=LocalDensity.current.density
+            CompositionLocalProvider(LocalDensity provides Density(pixels,2f),LocalLayoutDirection provides direction) {
+                MaterialTheme(colorScheme=if(dark) darkColorScheme() else lightColorScheme()) {
+                    Surface { Box(Modifier.fillMaxSize().testTag("floating:viewport")) {
+                        TimelineFloatingDateChip(indicator,{ clicks++ },Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(8.dp))
+                    } }
+                }
+            }
+        }
+        val node=compose.onNodeWithTag("timeline:date-rail").assertIsDisplayed()
+        val rect=node.fetchSemanticsNode().boundsInRoot
+        val viewport=compose.onNodeWithTag("floating:viewport").fetchSemanticsNode().boundsInRoot
+        assertEquals(viewport.center.x,rect.center.x,2f)
+        assertTrue(rect.left>=viewport.left && rect.right<=viewport.right)
+        assertTrue(rect.width>=48*pixels-1 && rect.height>=48*pixels-1)
+        node.assertContentDescriptionEquals("Jump to month or year").performClick();assertEquals(1,clicks)
+        screenshotPolish(if(dark) "floating-date-dark-rtl-large" else "floating-date-light-large")
+        compose.runOnIdle { indicator=TimelineDateIndicator(null) }
+        node.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,"Unknown date"))
+        compose.onNodeWithText("Unknown date").assertIsDisplayed()
+        node.performClick();assertEquals(2,clicks)
     }
 }
 

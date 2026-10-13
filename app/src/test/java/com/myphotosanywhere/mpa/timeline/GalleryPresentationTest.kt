@@ -64,4 +64,23 @@ class GalleryPresentationTest {
         assertThrows(IllegalArgumentException::class.java) { MonthNavigation(YearMonth.of(2026,1),YearMonth.of(2025,1)) }
         assertThrows(IllegalArgumentException::class.java) { MonthNavigation(YearMonth.of(2026,1),YearMonth.of(2026,1)).month(Float.NaN) }
     }
+    @Test fun floatingDateTracksDeviceDayAndMonthAtTimezoneBoundary() {
+        val millis=Instant.parse("2026-03-01T00:30:00Z").toEpochMilli()
+        val west=TimelineDateIndicator.from(millis,ZoneId.of("America/Los_Angeles"))
+        val east=TimelineDateIndicator.from(millis,ZoneId.of("Asia/Jerusalem"))
+        assertEquals("February 2026",west.label(java.util.Locale.US))
+        assertEquals("Saturday, February 28, 2026",west.description(java.util.Locale.US))
+        assertEquals("March 2026",east.label(java.util.Locale.US))
+        assertNotEquals(west.date,east.date)
+    }
+    @Test fun floatingUnknownDateRemainsUnknown() {
+        val value=TimelineDateIndicator.from(null,ZoneId.of("Asia/Jerusalem"))
+        assertNull(value.date);assertEquals("Unknown date",value.label(java.util.Locale.US))
+        assertEquals("Unknown date",value.description(java.util.Locale.US))
+    }
+    @Test fun floatingDateUsesChosenLocale() {
+        val value=TimelineDateIndicator(java.time.LocalDate.of(2026,9,25))
+        assertEquals("septembre 2026",value.label(java.util.Locale.FRANCE))
+        assertEquals("vendredi 25 septembre 2026",value.description(java.util.Locale.FRANCE))
+    }
 }
