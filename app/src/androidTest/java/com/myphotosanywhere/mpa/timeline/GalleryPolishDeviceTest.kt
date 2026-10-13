@@ -16,6 +16,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.*
+import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.myphotosanywhere.mpa.MainActivity
@@ -57,13 +58,22 @@ class GalleryPolishDeviceTest {
         try {
             app.galleryPresentation.update(GridDensity.DEFAULT);photos.forEach { app.database.photos().insert(it) }
             waitTag("photo:polish-0");compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:polish-30"));waitTag("photo:polish-30")
-            val before=compose.onNodeWithTag("photo:polish-30").fetchSemanticsNode().boundsInWindow.top
-            pinch(true);columns(2);waitTag("photo:polish-30");compose.waitForIdle()
-            assertEquals(before,compose.onNodeWithTag("photo:polish-30").fetchSemanticsNode().boundsInWindow.top,4f)
-            compose.activityRule.scenario.recreate();columns(2);waitTag("photo:polish-30")
+            compose.waitForIdle()
+            val timeline=compose.runOnUiThread { ViewModelProvider(compose.activity)[TimelineViewModel::class.java] }
+            val anchor=compose.runOnUiThread { requireNotNull(timeline.anchor()) }
+            val before=compose.onNodeWithTag(anchor.cursor.key).fetchSemanticsNode().boundsInWindow.top
+            pinch(true);columns(2);waitTag(anchor.cursor.key);compose.waitForIdle()
+            val after=compose.runOnUiThread { requireNotNull(timeline.anchor()) }
+            android.util.Log.i("DensityViewport","before=$anchor after=$after")
+            assertEquals("Density must preserve the actual first visible identity",anchor.cursor.key,after.cursor.key)
+            assertEquals("Density must preserve that identity's actual pixel offset",anchor.offset.toDouble(),after.offset.toDouble(),4.0)
+            assertEquals(before,compose.onNodeWithTag(anchor.cursor.key).fetchSemanticsNode().boundsInWindow.top,4f)
+            compose.activityRule.scenario.recreate();columns(2);waitTag(anchor.cursor.key)
+            compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:polish-30"));waitTag("photo:polish-30")
             screenshotPolish("density-large")
             compose.onNodeWithTag("photo:polish-30").performTouchInput { longClick() }
             compose.onNodeWithTag("timeline:date-rail").assertDoesNotExist();pinch(false);assertEquals(GridDensity.LARGE,app.galleryPresentation.density.value)
+            compose.onNodeWithTag("photo:polish-30").assertIsSelected()
             compose.onNodeWithTag("selection:close").performClick()
             waitTag("timeline:date-rail");pinch(false);columns(3)
             compose.onNodeWithTag("photo:polish-30").performClick();waitTag("viewer-screen");compose.onNodeWithTag("viewer-close").performClick();waitTag("photo:polish-30")

@@ -156,7 +156,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         LazyVerticalGrid(GridCells.Fixed(density.columns),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
             .semantics { stateDescription="${density.columns} columns" }
             .pointerInput(selection.isEmpty(),selectionLocked) {
-                if(selection.isNotEmpty() || selectionLocked) return@pointerInput
+                if(selectionLocked) return@pointerInput
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed=false,pass=PointerEventPass.Initial)
                     var scale=1f
@@ -169,7 +169,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                             if(transformed) event.changes.forEach { it.consume() }
                         }
                     } while(event.changes.any { it.pressed })
-                    if(transformed && scale.isFinite() && scale>0) pinch(scale)
+                    if(selection.isEmpty() && transformed && scale.isFinite() && scale>0) pinch(scale)
                 }
             },
             contentPadding=PaddingValues(start=2.dp,top=2.dp,end=2.dp,bottom=bottomClearance+2.dp),

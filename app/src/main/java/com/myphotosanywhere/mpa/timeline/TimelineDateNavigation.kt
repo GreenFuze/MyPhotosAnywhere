@@ -21,7 +21,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
-import java.util.Locale
+import androidx.compose.ui.platform.LocalConfiguration
 
 @Composable
 internal fun GridDensityControls(selected: GridDensity,onSelect: (GridDensity)->Unit) {
@@ -38,6 +38,7 @@ internal fun GridDensityControls(selected: GridDensity,onSelect: (GridDensity)->
 
 @Composable
 internal fun BoxScope.TimelineDateRail(state: LazyGridState,items: List<TimelineRow>,zone: ZoneId,onOpen: ()->Unit) {
+    val locale=LocalConfiguration.current.locales[0]
     val month by remember(state,items,zone) { derivedStateOf {
         state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
             (items.getOrNull(visible.index) as? TimelineRow.Media)?.entry?.millis
@@ -51,7 +52,7 @@ internal fun BoxScope.TimelineDateRail(state: LazyGridState,items: List<Timeline
             .testTag("timeline:date-rail").semantics { contentDescription="Jump to month or year" }) {
             com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_shell_date)
             Spacer(Modifier.width(4.dp))
-            Text(month?.format(DateTimeFormatter.ofPattern("MMM yyyy")) ?: "Jump to date",style=MaterialTheme.typography.labelLarge)
+            Text(month?.format(DateTimeFormatter.ofPattern("MMM yyyy",locale)) ?: "Jump to date",style=MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -90,11 +91,12 @@ internal fun TimelineDateNavigator(query: TimelineQuery,repository: TimelineRepo
 
 @Composable
 internal fun MonthNavigationControls(bounds: MonthNavigation,month: YearMonth,onValidityChanged: (Boolean)->Unit={},onSelect: (YearMonth)->Unit) {
+    val locale=LocalConfiguration.current.locales[0]
     Text("${bounds.first} – ${bounds.last}",style=MaterialTheme.typography.bodySmall)
-    Text(month.format(DateTimeFormatter.ofPattern("MMMM yyyy")),Modifier.testTag("timeline:month-preview").semantics { liveRegion=LiveRegionMode.Polite },style=MaterialTheme.typography.titleMedium)
+    Text(month.format(DateTimeFormatter.ofPattern("MMMM yyyy",locale)),Modifier.testTag("timeline:month-preview").semantics { heading() },style=MaterialTheme.typography.titleMedium)
     if(bounds.span>0) Slider(value=bounds.fraction(month),onValueChange={ onSelect(bounds.month(it)) },
         modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("timeline:month-slider")
-            .semantics { contentDescription="Browse months";stateDescription=month.format(DateTimeFormatter.ofPattern("MMMM yyyy")) })
+            .semantics { contentDescription="Browse months";stateDescription=month.format(DateTimeFormatter.ofPattern("MMMM yyyy",locale)) })
     var year by remember(month.year) { mutableStateOf(month.year.toString()) }
     val parsed=year.toIntOrNull()
     val valid=parsed!=null && parsed in bounds.first.year..bounds.last.year
@@ -111,7 +113,7 @@ internal fun MonthNavigationControls(bounds: MonthNavigation,month: YearMonth,on
         for(number in 1..12) {
             val candidate=YearMonth.of(month.year,number)
             FilterChip(selected=month.monthValue==number,onClick={ onSelect(candidate) },enabled=candidate in bounds.first..bounds.last,
-                label={ Text(candidate.month.getDisplayName(TextStyle.SHORT,Locale.getDefault())) },
+                label={ Text(candidate.month.getDisplayName(TextStyle.SHORT,locale)) },
                 modifier=Modifier.heightIn(min=48.dp).testTag("timeline:month:$number"))
         }
     }
