@@ -1,3 +1,11 @@
+## MPA 0.5.15: gallery gestures and date navigation
+
+Application `5aae9cbf7195703ad6b3fcb54ac5a806f27353bc` passed 305 unit/integration tests, zero lint findings and 92 native tests on each of API 29/35/37 (276 total), with no failures/errors/skips. Exact CI APK, established signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.15.md).
+
+Date-range queries over the mixed 100,000-item fixture measured 481.8–527.7ms across API 29/35/37 CI emulators. Timeline, Search and imported-label fixtures remain measured at 10k/100k. Metadata and Offline date ranges use bounded cursor scans, so their latency depends on matching data and filesystem checks. These are emulator measurements, not Samsung phone guarantees.
+
+Previously approved tooling diagnostics remain documented. S23 Ultra/JPEG acceptance remains unverified.
+
 ## MPA 0.5.14: focused management and imported people
 
 Application `e2d34e8240a328ed181220cf7f5f8aadce3b9785` passed 295 unit/integration tests, zero lint findings and 88 native tests on each of API 29/35/37 (264 total), with no failures/errors/skips. [Host](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38364372594) · [Native](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38364372555). Exact CI APK, established signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.14.md).

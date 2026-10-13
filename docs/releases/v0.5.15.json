@@ -1,0 +1,11 @@
+{
+  "tag": "v0.5.15",
+  "source_sha": "5aae9cbf7195703ad6b3fcb54ac5a806f27353bc",
+  "build_run_id": 38416206725,
+  "device_run_id": 38416206872,
+  "apk_sha256": "962ee9e3080a1374d5eeda9f22416bee623178702c3a3fc9e9a0cccb700b9a28",
+  "certificate_sha256": "1262430ed1e257b54a4c09697cbc63bc148af11755485bcf7b2c66492f0379b4",
+  "version_code": 26,
+  "room_schema": 9,
+  "owner_approved_emulator_diagnostics": true
+}
