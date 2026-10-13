@@ -169,7 +169,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             } },density.columns,(maxWidth.value-4f).coerceAtLeast(1f),layout)
         }
         LazyVerticalGrid(GridCells.Fixed(if(layout==GalleryLayout.SQUARE) plan.columns else JustifiedMosaic.SLOTS),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
-            .semantics { stateDescription="${density.columns} columns";collectionInfo=CollectionInfo(plan.rowCount,plan.columns) }
+            .semantics { stateDescription="${plan.columns} columns";collectionInfo=CollectionInfo(plan.rowCount,plan.columns) }
             .pointerInput(selection.isEmpty(),selectionLocked,restoring) {
                 if(selectionLocked || restoring) return@pointerInput
                 awaitEachGesture {
