@@ -43,7 +43,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 internal sealed interface TimelineRow {
-    data class Media(val entry: TimelineEntry,val generation: Long): TimelineRow
+    data class Media(val entry: TimelineEntry,val generation: Long,val query: TimelineQuery): TimelineRow
     data class Day(val date: LocalDate?,val label: String): TimelineRow
 }
 
@@ -72,7 +72,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     val density by model.density.collectAsStateWithLifecycle()
     var dateNavigation by remember(query) { mutableStateOf(false) }
     val rowsFlow=remember(model,zone) {
-        model.paging.map { data -> data.map<TimelineItem,TimelineRow> { TimelineRow.Media(it.entry,it.generation) }.insertSeparators { before,after ->
+        model.paging.map { data -> data.map<TimelineItem,TimelineRow> { TimelineRow.Media(it.entry,it.generation,it.query) }.insertSeparators { before,after ->
             val media=after as? TimelineRow.Media
             if(media==null) null else {
                 val date=media.entry.millis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
@@ -187,7 +187,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 when(val row=rows[index]) {
                     is TimelineRow.Day -> Text(row.label,Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=10.dp)
                         .semantics { heading() }.testTag("timeline:date:${row.date}"),style=MaterialTheme.typography.titleSmall)
-                    is TimelineRow.Media -> TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || restoring || row.generation!=restoration) {
+                    is TimelineRow.Media -> TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || row.query!=query) {
                         val offset=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==row.entry.key }?.offset?.y
                         val viewport=state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
                             (if(visible.index in 0 until rows.itemCount) rows.peek(visible.index) as? TimelineRow.Media else null)

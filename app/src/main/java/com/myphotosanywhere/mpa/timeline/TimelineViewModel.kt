@@ -15,7 +15,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 internal data class TimelineViewerState(val selected: TimelineEntry,val session: ViewerSession?=null,val problem: String?=null)
-internal data class TimelineItem(val entry: TimelineEntry,val generation: Long)
+internal data class TimelineItem(val entry: TimelineEntry,val generation: Long,val query: TimelineQuery)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class TimelineViewModel(application: Application,private val saved: SavedStateHandle): AndroidViewModel(application) {
@@ -51,7 +51,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
             TimelinePagingSource(repository,current.query) { _refreshedGeneration.value=current.generation }.also { source ->
                 sources.add(source);source.registerInvalidatedCallback { sources.remove(source) }
             }
-        }.flow.map { data -> data.map { TimelineItem(it,current.generation) } }
+        }.flow.map { data -> data.map { TimelineItem(it,current.generation,current.query) } }
             .onCompletion { synchronized(sources) { sources.toList().forEach { it.invalidate() };sources.clear() } }
     }.cachedIn(viewModelScope)
 
