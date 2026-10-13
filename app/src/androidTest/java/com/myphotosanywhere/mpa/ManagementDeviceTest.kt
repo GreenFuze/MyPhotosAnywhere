@@ -67,7 +67,7 @@ class ManagementDeviceTest {
         val source=DriveSource("management-disconnect","management-disconnect","disconnect@test","APP_FILES","disconnect-folder","Disconnect fixture")
         try {
             runBlocking { app.database.drive().saveSource(source);app.database.drive().saveConnection(source.connection()) }
-            compose.onNodeWithTag("shell:storage").performClick();compose.onNodeWithText("Remove this source").performScrollTo().performClick()
+            compose.onNodeWithTag("shell:storage").performClick();waitTag("source:remove");compose.onNodeWithTag("source:remove").performScrollTo().assertTextEquals("Remove this source").assertIsEnabled().performClick()
             compose.onNodeWithText("Disconnect source").assertIsDisplayed();compose.onNodeWithText("Drive originals are not deleted.",substring=true).assertExists()
             compose.onNodeWithText("Keep source").performClick();runBlocking { assertEquals(source,app.database.drive().source(source.key)) }
         } finally { runBlocking { app.database.drive().disconnectSource(source.key);app.database.drive().disconnect() } }

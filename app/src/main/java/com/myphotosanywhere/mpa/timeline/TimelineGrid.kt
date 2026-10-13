@@ -159,8 +159,8 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         } else Box(Modifier.weight(1f).fillMaxWidth()) {
         LazyVerticalGrid(GridCells.Fixed(density.columns),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
             .semantics { stateDescription="${density.columns} columns" }
-            .pointerInput(selection.isEmpty(),selectionLocked) {
-                if(selectionLocked) return@pointerInput
+            .pointerInput(selection.isEmpty(),selectionLocked,restoring) {
+                if(selectionLocked || restoring) return@pointerInput
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed=false,pass=PointerEventPass.Initial)
                     var scale=1f
@@ -187,7 +187,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 when(val row=rows[index]) {
                     is TimelineRow.Day -> Text(row.label,Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=10.dp)
                         .semantics { heading() }.testTag("timeline:date:${row.date}"),style=MaterialTheme.typography.titleSmall)
-                    is TimelineRow.Media -> TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked) {
+                    is TimelineRow.Media -> TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || restoring || row.generation!=restoration) {
                         val offset=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==row.entry.key }?.offset?.y
                         val viewport=state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
                             (if(visible.index in 0 until rows.itemCount) rows.peek(visible.index) as? TimelineRow.Media else null)
@@ -202,7 +202,8 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 LinearProgressIndicator(Modifier.fillMaxWidth().padding(8.dp))
             }
         }
-        if(selection.isEmpty() && !selectionLocked) TimelineDateRail(state,rows.itemSnapshotList.items,zone) { dateNavigation=true }
+        if(restoring || refresh is LoadState.Loading) LinearProgressIndicator(Modifier.align(Alignment.TopCenter).fillMaxWidth().testTag("timeline:refreshing"))
+        if(selection.isEmpty() && !selectionLocked && !restoring) TimelineDateRail(state,rows.itemSnapshotList.items,zone) { dateNavigation=true }
         }
     }
 }

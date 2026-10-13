@@ -152,7 +152,7 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
                         resolution.launch(IntentSenderRequest.Builder(pending.intentSender).build())
                     }
                 }) { Text("Reconnect") }
-                TextButton(enabled = !busy, onClick = { disconnecting=true }) { Text("Remove this source") }
+                TextButton(enabled = !busy, onClick = { disconnecting=true },modifier=Modifier.testTag("source:remove")) { Text("Remove this source") }
             }
         }
         Text("Removing a source stops its transfers. Other sources continue syncing; local photos and people are preserved. Google permissions can be revoked in your account settings.", style = MaterialTheme.typography.bodySmall)

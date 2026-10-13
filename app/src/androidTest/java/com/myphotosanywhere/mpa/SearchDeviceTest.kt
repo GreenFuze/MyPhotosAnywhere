@@ -91,6 +91,11 @@ class SearchDeviceTest {
             compose.onNodeWithTag("search:type:VIDEOS").performClick();compose.onNodeWithTag("search:organization:Favorites").performClick()
             compose.onNodeWithTag("search:source:${fixture.source.key}").performScrollTo().performClick();screenshot("search-filters")
             compose.onNodeWithTag("search:apply").performScrollTo().performClick();waitTag("photo:${fixture.photos[1].id}")
+            compose.waitUntil(30000) {
+                compose.onAllNodesWithTag("photo:${fixture.photos[0].id}").fetchSemanticsNodes().isEmpty() &&
+                    compose.onAllNodesWithTag("photo:${fixture.photos[1].id}").fetchSemanticsNodes().size==1 &&
+                    compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty()
+            }
             compose.onNodeWithTag("photo:${fixture.photos[0].id}").assertDoesNotExist()
             compose.onNodeWithTag("nav:Photos").performClick();compose.onNodeWithTag("shell:filters").performClick()
             compose.onNodeWithText("All sources").performScrollTo().assertIsSelected();compose.onNodeWithText("Done").performScrollTo().performClick()
@@ -156,6 +161,11 @@ class SearchDeviceTest {
             val date=Instant.ofEpochMilli(fixture.photos[1].capturedAt!!).atZone(ZoneId.systemDefault()).toLocalDate()
             val search=model();compose.runOnIdle { search.update(search.draft.value.copy(dates=SearchDates(date,date)));search.submit() }
             waitTag("search:filter-summary");waitTag("photo:${fixture.photos[1].id}")
+            compose.waitUntil(30000) {
+                compose.onAllNodesWithTag("photo:${fixture.photos[0].id}").fetchSemanticsNodes().isEmpty() &&
+                    compose.onAllNodesWithTag("photo:${fixture.photos[1].id}").fetchSemanticsNodes().size==1 &&
+                    compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty()
+            }
             compose.onNodeWithTag("photo:${fixture.photos[0].id}").assertDoesNotExist();compose.onNodeWithTag("photo:${fixture.photos[2].id}").assertDoesNotExist()
             compose.onNodeWithTag("shell:filters").performClick();compose.onNodeWithTag("search:dates").performScrollTo().performClick()
             compose.onNodeWithText("Use dates").assertExists();androidx.test.espresso.Espresso.pressBack()
