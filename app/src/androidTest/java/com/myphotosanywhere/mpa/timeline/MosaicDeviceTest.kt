@@ -68,13 +68,22 @@ class MosaicDeviceTest {
         } finally { photos.forEach { app.database.photos().find(it.id)?.let { row -> app.database.photos().update(row.copy(archived=true)) } };files.forEach { it.delete() };app.galleryPresentation.updateLayout(previous);app.galleryPresentation.update(density) }
     }
     @Test fun importInvalidationKeepsVisibleMosaicPhotoAndPixelOffset()=runBlocking<Unit> {
-        val previous=app.galleryPresentation.layout.value
+        val previous=app.galleryPresentation.layout.value;val density=app.galleryPresentation.density.value
         val files=listOf(picture(160,240,Color.BLUE),picture(240,240,Color.GREEN),picture(360,240,Color.RED))
         var photos=emptyList<Photo>();val additions=mutableListOf<Photo>()
         try {
             app.galleryPresentation.updateLayout(GalleryLayout.MOSAIC);photos=fixture(files);waitPhoto("photo:mosaic-000")
-            compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:mosaic-050"));waitPhoto("photo:mosaic-050");compose.waitForIdle()
-            val model=timeline();val anchor=compose.runOnUiThread { requireNotNull(model.anchor()) }
+            val model=timeline();val focused=requireNotNull(app.timeline.find(TimelineQuery(),"photo:mosaic-045"))
+            compose.runOnUiThread { model.rememberAnchor(focused,0);model.restoreAnchor() }
+            waitPhoto(focused.key)
+            compose.waitUntil(30000) { compose.onAllNodesWithTag("timeline:date-rail").fetchSemanticsNodes().isNotEmpty() && model.refreshedGeneration.value==model.restoration.value }
+            compose.runOnUiThread { model.changeDensity(GridDensity.LARGE) }
+            compose.waitUntil(30000) { compose.onNodeWithTag("photos:grid").fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="2 columns" }
+            compose.waitForIdle();assertEquals(focused.key,compose.runOnUiThread { model.anchor()?.cursor?.key })
+            compose.runOnUiThread { model.changeDensity(GridDensity.DEFAULT) }
+            compose.waitUntil(30000) { compose.onNodeWithTag("photos:grid").fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="3 columns" }
+            compose.waitForIdle();assertEquals(focused.key,compose.runOnUiThread { model.anchor()?.cursor?.key })
+            val anchor=compose.runOnUiThread { requireNotNull(model.anchor()) }
             val before=compose.onNodeWithTag(anchor.cursor.key).fetchSemanticsNode().boundsInWindow.top
             additions+=photos.first().copy(id="mosaic-newer",capturedAt=requireNotNull(photos.first().capturedAt)+60000)
             additions+=photos.last().copy(id="mosaic-older",capturedAt=requireNotNull(photos.last().capturedAt)-60000)
@@ -84,7 +93,7 @@ class MosaicDeviceTest {
             compose.waitUntil(30000) { compose.onAllNodes(hasTestTag(anchor.cursor.key) and hasContentDescription("Reloaded mosaic anchor",substring=true)).fetchSemanticsNodes().isNotEmpty() }
             compose.waitForIdle();assertEquals(before,compose.onNodeWithTag(anchor.cursor.key).fetchSemanticsNode().boundsInWindow.top,4f)
             assertEquals(photos.size+2,photos.count { app.database.photos().find(it.id)!=null }+additions.count { app.database.photos().find(it.id)!=null })
-        } finally { (photos+additions).forEach { app.database.photos().find(it.id)?.let { row -> app.database.photos().update(row.copy(archived=true)) } };files.forEach { it.delete() };app.galleryPresentation.updateLayout(previous) }
+        } finally { (photos+additions).forEach { app.database.photos().find(it.id)?.let { row -> app.database.photos().update(row.copy(archived=true)) } };files.forEach { it.delete() };app.galleryPresentation.updateLayout(previous);app.galleryPresentation.update(density) }
     }
     private fun screenshot(name: String) {
         val instrumentation=InstrumentationRegistry.getInstrumentation();val image=requireNotNull(instrumentation.uiAutomation.takeScreenshot())

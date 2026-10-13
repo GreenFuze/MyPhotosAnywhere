@@ -58,3 +58,11 @@ internal class JustifiedMosaic {
     }
     companion object { const val SLOTS=24;const val GAP=2f;const val MIN_TARGET=48f }
 }
+
+/** A row repack may put another tile before the anchored photo on the same top line. */
+internal object TimelineViewport {
+    fun choose(visible: List<TimelineAnchor>,preferred: TimelineAnchor?): TimelineAnchor? {
+        val first=visible.firstOrNull() ?: return null
+        return visible.firstOrNull { it.cursor.key==preferred?.cursor?.key && it.offset==first.offset } ?: first
+    }
+}

@@ -89,6 +89,13 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     val refreshedGeneration by model.refreshedGeneration.collectAsStateWithLifecycle()
     val viewer by model.viewer.collectAsStateWithLifecycle()
     var restoring by remember(query,restoration,zone,density,layout) { mutableStateOf(true) }
+    fun viewport(): TimelineAnchor? {
+        val visible=state.layoutInfo.visibleItemsInfo.mapNotNull { item ->
+            mediaByKey[item.key]?.takeIf { it.query==query && item.offset.y+item.size.height>state.layoutInfo.viewportStartOffset && item.offset.y<state.layoutInfo.viewportEndOffset }
+                ?.entry?.let { TimelineAnchor(it.cursor,-item.offset.y) }
+        }
+        return TimelineViewport.choose(visible,model.anchor(query))
+    }
     LaunchedEffect(query) { model.configure(query) }
     LaunchedEffect(query,restoration,zone,density,layout) {
         val anchor=model.anchor(query)
@@ -127,15 +134,10 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     LaunchedEffect(query,restoring,viewer,mediaByKey) {
         if(restoring || viewer!=null) return@LaunchedEffect
         snapshotFlow {
-            if(rows.loadState.refresh is LoadState.Loading) null else state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-                mediaByKey[visible.key]
-                    ?.takeIf { it.generation==restoration }?.entry?.let { it to -visible.offset.y }
+            if(rows.loadState.refresh is LoadState.Loading) null else viewport()?.let { anchor ->
+                mediaByKey[anchor.cursor.key]?.takeIf { it.generation==restoration }?.entry?.let { it to anchor.offset }
             }
         }.filterNotNull().distinctUntilChanged().collect { (entry,offset) -> model.rememberVisibleAnchor(entry,offset,restoration) }
-    }
-    fun viewport(): TimelineAnchor?=state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-        mediaByKey[visible.key]
-            ?.entry?.let { TimelineAnchor(it.cursor,-visible.offset.y) }
     }
     val pinch by rememberUpdatedState<(Float)->Unit> { scale -> model.changeDensity(density.pinch(scale),viewport()) }
     if(dateNavigation) TimelineDateNavigator(query,model.repository,zone,viewport()?.cursor?.millis,
@@ -203,11 +205,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                             val cell=plan.cells[index];collectionItemInfo=CollectionItemInfo(cell.row,1,cell.column,1)
                         }) {
                         val offset=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==row.entry.key }?.offset?.y
-                        val viewport=state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-                            mediaByKey[visible.key]
-                                ?.entry?.let { TimelineAnchor(it.cursor,-visible.offset.y) }
-                        }
-                        model.open(row.entry,offset?.let { -it },viewport)
+                        model.open(row.entry,offset?.let { -it },viewport())
                     }
                 }
             }

@@ -51,4 +51,17 @@ class JustifiedMosaicTest {
         val geometry=ThumbnailGeometry { assertNotSame(caller,Thread.currentThread());0f }
         assertThrows(IllegalStateException::class.java) { runBlocking { geometry.aspect("invalid","") } }
     }
+    @Test fun repackingKeepsPreferredCanonicalIdentityOnFirstLine() {
+        val first=TimelineAnchor(TimelineCursor(3,"photo:first"),40)
+        val held=TimelineAnchor(TimelineCursor(2,"photo:held"),40)
+        val later=TimelineAnchor(TimelineCursor(1,"photo:later"),-100)
+        assertEquals(held,TimelineViewport.choose(listOf(first,held,later),held))
+        assertEquals(first,TimelineViewport.choose(listOf(first,held,later),later))
+    }
+    @Test fun scrollingBeyondHeldRowAdvancesAnchorAndEmptyHasNoAnchor() {
+        val held=TimelineAnchor(TimelineCursor(3,"photo:held"),40)
+        val next=TimelineAnchor(TimelineCursor(2,"photo:next"),20)
+        assertEquals(next,TimelineViewport.choose(listOf(next),held))
+        assertNull(TimelineViewport.choose(emptyList(),held))
+    }
 }
