@@ -1,3 +1,11 @@
+## MPA 0.5.16: floating gallery date
+
+Application `a99a5e96ac7c901f28e530c790c8d5e769a33266` passed 308 unit/integration tests, zero lint findings and 94 native tests on each of API 29/35/37 (282 total), with no failures/errors/skips. Exact CI APK, signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.16.md).
+
+Date-range queries over 100,000 mixed items measured 312.3–506.6ms across API 29/35/37 CI emulators. Complete timeline, Search and imported-label 10k/100k measurements are attached. Metadata/Offline scans and full viewer-session preparation retain previously documented large-library latency; these are emulator results, not Samsung performance guarantees.
+
+Previously approved tooling diagnostics remain documented. S23 Ultra/JPEG acceptance remains pending.
+
 ## MPA 0.5.15: gallery gestures and date navigation
 
 Application `5aae9cbf7195703ad6b3fcb54ac5a806f27353bc` passed 305 unit/integration tests, zero lint findings and 92 native tests on each of API 29/35/37 (276 total), with no failures/errors/skips. Exact CI APK, established signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.15.md).
