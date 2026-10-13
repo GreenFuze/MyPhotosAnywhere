@@ -3,6 +3,20 @@ set -euo pipefail
 
 # Synthetic fixtures stay independent of live accounts and network timing.
 adb shell svc wifi disable
+# sys.boot_completed can precede publication of ITelephony on a fresh API 29 AVD.
+# Require its service before svc data, which otherwise dereferences a null binder.
+mpa_phone_ready=false
+for ((mpa_phone_attempt=0; mpa_phone_attempt<60; mpa_phone_attempt++)); do
+  if adb shell service check phone | tr -d '\r' | grep -q '^Service phone: found$'; then
+    mpa_phone_ready=true
+    break
+  fi
+  sleep 1
+done
+if [[ "$mpa_phone_ready" != true ]]; then
+  printf 'Emulator telephony service was not ready; offline tests cannot start\n' >&2
+  exit 1
+fi
 adb shell svc data disable
 mpa_test_status=0
 mkdir -p build/diagnostics
