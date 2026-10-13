@@ -20,11 +20,14 @@ class ShellNavigation(initial: List<ShellDestination> = listOf(ShellDestination.
     private var history by mutableStateOf(initial.toList())
     val destination: ShellDestination get()=history.last()
     val primary: ShellDestination get()=history.first()
+    val activePrimary: ShellDestination get()=if(ShellDestination.SEARCH in history) ShellDestination.SEARCH else primary
     val canGoBack: Boolean get()=history.size>1 || destination!=ShellDestination.PHOTOS
 
     fun select(destination: ShellDestination) {
         require(destination.primary) { "Expected a primary destination" }
-        history=listOf(destination)
+        if(destination==ShellDestination.SEARCH) {
+            if(this.destination!=destination) history=history+destination
+        } else history=listOf(destination)
     }
     fun open(destination: ShellDestination) {
         if(this.destination!=destination) history=history+destination

@@ -69,7 +69,7 @@ fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGrid
 
 
 @Composable
-private fun CollectionCard(title: String,icon: Int,repository: CollectionsRepository,query: TimelineQuery?,onClick: ()->Unit,tag: String="collections:$title") {
+internal fun CollectionCard(title: String,icon: Int,repository: CollectionsRepository,query: TimelineQuery?,onClick: ()->Unit,tag: String="collections:$title") {
     var failure by remember(query) { mutableStateOf(false) }
     var retry by remember(query) { mutableIntStateOf(0) }
     val preview by produceState<CollectionPreview?>(null,repository,query,retry) {

@@ -43,4 +43,15 @@ class ShellNavigationTest {
     fun childCannotBecomePrimaryDestination() { ShellNavigation().select(ShellDestination.STORAGE) }
     @Test(expected=IllegalArgumentException::class)
     fun emptyRestoredHistoryFailsFast() { ShellNavigation(emptyList()) }
+
+    @Test fun searchBackRestoresTheExactCollectionContext() {
+        val nav=ShellNavigation();nav.select(ShellDestination.COLLECTIONS);nav.open(ShellDestination.PHOTOS)
+        nav.select(ShellDestination.SEARCH);assertEquals(ShellDestination.SEARCH,nav.activePrimary)
+        nav.back();assertEquals(ShellDestination.PHOTOS,nav.destination);assertEquals(ShellDestination.COLLECTIONS,nav.primary)
+    }
+    @Test fun repeatedSearchSelectionDoesNotStackAndChildrenReturnToSearch() {
+        val nav=ShellNavigation();repeat(3) { nav.select(ShellDestination.SEARCH) };nav.open(ShellDestination.PEOPLE)
+        nav.back();assertEquals(ShellDestination.SEARCH,nav.destination);nav.back();assertEquals(ShellDestination.PHOTOS,nav.destination)
+        assertFalse(nav.canGoBack)
+    }
 }

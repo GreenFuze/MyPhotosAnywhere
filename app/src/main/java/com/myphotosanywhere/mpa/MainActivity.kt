@@ -11,25 +11,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.semantics.*
 import com.myphotosanywhere.mpa.selection.*
+import com.myphotosanywhere.mpa.search.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.shape.RoundedCornerShape
 import com.myphotosanywhere.mpa.ui.*
 import com.myphotosanywhere.mpa.timeline.*
 import java.time.Instant
@@ -42,7 +35,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
@@ -51,16 +43,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.myphotosanywhere.mpa.core.AiProvider
 import com.myphotosanywhere.mpa.data.*
 import com.myphotosanywhere.mpa.drive.binding
 import com.myphotosanywhere.mpa.drive.DriveStorageScreen
 import com.myphotosanywhere.mpa.edit.EditorScreen
 import com.myphotosanywhere.mpa.library.*
-import java.io.File
-import java.text.DateFormat
-import java.util.Date
 
 class MainActivity: ComponentActivity() {
     private var importNavigation by mutableIntStateOf(0)
@@ -82,7 +70,13 @@ class MainActivity: ComponentActivity() {
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = viewModel(),features: LibraryFeaturesModel = viewModel(),timeline: TimelineViewModel = viewModel(),selection: SelectionViewModel = viewModel()) {
+private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = viewModel(),features: LibraryFeaturesModel = viewModel(),timeline: TimelineViewModel = viewModel(),selection: SelectionViewModel = viewModel(),search: SearchViewModel = viewModel(),searchTimeline: TimelineViewModel = viewModel(key="search-timeline")) {
+    val searchDraft by search.draft.collectAsStateWithLifecycle()
+    val searchApplied by search.applied.collectAsStateWithLifecycle()
+    val searchRecents by search.recents.collectAsStateWithLifecycle()
+    val searchNotice by search.notice.collectAsStateWithLifecycle()
+    val searchViewer by searchTimeline.viewer.collectAsStateWithLifecycle()
+    val searchMessage by searchTimeline.message.collectAsStateWithLifecycle()
     val selectedTargets by selection.targets.collectAsStateWithLifecycle()
     val selectionBusy by selection.busy.collectAsStateWithLifecycle()
     val selectionResult by selection.result.collectAsStateWithLifecycle()
@@ -106,7 +100,6 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val cloud by features.cloud.collectAsStateWithLifecycle()
     val sources by features.sources.collectAsStateWithLifecycle()
     val sync by features.sync.collectAsStateWithLifecycle()
-    val downloads by features.downloads.collectAsStateWithLifecycle()
     val settings by features.settings.collectAsStateWithLifecycle()
     val navigation=rememberSaveable(saver=ShellNavigation.Saver) { ShellNavigation() }
     val tab=navigation.destination.id
@@ -118,7 +111,6 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     var viewerId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingViewKey by rememberSaveable { mutableStateOf<String?>(null) }
     var editorId by rememberSaveable { mutableStateOf<String?>(null) }
-    var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("All") }
     var albumId by rememberSaveable { mutableStateOf<String?>(null) }
     var sourceKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -127,12 +119,13 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val timelineViewer by timeline.viewer.collectAsStateWithLifecycle()
     val timelineMessage by timeline.message.collectAsStateWithLifecycle()
     LaunchedEffect(tab,selectedId,viewerId,pendingViewKey,editorId) {
-        val legacy=tab !in listOf(0,1) || selectedId!=null || viewerId!=null || pendingViewKey!=null || editorId!=null
-        model.legacyLoading(tab !in listOf(0,1) || viewerId!=null || pendingViewKey!=null);features.legacyLoading(legacy)
+        val legacy=tab !in listOf(0,1,5) || selectedId!=null || viewerId!=null || pendingViewKey!=null || editorId!=null
+        model.legacyLoading(tab !in listOf(0,1,5) || viewerId!=null || pendingViewKey!=null);features.legacyLoading(legacy)
     }
     var jumpToDate by rememberSaveable { mutableStateOf(false) }
     val photosGrid=rememberLazyGridState()
     val searchGrid=rememberLazyGridState()
+    val searchSuggestions=rememberLazyGridState()
     val collectionGrid=rememberLazyGridState()
     val collectionsHubGrid=rememberLazyGridState()
     var exportId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -149,14 +142,6 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     }
     fun pickResult(handoff: Handoff) { resultHandoffId=handoff.id; importResult.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
     fun selectPhoto(id: String) { selectedId=id; showShare=false }
-    fun viewPhoto(photo: Photo) {
-        focusManager.clearFocus(force=true);keyboard?.hide()
-        selectedId=photo.id;showShare=false
-        if(photo.originalPath.isNotBlank() && File(photo.originalPath).isFile) viewerId=photo.id
-        else cloud.find { it.photoId==photo.id && !it.removed && sources.any { source -> source.key==it.bindingKey } }?.let {
-            pendingViewKey=it.key;features.download(it)
-        }
-    }
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { features.resumeForegroundImports(); features.refreshCloudAutomatically() }
     LaunchedEffect(sources.map { it.key }) { if(sources.isNotEmpty()) features.refreshCloudAutomatically() }
     val presence=remember(cloud,sources,sourceKey) { GalleryVisibility.Index(cloud.filter { sourceKey==null || it.bindingKey==sourceKey },sources.map { it.key }.toSet()) }
@@ -176,18 +161,11 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         }
     }
     val selected=selectedState.value?.takeIf { it.id==selectedId }
-    val localIds=remember(photos) { photos.map { it.id }.toSet() }
-    val cloudByPhoto=remember(cloud,sources,sourceKey) {
-        val enabled=sources.map { it.key }.toSet()
-        cloud.filter { it.photoId!=null && !it.removed && it.bindingKey in enabled &&
-            (sourceKey==null || it.bindingKey==sourceKey) }.associateBy { requireNotNull(it.photoId) }
-    }
-    val namesByPhoto=remember(faces,people) {
-        val byId=people.associateBy { it.id }
-        faces.groupBy { it.photoId }.mapValues { (_,items) -> items.mapNotNull { byId[it.personId]?.name } }
-    }
-    val albumPhotoIds=remember(memberships,albumId) { memberships.filter { it.albumId==albumId }.map { it.photoId }.toSet() }
-    val personPhotoIds=remember(faces,personId) { faces.filter { it.personId==personId }.map { it.photoId }.toSet() }
+    val imeVisible=WindowInsets.ime.getBottom(LocalDensity.current)>0
+    fun submitSearch() { search.submit();focusManager.clearFocus(force=true);keyboard?.hide() }
+    LaunchedEffect(selecting) { if(selecting) { focusManager.clearFocus(force=true);keyboard?.hide() } }
+    LaunchedEffect(searchNotice) { searchNotice?.let { snackbar.showSnackbar(it);search.clearNotice() } }
+    LaunchedEffect(searchMessage) { searchMessage?.let { snackbar.showSnackbar(it);searchTimeline.clearMessage() } }
     LaunchedEffect(timelineMessage) { timelineMessage?.let { snackbar.showSnackbar(it);timeline.clearMessage() } }
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); model.clearMessage() } }
     LaunchedEffect(featureMessage) { featureMessage?.let { snackbar.showSnackbar(it); features.clearMessage() } }
@@ -202,6 +180,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     }
     BackHandler(enabled=!selecting && selectedId==null && viewerId==null && editorId==null && pendingViewKey==null &&
         !showFilters && navigation.canGoBack,onBack=::back)
+    BackHandler(enabled=tab==5 && imeVisible && !selecting && !showFilters && searchViewer==null) { focusManager.clearFocus(force=true);keyboard?.hide() }
     val title=when(navigation.destination) {
         ShellDestination.PHOTOS -> albums.find { it.id==albumId }?.name ?: people.find { it.id==personId }?.name
             ?: if(filter=="All") "Photos" else filter
@@ -211,7 +190,8 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val navigationClearance=with(LocalDensity.current) { navigationHeight.toDp() }
     val scrollClearance=if(selecting) 0.dp else navigationClearance
     val primaryBrand=navigation.destination==navigation.primary && tab in listOf(0,1)
-    Scaffold(topBar={ if(selecting) SelectionTopBar(selectedTargets.size,selectionBusy,selection::clear) else ShellTopBar(title,navigation.canGoBack && !primaryBrand,::back,canAddPhotos=!busy,
+    Scaffold(topBar={ if(selecting) SelectionTopBar(selectedTargets.size,selectionBusy,selection::clear) else if(tab==5) SearchTopBar(searchDraft.text,searchDraft.filtered,search::text,::submitSearch,
+        onBack={ if(imeVisible) { focusManager.clearFocus(force=true);keyboard?.hide() } else back() },onFilters={ showFilters=true }) else ShellTopBar(title,navigation.canGoBack && !primaryBrand,::back,canAddPhotos=!busy,
         onAddPhotos={ if(!busy) addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
         onStorage={ navigation.open(ShellDestination.STORAGE) },onActivity={ navigation.open(ShellDestination.STORAGE) },
         onFilters={ showFilters=true },showFilters=tab==0 || tab==5,
@@ -238,79 +218,12 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                         onClearFilters={ filter="All";sourceKey=null;albumId=null;personId=null },onRefresh=features::refreshCloud)
                 }
                 5 -> {
-                    val galleryQuery=if(tab==5) query else ""
-                    if(tab==5) OutlinedTextField(query,{ query=it },label={ Text("Search your photos") },singleLine=true,
-                        keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={ focusManager.clearFocus(force=true);keyboard?.hide() }),
-                        modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp).testTag("search:query"))
                     ShellImportActivity(onOpen={ navigation.open(ShellDestination.STORAGE) })
-                    val sourcesByKey=sources.associateBy { it.key }
-                    val sourceKeys=sourcesByKey.keys
-                    val sourcePhotoIds=cloud.filter { it.bindingKey==sourceKey && !it.removed }.mapNotNull { it.photoId }.toSet()
-                    val local=photos.filter { photo ->
-                        val names=namesByPhoto[photo.id] ?: emptyList()
-                        val indexed=cloudByPhoto[photo.id]?.removed==false
-                        presence.showLocal(photo,filter,albumId!=null || personId!=null) &&
-                        (photo.sourceRemoteId==null || photo.originalPath.isNotBlank() || indexed || albumId!=null || filter=="Favorites" || filter=="Archive") &&
-                        (sourceKey==null || photo.sourceBindingKey==sourceKey || photo.id in sourcePhotoIds) &&
-                        LibrarySearch.matches(photo,galleryQuery,names) && (if(filter=="Archive") photo.archived else !photo.archived) &&
-                            (filter!="Favorites" || photo.favorite) && (filter!="Offline" || photo.originalPath.isNotBlank()) &&
-                            (filter!="Videos" || photo.mimeType.startsWith("video/")) && (filter!="Edits" || photo.parentId!=null) &&
-                            (albumId==null || photo.id in albumPhotoIds) &&
-                            (personId==null || photo.id in personPhotoIds)
-                    }.sortedWith(compareByDescending<Photo> { it.capturedAt ?: it.importedAt }.thenByDescending { it.id })
-                    val remote=cloud.filter { row -> row.bindingKey in sourceKeys && (sourceKey==null || row.bindingKey==sourceKey) && !row.removed && row.photoId !in localIds &&
-                        albumId==null && personId==null && filter in listOf("All","Videos") &&
-                        (filter!="Videos" || row.mimeType.startsWith("video/")) && (galleryQuery.isBlank() || row.name.contains(galleryQuery,true) || row.mimeType.contains(galleryQuery,true)) }
-                    val activeSync=sync.filter { it.bindingKey in sourceKeys && (sourceKey==null || it.bindingKey==sourceKey) }
-                    if(activeSync.any { it.running || it.error!=null }) TextButton(
-                        onClick={ navigation.open(ShellDestination.STORAGE) },modifier=Modifier.fillMaxWidth().testTag("shell:sync")) {
-                        Text(if(activeSync.any { it.error!=null }) "Drive sync needs attention" else "Updating photo library…",
-                            maxLines=1,overflow=TextOverflow.Ellipsis)
-                    }
-                    if(local.isEmpty() && remote.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth().padding(32.dp),contentAlignment=Alignment.Center) {
-                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                            Text(if(galleryQuery.isNotBlank() || filter!="All" || sourceKey!=null) "No matching photos" else "Your photos belong here",
-                                style=MaterialTheme.typography.titleMedium)
-                            if(photos.isEmpty() && sources.isEmpty()) Button(onClick={ navigation.open(ShellDestination.STORAGE) }) { Text("Connect Google Drive") }
-                            else if(galleryQuery.isNotBlank() || filter!="All" || sourceKey!=null) TextButton(onClick={ query="";filter="All";sourceKey=null }) { Text("Clear filters") }
-                            else TextButton(onClick=features::refreshCloud) { Text("Refresh library") }
-                        }
-                    } else LazyVerticalGrid(columns=GridCells.Fixed(3),contentPadding=PaddingValues(start=2.dp,top=2.dp,end=2.dp,bottom=scrollClearance+2.dp),
-                        state=if(tab==5) searchGrid else if(albumId!=null || personId!=null) collectionGrid else photosGrid,
-                        horizontalArrangement=Arrangement.spacedBy(2.dp),verticalArrangement=Arrangement.spacedBy(2.dp),
-                        modifier=Modifier.weight(1f).testTag("photos:grid")) {
-                        items(local,key={ it.id }) { photo ->
-                            val cloudRow=cloudByPhoto[photo.id]
-                            PhotoTile(photo,features,cloudRow?.thumbnailUpdatedAt ?: 0,cloudRow,
-                                sourcesByKey[cloudRow?.bindingKey]?.connection(),selectedTargets,selection::toggle,selectionLocked) { viewPhoto(photo) }
-                        }
-                        items(remote,key={ "cloud:${it.key}" }) { row ->
-                            LaunchedEffect(row.key,row.version,row.thumbnailUpdatedAt,sourcesByKey[row.bindingKey]) {
-                                com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(context,row,sourcesByKey[row.bindingKey]?.connection())
-                            }
-                            val target=SelectionTarget.from(row)
-                            val chosen=selectedTargets.any { it.matches(target) }
-                            Card(Modifier.aspectRatio(1f).testTag("cloud:${row.key}").combinedClickable(enabled=!selectionLocked,
-                                onClick={ if(selecting) selection.toggle(target) else { pendingViewKey=row.key;features.download(row) } },
-                                onLongClickLabel="Select photo",onLongClick={ selection.toggle(target) }).semantics(mergeDescendants=true) {
-                                    contentDescription="${if(row.mimeType.startsWith("video/")) "Video" else "Photo"}, ${row.capturedAt?.let { DateFormat.getDateInstance().format(Date(it)) } ?: "Unknown date"}, ${row.name}";if(selecting) this.selected=chosen
-                                    customActions=listOf(CustomAccessibilityAction(if(chosen) "Deselect photo" else "Select photo") { if(!selectionLocked) selection.toggle(target);!selectionLocked })
-                                },shape=RoundedCornerShape(0.dp)) {
-                                Box(Modifier.fillMaxSize()) {
-                                    AsyncImage(coil.request.ImageRequest.Builder(context).data(File(row.thumbnailPath))
-                                        .memoryCacheKey("${row.key}:${row.thumbnailUpdatedAt}").build(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-                                    if(downloads.any { it.key==row.key && it.state in listOf("PENDING","DOWNLOADING","RETRYING") })
-                                        Surface(Modifier.align(Alignment.BottomStart),color=MaterialTheme.colorScheme.surface.copy(alpha=.85f)) {
-                                            Text("Downloading…",modifier=Modifier.padding(4.dp),style=MaterialTheme.typography.labelSmall)
-                                        }
-                                    if(selecting) SelectionMark(chosen)
-                                    if(row.mimeType.startsWith("video/")) Box(Modifier.align(Alignment.BottomEnd).padding(4.dp)) {
-                                        ShellIcon(R.drawable.ic_shell_video,"Video")
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    SearchScreen(searchDraft,searchApplied,searchRecents,search,searchTimeline,features,searchGrid,searchSuggestions,
+                        albums,sources,scrollClearance,selectedTargets,selection::toggle,selectionLocked,onFilters={ showFilters=true },
+                        onPeople={ navigation.open(ShellDestination.PEOPLE) },onPlaces={ navigation.open(ShellDestination.PLACES) },
+                        onAlbums={ navigation.open(ShellDestination.COLLECTIONS) },onSubmit=::submitSearch,
+                        onConnect={ navigation.open(ShellDestination.STORAGE) },modifier=Modifier.weight(1f).fillMaxWidth())
                 }
                 1 -> AlbumsScreen(features,albums,collectionsHubGrid,onAlbum={ albumId=it;personId=null;filter="All";navigation.open(ShellDestination.PHOTOS) },
                     onFavorites={ filter="Favorites";albumId=null;personId=null;navigation.open(ShellDestination.PHOTOS) },
@@ -337,18 +250,19 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                 4 -> DriveStorageScreen(photos)
             }
         }
-        if(selecting) SelectionBottomBar(selectionBusy,filter=="Archive",albumId!=null,onAction={ kind ->
+        if(selecting) SelectionBottomBar(selectionBusy,(if(tab==5) searchApplied.filter else filter)=="Archive",tab==0 && albumId!=null,onAction={ kind ->
             if(kind==BulkKind.ALBUM) selectionAlbums=true
             else selection.execute(BulkAction(kind,if(kind==BulkKind.REMOVE_ALBUM) albumId else null))
         },modifier=Modifier.align(Alignment.BottomCenter).onSizeChanged { navigationHeight=it.height })
-        else ShellBottomBar(navigation.primary,onSelect={ destination ->
-            if(destination.primary) { albumId=null;personId=null;filter="All" }
+        else ShellBottomBar(navigation.activePrimary,onSelect={ destination ->
+            if(destination.primary && destination!=ShellDestination.SEARCH) { albumId=null;personId=null;filter="All" }
             navigation.select(destination)
         },modifier=Modifier.align(Alignment.BottomCenter).testTag("shell:navigation").onSizeChanged { navigationHeight=it.height })
         }
     }
     SelectionDialogs(selection,albums,selectionAlbums,{ selectionAlbums=false },selectionResult,selectionBusy,selectionProgress,selectionTotal)
-    if(showFilters) ModalBottomSheet(onDismissRequest={ showFilters=false }) {
+    if(showFilters && tab==5) SearchFilters(searchDraft,sources,onApply={ search.update(it);submitSearch();showFilters=false },onClose={ showFilters=false })
+    if(showFilters && tab!=5) ModalBottomSheet(onDismissRequest={ showFilters=false }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("Filter photos",style=MaterialTheme.typography.titleLarge)
             if(tab==0) TextButton(onClick={ showFilters=false;jumpToDate=true },modifier=Modifier.heightIn(min=48.dp).testTag("timeline:jump")) { Text("Jump to date") }
@@ -371,6 +285,10 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             }) { Text("Jump") }
         },dismissButton={ TextButton(onClick={ jumpToDate=false }) { Text("Cancel") } }) { DatePicker(date) }
     }
+    searchViewer?.let { session -> TimelineViewer(session,searchTimeline,features,
+        onEdit={ searchTimeline.closeViewer();selectedId=it;editorId=it },
+        onDetails={ selectedId=it;viewerDetailsOpen=true },obscured=viewerDetailsOpen || editorId!=null || showShare,
+        onSource={ searchTimeline.closeViewer();navigation.open(ShellDestination.STORAGE) }) }
     timelineViewer?.let { session -> TimelineViewer(session,timeline,features,
         onEdit={ timeline.closeViewer();selectedId=it;editorId=it },
         onDetails={ selectedId=it;viewerDetailsOpen=true },obscured=viewerDetailsOpen || editorId!=null || showShare,
@@ -387,42 +305,14 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             confirmButton={ if(selectedProblem!=null) TextButton(onClick={ selectedAttempt++ }) { Text("Retry") } },
             dismissButton={ TextButton(onClick={ selectedId=null;viewerDetailsOpen=false }) { Text("Close") } })
     }
-    if(selected!=null && !showShare && editorId==null && (viewerId==null || viewerDetailsOpen) && pendingViewKey==null && (timelineViewer==null || viewerDetailsOpen)) PhotoDetails(selected,features,albums,memberships,people,faces,
+    if(selected!=null && !showShare && editorId==null && (viewerId==null || viewerDetailsOpen) && pendingViewKey==null && (timelineViewer==null && searchViewer==null || viewerDetailsOpen)) PhotoDetails(selected,features,albums,memberships,people,faces,
         onClose={ viewerDetailsOpen=false;if(viewerId==null) selectedId=null },onEdit={ editorId=selected.id },onAI={ showShare=true },onExport={
             exportId=selected.id; export.launch(selected.displayName)
-        },onResult=handoffs.firstOrNull { it.photoId==selected.id }?.let { h -> { pickResult(h) } },onView=if(viewerId==null && timelineViewer==null) ({ viewerId=selected.id }) else null,showPreview=viewerId==null && timelineViewer==null)
+        },onResult=handoffs.firstOrNull { it.photoId==selected.id }?.let { h -> { pickResult(h) } },onView=if(viewerId==null && timelineViewer==null && searchViewer==null) ({ viewerId=selected.id }) else null,showPreview=viewerId==null && timelineViewer==null && searchViewer==null)
     if(selected!=null && showShare) ShareDialog(busy,onDismiss={ showShare=false }) { provider,instructions ->
         model.share(selected,provider,instructions) { intent -> context.startActivity(intent); showShare=false }
     }
     editorId?.let { id -> EditorScreen(id,onClose={ editorId=null },onSaved={ saved -> editorId=null; selectedId=saved }) }
-}
-
-@Composable
-private fun PhotoTile(photo: Photo,features: LibraryFeaturesModel,thumbnailVersion: Long,cloudRow: com.myphotosanywhere.mpa.drive.CloudPhoto?,
-    source: com.myphotosanywhere.mpa.drive.DriveConnection?,selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,onClick: ()->Unit) {
-    val thumb by produceState<File?>(null,photo.id,photo.originalPath,thumbnailVersion) { value=runCatching { features.app.cache.thumbnail(photo) }.getOrNull() }
-    LaunchedEffect(photo.id,cloudRow?.version,thumbnailVersion,source) {
-        if(cloudRow!=null) com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(features.app,cloudRow,source)
-    }
-    val target=SelectionTarget.from(photo,cloudRow)
-    val chosen=selection.any { it.matches(target) }
-    val selecting=selection.isNotEmpty()
-    Card(Modifier.aspectRatio(1f).testTag("photo:${photo.id}").combinedClickable(enabled=!selectionLocked,role=Role.Button,
-        onClick={ if(selecting) onToggle(target) else onClick() },onLongClickLabel="Select photo",onLongClick={ onToggle(target) })
-        .semantics(mergeDescendants=true) {
-            contentDescription="${if(photo.mimeType.startsWith("video/")) "Video" else "Photo"}, ${DateFormat.getDateInstance().format(Date(photo.capturedAt ?: photo.importedAt))}, ${photo.displayName}";if(selecting) this.selected=chosen
-            customActions=listOf(CustomAccessibilityAction(if(chosen) "Deselect photo" else "Select photo") { if(!selectionLocked) onToggle(target);!selectionLocked })
-        },shape=RoundedCornerShape(0.dp)) {
-        Box(Modifier.fillMaxSize()) {
-            AsyncImage(coil.request.ImageRequest.Builder(features.app).data(thumb ?: File(photo.thumbnailPath))
-                .memoryCacheKey("${photo.id}:$thumbnailVersion:${photo.originalPath}").build(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-            if(selecting) SelectionMark(chosen)
-            if(photo.mimeType.startsWith("video/")) Surface(Modifier.align(Alignment.BottomEnd).padding(4.dp),
-                color=MaterialTheme.colorScheme.surface.copy(alpha=.85f)) {
-                ShellIcon(R.drawable.ic_shell_video,"Video")
-            }
-        }
-    }
 }
 
 @Composable
