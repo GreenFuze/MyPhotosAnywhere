@@ -55,12 +55,13 @@ internal fun GridDensityControls(selected: GridDensity,onSelect: (GridDensity)->
 
 @Composable
 internal fun BoxScope.TimelineDateRail(state: LazyGridState,items: List<TimelineRow>,query: TimelineQuery,zone: ZoneId,onOpen: ()->Unit) {
-    val indicator by remember(state,items,query,zone) { derivedStateOf {
+    val media=remember(items,query) { items.filterIsInstance<TimelineRow.Media>().filter { it.query==query }.associateBy { it.entry.key } }
+    val indicator by remember(state,media,zone) { derivedStateOf {
         val layout=state.layoutInfo
         // Choose the first intersecting media row before interpreting its timestamp. Skipping
         // null timestamps would incorrectly label unknown-date photos with a later photo's date.
         layout.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-            (items.getOrNull(visible.index) as? TimelineRow.Media)?.takeIf {
+            media[visible.key]?.takeIf {
                 it.query==query && visible.offset.y+visible.size.height>layout.viewportStartOffset && visible.offset.y<layout.viewportEndOffset
             }
         }?.let { TimelineDateIndicator.from(it.entry.millis,zone) }
