@@ -5,3 +5,7 @@ Sources, Activity, new imports, import history and Settings become focused desti
 Takeout `people[].name` values already retained in `Photo.importedMetadata.googleTakeout` become browsable provider labels under People and appear in Details. Labels have source-scoped deterministic identities, exact normalized-name membership, normal visibility rules, paged chronological grids and stable viewer snapshots. Existing imports need no upload. They do not create faces, embeddings or confirmed identities; equal names across sources and existing named faces remain distinct. Missing labels cannot be reconstructed from JSON that lacks them. No Room schema change or media/metadata rewrite is required.
 
 Remaining UX batch: optional density/date-navigation gestures, motion and visual polish, followed by full phone acceptance. S23 Ultra acceptance and the reported JPEG crash remain unverified. Release requires strict checks, native API 29/35/37, screenshots, data-preservation checks and exact established-signer APK verification. Previously approved tooling diagnostics remain the only exceptions.
+
+## Final publication evidence
+
+[Immutable source, exact CI APK, validation and remaining acceptance](releases/v0.5.14.md). Publication metadata changes no application, toolchain or workflow objects.

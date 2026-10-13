@@ -1,3 +1,11 @@
+## MPA 0.5.14: focused management and imported people
+
+Application `e2d34e8240a328ed181220cf7f5f8aadce3b9785` passed 295 unit/integration tests, zero lint findings and 88 native tests on each of API 29/35/37 (264 total), with no failures/errors/skips. [Host](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38364372594) · [Native](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38364372555). Exact CI APK, established signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.14.md).
+
+At 100,000 indexed items, imported-label discovery measured 3.86–10.12s, a sparse first label page 0.49–1.28s, and its viewer snapshot 3.98–10.42s across CI emulators. These are fixture measurements, not phone guarantees. Discovery scans retained metadata on an IO dispatcher; media pages and cursor windows remain bounded. No new persistent full-text or people-membership table was added.
+
+Previously approved tooling diagnostics remain documented. S23 Ultra/JPEG acceptance and the owner’s ZIP contents remain unverified.
+
 ## MPA 0.5.13: dedicated paged Search
 
 Application `be9df5edc9b4ceb4e8199442bf26c2587bb3e2ee` passed 278 unit/integration tests, zero lint findings and 80 native tests each on API 29/35/37 (240 total), with no failures/errors/skips. [Host](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38349866325) · [Native](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38349866291). The exact CI APK preserves the established signer and schema 9. [Scope, benchmarks and acceptance](releases/v0.5.13.md).
