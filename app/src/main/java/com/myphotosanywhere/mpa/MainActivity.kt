@@ -165,6 +165,9 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val selected=selectedState.value?.takeIf { it.id==selectedId }
     val imeVisible=WindowInsets.ime.getBottom(LocalDensity.current)>0
     fun submitSearch() { search.submit();focusManager.clearFocus(force=true);keyboard?.hide() }
+    // A destination change ends its text-entry session. Search controls its own focus/IME flow.
+    LaunchedEffect(tab) { if(tab!=ShellDestination.SEARCH.id) { focusManager.clearFocus(force=true);keyboard?.hide() } }
+
     LaunchedEffect(selecting) { if(selecting) { focusManager.clearFocus(force=true);keyboard?.hide() } }
     LaunchedEffect(searchNotice) { searchNotice?.let { snackbar.showSnackbar(it);search.clearNotice() } }
     LaunchedEffect(searchMessage) { searchMessage?.let { snackbar.showSnackbar(it);searchTimeline.clearMessage() } }

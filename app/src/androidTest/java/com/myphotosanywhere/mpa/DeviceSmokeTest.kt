@@ -548,6 +548,10 @@ class DeviceSmokeTest {
             assertTrue(app.settings.state.value.indexingPaused)
             compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             compose.onNodeWithTag("management:Backup and metadata").performClick()
+            compose.waitUntil(10000) {
+                compose.runOnUiThread { androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true }
+            }
+            compose.waitForIdle()
             compose.onNodeWithText("Portable annotations").performScrollTo().assertIsDisplayed()
             compose.onNodeWithText("Back up annotations to connected folders").performScrollTo().assertIsDisplayed()
         } finally { app.settings.update(original); app.people.schedule() }
