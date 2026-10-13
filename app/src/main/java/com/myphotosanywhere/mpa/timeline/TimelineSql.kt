@@ -4,7 +4,7 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 
 /** One global ordering and one visibility policy for paging, seeking and viewer snapshots. */
 internal class TimelineSql(private val query: TimelineQuery) {
-    private val arguments=arrayOf<Any?>(query.source,query.filter,query.album,query.person,query.type.name,query.fromMillis,query.untilMillis)
+    private val arguments=arrayOf<Any?>(query.source,query.filter,query.album,query.person.takeIf { query.importedPerson==null },query.type.name,query.fromMillis,query.untilMillis)
     private val projection="""
         WITH connected AS (
           SELECT c.* FROM cloud_photos c JOIN drive_sources s ON s.key=c.bindingKey
@@ -69,6 +69,7 @@ internal class TimelineSql(private val query: TimelineQuery) {
         ), filtered AS (
           SELECT * FROM entries WHERE (?5='ALL' OR (?5='PHOTOS' AND mimeType LIKE 'image/%') OR (?5='VIDEOS' AND mimeType LIKE 'video/%'))
           AND (?6 IS NULL OR effectiveMillis>=?6) AND (?7 IS NULL OR effectiveMillis<?7)
+          AND ${if(query.importedPerson!=null || query.includeMetadata) "photoId IS NOT NULL" else "1"}
         )
     """.trimIndent()
 
@@ -96,7 +97,7 @@ internal class TimelineSql(private val query: TimelineQuery) {
     }
 
     private fun statement(tail: String,vararg extra: Any?): SimpleSQLiteQuery {
-        val sql=if(query.searchText==null) tail else {
+        val sql=if(!query.needsMetadata) tail else {
             // Enrich only the candidate cursor. The first sixteen columns retain the existing viewer-index contract.
             val order=tail.substringAfter("ORDER BY ","").substringBefore(" LIMIT ").takeIf(String::isNotBlank)
             """SELECT e.*,p.placeLabel,p.labels,COALESCE(p.capturedAt,p.importedAt),p.importedMetadata,p.favorite,p.parentId,p.latitude,p.longitude,

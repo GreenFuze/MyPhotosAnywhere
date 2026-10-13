@@ -11,6 +11,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import coil.compose.AsyncImage
 import com.myphotosanywhere.mpa.data.*
 import com.myphotosanywhere.mpa.people.FaceMatching
@@ -19,8 +22,18 @@ import com.myphotosanywhere.mpa.people.PeopleRepository
 import java.io.File
 
 @Composable
-fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<FaceRecord>,enabled: Boolean,
+internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<FaceRecord>,enabled: Boolean,
     onPerson: (String)->Unit,onPhoto: (String)->Unit) {
+    val imported=remember(model) { com.myphotosanywhere.mpa.people.ImportedPeopleRepository(model.app.timeline) }
+    var retryImported by remember { mutableIntStateOf(0) }
+    val importedState by produceState(com.myphotosanywhere.mpa.people.ImportedPeopleState(),imported,retryImported) {
+        try { imported.changes().collect {
+            value=value.copy(loading=true,error=null)
+            value=com.myphotosanywhere.mpa.people.ImportedPeopleState(imported.groups(),loading=false)
+        } } catch(cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch(error: android.database.sqlite.SQLiteException) { value=value.copy(loading=false,error=error.message ?: "Cannot read imported people. Retry.") }
+    }
+    val sources by model.sources.collectAsStateWithLifecycle()
     var naming by remember { mutableStateOf<List<String>>(emptyList()) }
     var name by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf(false) }
@@ -59,6 +72,25 @@ fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<Fa
             }
             if(faces.isNotEmpty() || people.isNotEmpty()) TextButton(onClick={ deleting=true }) { Text("Delete people index") }
         }
+        item {
+            Text("Imported people",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })
+            Text("Names exported in Takeout. These are photo labels, not confirmed face assignments. Existing named faces stay separate.",style=MaterialTheme.typography.bodySmall)
+            if(importedState.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            importedState.error?.let { Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={ retryImported++ }) { Text("Retry imported people") } }
+            if(!importedState.loading && importedState.error==null && importedState.groups.isEmpty()) Text("No exported people labels found in the available photos. Takeout exports may omit them; on-device recognition is separate.",style=MaterialTheme.typography.bodySmall)
+        }
+        items(importedState.groups,key={ it.label.key }) { group ->
+            Card(onClick={ onPerson(group.label.key) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("imported-person:${group.label.key}")) {
+                Row(Modifier.padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    if(group.thumbnail.isNotBlank()) AsyncImage(File(group.thumbnail),null,Modifier.size(64.dp))
+                    Column { Text(group.label.name,style=MaterialTheme.typography.titleMedium)
+                        Text("${group.photos} photos · imported label",style=MaterialTheme.typography.bodySmall)
+                        Text(sources.find { it.key==group.label.binding }?.let { "${it.folderName} · ${it.email}" } ?: "Original import source disconnected",style=MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+        item { Text("Named faces",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() }) }
         items(people,key={ it.id }) { person ->
             Card(Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(12.dp),horizontalArrangement=Arrangement.SpaceBetween) {
@@ -103,7 +135,26 @@ fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<Fa
                 }
             } }
             item { OutlinedTextField(name,{ if(it.length<=100) name=it },readOnly=namingPerson!=null,label={ Text("Name") }) }
-            items(people,key={ it.id }) { person -> TextButton(enabled=selected.isNotEmpty(),onClick={ model.assign(selected.toList(),person.name,person.id); naming=emptyList() }) { Text("Use ${person.name}") } }
+            item {
+            Text("Imported people",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })
+            Text("Names exported in Takeout. These are photo labels, not confirmed face assignments. Existing named faces stay separate.",style=MaterialTheme.typography.bodySmall)
+            if(importedState.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            importedState.error?.let { Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={ retryImported++ }) { Text("Retry imported people") } }
+            if(!importedState.loading && importedState.error==null && importedState.groups.isEmpty()) Text("No exported people labels found in the available photos. Takeout exports may omit them; on-device recognition is separate.",style=MaterialTheme.typography.bodySmall)
+        }
+        items(importedState.groups,key={ it.label.key }) { group ->
+            Card(onClick={ onPerson(group.label.key) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("imported-person:${group.label.key}")) {
+                Row(Modifier.padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    if(group.thumbnail.isNotBlank()) AsyncImage(File(group.thumbnail),null,Modifier.size(64.dp))
+                    Column { Text(group.label.name,style=MaterialTheme.typography.titleMedium)
+                        Text("${group.photos} photos · imported label",style=MaterialTheme.typography.bodySmall)
+                        Text(sources.find { it.key==group.label.binding }?.let { "${it.folderName} · ${it.email}" } ?: "Original import source disconnected",style=MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+        item { Text("Named faces",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() }) }
+        items(people,key={ it.id }) { person -> TextButton(enabled=selected.isNotEmpty(),onClick={ model.assign(selected.toList(),person.name,person.id); naming=emptyList() }) { Text("Use ${person.name}") } }
         } },confirmButton={ Button(enabled=name.isNotBlank() && selected.isNotEmpty(),onClick={ model.assign(selected.toList(),name,namingPerson?.id); naming=emptyList() }) { Text("Confirm name") } },
         dismissButton={ TextButton(onClick={ naming=emptyList() }) { Text("Cancel") } })
     managing?.let { person -> AlertDialog(onDismissRequest={ managing=null },title={ Text("Manage ${person.name}") },

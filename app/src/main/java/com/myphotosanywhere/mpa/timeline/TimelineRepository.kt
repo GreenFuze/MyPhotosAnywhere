@@ -17,10 +17,11 @@ import java.io.File
 /** All database and filesystem work stays off the UI thread and bounded by a page or cursor window. */
 internal class TimelineRepository(internal val database: PhotoDatabase,
     private val originalExists: (String)->Boolean={ it.isNotBlank() && File(it).isFile }) {
+    private val importedPeople=com.myphotosanywhere.mpa.people.ImportedPeopleCodec()
     suspend fun page(query: TimelineQuery,cursor: TimelineCursor?,direction: TimelineDirection,
         limit: Int,inclusive: Boolean=false): List<TimelineEntry> = withContext(Dispatchers.IO) {
         require(limit in 1..300)
-        if(query.searchText!=null) return@withContext searchPage(query,cursor,direction,limit,inclusive)
+        if(query.needsMetadata) return@withContext searchPage(query,cursor,direction,limit,inclusive)
         val result=ArrayList<TimelineEntry>(limit)
         var boundary=cursor
         var include=inclusive
@@ -93,7 +94,7 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
         } ?: return@withContext null
         if(accepts(query,candidate)) candidate.cursor
         else {
-            val dated=if(query.search!=null) query.copy(untilMillis=minOf(query.untilMillis ?: beforeExclusive,beforeExclusive)) else query
+            val dated=if(query.search!=null || query.importedPerson!=null) query.copy(untilMillis=minOf(query.untilMillis ?: beforeExclusive,beforeExclusive)) else query
             page(dated,candidate.cursor,TimelineDirection.AFTER,1).firstOrNull()?.cursor
         }
     }
@@ -124,6 +125,9 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
 
     internal fun accepts(query: TimelineQuery,entry: TimelineEntry): Boolean {
         if(query.filter=="Offline" && !originalExists(entry.originalPath)) return false
+        query.importedPerson?.let { label ->
+            if(entry.photoId==null || !importedPeople.matches(label,entry.binding,requireNotNull(entry.searchDocument).metadata)) return false
+        }
         val text=query.searchText ?: return true
         return text.matches(requireNotNull(entry.searchDocument) { "Search cursor lacks metadata" },java.time.ZoneId.of(query.searchZone))
     }

@@ -65,6 +65,8 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
                 .size(480).build(),photo.displayName,modifier=Modifier.fillMaxWidth().height(160.dp),contentScale=ContentScale.Fit)
             if(available && onView!=null) TextButton(onClick=onView) { Text("View full screen") }
             Text("${DateFormat.getDateTimeInstance().format(Date(photo.capturedAt ?: photo.importedAt))} · %.1f MiB".format(photo.bytes/(1024.0*1024)))
+            val importedNames=remember(photo.importedMetadata) { com.myphotosanywhere.mpa.people.ImportedPeopleCodec().names(photo.importedMetadata) }
+            if(importedNames.isNotEmpty()) Text("Imported people labels: ${importedNames.joinToString()}",modifier=Modifier.testTag("details:imported-people"))
             Text(if(photo.parentId==null) "Original preserved" else "Edited copy · original preserved")
             Text("Type: ${photo.mimeType}")
             Text(if(available) "Original available on this device" else "Original unavailable on this device",

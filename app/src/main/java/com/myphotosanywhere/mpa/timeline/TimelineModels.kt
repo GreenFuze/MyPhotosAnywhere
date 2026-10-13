@@ -7,12 +7,14 @@ import com.myphotosanywhere.mpa.drive.CloudPhoto
 internal data class TimelineQuery(val filter: String="All",val source: String?=null,
     val album: String?=null,val person: String?=null,val search: String?=null,
     val type: TimelineMediaType=TimelineMediaType.ALL,val fromMillis: Long?=null,val untilMillis: Long?=null,
-    val searchZone: String=java.time.ZoneId.systemDefault().id) {
+    val searchZone: String=java.time.ZoneId.systemDefault().id,val includeMetadata: Boolean=false) {
     init {
         require(filter in setOf("All","Favorites","Offline","Videos","Edits","Archive"))
         require(search==null || search.length<=256)
         require(fromMillis==null || untilMillis==null || fromMillis<=untilMillis)
     }
+    val importedPerson=com.myphotosanywhere.mpa.people.ImportedPersonLabel.fromKey(person)
+    val needsMetadata get()=includeMetadata || searchText!=null || importedPerson!=null
     val searchText=search?.takeIf(String::isNotBlank)?.let { com.myphotosanywhere.mpa.search.SearchText(it) }
 }
 
