@@ -101,15 +101,16 @@ class GalleryPolishDeviceTest {
             val timeline=compose.runOnUiThread { ViewModelProvider(compose.activity)[TimelineViewModel::class.java] }
             // The selected photo was already visible before Jump. Its presence does not mean that the seek finished.
             // Enough older fixture rows make zero-offset placement possible without end-of-list clamping.
+            val contentInset=compose.runOnUiThread { Math.round(2f*compose.activity.resources.displayMetrics.density).toFloat() }
             var lastSeekState=""
             try { compose.waitUntil(30000) {
                 val anchor=compose.runOnUiThread { timeline.anchor() }
                 val ready=timeline.refreshedGeneration.value==timeline.restoration.value
                 val photoBounds=compose.onAllNodesWithTag("photo:polish-date-old").fetchSemanticsNodes().singleOrNull()?.boundsInWindow ?: return@waitUntil false
                 val gridBounds=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow
-                val diagnostic="anchor=$anchor generations=${timeline.refreshedGeneration.value}/${timeline.restoration.value} photo=$photoBounds grid=$gridBounds"
+                val diagnostic="anchor=$anchor generations=${timeline.refreshedGeneration.value}/${timeline.restoration.value} photo=$photoBounds grid=$gridBounds contentInset=$contentInset"
                 if(diagnostic!=lastSeekState) { lastSeekState=diagnostic;android.util.Log.i("DateSeekState",diagnostic) }
-                ready && anchor?.cursor?.key=="photo:polish-date-old" && anchor.offset==0 && kotlin.math.abs(photoBounds.top-gridBounds.top)<4f
+                ready && anchor?.cursor?.key=="photo:polish-date-old" && anchor.offset==0 && kotlin.math.abs(photoBounds.top-gridBounds.top-contentInset)<3f
             } } finally { screenshotPolish("date-after-seek");android.util.Log.i("DateSeekState","last: $lastSeekState") }
             compose.waitForIdle()
             val before=compose.onNodeWithTag("photo:polish-date-old").fetchSemanticsNode().boundsInWindow.top
