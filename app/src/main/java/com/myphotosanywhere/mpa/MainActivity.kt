@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.horizontalScroll
@@ -135,6 +136,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val context=LocalContext.current
     val keyboard=LocalSoftwareKeyboardController.current
     val focusManager=LocalFocusManager.current
+    val rootView=LocalView.current
     val addPhotos=rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(100)) { model.importPhotos(it) }
     val importResult=rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if(uri!=null) resultHandoffId?.let { model.importResult(uri,it) }; resultHandoffId=null
@@ -164,6 +166,14 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     }
     val selected=selectedState.value?.takeIf { it.id==selectedId }
     val imeVisible=WindowInsets.ime.getBottom(LocalDensity.current)>0
+    // Animated Compose inset height can remain positive after IME submission has hidden the keyboard.
+    // Resolve Back against current platform visibility, so a hiding animation cannot swallow navigation.
+    fun dismissKeyboardIfOpen(): Boolean {
+        val open=androidx.core.view.ViewCompat.getRootWindowInsets(rootView)
+            ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())==true
+        if(open) { focusManager.clearFocus(force=true);keyboard?.hide() }
+        return open
+    }
     fun submitSearch() { search.submit();focusManager.clearFocus(force=true);keyboard?.hide() }
     // A destination change ends its text-entry session. Search controls its own focus/IME flow.
     LaunchedEffect(tab) { if(tab!=ShellDestination.SEARCH.id) { focusManager.clearFocus(force=true);keyboard?.hide() } }
@@ -189,7 +199,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     }
     BackHandler(enabled=!selecting && selectedId==null && viewerId==null && editorId==null && pendingViewKey==null &&
         !showFilters && navigation.canGoBack,onBack=::back)
-    BackHandler(enabled=tab==5 && imeVisible && !selecting && !showFilters && searchViewer==null && selectedId==null && editorId==null && pendingViewKey==null) { focusManager.clearFocus(force=true);keyboard?.hide() }
+    BackHandler(enabled=tab==5 && imeVisible && !selecting && !showFilters && searchViewer==null && selectedId==null && editorId==null && pendingViewKey==null) { if(!dismissKeyboardIfOpen()) back() }
     val title=when(navigation.destination) {
         ShellDestination.PHOTOS -> albums.find { it.id==albumId }?.name ?: people.find { it.id==personId }?.name
             ?: importedLabel?.name ?: if(filter=="All") "Photos" else filter
@@ -200,7 +210,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val scrollClearance=if(selecting) 0.dp else navigationClearance
     val primaryBrand=navigation.destination==navigation.primary && tab in listOf(0,1)
     Scaffold(topBar={ if(selecting) SelectionTopBar(selectedTargets.size,selectionBusy,selection::clear) else if(tab==5) SearchTopBar(searchDraft.text,searchDraft.filtered,search::text,::submitSearch,
-        onBack={ if(imeVisible) { focusManager.clearFocus(force=true);keyboard?.hide() } else back() },onFilters={ showFilters=true }) else ShellTopBar(title,navigation.canGoBack && !primaryBrand,::back,canAddPhotos=!busy,
+        onBack={ if(!dismissKeyboardIfOpen()) back() },onFilters={ showFilters=true }) else ShellTopBar(title,navigation.canGoBack && !primaryBrand,::back,canAddPhotos=!busy,
         onAddPhotos={ if(!busy) addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
         onStorage={ navigation.open(ShellDestination.STORAGE) },onActivity={ navigation.open(ShellDestination.ACTIVITY) },onImport={ navigation.open(ShellDestination.IMPORTS) },
         onFilters={ showFilters=true },showFilters=tab==0 || tab==5,
