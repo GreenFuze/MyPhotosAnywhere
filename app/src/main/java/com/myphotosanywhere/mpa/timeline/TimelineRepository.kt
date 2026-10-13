@@ -99,6 +99,31 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
         }
     }
 
+    suspend fun dateRange(query: TimelineQuery): TimelineDateRange?=withContext(Dispatchers.IO) {
+        if(!query.needsMetadata && query.filter!="Offline") {
+            database.openHelper.readableDatabase.query(TimelineSql(query).dateRange()).use { rows ->
+                check(rows.moveToFirst())
+                if(rows.isNull(0)) null else TimelineDateRange(rows.getLong(0),rows.getLong(1))
+            }
+        } else {
+            // Metadata/offline predicates use one bounded cursor and no retained media list.
+            var oldest: Long?=null
+            var newest: Long?=null
+            database.openHelper.readableDatabase.query(TimelineSql(query).scan(null,TimelineDirection.AFTER)).use { rows ->
+                forwardWindow(rows)
+                while(rows.moveToNext()) {
+                    currentCoroutineContext().ensureActive()
+                    val entry=read(rows)
+                    if(entry.millis!=null && accepts(query,entry)) {
+                        if(newest==null) newest=entry.millis
+                        oldest=entry.millis
+                    }
+                }
+            }
+            oldest?.let { TimelineDateRange(it,requireNotNull(newest)) }
+        }
+    }
+
     suspend fun resolve(entry: TimelineEntry): TimelineMedia=withContext(Dispatchers.IO) {
         database.withTransaction {
             val cloud=entry.cloudKey?.let { database.cloud().photo(it) }?.takeIf { current ->

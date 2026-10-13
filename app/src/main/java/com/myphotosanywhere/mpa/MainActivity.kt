@@ -270,6 +270,8 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     if(showFilters && tab!=5) ModalBottomSheet(onDismissRequest={ showFilters=false }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("Filter photos",style=MaterialTheme.typography.titleLarge)
+            val gridDensity by timeline.density.collectAsStateWithLifecycle()
+            GridDensityControls(gridDensity) { timeline.changeDensity(it) }
             if(tab==0) TextButton(onClick={ showFilters=false;jumpToDate=true },modifier=Modifier.heightIn(min=48.dp).testTag("timeline:jump")) { Text("Jump to date") }
             listOf("All","Favorites","Offline","Videos","Edits","Archive").forEach { option ->
                 FilterChip(selected=filter==option,onClick={ filter=option },label={ Text(option) })

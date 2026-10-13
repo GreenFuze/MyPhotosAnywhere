@@ -68,7 +68,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                 Row(Modifier.padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     if(group.thumbnail.isNotBlank()) AsyncImage(File(group.thumbnail),null,Modifier.size(64.dp))
                     Column { Text(group.label.name,style=MaterialTheme.typography.titleMedium)
-                        Text("${group.photos} photos · imported label",style=MaterialTheme.typography.bodySmall)
+                        Text("${group.photos} ${if(group.photos==1) "photo" else "photos"} · imported label",style=MaterialTheme.typography.bodySmall)
                         Text(sources.find { it.key==group.label.binding }?.let { "${it.folderName} · ${it.email}" } ?: if(group.label.binding==null) "Imported source not recorded" else "Original import source disconnected",style=MaterialTheme.typography.bodySmall)
                     }
                 }

@@ -54,6 +54,10 @@ class TimelineScaleTest {
                 var started=System.nanoTime()
                 val first=repository.page(query,null,TimelineDirection.AFTER,90)
                 val firstMillis=(System.nanoTime()-started)/1000000.0
+                started=System.nanoTime()
+                val dateRange=repository.dateRange(query)
+                val dateRangeMillis=(System.nanoTime()-started)/1000000.0
+                assertEquals(TimelineDateRange(0,size-1L),dateRange)
                 assertEquals(90,first.size)
                 started=System.nanoTime()
                 val middle=repository.seek(query,size/2L)
@@ -96,7 +100,7 @@ class TimelineScaleTest {
                 assertEquals(9,database.openHelper.readableDatabase.version)
                 val memoryAfter=Debug.getPss()
                 results.put(JSONObject().put("items",size).put("firstPageMs",firstMillis).put("seekMs",seekMillis)
-                    .put("aroundPageMs",aroundMillis).put("snapshotMs",snapshotMillis).put("duringImportMs",duringImportMillis).put("snapshotImportMs",snapshotImportMillis)
+                    .put("dateRangeMs",dateRangeMillis).put("aroundPageMs",aroundMillis).put("snapshotMs",snapshotMillis).put("duringImportMs",duringImportMillis).put("snapshotImportMs",snapshotImportMillis)
                     .put("pssBeforeKb",memoryBefore).put("pssAfterKb",memoryAfter)
                     .put("pageBudget",TimelinePagingSource.CONFIG.maxSize).put("pageRows",90)
                     .put("indexBytes",directory.listFiles().orEmpty().sumOf { it.length() }))

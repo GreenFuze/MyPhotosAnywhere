@@ -1,5 +1,7 @@
 package com.myphotosanywhere.mpa.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -104,7 +106,8 @@ fun ShellBottomBar(selected: ShellDestination,onSelect: (ShellDestination)->Unit
 private fun ShellTab(destination: ShellDestination,@DrawableRes icon: Int,selected: ShellDestination,
     onSelect: (ShellDestination)->Unit,modifier: Modifier) {
     val active=destination==selected
-    Surface(color=if(active) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+    val color by animateColorAsState(if(active) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,tween(150),label="Navigation selection")
+    Surface(color=color,
         contentColor=if(active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
         shape=RoundedCornerShape(28.dp),modifier=modifier) {
         Row(Modifier.selectable(active,role=Role.Tab,onClick={ onSelect(destination) })

@@ -21,11 +21,23 @@ internal data class TimelineItem(val entry: TimelineEntry,val generation: Long)
 internal class TimelineViewModel(application: Application,private val saved: SavedStateHandle): AndroidViewModel(application) {
     private val app=application as MpaApplication
     val repository=app.timeline
+    val density=app.galleryPresentation.density
+    fun changeDensity(value: GridDensity,viewport: TimelineAnchor?=anchor()) {
+        if(value==density.value) return
+        if(viewport!=null) saved[anchorName(request.value.query)]=anchorBundle(viewport.cursor,viewport.offset)
+        observingAnchor=false
+        viewModelScope.launch {
+            try { app.galleryPresentation.update(value) }
+            catch(cancelled: CancellationException) { throw cancelled }
+            catch(error: java.io.IOException) { _message.value=error.message ?: "Cannot save grid density.";observingAnchor=true }
+        }
+    }
     private data class Request(val query: TimelineQuery,val cursor: TimelineCursor?,val generation: Long=0)
     private val request=MutableStateFlow(Request(TimelineQuery(),null))
     private var configured=false
     private var observingAnchor=false
     private var viewerJob: Job?=null
+    private var jumpJob: Job?=null
     private val _viewer=MutableStateFlow<TimelineViewerState?>(null)
     val viewer=_viewer.asStateFlow()
     val restoration=request.map { it.generation }.stateIn(viewModelScope,SharingStarted.Eagerly,0L)
@@ -93,12 +105,13 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
     }
 
     fun jump(date: LocalDate,zone: ZoneId) {
-        viewModelScope.launch {
+        jumpJob?.cancel()
+        jumpJob=viewModelScope.launch {
             try {
                 val current=request.value
                 val cursor=repository.seek(current.query,date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
                 if(cursor==null) _message.value="No photos on or before this date."
-                else if(request.value.query==current.query) {
+                else if(request.value==current) {
                     saved[anchorName(current.query)]=Bundle().apply { putString("query",queryIdentity(current.query));putString("key",cursor.key);cursor.millis?.let { putLong("millis",it) };putInt("offset",0) }
                     updateRequest(current.copy(cursor=cursor,generation=current.generation+1))
                 }

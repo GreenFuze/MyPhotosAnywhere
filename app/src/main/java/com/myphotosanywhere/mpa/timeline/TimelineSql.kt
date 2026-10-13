@@ -73,6 +73,7 @@ internal class TimelineSql(private val query: TimelineQuery) {
         )
     """.trimIndent()
 
+    fun dateRange()=statement("SELECT MIN(effectiveMillis),MAX(effectiveMillis) FROM filtered")
     fun ordered()=statement("SELECT * FROM filtered ORDER BY effectiveMillis DESC,canonicalKey COLLATE BINARY ASC")
     fun identity(key: String)=statement("SELECT * FROM filtered WHERE canonicalKey=?8",key)
     fun date(beforeExclusive: Long)=statement("SELECT * FROM filtered WHERE effectiveMillis<?8 ORDER BY effectiveMillis DESC,canonicalKey COLLATE BINARY ASC LIMIT 1",beforeExclusive)

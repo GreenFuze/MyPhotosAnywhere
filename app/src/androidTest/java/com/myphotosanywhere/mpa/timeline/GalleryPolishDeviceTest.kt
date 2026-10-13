@@ -1,0 +1,124 @@
+package com.myphotosanywhere.mpa.timeline
+
+import android.graphics.Bitmap
+import android.graphics.Color
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.unit.*
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.myphotosanywhere.mpa.MainActivity
+import com.myphotosanywhere.mpa.MpaApplication
+import com.myphotosanywhere.mpa.data.Photo
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.io.File
+import java.time.YearMonth
+import java.time.ZoneId
+
+@RunWith(AndroidJUnit4::class)
+class GalleryPolishDeviceTest {
+    @get:Rule val compose=createAndroidComposeRule<MainActivity>()
+    private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
+    private fun waitTag(tag: String)=compose.waitUntil(30000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+    private fun columns(value: Int)=compose.waitUntil(15000) {
+        compose.onNodeWithTag("photos:grid").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)=="$value columns"
+    }
+    private fun pinch(out: Boolean) {
+        compose.onNodeWithTag("photos:grid").performTouchInput {
+            val point=Offset(center.x,center.y)
+            val begin=if(out) 60f else 180f;val end=if(out) 180f else 60f
+            down(0,point.copy(x=point.x-begin));down(1,point.copy(x=point.x+begin))
+            moveTo(0,point.copy(x=point.x-end),200);moveTo(1,point.copy(x=point.x+end),200)
+            up(0);up(1)
+        }
+    }
+    @Test fun densityPinchPreservesAnchorRotationSelectionAndViewer()=runBlocking<Unit> {
+        val original=app.galleryPresentation.density.value
+        val file=File.createTempFile("polish-",".png",app.filesDir)
+        val bitmap=Bitmap.createBitmap(200,200,Bitmap.Config.ARGB_8888)
+        try { bitmap.eraseColor(Color.CYAN);file.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it)) } } finally { bitmap.recycle() }
+        val base=YearMonth.of(2090,12).atEndOfMonth().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val photos=(0 until 90).map { i -> Photo("polish-$i","polish-$i.png",file.path,file.path,"image/png",file.length(),base,"polish-sha",capturedAt=base-i*86400000L) }
+        try {
+            app.galleryPresentation.update(GridDensity.DEFAULT);photos.forEach { app.database.photos().insert(it) }
+            waitTag("photo:polish-0");compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:polish-30"));waitTag("photo:polish-30")
+            val before=compose.onNodeWithTag("photo:polish-30").fetchSemanticsNode().boundsInWindow.top
+            pinch(true);columns(2);waitTag("photo:polish-30");compose.waitForIdle()
+            assertEquals(before,compose.onNodeWithTag("photo:polish-30").fetchSemanticsNode().boundsInWindow.top,4f)
+            compose.activityRule.scenario.recreate();columns(2);waitTag("photo:polish-30")
+            screenshotPolish("density-large")
+            compose.onNodeWithTag("photo:polish-30").performTouchInput { longClick() }
+            compose.onNodeWithTag("timeline:date-rail").assertDoesNotExist();pinch(false);assertEquals(GridDensity.LARGE,app.galleryPresentation.density.value)
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+            waitTag("timeline:date-rail");pinch(false);columns(3)
+            compose.onNodeWithTag("photo:polish-30").performClick();waitTag("viewer-screen");compose.onNodeWithTag("viewer-close").performClick();waitTag("photo:polish-30")
+            photos.forEach { assertEquals(it,app.database.photos().find(it.id)?.copy(lastAccess=it.lastAccess)) }
+        } finally { photos.forEach { app.database.photos().find(it.id)?.let { row -> app.database.photos().update(row.copy(archived=true)) } };file.delete();app.galleryPresentation.update(original) }
+    }
+    @Test fun dateRailJumpsDirectlyAndCancelLeavesPosition()=runBlocking<Unit> {
+        val base=YearMonth.of(2080,1).atDay(15).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val photos=listOf(Photo("polish-date-old","date-old.png","","","image/png",1,base,"old",capturedAt=base),Photo("polish-date-new","date-new.png","","","image/png",1,base+86400000L*366,"new",capturedAt=base+86400000L*366))
+        try {
+            photos.forEach { app.database.photos().insert(it) };waitTag("timeline:date-rail")
+            compose.onNodeWithTag("timeline:date-rail").performClick();waitTag("timeline:year")
+            compose.onNodeWithTag("timeline:year").performTextReplacement("2080")
+            compose.onNodeWithTag("timeline:month:1").performScrollTo().performClick();screenshotPolish("date-navigation")
+            compose.onNodeWithTag("timeline:month-jump").performClick();waitTag("photo:polish-date-old")
+            val before=compose.onNodeWithTag("photo:polish-date-old").fetchSemanticsNode().boundsInWindow.top
+            compose.onNodeWithTag("timeline:date-rail").performClick();waitTag("timeline:year");compose.onNodeWithText("Cancel").performClick();compose.waitForIdle()
+            assertEquals(before,compose.onNodeWithTag("photo:polish-date-old").fetchSemanticsNode().boundsInWindow.top,3f)
+            photos.forEach { assertEquals(it,app.database.photos().find(it.id)) }
+        } finally { photos.forEach { app.database.photos().update(it.copy(archived=true)) } }
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
+class GalleryPolishChromeDeviceTest {
+    @get:Rule val compose=createComposeRule()
+    @Test fun largeLightControlsHaveAccessibleAlternatives()=verify(false,LayoutDirection.Ltr)
+    @Test fun largeDarkRtlControlsHaveAccessibleAlternatives()=verify(true,LayoutDirection.Rtl)
+    private fun verify(dark: Boolean,direction: LayoutDirection) {
+        var pixels=0f;var selected=GridDensity.DEFAULT
+        compose.setContent {
+            pixels=LocalDensity.current.density
+            CompositionLocalProvider(LocalDensity provides Density(pixels,2f),LocalLayoutDirection provides direction) {
+                MaterialTheme(colorScheme=if(dark) darkColorScheme() else lightColorScheme()) {
+                    Surface { Column(Modifier.width(320.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(16.dp)) {
+                        GridDensityControls(selected) { selected=it }
+                        MonthNavigationControls(MonthNavigation(YearMonth.of(1998,1),YearMonth.of(2026,12)),YearMonth.of(2024,2)) { }
+                    } }
+                }
+            }
+        }
+        for(value in GridDensity.entries) {
+            val node=compose.onNodeWithTag("density:${value.columns}").performScrollTo().assertIsDisplayed();val rect=node.fetchSemanticsNode().boundsInRoot
+            assertTrue(rect.width>=48*pixels-1);assertTrue(rect.height>=48*pixels-1);node.performClick();assertEquals(value,selected)
+        }
+        compose.onNodeWithTag("timeline:year").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("timeline:month:2").performScrollTo().assertIsDisplayed()
+        screenshotPolish(if(dark) "polish-dark-rtl-large" else "polish-light-large")
+    }
+}
+
+private fun screenshotPolish(name: String) {
+    val instrumentation=InstrumentationRegistry.getInstrumentation();val bitmap=requireNotNull(instrumentation.uiAutomation.takeScreenshot());val context=instrumentation.targetContext
+    try {
+        val values=android.content.ContentValues().apply { put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"$name.png");put(android.provider.MediaStore.MediaColumns.MIME_TYPE,"image/png");put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA") }
+        val uri=requireNotNull(context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,values));requireNotNull(context.contentResolver.openOutputStream(uri)).use { check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it)) }
+    } finally { bitmap.recycle() }
+}

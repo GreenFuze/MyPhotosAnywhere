@@ -6,6 +6,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import com.myphotosanywhere.mpa.selection.*
@@ -64,6 +69,8 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,
     hasSources: Boolean,onConnect: ()->Unit,onClearFilters: ()->Unit,onRefresh: ()->Unit,emptyActionLabel: String="Clear filters") {
     val zone=deviceTimelineZone(model)
+    val density by model.density.collectAsStateWithLifecycle()
+    var dateNavigation by remember(query) { mutableStateOf(false) }
     val rowsFlow=remember(model,zone) {
         model.paging.map { data -> data.map<TimelineItem,TimelineRow> { TimelineRow.Media(it.entry,it.generation) }.insertSeparators { before,after ->
             val media=after as? TimelineRow.Media
@@ -78,9 +85,9 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     val restoration by model.restoration.collectAsStateWithLifecycle()
     val refreshedGeneration by model.refreshedGeneration.collectAsStateWithLifecycle()
     val viewer by model.viewer.collectAsStateWithLifecycle()
-    var restoring by remember(query,restoration,zone) { mutableStateOf(true) }
+    var restoring by remember(query,restoration,zone,density) { mutableStateOf(true) }
     LaunchedEffect(query) { model.configure(query) }
-    LaunchedEffect(query,restoration,zone) {
+    LaunchedEffect(query,restoration,zone,density) {
         val anchor=model.anchor(query)
         if(anchor!=null) {
             snapshotFlow { Triple(rows.itemSnapshotList.items,rows.loadState.refresh,refreshedGeneration) }.first { (items,load,generation) ->
@@ -119,6 +126,13 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             }
         }.filterNotNull().distinctUntilChanged().collect { (entry,offset) -> model.rememberVisibleAnchor(entry,offset,restoration) }
     }
+    fun viewport(): TimelineAnchor?=state.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
+        (if(visible.index in 0 until rows.itemCount) rows.peek(visible.index) as? TimelineRow.Media else null)
+            ?.entry?.let { TimelineAnchor(it.cursor,-visible.offset.y) }
+    }
+    val pinch by rememberUpdatedState<(Float)->Unit> { scale -> model.changeDensity(density.pinch(scale),viewport()) }
+    if(dateNavigation) TimelineDateNavigator(query,model.repository,zone,viewport()?.cursor?.millis,
+        onJump={ dateNavigation=false;model.jump(it,zone) },onClose={ dateNavigation=false })
     Column(modifier) {
         val refresh=rows.loadState.refresh
         val failure=(refresh as? LoadState.Error) ?: (rows.loadState.append as? LoadState.Error) ?: (rows.loadState.prepend as? LoadState.Error)
@@ -126,7 +140,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             Text("Library could not update. Available photos are shown. Retry")
         }
         if(rows.itemCount==0 && (refresh is LoadState.Loading || refresh is LoadState.NotLoading && refreshedGeneration!=restoration)) {
-            LazyVerticalGrid(GridCells.Fixed(3),modifier=Modifier.weight(1f).testTag("timeline:loading"),
+            LazyVerticalGrid(GridCells.Fixed(density.columns),modifier=Modifier.weight(1f).testTag("timeline:loading"),
                 horizontalArrangement=Arrangement.spacedBy(2.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
                 items(18) { Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant)) }
             }
@@ -138,7 +152,26 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 else if(!hasSources) Button(onClick=onConnect) { Text("Connect Google Drive") }
                 else TextButton(onClick=onRefresh) { Text("Refresh library") }
             }
-        } else LazyVerticalGrid(GridCells.Fixed(3),state=state,modifier=Modifier.weight(1f).testTag("photos:grid"),
+        } else Box(Modifier.weight(1f).fillMaxWidth()) {
+        LazyVerticalGrid(GridCells.Fixed(density.columns),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
+            .semantics { stateDescription="${density.columns} columns" }
+            .pointerInput(selection.isEmpty(),selectionLocked) {
+                if(selection.isNotEmpty() || selectionLocked) return@pointerInput
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed=false,pass=PointerEventPass.Initial)
+                    var scale=1f
+                    var transformed=false
+                    do {
+                        val event=awaitPointerEvent(PointerEventPass.Initial)
+                        if(event.changes.count { it.pressed && it.previousPressed }>=2) {
+                            scale*=event.calculateZoom()
+                            if(kotlin.math.abs(scale-1f)>0.08f) transformed=true
+                            if(transformed) event.changes.forEach { it.consume() }
+                        }
+                    } while(event.changes.any { it.pressed })
+                    if(transformed && scale.isFinite() && scale>0) pinch(scale)
+                }
+            },
             contentPadding=PaddingValues(start=2.dp,top=2.dp,end=2.dp,bottom=bottomClearance+2.dp),
             horizontalArrangement=Arrangement.spacedBy(2.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
             items(rows.itemCount,key={ index -> when(val row=rows.peek(index)) {
@@ -164,6 +197,8 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             if(rows.loadState.append is LoadState.Loading) item(span={ GridItemSpan(maxLineSpan) }) {
                 LinearProgressIndicator(Modifier.fillMaxWidth().padding(8.dp))
             }
+        }
+        if(selection.isEmpty() && !selectionLocked) TimelineDateRail(state,rows.itemSnapshotList.items,zone) { dateNavigation=true }
         }
     }
 }

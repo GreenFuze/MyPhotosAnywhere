@@ -20,6 +20,7 @@ class MpaApplication : Application(), androidx.work.Configuration.Provider {
     val repository: PhotoRepository by lazy {
         PhotoRepository(this, database)
     }
+    internal val galleryPresentation by lazy { com.myphotosanywhere.mpa.timeline.GalleryPresentation(this) }
     internal val timeline by lazy { com.myphotosanywhere.mpa.timeline.TimelineRepository(database) }
     internal val viewerSessions by lazy { com.myphotosanywhere.mpa.timeline.ViewerSessionStore(java.io.File(noBackupFilesDir,"viewer-sessions"),timeline,storage) }
     val settings by lazy { com.myphotosanywhere.mpa.core.LibrarySettings(this) }

@@ -50,6 +50,25 @@ class TimelineRepositoryTest {
     }
     private suspend fun rows(query: TimelineQuery=TimelineQuery())=repository.page(query,null,TimelineDirection.AFTER,300)
 
+    @Test fun dateBoundsRespectSourcesVisibilityAndUnknownDates()=runBlocking<Unit> {
+        photo("old",1000);photo("new",3000);photo("hidden",9999,archived=true)
+        cloud("remote",4000,source="a");cloud("unknown",null,source="a");cloud("disconnected",10000,source="disabled")
+        assertEquals(TimelineDateRange(1000,4000),repository.dateRange(TimelineQuery()))
+        assertEquals(TimelineDateRange(4000,4000),repository.dateRange(TimelineQuery(source="a")))
+        assertEquals(TimelineDateRange(9999,9999),repository.dateRange(TimelineQuery("Archive")))
+        assertNull(repository.dateRange(TimelineQuery(source="b")))
+        assertEquals(4000L,rows().first().millis)
+    }
+
+    @Test fun dateBoundsUseRealOriginalsAndMetadataPredicates()=runBlocking<Unit> {
+        val kept=photo("labelled",2000,path="/present/labelled")
+        photo("missing",5000,path="/missing/file");photo("older",1000,path="/present/older")
+        assertEquals(TimelineDateRange(1000,2000),repository.dateRange(TimelineQuery("Offline")))
+        assertEquals(TimelineDateRange(2000,2000),repository.dateRange(TimelineQuery(search="labelled")))
+        assertNull(repository.dateRange(TimelineQuery(search="no match")))
+        assertEquals(kept,db.photos().find(kept.id))
+    }
+
     @Test fun mixedSourcesShareChronologyAndOnlyExplicitLinksCollapse()=runBlocking {
         photo("local",1000);photo("linked",null,source="a",remote="linked")
         cloud("linked",2000,photo="linked");cloud("new",3000);cloud("distinct",500,source="a")
