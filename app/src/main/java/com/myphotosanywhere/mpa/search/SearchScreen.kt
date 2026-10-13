@@ -6,6 +6,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
@@ -51,6 +52,7 @@ internal fun SearchScreen(draft: SearchCriteria,applied: SearchCriteria,recents:
     albums: List<Album>,sources: List<DriveSource>,bottomClearance: Dp,selection: List<SelectionTarget>,
     onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,onFilters: ()->Unit,onPeople: ()->Unit,onPlaces: ()->Unit,
     onAlbums: ()->Unit,onSubmit: ()->Unit,onConnect: ()->Unit,modifier: Modifier=Modifier) {
+    val settings by features.settings.collectAsStateWithLifecycle()
     val zone=deviceTimelineZone(timeline)
     val query=remember(applied,zone) { applied.timeline(zone) }
     Column(modifier.testTag("search:screen")) {
@@ -94,7 +96,7 @@ internal fun SearchScreen(draft: SearchCriteria,applied: SearchCriteria,recents:
                 },"search:category:Videos") }
                 item { Column {
                     CollectionCard("People",R.drawable.ic_shell_people,repository,null,onPeople,"search:category:People")
-                    if(!features.settings.value.faceIndexing) Text("Recognition is off",style=MaterialTheme.typography.bodySmall)
+                    if(!settings.faceIndexing) Text("Recognition is off",style=MaterialTheme.typography.bodySmall)
                 } }
                 item { CollectionCard("Places",R.drawable.ic_shell_places,repository,null,onPlaces,"search:category:Places") }
                 if(albums.isNotEmpty()) item { CollectionCard("Albums",R.drawable.ic_shell_collections,repository,TimelineQuery(album=albums.first().id),onAlbums,"search:category:Albums") }
