@@ -243,7 +243,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                         } }
                     }
                 }
-                2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; albumId=null; sourceKey=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto)
+                2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; albumId=null; sourceKey=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto,onSettings={ navigation.open(ShellDestination.RECOGNITION) })
                 3 -> PlacesScreen(photos,settings.onlineMaps,{ features.updateSettings(settings.copy(onlineMaps=it)) },::selectPhoto)
                 4,7,8,9,10,11,12,13,14,15 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
             }
@@ -272,7 +272,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             Text("Sources",style=MaterialTheme.typography.titleMedium)
             FilterChip(selected=sourceKey==null,onClick={ sourceKey=null },label={ Text("All sources") })
             sources.forEach { source -> FilterChip(selected=sourceKey==source.key,onClick={ sourceKey=source.key },
-                label={ Text("${source.folderName} Ã‚Â· ${source.email}") }) }
+                label={ Text("${source.folderName} · ${source.email}") }) }
             Button(onClick={ showFilters=false },modifier=Modifier.align(Alignment.End)) { Text("Done") }
         }
     }
@@ -301,7 +301,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         onEdit={ viewerId=null; selectedId=it; editorId=it },onDetails={ selectedId=it;viewerDetailsOpen=true }) }
     if(selectedId!=null && selected==null && editorId==null && (viewerId==null || viewerDetailsOpen) && pendingViewKey==null) {
         AlertDialog(onDismissRequest={ selectedId=null;viewerDetailsOpen=false },title={ Text("Photo details") },
-            text={ Text(selectedProblem ?: "Loading photo detailsÃ¢â‚¬Â¦") },
+            text={ Text(selectedProblem ?: "Loading photo details…") },
             confirmButton={ if(selectedProblem!=null) TextButton(onClick={ selectedAttempt++ }) { Text("Retry") } },
             dismissButton={ TextButton(onClick={ selectedId=null;viewerDetailsOpen=false }) { Text("Close") } })
     }

@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import coil.compose.AsyncImage
 import com.myphotosanywhere.mpa.data.*
@@ -23,7 +24,7 @@ import java.io.File
 
 @Composable
 internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<FaceRecord>,enabled: Boolean,
-    onPerson: (String)->Unit,onPhoto: (String)->Unit) {
+    onPerson: (String)->Unit,onPhoto: (String)->Unit,onSettings: ()->Unit) {
     val imported=remember(model) { com.myphotosanywhere.mpa.people.ImportedPeopleRepository(model.app.timeline) }
     var retryImported by remember { mutableIntStateOf(0) }
     val importedState by produceState(com.myphotosanywhere.mpa.people.ImportedPeopleState(),imported,retryImported) {
@@ -54,30 +55,13 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
         naming=ids; selected=ids.toSet(); namingPerson=person; name=person?.name ?: ""
     }
     LazyColumn(Modifier.fillMaxSize().testTag("people-list"),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item {
-            Text("People",style=MaterialTheme.typography.headlineSmall)
-            ScanActions(model)
-            Text("Matching runs on this phone. Face crops and embeddings stay here; names and reviewed regions can be backed up as XMP if enabled in Storage. Matches require your review.")
-            Row {
-                Switch(checked=enabled,onCheckedChange={ model.updateSettings(model.settings.value.copy(faceIndexing=it)) })
-                Text("On-device face indexing",Modifier.padding(12.dp))
-            }
-            if(faces.any { it.cropPath.isBlank() }) Text("Some restored regions need a phone scan to rebuild their previews. Legacy assignments without geometry remain for manual review.",style=MaterialTheme.typography.bodySmall)
-            IndexingControls(model)
-            if(faces.isNotEmpty()) {
-                val unavailable=review.diagnostics.values.count { it.status in listOf(FaceReview.Status.NO_EMBEDDING,FaceReview.Status.INVALID_EMBEDDING,FaceReview.Status.DIFFERENT_MODEL) }
-                if(unavailable>0) Text("$unavailable unassigned faces lack usable matching data. Open Why separate? to check them.")
-                TextButton(enabled=enabled,onClick={ rescanning=true },modifier=Modifier.testTag("rescan-faces")) { Text("Rescan all faces") }
-                Text("Scan now checks new and failed photos. Rescan all faces repeats detection while preserving names and corrections.",style=MaterialTheme.typography.bodySmall)
-            }
-            if(faces.isNotEmpty() || people.isNotEmpty()) TextButton(onClick={ deleting=true }) { Text("Delete people index") }
-        }
+        item { Text("People",style=MaterialTheme.typography.headlineSmall) }
         item {
             Text("Imported people",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })
             Text("Names exported in Takeout. These are photo labels, not confirmed face assignments. Existing named faces stay separate.",style=MaterialTheme.typography.bodySmall)
             if(importedState.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             importedState.error?.let { Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={ retryImported++ }) { Text("Retry imported people") } }
-            if(!importedState.loading && importedState.error==null && importedState.groups.isEmpty()) Text("No exported people labels found in the available photos. Takeout exports may omit them; on-device recognition is separate.",style=MaterialTheme.typography.bodySmall)
+            if(!importedState.loading && importedState.error==null && importedState.groups.isEmpty()) Text("No exported people labels found in the available photos. Only names present in imported JSON are shown; on-device recognition is separate.",style=MaterialTheme.typography.bodySmall)
         }
         items(importedState.groups,key={ it.label.key }) { group ->
             Card(onClick={ onPerson(group.label.key) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("imported-person:${group.label.key}")) {
@@ -85,10 +69,28 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                     if(group.thumbnail.isNotBlank()) AsyncImage(File(group.thumbnail),null,Modifier.size(64.dp))
                     Column { Text(group.label.name,style=MaterialTheme.typography.titleMedium)
                         Text("${group.photos} photos · imported label",style=MaterialTheme.typography.bodySmall)
-                        Text(sources.find { it.key==group.label.binding }?.let { "${it.folderName} · ${it.email}" } ?: "Original import source disconnected",style=MaterialTheme.typography.bodySmall)
+                        Text(sources.find { it.key==group.label.binding }?.let { "${it.folderName} · ${it.email}" } ?: if(group.label.binding==null) "Imported source not recorded" else "Original import source disconnected",style=MaterialTheme.typography.bodySmall)
                     }
                 }
             }
+        }
+        item {
+            Text("On-device faces",style=MaterialTheme.typography.titleMedium)
+            ScanActions(model)
+            Text("Matching runs on this phone. Face crops and embeddings stay here; names and reviewed regions can be backed up as XMP if enabled in Settings > Backup and metadata. Matches require your review.")
+            Row {
+                Switch(modifier=Modifier.semantics { contentDescription="On-device face indexing" },checked=enabled,onCheckedChange={ model.updateSettings(model.settings.value.copy(faceIndexing=it)) })
+                Text("On-device face indexing",Modifier.padding(12.dp))
+            }
+            TextButton(onClick=onSettings,modifier=Modifier.heightIn(min=48.dp)) { Text("Recognition settings") }
+            if(faces.any { it.cropPath.isBlank() }) Text("Some restored regions need a phone scan to rebuild their previews. Legacy assignments without geometry remain for manual review.",style=MaterialTheme.typography.bodySmall)
+            if(faces.isNotEmpty()) {
+                val unavailable=review.diagnostics.values.count { it.status in listOf(FaceReview.Status.NO_EMBEDDING,FaceReview.Status.INVALID_EMBEDDING,FaceReview.Status.DIFFERENT_MODEL) }
+                if(unavailable>0) Text("$unavailable unassigned faces lack usable matching data. Open Why separate? to check them.")
+                TextButton(enabled=enabled,onClick={ rescanning=true },modifier=Modifier.testTag("rescan-faces")) { Text("Rescan all faces") }
+                Text("Scan now checks new and failed photos. Rescan all faces repeats detection while preserving names and corrections.",style=MaterialTheme.typography.bodySmall)
+            }
+            if(faces.isNotEmpty() || people.isNotEmpty()) TextButton(onClick={ deleting=true }) { Text("Delete people index") }
         }
         item { Text("Named faces",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() }) }
         items(people,key={ it.id }) { person ->
@@ -140,7 +142,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
             Text("Names exported in Takeout. These are photo labels, not confirmed face assignments. Existing named faces stay separate.",style=MaterialTheme.typography.bodySmall)
             if(importedState.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             importedState.error?.let { Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={ retryImported++ }) { Text("Retry imported people") } }
-            if(!importedState.loading && importedState.error==null && importedState.groups.isEmpty()) Text("No exported people labels found in the available photos. Takeout exports may omit them; on-device recognition is separate.",style=MaterialTheme.typography.bodySmall)
+            if(!importedState.loading && importedState.error==null && importedState.groups.isEmpty()) Text("No exported people labels found in the available photos. Only names present in imported JSON are shown; on-device recognition is separate.",style=MaterialTheme.typography.bodySmall)
         }
         items(importedState.groups,key={ it.label.key }) { group ->
             Card(onClick={ onPerson(group.label.key) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("imported-person:${group.label.key}")) {
@@ -148,7 +150,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                     if(group.thumbnail.isNotBlank()) AsyncImage(File(group.thumbnail),null,Modifier.size(64.dp))
                     Column { Text(group.label.name,style=MaterialTheme.typography.titleMedium)
                         Text("${group.photos} photos · imported label",style=MaterialTheme.typography.bodySmall)
-                        Text(sources.find { it.key==group.label.binding }?.let { "${it.folderName} · ${it.email}" } ?: "Original import source disconnected",style=MaterialTheme.typography.bodySmall)
+                        Text(sources.find { it.key==group.label.binding }?.let { "${it.folderName} · ${it.email}" } ?: if(group.label.binding==null) "Imported source not recorded" else "Original import source disconnected",style=MaterialTheme.typography.bodySmall)
                     }
                 }
             }

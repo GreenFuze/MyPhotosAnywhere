@@ -16,7 +16,7 @@ fun StorageControls(photos: List<Photo>,model: LibraryFeaturesModel = viewModel(
     Text("Offline storage",style=MaterialTheme.typography.titleLarge)
     val disposable=photos.filter { it.sourceRemoteId!=null && it.originalPath.isNotBlank() }.sumOf { it.bytes }
     val protected=photos.filter { it.sourceRemoteId==null && it.originalPath.isNotBlank() }.sumOf { it.bytes }
-    Text("%.1f MiB protected imports and edits Â· %.1f MiB downloaded originals".format(protected/(1024.0*1024),disposable/(1024.0*1024)))
+    Text("%.1f MiB protected imports and edits · %.1f MiB downloaded originals".format(protected/(1024.0*1024),disposable/(1024.0*1024)))
     Text("Disposable original budget",style=MaterialTheme.typography.titleMedium)
     FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         listOf(512L,2048L,5120L).forEach { mib -> FilterChip(selected=settings.originalBudget==mib*1024*1024,

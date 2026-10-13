@@ -234,7 +234,7 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
                     val value=it; model.run { model.app.takeoutMetadata.enable(source.key,value); enabled=value }
                 }); Text("Convert and clean up Google metadata in ${source.folderName}") }
                 val records=sidecars.filter { it.binding==source.key }
-                Text("${records.count { it.state=="COMPLETE" }} converted Ã‚Â· ${records.count { it.state!="COMPLETE" && it.state!="GONE" }} pending/review")
+                Text("${records.count { it.state=="COMPLETE" }} converted · ${records.count { it.state!="COMPLETE" && it.state!="GONE" }} pending/review")
                 records.filter { it.error!=null }.take(3).forEach { Text("${it.name}: ${it.error}",style=MaterialTheme.typography.bodySmall) }
                 TextButton(enabled=!busy && enabled,onClick={ model.run { model.app.takeoutMetadata.retry(source.key) } }) { Text("Retry metadata conversion") }
             }
@@ -251,13 +251,13 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
         AlertDialog(onDismissRequest={ preview=null },title={ Text("Import preview") },text={
             LazyColumn(Modifier.heightIn(max=480.dp)) {
                 item {
-                Text("${entries.count { it.selected }} selected Ã‚Â· %.1f MiB known media size".format(entries.filter { it.selected }.sumOf { it.size }/(1024.0*1024)))
+                Text("${entries.count { it.selected }} selected · %.1f MiB known media size".format(entries.filter { it.selected }.sumOf { it.size }/(1024.0*1024)))
                 Text("Picker sizes are unknown until downloaded. Exact duplicates are checked against verified bytes in this destination before upload.")
                 }
                 items(entries,key={ it.id }) { item ->
                     Row { Checkbox(item.selected,{ selected -> model.run { model.app.imports.select(item.id,selected) } },
                         enabled=!busy && job?.state in listOf("PREVIEW","PAUSED","FAILED") && item.state !in listOf("COMPLETE","UNSUPPORTED","MATCHED","UNRESOLVED","INFORMATION"))
-                        Column { Text(item.path.take(250)); Text("${item.state.lowercase()} Ã‚Â· ${if(item.metadata!=null) "metadata present" else "no supplemental metadata"}",style=MaterialTheme.typography.bodySmall) }
+                        Column { Text(item.path.take(250)); Text("${item.state.lowercase()} · ${if(item.metadata!=null) "metadata present" else "no supplemental metadata"}",style=MaterialTheme.typography.bodySmall) }
                     }
                     item.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
                     if(item.mime.startsWith("image/") || item.mime.startsWith("video/")) item.metadata?.let { raw ->

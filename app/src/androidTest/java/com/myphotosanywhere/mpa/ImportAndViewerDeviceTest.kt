@@ -98,7 +98,7 @@ class ImportAndViewerDeviceTest {
             app.database.imports().saveJob(ImportJob(id,"synthetic-import-source","TAKEOUT",state="RUNNING"))
             compose.waitUntil(10000) { compose.onAllNodesWithTag("photo:$id").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("photo:$id").performClick()
-            compose.waitUntil(10000) { compose.onAllNodes(hasText("Original Â· 640 Ã— 480",substring=true)).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Original · 640 × 480",substring=true)).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(photo.displayName).assertIsDisplayed()
             fun footer()=compose.onNodeWithTag("viewer-position").fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
             val before=footer()

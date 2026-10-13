@@ -136,7 +136,7 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
                         Switch(checked = current.unmeteredOnly, enabled = !busy, onCheckedChange = model::unmeteredOnly)
                         Text("Transfer on unmetered networks only", style = MaterialTheme.typography.bodySmall)
                     }
-                    Text("${currentBackups.count { it.state == "COMPLETE" }} backed up Â· ${currentBackups.count { it.state != "COMPLETE" }} pending")
+                    Text("${currentBackups.count { it.state == "COMPLETE" }} backed up · ${currentBackups.count { it.state != "COMPLETE" }} pending")
                     if (current.backupEnabled) TextButton(enabled = !busy, onClick = model::retryBackup) { Text("Retry pending backups") }
                 }
             }

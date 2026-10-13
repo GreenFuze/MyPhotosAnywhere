@@ -3,6 +3,8 @@ package com.myphotosanywhere.mpa.management
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -47,8 +49,8 @@ internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,
                     val settings by features.settings.collectAsStateWithLifecycle()
                     ScanActions(features)
                     Text("Recognition is optional and runs on this phone. Enabling it may download connected originals. Imported Takeout names remain photo labels; they are not assigned to faces automatically.")
-                    Row { Switch(checked=settings.faceIndexing,onCheckedChange={ features.updateSettings(settings.copy(faceIndexing=it)) });Text("On-device face indexing",Modifier.padding(12.dp)) }
-                    Row { Switch(checked=settings.objectIndexing,onCheckedChange={ features.updateSettings(settings.copy(objectIndexing=it)) });Text("On-device object and scene labels",Modifier.padding(12.dp)) }
+                    SettingsToggle("On-device face indexing",settings.faceIndexing) { features.updateSettings(settings.copy(faceIndexing=it)) }
+                    SettingsToggle("On-device object and scene labels",settings.objectIndexing) { features.updateSettings(settings.copy(objectIndexing=it)) }
                     IndexingControls(features)
                 }
                 ShellDestination.ANNOTATIONS -> MetadataControls(features)
@@ -56,7 +58,7 @@ internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,
                     val settings by features.settings.collectAsStateWithLifecycle()
                     val context=LocalContext.current
                     Text("Online maps are optional. Opening an online map sends map requests to its provider. Place photos and indexed locations remain browsable without it.")
-                    Row { Switch(checked=settings.onlineMaps,onCheckedChange={ features.updateSettings(settings.copy(onlineMaps=it)) });Text("Allow online maps",Modifier.padding(12.dp)) }
+                    SettingsToggle("Allow online maps",settings.onlineMaps) { features.updateSettings(settings.copy(onlineMaps=it)) }
                     TextButton(onClick={ context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.fromParts("package",context.packageName,null))) },modifier=Modifier.heightIn(min=48.dp)) { Text("Android permissions and notifications") }
                     Text("Face crops and embeddings stay on this phone. Annotation backup can include names and reviewed regions in your selected Drive folders; configure it under Backup and metadata.")
                 }
@@ -83,4 +85,12 @@ internal fun ManagementSettingsMenu(onOpen: (ShellDestination)->Unit) {
 @Composable
 private fun ManagementLink(destination: ShellDestination,onOpen: (ShellDestination)->Unit) {
     OutlinedButton(onClick={ onOpen(destination) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("management:${destination.title}")) { Text(destination.title) }
+}
+
+@Composable
+private fun SettingsToggle(label: String,checked: Boolean,onChange: (Boolean)->Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min=48.dp).toggleable(checked,role=Role.Switch,onValueChange=onChange).padding(vertical=8.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+        Switch(checked=checked,onCheckedChange=null)
+        Text(label,Modifier.weight(1f))
+    }
 }
