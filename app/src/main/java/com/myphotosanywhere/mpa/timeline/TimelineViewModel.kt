@@ -66,20 +66,23 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
     }
 
     private fun anchorBundle(cursor: TimelineCursor,offset: Int)=Bundle().apply {
-        putString("key",cursor.key);cursor.millis?.let { putLong("millis",it) };putInt("offset",offset)
+        putString("query",queryIdentity(request.value.query));putString("key",cursor.key);cursor.millis?.let { putLong("millis",it) };putInt("offset",offset)
     }
 
-    private fun anchorName(query: TimelineQuery)="timeline:"+listOf(query.filter,query.source,query.album,query.person).joinToString("|") { it?.let { value -> "${value.length}:$value" } ?: "-" }
+    private fun queryIdentity(query: TimelineQuery)=listOf(query.filter,query.source,query.album,query.person,query.search,query.type.name,query.fromMillis?.toString(),query.untilMillis?.toString()).joinToString("|") { it?.let { value -> "${value.length}:$value" } ?: "-" }
+    // Search retains its last anchored query only; typing cannot grow a SavedState bundle without bound.
+    private fun anchorName(query: TimelineQuery)=if(query.search!=null) "search-anchor" else "timeline:"+listOf(query.filter,query.source,query.album,query.person).joinToString("|") { it?.let { value -> "${value.length}:$value" } ?: "-" }
 
     fun anchor(query: TimelineQuery=request.value.query): TimelineAnchor? {
         val value=saved.get<Bundle>(anchorName(query)) ?: return null
+        if(query.search!=null && value.getString("query")!=queryIdentity(query)) return null
         val key=value.getString("key") ?: return null
         return TimelineAnchor(TimelineCursor(if(value.containsKey("millis")) value.getLong("millis") else null,key),value.getInt("offset"))
     }
 
     fun rememberAnchor(entry: TimelineEntry,offset: Int) {
         saved[anchorName(request.value.query)]=Bundle().apply {
-            putString("key",entry.key);entry.millis?.let { putLong("millis",it) };putInt("offset",offset)
+            putString("query",queryIdentity(request.value.query));putString("key",entry.key);entry.millis?.let { putLong("millis",it) };putInt("offset",offset)
         }
     }
 
@@ -96,7 +99,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
                 val cursor=repository.seek(current.query,date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
                 if(cursor==null) _message.value="No photos on or before this date."
                 else if(request.value.query==current.query) {
-                    saved[anchorName(current.query)]=Bundle().apply { putString("key",cursor.key);cursor.millis?.let { putLong("millis",it) };putInt("offset",0) }
+                    saved[anchorName(current.query)]=Bundle().apply { putString("query",queryIdentity(current.query));putString("key",cursor.key);cursor.millis?.let { putLong("millis",it) };putInt("offset",0) }
                     updateRequest(current.copy(cursor=cursor,generation=current.generation+1))
                 }
             } catch(cancelled: CancellationException) { throw cancelled }

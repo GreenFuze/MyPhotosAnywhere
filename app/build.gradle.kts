@@ -12,8 +12,8 @@ android {
         applicationId = "com.myphotosanywhere.mpa"
         minSdk = 26
         targetSdk = 37
-        versionCode = 23
-        versionName = "0.5.12"
+        versionCode = 24
+        versionName = "0.5.13"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     // CI keeps the upgrade key outside every cache and artifact path.
@@ -71,6 +71,7 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:5.5.0")
     testImplementation("org.robolectric:robolectric:4.17")
 }

@@ -5,9 +5,18 @@ import com.myphotosanywhere.mpa.drive.CloudPhoto
 
 /** Query identity is independent of the currently highlighted management account. */
 internal data class TimelineQuery(val filter: String="All",val source: String?=null,
-    val album: String?=null,val person: String?=null) {
-    init { require(filter in setOf("All","Favorites","Offline","Videos","Edits","Archive")) }
+    val album: String?=null,val person: String?=null,val search: String?=null,
+    val type: TimelineMediaType=TimelineMediaType.ALL,val fromMillis: Long?=null,val untilMillis: Long?=null,
+    val searchZone: String=java.time.ZoneId.systemDefault().id) {
+    init {
+        require(filter in setOf("All","Favorites","Offline","Videos","Edits","Archive"))
+        require(search==null || search.length<=256)
+        require(fromMillis==null || untilMillis==null || fromMillis<untilMillis)
+    }
+    val searchText=search?.takeIf(String::isNotBlank)?.let { com.myphotosanywhere.mpa.search.SearchText(it) }
 }
+
+internal enum class TimelineMediaType { ALL, PHOTOS, VIDEOS }
 
 internal enum class TimestampProvenance { CAPTURE, LINKED_CAPTURE, IMPORT, DRIVE_MODIFIED, UNKNOWN }
 
@@ -20,7 +29,7 @@ internal data class TimelineEntry(val key: String,val photoId: String?,val cloud
     val millis: Long?,val provenance: TimestampProvenance,val name: String,val mimeType: String,
     val originalPath: String,val thumbnailPath: String,val thumbnailRevision: Long,
     val bytes: Long,val sha256: String?,val md5: String?,val version: String?,
-    val binding: String?,val remoteId: String?) {
+    val binding: String?,val remoteId: String?,val searchDocument: com.myphotosanywhere.mpa.search.SearchDocument?=null) {
     val cursor get()=TimelineCursor(millis,key)
     init {
         require((photoId!=null && key=="photo:$photoId") || (photoId==null && cloudKey!=null && key=="cloud:$cloudKey"))

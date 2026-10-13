@@ -4,7 +4,7 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 
 /** One global ordering and one visibility policy for paging, seeking and viewer snapshots. */
 internal class TimelineSql(private val query: TimelineQuery) {
-    private val arguments=arrayOf<Any?>(query.source,query.filter,query.album,query.person)
+    private val arguments=arrayOf<Any?>(query.source,query.filter,query.album,query.person,query.type.name,query.fromMillis,query.untilMillis)
     private val projection="""
         WITH connected AS (
           SELECT c.* FROM cloud_photos c JOIN drive_sources s ON s.key=c.bindingKey
@@ -66,25 +66,43 @@ internal class TimelineSql(private val query: TimelineQuery) {
             FROM connected r) c
           WHERE c.removed=0 AND NOT EXISTS(SELECT 1 FROM photos p WHERE p.id=c.photoId)
           AND ?2 IN ('All','Videos') AND (?2<>'Videos' OR c.mimeType LIKE 'video/%') AND ?3 IS NULL AND ?4 IS NULL
+        ), filtered AS (
+          SELECT * FROM entries WHERE (?5='ALL' OR (?5='PHOTOS' AND mimeType LIKE 'image/%') OR (?5='VIDEOS' AND mimeType LIKE 'video/%'))
+          AND (?6 IS NULL OR effectiveMillis>=?6) AND (?7 IS NULL OR effectiveMillis<?7)
         )
     """.trimIndent()
 
-    fun ordered()=statement("SELECT * FROM entries ORDER BY effectiveMillis DESC,canonicalKey COLLATE BINARY ASC")
-    fun identity(key: String)=statement("SELECT * FROM entries WHERE canonicalKey=?5",key)
-    fun date(beforeExclusive: Long)=statement("SELECT * FROM entries WHERE effectiveMillis<?5 ORDER BY effectiveMillis DESC,canonicalKey COLLATE BINARY ASC LIMIT 1",beforeExclusive)
+    fun ordered()=statement("SELECT * FROM filtered ORDER BY effectiveMillis DESC,canonicalKey COLLATE BINARY ASC")
+    fun identity(key: String)=statement("SELECT * FROM filtered WHERE canonicalKey=?8",key)
+    fun date(beforeExclusive: Long)=statement("SELECT * FROM filtered WHERE effectiveMillis<?8 ORDER BY effectiveMillis DESC,canonicalKey COLLATE BINARY ASC LIMIT 1",beforeExclusive)
 
     fun page(cursor: TimelineCursor?,direction: TimelineDirection,limit: Int,inclusive: Boolean=false): SimpleSQLiteQuery {
         require(limit in 1..300)
-        val reverse=direction==TimelineDirection.BEFORE
-        val predicate=if(cursor==null) "1" else if(cursor.millis==null) {
-            if(reverse) "(effectiveMillis IS NOT NULL OR (effectiveMillis IS NULL AND canonicalKey COLLATE BINARY<?5))"
-            else "(effectiveMillis IS NULL AND canonicalKey COLLATE BINARY${if(inclusive) ">=" else ">"}?5)"
-        } else if(reverse) "(effectiveMillis>?5 OR (effectiveMillis=?5 AND canonicalKey COLLATE BINARY<?6))"
-        else "(effectiveMillis IS NULL OR effectiveMillis<?5 OR (effectiveMillis=?5 AND canonicalKey COLLATE BINARY${if(inclusive) ">=" else ">"}?6))"
-        val params=if(cursor==null) emptyArray() else if(cursor.millis==null) arrayOf<Any?>(cursor.key) else arrayOf<Any?>(cursor.millis,cursor.key)
-        val order=if(reverse) "effectiveMillis IS NULL DESC,effectiveMillis ASC,canonicalKey COLLATE BINARY DESC" else "effectiveMillis DESC,canonicalKey COLLATE BINARY ASC"
-        return statement("SELECT * FROM entries WHERE $predicate ORDER BY $order LIMIT ${limit}",*params)
+        return scan(cursor,direction,inclusive,limit)
     }
 
-    private fun statement(tail: String,vararg extra: Any?)=SimpleSQLiteQuery("$projection\n$tail",(arguments.toList()+extra.toList()).toTypedArray())
+    /** A search scans one bounded cursor, never repeats a full sorted query per nonmatching batch. */
+    fun scan(cursor: TimelineCursor?,direction: TimelineDirection,inclusive: Boolean=false,limit: Int?=null): SimpleSQLiteQuery {
+        val reverse=direction==TimelineDirection.BEFORE
+        val predicate=if(cursor==null) "1" else if(cursor.millis==null) {
+            if(reverse) "(effectiveMillis IS NOT NULL OR (effectiveMillis IS NULL AND canonicalKey COLLATE BINARY<?8))"
+            else "(effectiveMillis IS NULL AND canonicalKey COLLATE BINARY${if(inclusive) ">=" else ">"}?8)"
+        } else if(reverse) "(effectiveMillis>?8 OR (effectiveMillis=?8 AND canonicalKey COLLATE BINARY<?9))"
+        else "(effectiveMillis IS NULL OR effectiveMillis<?8 OR (effectiveMillis=?8 AND canonicalKey COLLATE BINARY${if(inclusive) ">=" else ">"}?9))"
+        val params=if(cursor==null) emptyArray() else if(cursor.millis==null) arrayOf<Any?>(cursor.key) else arrayOf<Any?>(cursor.millis,cursor.key)
+        val order=if(reverse) "effectiveMillis IS NULL DESC,effectiveMillis ASC,canonicalKey COLLATE BINARY DESC" else "effectiveMillis DESC,canonicalKey COLLATE BINARY ASC"
+        return statement("SELECT * FROM filtered WHERE $predicate ORDER BY $order${limit?.let { " LIMIT $it" }.orEmpty()}",*params)
+    }
+
+    private fun statement(tail: String,vararg extra: Any?): SimpleSQLiteQuery {
+        val sql=if(query.searchText==null) tail else {
+            // Enrich only the candidate cursor. The first sixteen columns retain the existing viewer-index contract.
+            val order=tail.substringAfter("ORDER BY ","").substringBefore(" LIMIT ").takeIf(String::isNotBlank)
+            """SELECT e.*,p.placeLabel,p.labels,COALESCE(p.capturedAt,p.importedAt),p.importedMetadata,p.favorite,p.parentId,p.latitude,p.longitude,
+                (SELECT group_concat(n.name,' ') FROM faces f JOIN people n ON n.id=f.personId WHERE f.photoId=p.id),
+                (SELECT group_concat(a.name,' ') FROM album_photos m JOIN albums a ON a.id=m.albumId WHERE m.photoId=p.id)
+                FROM ($tail) e LEFT JOIN photos p ON p.id=e.photoId ${order?.let { "ORDER BY $it" }.orEmpty()}"""
+        }
+        return SimpleSQLiteQuery("$projection\n$sql",(arguments.toList()+extra.toList()).toTypedArray())
+    }
 }

@@ -106,6 +106,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 if(nearest!=null) state.scrollToItem(nearest.first,anchor.offset)
             }
         }
+        if(anchor==null && query.search!=null) state.scrollToItem(0)
         model.restored(restoration)
         restoring=false
     }

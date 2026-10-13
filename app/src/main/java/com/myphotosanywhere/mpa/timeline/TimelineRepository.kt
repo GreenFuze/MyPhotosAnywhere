@@ -20,6 +20,7 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
     suspend fun page(query: TimelineQuery,cursor: TimelineCursor?,direction: TimelineDirection,
         limit: Int,inclusive: Boolean=false): List<TimelineEntry> = withContext(Dispatchers.IO) {
         require(limit in 1..300)
+        if(query.searchText!=null) return@withContext searchPage(query,cursor,direction,limit,inclusive)
         val result=ArrayList<TimelineEntry>(limit)
         var boundary=cursor
         var include=inclusive
@@ -41,6 +42,28 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
         result
     }
 
+    private suspend fun searchPage(query: TimelineQuery,cursor: TimelineCursor?,direction: TimelineDirection,limit: Int,inclusive: Boolean): List<TimelineEntry> {
+        val result=ArrayList<TimelineEntry>(limit)
+        database.openHelper.readableDatabase.query(TimelineSql(query).scan(cursor,direction,inclusive)).use { rows ->
+            forwardWindow(rows)
+            while(rows.moveToNext()) {
+                currentCoroutineContext().ensureActive()
+                val entry=read(rows)
+                if(accepts(query,entry)) result.add(entry.copy(searchDocument=null))
+                if(result.size==limit) break
+            }
+        }
+        if(direction==TimelineDirection.BEFORE) result.reverse()
+        return result
+    }
+
+    internal fun forwardWindow(rows: Cursor) {
+        if(android.os.Build.VERSION.SDK_INT>=28 && rows is android.database.sqlite.SQLiteCursor) {
+            rows.window=android.database.CursorWindow("MPA bounded metadata cursor",8L*1024*1024)
+            rows.setFillWindowForwardOnly(true)
+        }
+    }
+
     suspend fun around(query: TimelineQuery,cursor: TimelineCursor?,limit: Int): List<TimelineEntry> {
         if(cursor==null) return page(query,null,TimelineDirection.AFTER,limit)
         val before=page(query,cursor,TimelineDirection.BEFORE,limit/2)
@@ -52,7 +75,7 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
 
     suspend fun find(query: TimelineQuery,key: String): TimelineEntry?=withContext(Dispatchers.IO) {
         database.openHelper.readableDatabase.query(TimelineSql(query).identity(key)).use { rows ->
-            if(rows.moveToFirst()) read(rows).takeIf { query.filter!="Offline" || originalExists(it.originalPath) } else null
+            if(rows.moveToFirst()) read(rows).takeIf { accepts(query,it) }?.copy(searchDocument=null) else null
         }
     }
 
@@ -68,7 +91,7 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
         val candidate=database.openHelper.readableDatabase.query(TimelineSql(query).date(beforeExclusive)).use { rows ->
             if(rows.moveToFirst()) read(rows) else null
         } ?: return@withContext null
-        if(query.filter!="Offline" || originalExists(candidate.originalPath)) candidate.cursor
+        if(accepts(query,candidate)) candidate.cursor
         else page(query,candidate.cursor,TimelineDirection.AFTER,1).firstOrNull()?.cursor
     }
 
@@ -89,14 +112,18 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
     }
 
     internal fun observe(onChanged: ()->Unit): AutoCloseable {
-        val observer=object: InvalidationTracker.Observer("photos","cloud_photos","drive_sources","album_photos","faces") {
+        val observer=object: InvalidationTracker.Observer("photos","cloud_photos","drive_sources","album_photos","faces","people","albums") {
             override fun onInvalidated(tables: Set<String>)=onChanged()
         }
         database.invalidationTracker.addObserver(observer)
         return AutoCloseable { database.invalidationTracker.removeObserver(observer) }
     }
 
-    internal fun accepts(query: TimelineQuery,entry: TimelineEntry)=query.filter!="Offline" || originalExists(entry.originalPath)
+    internal fun accepts(query: TimelineQuery,entry: TimelineEntry): Boolean {
+        if(query.filter=="Offline" && !originalExists(entry.originalPath)) return false
+        val text=query.searchText ?: return true
+        return text.matches(requireNotNull(entry.searchDocument) { "Search cursor lacks metadata" },java.time.ZoneId.of(query.searchZone))
+    }
 
     private fun changes()=callbackFlow {
         val observation=observe { trySend(Unit) }
@@ -114,7 +141,11 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
     internal fun read(row: Cursor)=TimelineEntry(
         row.getString(0),row.nullableString(1),row.nullableString(2),if(row.isNull(3)) null else row.getLong(3),
         TimestampProvenance.valueOf(row.getString(4)),row.getString(5),row.getString(6),row.getString(7),row.getString(8),
-        row.getLong(9),row.getLong(10),row.nullableString(11),row.nullableString(12),row.nullableString(13),row.nullableString(14),row.nullableString(15))
+        row.getLong(9),row.getLong(10),row.nullableString(11),row.nullableString(12),row.nullableString(13),row.nullableString(14),row.nullableString(15),if(row.columnCount<=16) null else com.myphotosanywhere.mpa.search.SearchDocument(
+            row.getString(5),row.getString(6),!row.isNull(1),if(row.isNull(18)) null else row.getLong(18),
+            row.nullableString(16).orEmpty(),row.nullableString(17).orEmpty(),row.nullableString(19).orEmpty(),
+            row.nullableString(24).orEmpty(),row.nullableString(25).orEmpty(),!row.isNull(20) && row.getInt(20)==1,!row.isNull(21),
+            if(row.isNull(22)) null else row.getDouble(22),if(row.isNull(23)) null else row.getDouble(23)))
 
     private fun Cursor.nullableString(index: Int)=if(isNull(index)) null else getString(index)
 }
