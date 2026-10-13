@@ -29,7 +29,7 @@ class SearchDeviceTest {
     private fun model()=compose.runOnIdle { ViewModelProvider(compose.activity)[SearchViewModel::class.java] }
     private fun search(text: String) {
         compose.onNodeWithTag("nav:Search").performClick()
-        compose.onNodeWithTag("search:query").performTextReplacement(text).performImeAction()
+        compose.onNodeWithTag("search:query").performTextReplacement(text);compose.onNodeWithTag("search:query").performImeAction()
     }
     private inner class Fixture(val suffix: String): AutoCloseable {
         val source=DriveSource("search-next-$suffix","search-next-$suffix","search@test","APP_FILES","search-next-$suffix","Search fixture $suffix")
@@ -145,7 +145,7 @@ class SearchDeviceTest {
             runBlocking { app.database.photos().update(fixture.photos[0].copy(originalPath=""));app.database.cloud().savePhoto(fixture.cloud) }
             search("specialfield-offline");waitTag("photo:${fixture.photos[0].id}")
             assertNull(runBlocking { app.database.cloud().download(fixture.cloud.key) })
-            compose.onNodeWithTag("search:query").performTextReplacement("search-next-offline-cloud").performImeAction();waitTag("cloud:${fixture.cloud.key}")
+            compose.onNodeWithTag("search:query").performTextReplacement("search-next-offline-cloud");compose.onNodeWithTag("search:query").performImeAction();waitTag("cloud:${fixture.cloud.key}")
             compose.onNodeWithTag("cloud:${fixture.cloud.key}").performClick();waitTag("viewer-screen")
             compose.onNodeWithTag("viewer-details").assertIsDisplayed();compose.onNodeWithTag("viewer-close").performClick()
             waitTag("cloud:${fixture.cloud.key}");fixture.verify()
@@ -154,7 +154,7 @@ class SearchDeviceTest {
     @Test fun supersededQueryDoesNotReplaceCurrentResultsWithAnOldEmptyState() {
         Fixture("debounce").use { fixture ->
             search("missing-search-next-debounce")
-            compose.onNodeWithTag("search:query").performTextReplacement("search-next-debounce").performImeAction()
+            compose.onNodeWithTag("search:query").performTextReplacement("search-next-debounce");compose.onNodeWithTag("search:query").performImeAction()
             waitTag("photo:${fixture.photos[0].id}");compose.onNodeWithText("No matching photos").assertDoesNotExist();fixture.verify()
         }
     }
