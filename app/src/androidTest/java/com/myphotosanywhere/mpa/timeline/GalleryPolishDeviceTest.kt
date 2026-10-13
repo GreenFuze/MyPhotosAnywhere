@@ -104,7 +104,7 @@ class GalleryPolishDeviceTest {
             compose.waitUntil(30000) {
                 val anchor=compose.runOnUiThread { timeline.anchor() }
                 val ready=timeline.refreshedGeneration.value==timeline.restoration.value
-                val photoBounds=compose.onNodeWithTag("photo:polish-date-old").fetchSemanticsNode().boundsInWindow
+                val photoBounds=compose.onAllNodesWithTag("photo:polish-date-old").fetchSemanticsNodes().singleOrNull()?.boundsInWindow ?: return@waitUntil false
                 val gridBounds=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow
                 ready && anchor?.cursor?.key=="photo:polish-date-old" && anchor.offset==0 && kotlin.math.abs(photoBounds.top-gridBounds.top)<4f
             }
