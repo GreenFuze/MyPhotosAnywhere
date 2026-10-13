@@ -117,6 +117,19 @@ class SearchDeviceTest {
             compose.onNodeWithTag("collections:grid").performScrollToNode(hasTestTag("album:${fixture.album.id}"))
             compose.onNodeWithTag("album:${fixture.album.id}").performClick();waitTag("photo:${fixture.photos[0].id}")
             search("search-next-origin");waitTag("photo:${fixture.photos[0].id}")
+            val other=fixture.album.copy(id="search-other-origin",name="Another search album")
+            try {
+                runBlocking { app.database.library().saveAlbum(other);app.database.library().addToAlbum(AlbumPhoto(other.id,fixture.photos[2].id)) }
+                compose.onNodeWithTag("search:clear").performClick();waitTag("search:suggestions")
+                compose.onNodeWithTag("search:suggestions").performScrollToNode(hasTestTag("search:category:Albums"))
+                compose.onNodeWithTag("search:category:Albums").performClick()
+                compose.onNodeWithTag("collections:grid").performScrollToNode(hasTestTag("album:${other.id}"))
+                compose.onNodeWithTag("album:${other.id}").performClick();waitTag("photo:${fixture.photos[2].id}")
+                compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+                waitTag("collections:grid")
+                compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+                waitTag("search:query")
+            } finally { runBlocking { app.database.library().clearAlbum(other.id);app.database.library().deleteAlbum(other.id) } }
             compose.onNodeWithTag("search:back").performClick();waitTag("photo:${fixture.photos[0].id}")
             compose.onNodeWithText(fixture.album.name).assertExists();compose.onNodeWithTag("photo:${fixture.photos[2].id}").assertDoesNotExist()
             fixture.verify()

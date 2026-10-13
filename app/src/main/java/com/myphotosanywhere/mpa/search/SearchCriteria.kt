@@ -41,3 +41,12 @@ internal class RecentQueries(initial: List<String> = emptyList()) {
     fun clear() { values=emptyList() }
     companion object { const val LIMIT=8 }
 }
+
+/** Search children may open another gallery; retain the original context until Search is exited. */
+internal data class GalleryContext(val filter: String,val source: String?,val album: String?,val person: String?) {
+    init { require(filter in setOf("All","Favorites","Offline","Videos","Edits","Archive")) }
+    fun save()=Bundle().apply { putString("filter",filter);putString("source",source);putString("album",album);putString("person",person) }
+    companion object {
+        fun restore(value: Bundle)=GalleryContext(requireNotNull(value.getString("filter")),value.getString("source"),value.getString("album"),value.getString("person"))
+    }
+}

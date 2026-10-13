@@ -115,6 +115,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     var albumId by rememberSaveable { mutableStateOf<String?>(null) }
     var sourceKey by rememberSaveable { mutableStateOf<String?>(null) }
     var personId by rememberSaveable { mutableStateOf<String?>(null) }
+    var searchOrigin by rememberSaveable { mutableStateOf<Bundle?>(null) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
     val timelineViewer by timeline.viewer.collectAsStateWithLifecycle()
     val timelineMessage by timeline.message.collectAsStateWithLifecycle()
@@ -177,6 +178,10 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             albumId=null;personId=null;filter="All"
         }
         navigation.back()
+        if(navigation.activePrimary!=ShellDestination.SEARCH) searchOrigin?.let { savedOrigin ->
+            val origin=GalleryContext.restore(savedOrigin)
+            filter=origin.filter;sourceKey=origin.source;albumId=origin.album;personId=origin.person;searchOrigin=null
+        }
     }
     BackHandler(enabled=!selecting && selectedId==null && viewerId==null && editorId==null && pendingViewKey==null &&
         !showFilters && navigation.canGoBack,onBack=::back)
@@ -255,7 +260,9 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             else selection.execute(BulkAction(kind,if(kind==BulkKind.REMOVE_ALBUM) albumId else null))
         },modifier=Modifier.align(Alignment.BottomCenter).onSizeChanged { navigationHeight=it.height })
         else ShellBottomBar(navigation.activePrimary,onSelect={ destination ->
-            if(destination.primary && destination!=ShellDestination.SEARCH) { albumId=null;personId=null;filter="All" }
+            if(destination==ShellDestination.SEARCH && navigation.activePrimary!=ShellDestination.SEARCH)
+                searchOrigin=GalleryContext(filter,sourceKey,albumId,personId).save()
+            if(destination.primary && destination!=ShellDestination.SEARCH) { albumId=null;personId=null;filter="All";searchOrigin=null }
             navigation.select(destination)
         },modifier=Modifier.align(Alignment.BottomCenter).testTag("shell:navigation").onSizeChanged { navigationHeight=it.height })
         }

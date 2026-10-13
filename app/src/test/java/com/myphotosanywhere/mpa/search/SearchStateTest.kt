@@ -29,6 +29,10 @@ class SearchStateTest {
         val query=SearchCriteria(dates=SearchDates(day,day)).timeline(ZoneId.of("Pacific/Apia"))
         assertEquals(query.fromMillis,query.untilMillis)
     }
+    @Test fun nestedSearchGalleryOriginSurvivesSavedState() {
+        val origin=GalleryContext("Favorites","account:folder","album","person")
+        assertEquals(origin,GalleryContext.restore(origin.save()))
+    }
     @Test fun savedCriteriaRetainEveryIndependentFilter() {
         val value=SearchCriteria("כינרת",TimelineMediaType.VIDEOS,"Favorites","account:folder",SearchDates(LocalDate.of(2026,1,1),LocalDate.of(2026,2,3)))
         assertEquals(value,SearchCriteria.restore(value.save()));assertTrue(value.filtered);assertTrue(value.browsing)
