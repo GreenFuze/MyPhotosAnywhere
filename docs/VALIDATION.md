@@ -1,3 +1,11 @@
+## MPA 0.5.17: justified photo mosaic
+
+Application `b966cfdd3c1a56f2676f1d23938d765d054728f4` passed 320 unit/integration tests, zero lint findings and 96 native tests on each of API 29/35/37 (288 total), with no failures/errors/skips. Exact CI APK, signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.17.md).
+
+Date-range queries over 100,000 mixed items measured 457.3–1001.0ms across API 29/35/37 CI emulators. Complete timeline, Search and imported-label 10k/100k measurements are attached. Metadata/Offline scans and full viewer-session preparation retain previously documented large-library latency; these are emulator results, not Samsung performance guarantees. Bounded 300-item mosaic planning measured 0.49–4.99ms in those fixtures (planning only, excluding drawing and thumbnail header IO).
+
+Previously approved tooling diagnostics remain documented. S23 Ultra acceptance remains pending; the owner could not reproduce the JPEG crash again, and its cause remains unconfirmed.
+
 ## MPA 0.5.16: floating gallery date
 
 Application `a99a5e96ac7c901f28e530c790c8d5e769a33266` passed 308 unit/integration tests, zero lint findings and 94 native tests on each of API 29/35/37 (282 total), with no failures/errors/skips. Exact CI APK, signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.16.md).
