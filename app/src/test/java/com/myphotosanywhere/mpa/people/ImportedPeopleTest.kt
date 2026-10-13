@@ -80,7 +80,7 @@ class ImportedPeopleTest {
         assertThrows(IllegalArgumentException::class.java) { ImportedPersonLabel.fromKey("takeout-person:!") }
         assertThrows(IllegalArgumentException::class.java) { ImportedPersonLabel("  ",null) }
     }
-    @Test fun providerLabelKeysCannotHijackAnExistingReviewedPersonId()=runBlocking {
+    @Test fun providerLabelKeysCannotHijackAnExistingReviewedPersonId()=runBlocking<Unit> {
         photo("imported",listOf("Sam"));photo("reviewed",emptyList())
         val label=ImportedPersonLabel("Sam","a")
         db.library().savePerson(Person(label.key,"Reviewed identity"));db.library().saveFace(FaceRecord("reviewed-face","reviewed","",null,personId=label.key,corrected=true))

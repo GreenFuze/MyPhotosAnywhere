@@ -117,14 +117,14 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { group.take(4).forEach { face ->
                         AsyncImage(File(face.cropPath),"Detected face",Modifier.size(64.dp).clickable { onPhoto(face.photoId) })
                     } }
-                    TextButton(onClick={ startNaming(ids) }) { Text(if(group.size>1) "Review and name group" else "Name this person") }
+                    TextButton(onClick={ startNaming(ids) },modifier=Modifier.testTag("name-faces:${ids.first()}")) { Text(if(group.size>1) "Review and name group" else "Name this person") }
                     group.forEach { face ->
                         TextButton(onClick={ explaining=face.id },modifier=Modifier.testTag("face-why:${face.id}")) { Text("Why separate?") }
                     }
                 }
             }
         }
-        if(enabled && faces.isEmpty()) item { Text("Enable indexing of connected Drive sources in Storage, or download photos to scan them on this phone. Individual pet recognition is not yet included; cats and dogs are searchable object labels.") }
+        if(enabled && faces.isEmpty()) item { Text("Enable indexing of connected Drive sources in Recognition settings, or download photos to scan them on this phone. Individual pet recognition is not yet included; cats and dogs are searchable object labels.") }
     }
     if(naming.isNotEmpty()) AlertDialog(onDismissRequest={ naming=emptyList() },title={ Text("Name these faces") },
         text={ LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -137,25 +137,6 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                 }
             } }
             item { OutlinedTextField(name,{ if(it.length<=100) name=it },readOnly=namingPerson!=null,label={ Text("Name") }) }
-            item {
-            Text("Imported people",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })
-            Text("Names exported in Takeout. These are photo labels, not confirmed face assignments. Existing named faces stay separate.",style=MaterialTheme.typography.bodySmall)
-            if(importedState.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            importedState.error?.let { Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={ retryImported++ }) { Text("Retry imported people") } }
-            if(!importedState.loading && importedState.error==null && importedState.groups.isEmpty()) Text("No exported people labels found in the available photos. Only names present in imported JSON are shown; on-device recognition is separate.",style=MaterialTheme.typography.bodySmall)
-        }
-        items(importedState.groups,key={ "provider-label:${it.label.key}" }) { group ->
-            Card(onClick={ onImported(group.label.key) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("imported-person:${group.label.key}")) {
-                Row(Modifier.padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                    if(group.thumbnail.isNotBlank()) AsyncImage(File(group.thumbnail),null,Modifier.size(64.dp))
-                    Column { Text(group.label.name,style=MaterialTheme.typography.titleMedium)
-                        Text("${group.photos} photos · imported label",style=MaterialTheme.typography.bodySmall)
-                        Text(sources.find { it.key==group.label.binding }?.let { "${it.folderName} · ${it.email}" } ?: if(group.label.binding==null) "Imported source not recorded" else "Original import source disconnected",style=MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-        }
-        item { Text("Named faces",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() }) }
         items(people,key={ it.id }) { person -> TextButton(enabled=selected.isNotEmpty(),onClick={ model.assign(selected.toList(),person.name,person.id); naming=emptyList() }) { Text("Use ${person.name}") } }
         } },confirmButton={ Button(enabled=name.isNotBlank() && selected.isNotEmpty(),onClick={ model.assign(selected.toList(),name,namingPerson?.id); naming=emptyList() }) { Text("Confirm name") } },
         dismissButton={ TextButton(onClick={ naming=emptyList() }) { Text("Cancel") } })
@@ -171,7 +152,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
         } },confirmButton={ Button(enabled=name.isNotBlank(),onClick={ model.renamePerson(person,name); managing=null }) { Text("Save name") } },
         dismissButton={ TextButton(onClick={ managing=null }) { Text("Close") } }) }
     if(deleting) AlertDialog(onDismissRequest={ deleting=false },title={ Text("Delete people index?") },
-        text={ Text("This removes all local face crops, embeddings, names, and corrections, and turns face indexing off. Your photos are preserved.") },
+        text={ Text("This removes on-device face crops, embeddings, reviewed names and corrections, and turns face indexing off. Imported Takeout photo labels and your photos are preserved.") },
         confirmButton={ TextButton(onClick={ model.deletePeopleIndex(); deleting=false }) { Text("Delete index") } },
         dismissButton={ TextButton(onClick={ deleting=false }) { Text("Cancel") } })
     if(rescanning) AlertDialog(onDismissRequest={ rescanning=false },title={ Text("Rescan all faces?") },

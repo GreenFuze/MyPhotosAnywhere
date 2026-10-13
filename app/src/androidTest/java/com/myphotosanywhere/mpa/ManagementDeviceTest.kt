@@ -72,6 +72,23 @@ class ManagementDeviceTest {
             compose.onNodeWithText("Keep source").performClick();runBlocking { assertEquals(source,app.database.drive().source(source.key)) }
         } finally { runBlocking { app.database.drive().disconnectSource(source.key);app.database.drive().disconnect() } }
     }
+    @Test fun importedLabelsNeverEnterTheReviewedFaceNamingDialog() {
+        val id="management-naming-fixture";val faceId="$id-face"
+        val raw="""{"title":"naming.jpg","photoTakenTime":{"timestamp":"1"},"people":[{"name":"Imported fixture name"}]}"""
+        val codec=TakeoutCodec();val photo=codec.apply(Photo(id,"naming.jpg","","","image/jpeg",1,1,"naming-hash"),codec.parse(raw))
+        try {
+            runBlocking { app.database.photos().insert(photo);app.database.library().saveFace(FaceRecord(faceId,id,"",null)) }
+            compose.onNodeWithTag("nav:Collections").performClick();compose.onNodeWithTag("collections:People").performClick()
+            val features=androidx.lifecycle.ViewModelProvider(compose.activity)[com.myphotosanywhere.mpa.library.LibraryFeaturesModel::class.java]
+            compose.waitUntil(10000) { features.faces.value.any { it.id==faceId } };compose.waitForIdle()
+            compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("name-faces:$faceId"))
+            compose.onNodeWithTag("name-faces:$faceId").performClick();compose.onNodeWithText("Name these faces").assertIsDisplayed()
+            compose.onAllNodes(hasText("Imported people") and hasAnyAncestor(isDialog())).assertCountEquals(0)
+            compose.onAllNodes(hasTestTag("imported-person:${ImportedPersonLabel("Imported fixture name",null).key}") and hasAnyAncestor(isDialog())).assertCountEquals(0)
+            compose.onNodeWithText("Cancel").performClick()
+            runBlocking { assertEquals(photo,app.database.photos().find(id));assertNull(app.database.library().face(faceId)?.personId) }
+        } finally { runBlocking { app.database.library().deletePhotoFaces(id);app.database.photos().update(photo.copy(archived=true)) } }
+    }
     @Test fun takeoutZipPeopleAppearWithoutRecognitionAndBrowseWithPreservedDetailsAndMetadata() {
         val originalSettings=app.settings.state.value
         val file=File(app.cacheDir,"takeout-people-device.png");val archive=File(app.cacheDir,"takeout-people-device.zip")
@@ -93,7 +110,7 @@ class ManagementDeviceTest {
             waitTag("imported-person:${label.key}");compose.onNodeWithTag("imported-person:${label.key}").performScrollTo().assertIsDisplayed()
             screenshotManagement("takeout-imported-people");compose.onNodeWithTag("imported-person:${label.key}").performClick();waitTag("photo:$id")
             compose.onNodeWithTag("photo:$id").performClick();waitTag("viewer-details");compose.onNodeWithTag("viewer-details").performClick()
-            waitTag("details:imported-people");compose.onNodeWithTag("details:imported-people").performScrollTo().assertTextContains("כינרת Exported")
+            waitTag("details:imported-people");compose.onNodeWithTag("details:imported-people").performScrollTo().assertTextEquals("Imported people labels: כינרת Exported, Sam Exported")
             compose.onNodeWithTag("photo-details-close").performClick();compose.onNodeWithTag("viewer-close").performClick();waitTag("photo:$id")
             compose.onNodeWithTag("nav:Search").performClick();compose.onNodeWithTag("search:query").performImeAction()
             compose.waitUntil(10000) {
