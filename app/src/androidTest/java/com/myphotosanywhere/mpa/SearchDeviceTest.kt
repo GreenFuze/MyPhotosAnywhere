@@ -64,6 +64,10 @@ class SearchDeviceTest {
         Fixture("viewer").use { fixture ->
             runBlocking { app.database.cloud().savePhoto(fixture.cloud) }
             search("search-next-viewer");waitTag("photo:${fixture.photos[1].id}")
+            // Mosaic portraits can be taller than squares. Bring the target fully into the
+            // viewport before measuring/tapping; a clipped sliver may sit under navigation.
+            compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:${fixture.photos[1].id}"))
+            compose.onNodeWithTag("photo:${fixture.photos[1].id}").assertIsDisplayed()
             val before=compose.onNodeWithTag("photo:${fixture.photos[1].id}").fetchSemanticsNode().boundsInWindow.top
             val beforeGrid=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow.top
             screenshot("search-results")

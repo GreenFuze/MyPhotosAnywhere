@@ -168,7 +168,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 is TimelineRow.Day -> MosaicInput("day:${row.date}",heading=true)
             } },density.columns,(maxWidth.value-4f).coerceAtLeast(1f),layout)
         }
-        LazyVerticalGrid(GridCells.Fixed(JustifiedMosaic.SLOTS),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
+        LazyVerticalGrid(GridCells.Fixed(if(layout==GalleryLayout.SQUARE) plan.columns else JustifiedMosaic.SLOTS),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
             .semantics { stateDescription="${density.columns} columns";collectionInfo=CollectionInfo(plan.rowCount,plan.columns) }
             .pointerInput(selection.isEmpty(),selectionLocked,restoring) {
                 if(selectionLocked || restoring) return@pointerInput
@@ -192,7 +192,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             items(retained.size,key={ index -> when(val row=retained[index]) {
                 is TimelineRow.Media -> row.entry.key
                 is TimelineRow.Day -> "day:${row.date}"
-            } },span={ index -> GridItemSpan(plan.cells[index].span) },
+            } },span={ index -> GridItemSpan(if(layout==GalleryLayout.SQUARE) { if(plan.cells[index].heading) plan.columns else 1 } else plan.cells[index].span) },
                 contentType={ index -> if(retained[index] is TimelineRow.Day) "date" else "media" }) { index ->
                 // Signal Paging access, but render one immutable row/geometry snapshot together.
                 // A concurrent prepend must never apply another identity's cell dimensions/actions.

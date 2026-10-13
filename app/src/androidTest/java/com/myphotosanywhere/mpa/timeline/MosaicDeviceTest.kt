@@ -30,10 +30,10 @@ class MosaicDeviceTest {
         try { image.eraseColor(color);file.outputStream().use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) } } finally { image.recycle() }
         return file
     }
-    private suspend fun fixture(files: List<File>): List<Photo> {
+    private suspend fun fixture(files: List<File>,prefix: String="mosaic"): List<Photo> {
         val base=Instant.parse("2190-05-15T12:00:00Z").toEpochMilli()
         return (0 until 90).map { i ->
-            val file=files[i%files.size];val id="mosaic-${i.toString().padStart(3,'0')}"
+            val file=files[i%files.size];val id="$prefix-${i.toString().padStart(3,'0')}"
             Photo(id,"$id.png",file.path,file.path,"image/png",file.length(),base,"sha-$i",capturedAt=base-i*60000).also { app.database.photos().insert(it) }
         }
     }
@@ -72,8 +72,8 @@ class MosaicDeviceTest {
         val files=listOf(picture(160,240,Color.BLUE),picture(240,240,Color.GREEN),picture(360,240,Color.RED))
         var photos=emptyList<Photo>();val additions=mutableListOf<Photo>()
         try {
-            app.galleryPresentation.updateLayout(GalleryLayout.MOSAIC);photos=fixture(files);waitPhoto("photo:mosaic-000")
-            val model=timeline();val focused=requireNotNull(app.timeline.find(TimelineQuery(),"photo:mosaic-045"))
+            app.galleryPresentation.updateLayout(GalleryLayout.MOSAIC);photos=fixture(files,"mosaic-continuity");waitPhoto("photo:mosaic-continuity-000")
+            val model=timeline();val focused=requireNotNull(app.timeline.find(TimelineQuery(),"photo:mosaic-continuity-045"))
             compose.runOnUiThread { model.rememberAnchor(focused,0);model.restoreAnchor() }
             waitPhoto(focused.key)
             compose.waitUntil(30000) { compose.onAllNodesWithTag("timeline:date-rail").fetchSemanticsNodes().isNotEmpty() && model.refreshedGeneration.value==model.restoration.value }
@@ -85,8 +85,8 @@ class MosaicDeviceTest {
             compose.waitForIdle();assertEquals(focused.key,compose.runOnUiThread { model.anchor()?.cursor?.key })
             val anchor=compose.runOnUiThread { requireNotNull(model.anchor()) }
             val before=compose.onNodeWithTag(anchor.cursor.key).fetchSemanticsNode().boundsInWindow.top
-            additions+=photos.first().copy(id="mosaic-newer",capturedAt=requireNotNull(photos.first().capturedAt)+60000)
-            additions+=photos.last().copy(id="mosaic-older",capturedAt=requireNotNull(photos.last().capturedAt)-60000)
+            additions+=photos.first().copy(id="mosaic-continuity-newer",capturedAt=requireNotNull(photos.first().capturedAt)+60000)
+            additions+=photos.last().copy(id="mosaic-continuity-older",capturedAt=requireNotNull(photos.last().capturedAt)-60000)
             additions.forEach { app.database.photos().insert(it) }
             val anchorPhoto=requireNotNull(app.database.photos().find(requireNotNull(anchor.cursor.key.removePrefix("photo:"))))
             app.database.photos().update(anchorPhoto.copy(displayName="Reloaded mosaic anchor"))
