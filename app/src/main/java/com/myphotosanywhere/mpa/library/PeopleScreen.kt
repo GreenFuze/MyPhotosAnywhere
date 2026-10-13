@@ -24,7 +24,7 @@ import java.io.File
 
 @Composable
 internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<FaceRecord>,enabled: Boolean,
-    onPerson: (String)->Unit,onPhoto: (String)->Unit,onSettings: ()->Unit) {
+    onPerson: (String)->Unit,onPhoto: (String)->Unit,onImported: (String)->Unit,onSettings: ()->Unit) {
     val imported=remember(model) { com.myphotosanywhere.mpa.people.ImportedPeopleRepository(model.app.timeline) }
     var retryImported by remember { mutableIntStateOf(0) }
     val importedState by produceState(com.myphotosanywhere.mpa.people.ImportedPeopleState(),imported,retryImported) {
@@ -63,8 +63,8 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
             importedState.error?.let { Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={ retryImported++ }) { Text("Retry imported people") } }
             if(!importedState.loading && importedState.error==null && importedState.groups.isEmpty()) Text("No exported people labels found in the available photos. Only names present in imported JSON are shown; on-device recognition is separate.",style=MaterialTheme.typography.bodySmall)
         }
-        items(importedState.groups,key={ it.label.key }) { group ->
-            Card(onClick={ onPerson(group.label.key) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("imported-person:${group.label.key}")) {
+        items(importedState.groups,key={ "provider-label:${it.label.key}" }) { group ->
+            Card(onClick={ onImported(group.label.key) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("imported-person:${group.label.key}")) {
                 Row(Modifier.padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     if(group.thumbnail.isNotBlank()) AsyncImage(File(group.thumbnail),null,Modifier.size(64.dp))
                     Column { Text(group.label.name,style=MaterialTheme.typography.titleMedium)
@@ -93,7 +93,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
             if(faces.isNotEmpty() || people.isNotEmpty()) TextButton(onClick={ deleting=true }) { Text("Delete people index") }
         }
         item { Text("Named faces",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() }) }
-        items(people,key={ it.id }) { person ->
+        items(people,key={ "reviewed-person:${it.id}" }) { person ->
             Card(Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(12.dp),horizontalArrangement=Arrangement.SpaceBetween) {
                     Column(Modifier.weight(1f).clickable { onPerson(person.id) }) {
@@ -144,8 +144,8 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
             importedState.error?.let { Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={ retryImported++ }) { Text("Retry imported people") } }
             if(!importedState.loading && importedState.error==null && importedState.groups.isEmpty()) Text("No exported people labels found in the available photos. Only names present in imported JSON are shown; on-device recognition is separate.",style=MaterialTheme.typography.bodySmall)
         }
-        items(importedState.groups,key={ it.label.key }) { group ->
-            Card(onClick={ onPerson(group.label.key) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("imported-person:${group.label.key}")) {
+        items(importedState.groups,key={ "provider-label:${it.label.key}" }) { group ->
+            Card(onClick={ onImported(group.label.key) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("imported-person:${group.label.key}")) {
                 Row(Modifier.padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     if(group.thumbnail.isNotBlank()) AsyncImage(File(group.thumbnail),null,Modifier.size(64.dp))
                     Column { Text(group.label.name,style=MaterialTheme.typography.titleMedium)

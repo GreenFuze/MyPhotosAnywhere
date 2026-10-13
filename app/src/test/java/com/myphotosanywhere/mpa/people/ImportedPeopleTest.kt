@@ -29,7 +29,7 @@ class ImportedPeopleTest {
         val raw=JsonObject().apply { addProperty("title","$id.jpg");add("photoTakenTime",JsonObject().apply { addProperty("timestamp","1") });add("people",JsonArray().apply { names.forEach { name -> add(JsonObject().apply { addProperty("name",name) }) } }) }.toString()
         val codec=TakeoutCodec();val photo=codec.apply(Photo(id,"$id.jpg","present-$id","thumb-$id","image/jpeg",1,time,"hash-$id",capturedAt=time,sourceBindingKey=binding,archived=archived),codec.parse(raw));db.photos().insert(photo);return photo
     }
-    private suspend fun page(label: ImportedPersonLabel)=timeline.page(TimelineQuery(person=label.key),null,TimelineDirection.AFTER,300)
+    private suspend fun page(label: ImportedPersonLabel)=timeline.page(TimelineQuery(importedPerson=label),null,TimelineDirection.AFTER,300)
     @Test fun existingMetadataBecomesGroupsWithoutMutationOrRecognition()=runBlocking {
         val photo=photo("old",listOf(" כינרת ","כינרת","Alice",""));val before=requireNotNull(db.photos().find(photo.id))
         assertEquals(listOf("Alice","כינרת"),imported.groups().map { it.label.name });assertEquals(listOf(1,1),imported.groups().map { it.photos })
@@ -56,11 +56,11 @@ class ImportedPeopleTest {
         db.drive().saveSource(DriveSource("a","a","a@test","APP_FILES","a","A"))
         db.cloud().savePhoto(CloudPhoto("a:r","a","r","a","removed.jpg","image/jpeg",1,"md5","1",null,100,null,null,photoId="removed",removed=true))
         assertEquals(1,imported.groups().single().photos);assertEquals(listOf(visible.id),page(ImportedPersonLabel("Sam","a")).map { it.photoId })
-        assertEquals(listOf("archived"),timeline.page(TimelineQuery("Archive",person=ImportedPersonLabel("Sam","a").key),null,TimelineDirection.AFTER,10).map { it.photoId })
+        assertEquals(listOf("archived"),timeline.page(TimelineQuery("Archive",importedPerson=ImportedPersonLabel("Sam","a")),null,TimelineDirection.AFTER,10).map { it.photoId })
     }
     @Test fun sparseBidirectionalPagingSeekAndOfflineFilterHaveNoExtraMatches()=runBlocking {
         repeat(35) { photo("p${it.toString().padStart(2,'0')}",if(it%5==0) listOf("Sam") else listOf("Other"),time=it.toLong()) }
-        val q=TimelineQuery(person=ImportedPersonLabel("Sam","a").key);val expected=page(ImportedPersonLabel("Sam","a"));val actual=mutableListOf<TimelineEntry>();var cursor: TimelineCursor?=null
+        val q=TimelineQuery(importedPerson=ImportedPersonLabel("Sam","a"));val expected=page(ImportedPersonLabel("Sam","a"));val actual=mutableListOf<TimelineEntry>();var cursor: TimelineCursor?=null
         while(true) { val rows=timeline.page(q,cursor,TimelineDirection.AFTER,2);if(rows.isEmpty()) break;actual+=rows;cursor=rows.last().cursor }
         assertEquals(expected.map { it.key },actual.map { it.key });assertEquals(7,actual.size);assertTrue(actual.all { it.searchDocument==null })
         assertEquals(expected.dropLast(1).map { it.key },timeline.page(q,actual.last().cursor,TimelineDirection.BEFORE,10).map { it.key })
@@ -69,7 +69,7 @@ class ImportedPeopleTest {
     }
     @Test fun viewerSnapshotRemainsFrozenAcrossImportsAndLabelChanges()=runBlocking {
         photo("one",listOf("Sam"),time=100);photo("two",listOf("Sam"),time=50)
-        val label=ImportedPersonLabel("Sam","a");val q=TimelineQuery(person=label.key);val directory=Files.createTempDirectory("mpa-imported-people").toFile()
+        val label=ImportedPersonLabel("Sam","a");val q=TimelineQuery(importedPerson=label);val directory=Files.createTempDirectory("mpa-imported-people").toFile()
         try { val session=ViewerSessionStore(directory,timeline).prepare(q,page(label).first())
             session.use { assertEquals(2,it.count);photo("new",listOf("Sam"),time=200);assertEquals("one",it.entry(0).photoId);assertEquals("two",it.entry(1).photoId) }
             assertEquals(3,page(label).size)
@@ -79,5 +79,19 @@ class ImportedPeopleTest {
         for(binding in listOf(null,"a/b:source")) { val label=ImportedPersonLabel("כינרת O'Neil_%",binding);assertEquals(label,ImportedPersonLabel.fromKey(label.key)) }
         assertThrows(IllegalArgumentException::class.java) { ImportedPersonLabel.fromKey("takeout-person:!") }
         assertThrows(IllegalArgumentException::class.java) { ImportedPersonLabel("  ",null) }
+    }
+    @Test fun providerLabelKeysCannotHijackAnExistingReviewedPersonId()=runBlocking {
+        photo("imported",listOf("Sam"));photo("reviewed",emptyList())
+        val label=ImportedPersonLabel("Sam","a")
+        db.library().savePerson(Person(label.key,"Reviewed identity"));db.library().saveFace(FaceRecord("reviewed-face","reviewed","",null,personId=label.key,corrected=true))
+        assertEquals(listOf("reviewed"),timeline.page(TimelineQuery(person=label.key),null,TimelineDirection.AFTER,10).map { it.photoId })
+        assertEquals(listOf("imported"),page(label).map { it.photoId });assertEquals(label.key,db.library().face("reviewed-face")?.personId)
+        assertThrows(IllegalArgumentException::class.java) { TimelineQuery(person=label.key,importedPerson=label) }
+    }
+    @Test fun importedOriginRoundTripsSeparatelyFromReviewedIdentity() {
+        val label=ImportedPersonLabel("כינרת","source")
+        val context=com.myphotosanywhere.mpa.search.GalleryContext("All",null,null,null,label.key)
+        assertEquals(context,com.myphotosanywhere.mpa.search.GalleryContext.restore(context.save()))
+        assertNull(context.person);assertEquals(label,ImportedPersonLabel.fromKey(context.importedPerson))
     }
 }

@@ -114,6 +114,8 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     var albumId by rememberSaveable { mutableStateOf<String?>(null) }
     var sourceKey by rememberSaveable { mutableStateOf<String?>(null) }
     var personId by rememberSaveable { mutableStateOf<String?>(null) }
+    var importedPersonKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val importedLabel=remember(importedPersonKey) { importedPersonKey?.let { requireNotNull(com.myphotosanywhere.mpa.people.ImportedPersonLabel.fromKey(it)) } }
     var searchOrigin by rememberSaveable { mutableStateOf<Bundle?>(null) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
     val timelineViewer by timeline.viewer.collectAsStateWithLifecycle()
@@ -174,12 +176,12 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     BackHandler(enabled=selecting && !selectionBusy && selectionResult==null && !selectionAlbums) { selection.clear() }
     fun back() {
         if(tab==0 && navigation.primary==ShellDestination.COLLECTIONS) {
-            albumId=null;personId=null;filter="All"
+            albumId=null;personId=null;importedPersonKey=null;filter="All"
         }
         navigation.back()
         if(navigation.activePrimary!=ShellDestination.SEARCH) searchOrigin?.let { savedOrigin ->
             val origin=GalleryContext.restore(savedOrigin)
-            filter=origin.filter;sourceKey=origin.source;albumId=origin.album;personId=origin.person;searchOrigin=null
+            filter=origin.filter;sourceKey=origin.source;albumId=origin.album;personId=origin.person;importedPersonKey=origin.importedPerson;searchOrigin=null
         }
     }
     BackHandler(enabled=!selecting && selectedId==null && viewerId==null && editorId==null && pendingViewKey==null &&
@@ -187,7 +189,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     BackHandler(enabled=tab==5 && imeVisible && !selecting && !showFilters && searchViewer==null && selectedId==null && editorId==null && pendingViewKey==null) { focusManager.clearFocus(force=true);keyboard?.hide() }
     val title=when(navigation.destination) {
         ShellDestination.PHOTOS -> albums.find { it.id==albumId }?.name ?: people.find { it.id==personId }?.name
-            ?: com.myphotosanywhere.mpa.people.ImportedPersonLabel.fromKey(personId)?.name ?: if(filter=="All") "Photos" else filter
+            ?: importedLabel?.name ?: if(filter=="All") "Photos" else filter
         else -> navigation.destination.title
     }
     var navigationHeight by remember { mutableIntStateOf(0) }
@@ -200,7 +202,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         onStorage={ navigation.open(ShellDestination.STORAGE) },onActivity={ navigation.open(ShellDestination.ACTIVITY) },onImport={ navigation.open(ShellDestination.IMPORTS) },
         onFilters={ showFilters=true },showFilters=tab==0 || tab==5,
         filtersActive=filter!="All" || sourceKey!=null,needsAttention=sync.any { it.error!=null },
-        showTitle=!primaryBrand || filter!="All" || albumId!=null || personId!=null)
+        showTitle=!primaryBrand || filter!="All" || albumId!=null || personId!=null || importedLabel!=null)
     },snackbarHost={ SnackbarHost(snackbar,Modifier.padding(bottom=navigationClearance)) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
         // Browsing scrolls beneath floating navigation. Selection reserves the opaque toolbar viewport.
@@ -209,11 +211,11 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             when(tab) {
                 0 -> {
                     ShellImportActivity(onOpen={ navigation.open(ShellDestination.ACTIVITY) },sync=sync)
-                    TimelineGrid(TimelineQuery(filter,sourceKey,albumId,personId),timeline,features,
-                        if(albumId!=null || personId!=null) collectionGrid else photosGrid,scrollClearance,
+                    TimelineGrid(TimelineQuery(filter,sourceKey,albumId,personId,importedPerson=importedLabel),timeline,features,
+                        if(albumId!=null || personId!=null || importedLabel!=null) collectionGrid else photosGrid,scrollClearance,
                         modifier=Modifier.weight(1f).fillMaxWidth(),selection=selectedTargets,onToggle=selection::toggle,selectionLocked=selectionLocked,hasSources=sources.isNotEmpty(),
                         onConnect={ navigation.open(ShellDestination.STORAGE) },
-                        onClearFilters={ filter="All";sourceKey=null;albumId=null;personId=null },onRefresh=features::refreshCloud)
+                        onClearFilters={ filter="All";sourceKey=null;albumId=null;personId=null;importedPersonKey=null },onRefresh=features::refreshCloud)
                 }
                 5 -> {
                     ShellImportActivity(onOpen={ navigation.open(ShellDestination.ACTIVITY) },sync=sync)
@@ -223,13 +225,13 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                         onAlbums={ navigation.open(ShellDestination.COLLECTIONS) },onSubmit=::submitSearch,
                         onConnect={ navigation.open(ShellDestination.STORAGE) },modifier=Modifier.weight(1f).fillMaxWidth())
                 }
-                1 -> AlbumsScreen(features,albums,collectionsHubGrid,onAlbum={ albumId=it;personId=null;filter="All";navigation.open(ShellDestination.PHOTOS) },
-                    onFavorites={ filter="Favorites";albumId=null;personId=null;navigation.open(ShellDestination.PHOTOS) },
-                    onArchive={ filter="Archive";albumId=null;personId=null;navigation.open(ShellDestination.PHOTOS) },
+                1 -> AlbumsScreen(features,albums,collectionsHubGrid,onAlbum={ albumId=it;personId=null;importedPersonKey=null;filter="All";navigation.open(ShellDestination.PHOTOS) },
+                    onFavorites={ filter="Favorites";albumId=null;personId=null;importedPersonKey=null;navigation.open(ShellDestination.PHOTOS) },
+                    onArchive={ filter="Archive";albumId=null;personId=null;importedPersonKey=null;navigation.open(ShellDestination.PHOTOS) },
                     onActivity={ navigation.open(ShellDestination.AI_ACTIVITY) },
                     onPeople={ navigation.open(ShellDestination.PEOPLE) },onPlaces={ navigation.open(ShellDestination.PLACES) },
-                    onOffline={ filter="Offline";albumId=null;personId=null;navigation.open(ShellDestination.PHOTOS) },
-                    onEdits={ filter="Edits";albumId=null;personId=null;navigation.open(ShellDestination.PHOTOS) },bottomClearance=navigationClearance)
+                    onOffline={ filter="Offline";albumId=null;personId=null;importedPersonKey=null;navigation.open(ShellDestination.PHOTOS) },
+                    onEdits={ filter="Edits";albumId=null;personId=null;importedPersonKey=null;navigation.open(ShellDestination.PHOTOS) },bottomClearance=navigationClearance)
                 6 -> {
                     LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                         if(handoffs.isEmpty()) item { Text("Open a photo and choose Edit with AI. Saved handoffs appear here.") }
@@ -243,7 +245,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                         } }
                     }
                 }
-                2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; albumId=null; sourceKey=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto,onSettings={ navigation.open(ShellDestination.RECOGNITION) })
+                2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; importedPersonKey=null; albumId=null; sourceKey=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto,onImported={ importedPersonKey=it;personId=null;albumId=null;sourceKey=null;filter="All";navigation.open(ShellDestination.PHOTOS) },onSettings={ navigation.open(ShellDestination.RECOGNITION) })
                 3 -> PlacesScreen(photos,settings.onlineMaps,{ features.updateSettings(settings.copy(onlineMaps=it)) },::selectPhoto)
                 4,7,8,9,10,11,12,13,14,15 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
             }
@@ -254,8 +256,8 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         },modifier=Modifier.align(Alignment.BottomCenter).onSizeChanged { navigationHeight=it.height })
         else ShellBottomBar(navigation.activePrimary,onSelect={ destination ->
             if(destination==ShellDestination.SEARCH && navigation.activePrimary!=ShellDestination.SEARCH)
-                searchOrigin=GalleryContext(filter,sourceKey,albumId,personId).save()
-            if(destination.primary && destination!=ShellDestination.SEARCH) { albumId=null;personId=null;filter="All";searchOrigin=null }
+                searchOrigin=GalleryContext(filter,sourceKey,albumId,personId,importedPersonKey).save()
+            if(destination.primary && destination!=ShellDestination.SEARCH) { albumId=null;personId=null;importedPersonKey=null;filter="All";searchOrigin=null }
             navigation.select(destination)
         },modifier=Modifier.align(Alignment.BottomCenter).testTag("shell:navigation").onSizeChanged { navigationHeight=it.height })
         }
@@ -296,7 +298,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     pendingViewKey?.let { key -> DriveOriginalDialog(cloud.find { it.key==key },features,onClose={ pendingViewKey=null;selectedId=null },onReady={
         pendingViewKey=null;selectedId=it;viewerId=it
     }) }
-    viewerId?.let { id -> PhotoViewer(photos.filter { it.id==id || presence.showLocal(it,filter,albumId!=null || personId!=null) },id,features,
+    viewerId?.let { id -> PhotoViewer(photos.filter { it.id==id || presence.showLocal(it,filter,albumId!=null || personId!=null || importedLabel!=null) },id,features,
         onClose={ viewerId=null;selectedId=null;viewerDetailsOpen=false },obscured=viewerDetailsOpen || editorId!=null || showShare,onCurrent={ selectedId=it },
         onEdit={ viewerId=null; selectedId=it; editorId=it },onDetails={ selectedId=it;viewerDetailsOpen=true }) }
     if(selectedId!=null && selected==null && editorId==null && (viewerId==null || viewerDetailsOpen) && pendingViewKey==null) {

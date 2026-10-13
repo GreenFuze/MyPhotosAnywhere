@@ -69,9 +69,9 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
         putString("query",queryIdentity(request.value.query));putString("key",cursor.key);cursor.millis?.let { putLong("millis",it) };putInt("offset",offset)
     }
 
-    private fun queryIdentity(query: TimelineQuery)=listOf(query.filter,query.source,query.album,query.person,query.search,query.type.name,query.fromMillis?.toString(),query.untilMillis?.toString()).joinToString("|") { it?.let { value -> "${value.length}:$value" } ?: "-" }
+    private fun queryIdentity(query: TimelineQuery)=listOf(query.filter,query.source,query.album,query.person,query.search,query.type.name,query.fromMillis?.toString(),query.untilMillis?.toString(),query.importedPerson?.key).joinToString("|") { it?.let { value -> "${value.length}:$value" } ?: "-" }
     // Search retains its last anchored query only; typing cannot grow a SavedState bundle without bound.
-    private fun anchorName(query: TimelineQuery)=if(query.search!=null) "search-anchor" else "timeline:"+listOf(query.filter,query.source,query.album,query.person).joinToString("|") { it?.let { value -> "${value.length}:$value" } ?: "-" }
+    private fun anchorName(query: TimelineQuery)=if(query.importedPerson!=null) "imported-person:"+queryIdentity(query) else if(query.search!=null) "search-anchor" else "timeline:"+listOf(query.filter,query.source,query.album,query.person).joinToString("|") { it?.let { value -> "${value.length}:$value" } ?: "-" }
 
     fun anchor(query: TimelineQuery=request.value.query): TimelineAnchor? {
         val value=saved.get<Bundle>(anchorName(query)) ?: return null

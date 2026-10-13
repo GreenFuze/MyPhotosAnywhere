@@ -95,6 +95,11 @@ class ManagementDeviceTest {
             compose.onNodeWithTag("photo:$id").performClick();waitTag("viewer-details");compose.onNodeWithTag("viewer-details").performClick()
             waitTag("details:imported-people");compose.onNodeWithTag("details:imported-people").performScrollTo().assertTextContains("כינרת Exported")
             compose.onNodeWithTag("photo-details-close").performClick();compose.onNodeWithTag("viewer-close").performClick();waitTag("photo:$id")
+            compose.onNodeWithTag("nav:Search").performClick();compose.onNodeWithTag("search:query").performImeAction()
+            compose.waitUntil(10000) {
+                compose.runOnUiThread { androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true }
+            }
+            back();waitTag("photo:$id")
             compose.activityRule.scenario.recreate();waitTag("photo:$id");back();waitTag("imported-person:${label.key}")
             runBlocking { assertEquals(photo,app.database.photos().find(id));assertFalse(app.database.library().allFaces().any { it.photoId==id }) }
             assertFalse(app.settings.state.value.faceIndexing);assertTrue(archive.isFile)

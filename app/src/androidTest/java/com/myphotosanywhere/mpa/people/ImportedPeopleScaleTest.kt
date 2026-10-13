@@ -32,7 +32,7 @@ class ImportedPeopleScaleTest {
                 } }
                 val repository=TimelineRepository(db);val imported=ImportedPeopleRepository(repository);val before=Debug.getPss();var start=System.nanoTime()
                 val groups=imported.groups();val groupsMs=(System.nanoTime()-start)/1e6;assertEquals(1,groups.size);assertEquals(size/100,groups.single().photos)
-                val query=TimelineQuery(person=groups.single().label.key);start=System.nanoTime();val page=repository.page(query,null,TimelineDirection.AFTER,60);val firstMs=(System.nanoTime()-start)/1e6
+                val query=TimelineQuery(importedPerson=groups.single().label);start=System.nanoTime();val page=repository.page(query,null,TimelineDirection.AFTER,60);val firstMs=(System.nanoTime()-start)/1e6
                 assertEquals(60,page.size);assertTrue(page.all { it.searchDocument==null });start=System.nanoTime()
                 val session=ViewerSessionStore(directory,repository).prepare(query,page[30]);val snapshotMs=(System.nanoTime()-start)/1e6
                 try { assertEquals(size/100,session.count);assertEquals(page[30].key,session.entry(session.initialPage).key)

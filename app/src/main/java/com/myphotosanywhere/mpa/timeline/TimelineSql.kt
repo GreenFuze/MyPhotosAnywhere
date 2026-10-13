@@ -4,7 +4,7 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 
 /** One global ordering and one visibility policy for paging, seeking and viewer snapshots. */
 internal class TimelineSql(private val query: TimelineQuery) {
-    private val arguments=arrayOf<Any?>(query.source,query.filter,query.album,query.person.takeIf { query.importedPerson==null },query.type.name,query.fromMillis,query.untilMillis)
+    private val arguments=arrayOf<Any?>(query.source,query.filter,query.album,query.person,query.type.name,query.fromMillis,query.untilMillis)
     private val projection="""
         WITH connected AS (
           SELECT c.* FROM cloud_photos c JOIN drive_sources s ON s.key=c.bindingKey
