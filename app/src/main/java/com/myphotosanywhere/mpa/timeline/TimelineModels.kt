@@ -11,7 +11,7 @@ internal data class TimelineQuery(val filter: String="All",val source: String?=n
     init {
         require(filter in setOf("All","Favorites","Offline","Videos","Edits","Archive"))
         require(search==null || search.length<=256)
-        require(fromMillis==null || untilMillis==null || fromMillis<untilMillis)
+        require(fromMillis==null || untilMillis==null || fromMillis<=untilMillis)
     }
     val searchText=search?.takeIf(String::isNotBlank)?.let { com.myphotosanywhere.mpa.search.SearchText(it) }
 }

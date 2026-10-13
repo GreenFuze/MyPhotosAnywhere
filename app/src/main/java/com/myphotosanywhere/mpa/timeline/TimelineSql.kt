@@ -83,6 +83,7 @@ internal class TimelineSql(private val query: TimelineQuery) {
 
     /** A search scans one bounded cursor, never repeats a full sorted query per nonmatching batch. */
     fun scan(cursor: TimelineCursor?,direction: TimelineDirection,inclusive: Boolean=false,limit: Int?=null): SimpleSQLiteQuery {
+        require(limit==null || limit in 1..300)
         val reverse=direction==TimelineDirection.BEFORE
         val predicate=if(cursor==null) "1" else if(cursor.millis==null) {
             if(reverse) "(effectiveMillis IS NOT NULL OR (effectiveMillis IS NULL AND canonicalKey COLLATE BINARY<?8))"

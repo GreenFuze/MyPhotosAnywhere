@@ -24,6 +24,11 @@ class SearchStateTest {
         assertEquals(23*60*60*1000L,requireNotNull(query.untilMillis)-requireNotNull(query.fromMillis))
         assertEquals("",query.search);assertEquals(TimelineMediaType.ALL,query.type)
     }
+    @Test fun aCalendarDaySkippedByItsTimezoneIsAnEmptyRangeRatherThanACrash() {
+        val day=LocalDate.of(2011,12,30)
+        val query=SearchCriteria(dates=SearchDates(day,day)).timeline(ZoneId.of("Pacific/Apia"))
+        assertEquals(query.fromMillis,query.untilMillis)
+    }
     @Test fun savedCriteriaRetainEveryIndependentFilter() {
         val value=SearchCriteria("כינרת",TimelineMediaType.VIDEOS,"Favorites","account:folder",SearchDates(LocalDate.of(2026,1,1),LocalDate.of(2026,2,3)))
         assertEquals(value,SearchCriteria.restore(value.save()));assertTrue(value.filtered);assertTrue(value.browsing)

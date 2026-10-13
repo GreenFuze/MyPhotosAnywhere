@@ -30,6 +30,10 @@ class SearchDeviceTest {
     private fun search(text: String) {
         compose.onNodeWithTag("nav:Search").performClick()
         compose.onNodeWithTag("search:query").performTextReplacement(text);compose.onNodeWithTag("search:query").performImeAction()
+        compose.waitUntil(10000) {
+            androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+                ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true
+        }
     }
     private inner class Fixture(val suffix: String): AutoCloseable {
         val source=DriveSource("search-next-$suffix","search-next-$suffix","search@test","APP_FILES","search-next-$suffix","Search fixture $suffix")
@@ -136,7 +140,7 @@ class SearchDeviceTest {
             waitTag("search:filter-summary");waitTag("photo:${fixture.photos[1].id}")
             compose.onNodeWithTag("photo:${fixture.photos[0].id}").assertDoesNotExist();compose.onNodeWithTag("photo:${fixture.photos[2].id}").assertDoesNotExist()
             compose.onNodeWithTag("shell:filters").performClick();compose.onNodeWithTag("search:dates").performScrollTo().performClick()
-            compose.onNodeWithText("Use dates").assertExists();compose.onAllNodesWithText("Cancel").onLast().performClick()
+            compose.onNodeWithText("Use dates").assertExists();androidx.test.espresso.Espresso.pressBack()
             compose.onNodeWithTag("search:apply").performScrollTo().performClick();fixture.verify()
         }
     }

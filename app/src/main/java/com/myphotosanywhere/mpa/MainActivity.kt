@@ -180,7 +180,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     }
     BackHandler(enabled=!selecting && selectedId==null && viewerId==null && editorId==null && pendingViewKey==null &&
         !showFilters && navigation.canGoBack,onBack=::back)
-    BackHandler(enabled=tab==5 && imeVisible && !selecting && !showFilters && searchViewer==null) { focusManager.clearFocus(force=true);keyboard?.hide() }
+    BackHandler(enabled=tab==5 && imeVisible && !selecting && !showFilters && searchViewer==null && selectedId==null && editorId==null && pendingViewKey==null) { focusManager.clearFocus(force=true);keyboard?.hide() }
     val title=when(navigation.destination) {
         ShellDestination.PHOTOS -> albums.find { it.id==albumId }?.name ?: people.find { it.id==personId }?.name
             ?: if(filter=="All") "Photos" else filter

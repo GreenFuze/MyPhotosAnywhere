@@ -92,7 +92,10 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
             if(rows.moveToFirst()) read(rows) else null
         } ?: return@withContext null
         if(accepts(query,candidate)) candidate.cursor
-        else page(query,candidate.cursor,TimelineDirection.AFTER,1).firstOrNull()?.cursor
+        else {
+            val dated=if(query.search!=null) query.copy(untilMillis=minOf(query.untilMillis ?: beforeExclusive,beforeExclusive)) else query
+            page(dated,candidate.cursor,TimelineDirection.AFTER,1).firstOrNull()?.cursor
+        }
     }
 
     suspend fun resolve(entry: TimelineEntry): TimelineMedia=withContext(Dispatchers.IO) {
