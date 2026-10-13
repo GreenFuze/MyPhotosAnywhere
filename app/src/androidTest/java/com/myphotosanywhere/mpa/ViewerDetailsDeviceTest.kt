@@ -29,7 +29,12 @@ class ViewerDetailsDeviceTest {
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
     private fun waitTag(tag: String)=compose.waitUntil(30000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
     private fun waitGone(tag: String)=compose.waitUntil(10000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() }
-    private fun currentImage()=compose.onNode(hasTestTag("original-image") and SemanticsMatcher("visible image") { it.boundsInRoot.width>0 && it.boundsInRoot.height>0 })
+    private fun currentImage(): SemanticsNodeInteraction {
+        val matcher=hasTestTag("original-image") and SemanticsMatcher("visible image") { it.boundsInRoot.width>0 && it.boundsInRoot.height>0 }
+        // The filename changes when the pager crosses its midpoint, before the new original is necessarily placed.
+        compose.waitUntil(30000) { compose.onAllNodes(matcher).fetchSemanticsNodes().size==1 }
+        return compose.onNode(matcher)
+    }
     private fun waitName(name: String)=compose.waitUntil(10000) { compose.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty() }
 
     private inner class Fixture(val suffix: String): AutoCloseable {

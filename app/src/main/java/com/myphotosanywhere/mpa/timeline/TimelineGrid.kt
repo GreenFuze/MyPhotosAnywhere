@@ -96,6 +96,10 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             val index=rows.itemSnapshotList.items.indexOfFirst { (it as? TimelineRow.Media)?.entry?.key==anchor.cursor.key }
             if(index>=0) {
                 state.scrollToItem(index,anchor.offset)
+                // A target already visible before a seek can still have old bounds while a new
+                // page/density is applied. Observe a completed layout frame before correcting pixels.
+                withFrameNanos { }
+                withFrameNanos { }
                 // Full-span date rows can change the line selected by scrollToItem.
                 // Correct against the actual media bounds after measurement.
                 val placed=snapshotFlow {
