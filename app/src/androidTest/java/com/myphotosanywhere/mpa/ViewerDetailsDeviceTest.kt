@@ -35,6 +35,7 @@ class ViewerDetailsDeviceTest {
         compose.waitUntil(30000) { compose.onAllNodes(matcher).fetchSemanticsNodes().size==1 }
         return compose.onNode(matcher)
     }
+    private fun systemBack() { InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK) }
     private fun waitName(name: String)=compose.waitUntil(10000) { compose.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty() }
 
     private inner class Fixture(val suffix: String): AutoCloseable {
@@ -79,7 +80,7 @@ class ViewerDetailsDeviceTest {
             compose.activityRule.scenario.recreate();waitTag("photo-details")
             compose.onNodeWithText("Garden").performScrollTo().assertIsDisplayed()
             saveScreenshot("viewer-details")
-            Espresso.pressBack();waitGone("photo-details")
+            systemBack();waitGone("photo-details")
             compose.onNodeWithTag("viewer-screen").assertExists()
             compose.onNodeWithText(fixture.photos[0].displayName).assertExists()
             compose.onNodeWithTag("viewer-favorite").assertIsSelected()
@@ -134,7 +135,7 @@ class ViewerDetailsDeviceTest {
             }
             compose.onNodeWithTag("viewer-details").performClick();waitTag("photo-details")
             compose.onNodeWithTag("details:source").assertExists()
-            Espresso.pressBack();waitGone("photo-details")
+            systemBack();waitGone("photo-details")
             compose.onNodeWithTag("viewer-screen").assertExists()
             compose.onNodeWithTag("viewer-close").performClick()
             compose.onNodeWithTag("nav:Search").assertIsSelected()
@@ -161,7 +162,7 @@ class ViewerDetailsDeviceTest {
             compose.activityRule.scenario.recreate();waitTag("photo-details")
             compose.waitUntil(10000) { compose.onAllNodesWithTag("details:availability").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("details:availability").assertTextEquals("Original unavailable on this device")
-            Espresso.pressBack();waitGone("photo-details")
+            systemBack();waitGone("photo-details")
             compose.onNodeWithTag("viewer-screen").assertExists()
             compose.onNodeWithTag("viewer-edit").assertIsNotEnabled()
             compose.onNodeWithTag("viewer-share").assertIsNotEnabled()
