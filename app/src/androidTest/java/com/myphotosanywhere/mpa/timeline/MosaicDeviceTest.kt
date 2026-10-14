@@ -81,10 +81,14 @@ class MosaicDeviceTest {
                     assertEquals(anchor.cursor.key,compose.runOnUiThread { model.anchor()?.cursor?.key })
                 }
             }
+            android.util.Log.i("MosaicTransitions","Final Mosaic before recreation")
             compose.runOnUiThread { model.changeLayout(GalleryLayout.MOSAIC) }
             compose.waitUntil(30000) { app.galleryPresentation.layout.value==GalleryLayout.MOSAIC && compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() }
+            android.util.Log.i("MosaicTransitions","Recreate activity")
             compose.activityRule.scenario.recreate();waitPhoto(anchor.cursor.key)
+            android.util.Log.i("MosaicTransitions","Open viewer")
             compose.onNodeWithTag("photo:mosaic-000").performClick();compose.waitUntil(30000) { compose.onAllNodesWithTag("viewer-screen").fetchSemanticsNodes().isNotEmpty() }
+            android.util.Log.i("MosaicTransitions","Close viewer")
             compose.onNodeWithTag("viewer-close").performClick();waitPhoto(anchor.cursor.key)
             assertEquals(before,compose.onNodeWithTag(anchor.cursor.key).fetchSemanticsNode().boundsInWindow.top,4f)
             photos.forEach { assertEquals(it,app.database.photos().find(it.id)?.copy(lastAccess=it.lastAccess)) }

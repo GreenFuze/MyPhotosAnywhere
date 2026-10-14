@@ -69,8 +69,10 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,
     hasSources: Boolean,onConnect: ()->Unit,onClearFilters: ()->Unit,onRefresh: ()->Unit,emptyActionLabel: String="Clear filters") {
     val zone=deviceTimelineZone(model)
-    val density by model.density.collectAsStateWithLifecycle()
-    val layout by model.layout.collectAsStateWithLifecycle()
+    // Content/span callbacks must capture one immutable geometry snapshot. A delegated
+    // State read inside an old callback can mix new spans with the preceding slot count.
+    val density=model.density.collectAsStateWithLifecycle().value
+    val layout=model.layout.collectAsStateWithLifecycle().value
     // LazyGridState owns measured placeables as well as scroll coordinates. Never move
     // that cache between incompatible slot structures; restore the canonical model anchor.
     val state=key(density,layout) { rememberLazyGridState() }
