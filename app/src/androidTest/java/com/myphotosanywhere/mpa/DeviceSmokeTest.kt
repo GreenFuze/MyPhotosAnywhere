@@ -103,8 +103,25 @@ class DeviceSmokeTest {
             runBlocking { dao.saveJob(job.copy(error="Connection interrupted · Retrying automatically")) }
             waitText("import-detail:$id","Connection interrupted · Retrying automatically")
             runBlocking { dao.saveJob(job.copy(state="PAUSED",created=Long.MAX_VALUE)) }
-            waitText("import-detail:$id","Paused · Open MPA to resume")
+            waitText("import-detail:$id","Paused · Resume when ready")
             waitText("import-count:$id","1/2 verified in Drive")
+            val legacy="Background import stopped. Open MPA and resume; transfer checkpoints are preserved."
+            runBlocking { dao.saveJob(job.copy(state="FAILED",error=legacy,created=Long.MAX_VALUE)) }
+            waitText("import-detail:$id","Background import stopped. Resume this import; transfer checkpoints are preserved.")
+            waitText("import-count:$id","1/2 verified in Drive")
+            compose.onAllNodesWithText(legacy).assertCountEquals(0)
+            assertEquals(legacy,runBlocking { requireNotNull(dao.job(id)).error })
+            assertEquals(50L,runBlocking { dao.items(id).single { it.id=="$id-pending" }.offset })
+            val recoveryImage=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+            try {
+                val values=android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"import-recovery.png")
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE,"image/png")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA")
+                }
+                val uri=requireNotNull(app.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,values))
+                requireNotNull(app.contentResolver.openOutputStream(uri)).use { check(recoveryImage.compress(Bitmap.CompressFormat.PNG,100,it)) }
+            } finally { recoveryImage.recycle() }
         } finally {
             app.database.openHelper.writableDatabase.execSQL("DELETE FROM import_items WHERE job=?",arrayOf(id))
             (history.map { it.id }+id).forEach {
@@ -447,7 +464,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
-        compose.onNodeWithText("MPA 0.5.21 (32)",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.5.22 (33)",substring=true).assertExists()
         val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
         assertEquals("com.myphotosanywhere.mpa",info.packageName)
         assertTrue(info.sha1.isNotEmpty())

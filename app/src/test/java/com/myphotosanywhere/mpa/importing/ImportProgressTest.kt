@@ -26,12 +26,12 @@ class ImportProgressTest {
         assertEquals("Review selection, then import selected files",ImportProgress.from(job.copy(state="PREVIEW"),stale).detail)
         assertEquals("Choose photos in the Google Photos picker",ImportProgress.from(job.copy(state="PICKING"),emptyList()).detail)
         assertEquals("Downloading Takeout ZIP",ImportProgress.from(job.copy(state="DOWNLOADING"),emptyList()).detail)
-        assertEquals("Open MPA to continue import",ImportProgress.from(job.copy(state="WAITING_FOR_APP"),stale).detail)
+        assertEquals("Resume this import to continue",ImportProgress.from(job.copy(state="WAITING_FOR_APP"),stale).detail)
         assertEquals("Saved error",ImportProgress.from(job.copy(state="PREVIEW",error="Saved error"),stale).detail)
     }
     @Test fun terminalStateOverridesStaleTransferAndZeroTotalsAreValid() {
-        assertEquals("Needs attention · Open MPA to resume",ImportProgress.from(job.copy(state="FAILED"),listOf(item("photo","UPLOADING"))).detail)
-        assertEquals("Paused · Open MPA to resume",ImportProgress.from(job.copy(state="PAUSED"),emptyList()).detail)
+        assertEquals("Import needs attention. Review the error and resume.",ImportProgress.from(job.copy(state="FAILED"),listOf(item("photo","UPLOADING"))).detail)
+        assertEquals("Paused · Resume when ready",ImportProgress.from(job.copy(state="PAUSED"),emptyList()).detail)
         assertEquals(0,ImportProgress.from(job.copy(state="COMPLETE"),emptyList()).total)
     }
     @Test fun batchKeepsWorkingAcrossFilesUntilDurableCompletion() = runBlocking {
@@ -56,4 +56,22 @@ class ImportProgressTest {
         assertEquals(0,progress.complete)
         assertEquals(waiting.error,ImportProgress.from(waiting.copy(state="FAILED"),listOf(item("clip","UPLOADING"))).detail)
     }
+    @Test fun storedLegacyOpenAppInstructionsAreRenderedInContextWithoutChangingTheSavedFailure() {
+        val error="Background import stopped. Open MPA and resume; transfer checkpoints are preserved."
+        val saved=job.copy(state="FAILED",error=error)
+        val detail=ImportProgress.from(saved,emptyList()).detail
+        assertEquals("Background import stopped. Resume this import; transfer checkpoints are preserved.",detail)
+        assertEquals(error,saved.error)
+        assertEquals("Unknown failure: original missing",ImportStatusText.inApp("Unknown failure: original missing"))
+        assertEquals("Android could not start background import. Resume this import to continue; transfer checkpoints are preserved.",
+            ImportStatusText.inApp("Android could not start background import. Reopen MPA to continue; transfer checkpoints are preserved."))
+    }
+    @Test fun onlyExternalStoppedImportNotificationAsksToOpenMpa() {
+        val paused=ImportProgress.from(job.copy(state="PAUSED"),emptyList())
+        assertFalse(paused.detail.contains("Open MPA"))
+        assertTrue(ImportStatusText.notification(paused).endsWith("Open MPA to review this import"))
+        val running=ImportProgress.from(job,emptyList())
+        assertEquals(running.detail,ImportStatusText.notification(running))
+    }
+
 }

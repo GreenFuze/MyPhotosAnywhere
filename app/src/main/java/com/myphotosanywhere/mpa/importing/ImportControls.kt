@@ -129,7 +129,7 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
         val download=downloads.find { it.job==job.id }
         val progress=ImportProgress.from(job,entries)
         ImportJobProgress(job.id,progress)
-        job.error?.takeIf { it!=progress.detail }?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+        job.error?.let(ImportStatusText::inApp)?.takeIf { it!=progress.detail }?.let { Text(it,color=MaterialTheme.colorScheme.error) }
         Text("Destination: ${sources.find { it.key==job.binding }?.let { "${it.folderName} (${it.email})" } ?: "Disconnected original source"}",style=MaterialTheme.typography.bodySmall)
         TextButton(onClick={ expandedJob=if(expandedJob==job.id) null else job.id },modifier=Modifier.heightIn(min=48.dp).testTag("import:details:${job.id}")) { Text(if(expandedJob==job.id) "Hide details" else "View details") }
         if(ImportErrorDismissal.canDismiss(job) && ImportErrorDismissal.hasErrors(job,entries,download))

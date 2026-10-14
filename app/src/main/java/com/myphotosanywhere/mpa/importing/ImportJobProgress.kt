@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 fun ImportJobProgress(id: String, progress: ImportProgress) {
     Column(Modifier.fillMaxWidth().testTag("import-progress:$id"),verticalArrangement=Arrangement.spacedBy(6.dp)) {
         val name=if(progress.kind=="TAKEOUT") "Takeout" else "Photos Picker"
-        val state=if(progress.state=="WAITING_FOR_APP") "waiting for MPA" else progress.state.lowercase()
+        val state=if(progress.state=="WAITING_FOR_APP") "waiting to resume" else progress.state.lowercase()
         Text("$name: $state",style=MaterialTheme.typography.titleSmall)
         Text("${progress.complete}/${progress.total} verified in Drive",modifier=Modifier.testTag("import-count:$id"))
         val bar=Modifier.fillMaxWidth().testTag("import-bar:$id")

@@ -25,10 +25,10 @@ data class ImportProgress(val kind: String, val state: String, val complete: Int
                 "PREVIEW" -> job.error ?: "Review selection, then import selected files"
                 "PICKING" -> job.error ?: "Choose photos in the Google Photos picker"
                 "DOWNLOADING" -> job.error ?: "Downloading Takeout ZIP"
-                "WAITING_FOR_APP" -> job.error ?: "Open MPA to continue import"
+                "WAITING_FOR_APP" -> job.error ?: "Resume this import to continue"
                 "COMPLETE" -> "Import complete"
-                "FAILED" -> job.error ?: "Needs attention · Open MPA to resume"
-                "PAUSED" -> "Paused · Open MPA to resume"
+                "FAILED" -> job.error ?: "Import needs attention. Review the error and resume."
+                "PAUSED" -> "Paused · Resume when ready"
                 "CANCELLED" -> "Remaining import cancelled"
                 else -> job.error ?: when(current?.state) {
                     "STAGING" -> "Preparing ${current.name}"
@@ -38,7 +38,7 @@ data class ImportProgress(val kind: String, val state: String, val complete: Int
                     else -> "Preparing import · Waiting for the next file"
                 }
             }
-            return ImportProgress(job.kind,job.state,selected.count { it.state=="COMPLETE" },selected.size,detail)
+            return ImportProgress(job.kind,job.state,selected.count { it.state=="COMPLETE" },selected.size,ImportStatusText.inApp(detail))
         }
     }
 }
@@ -55,11 +55,12 @@ class ImportNotifications(private val context: Context) {
             .setAction(ACTION_OPEN).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val running=progress.state=="RUNNING"
+        val detail=ImportStatusText.notification(progress)
         return NotificationCompat.Builder(context,CHANNEL)
             .setSmallIcon(R.drawable.ic_import_notification)
             .setContentTitle("MPA · ${if(progress.kind=="TAKEOUT") "Takeout" else "Photos Picker"} import")
-            .setContentText("${progress.complete}/${progress.total} verified in Drive · ${progress.detail}")
-            .setStyle(NotificationCompat.BigTextStyle().bigText("${progress.complete}/${progress.total} verified in Drive\n${progress.detail}"))
+            .setContentText("${progress.complete}/${progress.total} verified in Drive · $detail")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("${progress.complete}/${progress.total} verified in Drive\n$detail"))
             .setContentIntent(open).setOnlyAlertOnce(true).setSilent(true)
             .setOngoing(running).setAutoCancel(!running).setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
