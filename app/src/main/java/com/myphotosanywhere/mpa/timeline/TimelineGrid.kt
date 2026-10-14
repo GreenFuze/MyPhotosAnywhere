@@ -102,15 +102,23 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         if(anchor!=null) {
             val placement=object: TimelinePlacement {
                 override suspend fun place(index: Int,offset: Int) {
-                    state.scrollToItem(index,offset)
+                    state.requestScrollToItem(index,offset)
+                    // Defer the request until the item provider and its new index snapshot are
+                    // applied together; a synchronous remeasure can use the preceding provider.
                     // Complete measurement before correcting against actual media bounds.
                     withFrameNanos { }
                     withFrameNanos { }
                 }
-                override suspend fun align(key: String,offset: Int) {
-                    val placed=snapshotFlow { state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key } }
-                        .filterNotNull().first()
-                    state.scrollBy((placed.offset.y+offset).toFloat())
+                override suspend fun align(key: String,offset: Int): Boolean {
+                    // A completed layout can still reflect the preceding span/index cache.
+                    // Missing placement must retry, even when the retained keys did not change.
+                    val placed=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key } ?: return false
+                    val correction=placed.offset.y+offset
+                    if(correction!=0) state.scrollBy(correction.toFloat())
+                    withFrameNanos { }
+                    withFrameNanos { }
+                    val corrected=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key }
+                    return corrected!=null && kotlin.math.abs(corrected.offset.y+offset)<=1
                 }
             }
             val snapshots=snapshotFlow { Triple(rows.itemSnapshotList.items,rows.loadState.refresh,refreshedGeneration) }
@@ -128,10 +136,10 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 }
                 val nearest=candidates.firstOrNull { (_,entry) -> TimelineOrder.compare(entry.cursor,anchor.cursor)>=0 }
                     ?: candidates.lastOrNull()
-                if(nearest!=null) state.scrollToItem(nearest.first,anchor.offset)
+                if(nearest!=null) state.requestScrollToItem(nearest.first,anchor.offset)
             }
         }
-        if(anchor==null && query.search!=null) state.scrollToItem(0)
+        if(anchor==null && query.search!=null) state.requestScrollToItem(0)
         model.restored(restoration)
         restoring=false
     }

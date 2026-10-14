@@ -14,10 +14,10 @@ class TimelineAnchorRestorerTest {
         val placements=mutableListOf<Pair<Int,Int>>();var cancelled=0;var corrections=0
         val restorer=TimelineAnchorRestorer(object: TimelinePlacement {
             override suspend fun place(index: Int,offset: Int) { placements.add(index to offset) }
-            override suspend fun align(key: String,offset: Int) {
+            override suspend fun align(key: String,offset: Int): Boolean {
                 assertEquals("photo:anchor",key);assertEquals(-8,offset)
                 if(placements.size==1) try { awaitCancellation() } finally { cancelled++ }
-                else corrections++
+                else { corrections++;return true }
             }
         })
         val result=async { restorer.restore(anchor,snapshots) }
@@ -30,7 +30,7 @@ class TimelineAnchorRestorerTest {
         val snapshots=MutableStateFlow(listOf("photo:anchor"));var cancelled=false
         val restorer=TimelineAnchorRestorer(object: TimelinePlacement {
             override suspend fun place(index: Int,offset: Int) { assertEquals(0,index) }
-            override suspend fun align(key: String,offset: Int) { try { awaitCancellation() } finally { cancelled=true } }
+            override suspend fun align(key: String,offset: Int): Boolean { try { awaitCancellation() } finally { cancelled=true } }
         })
         val result=async { restorer.restore(anchor,snapshots) }
         runCurrent();snapshots.value=listOf("other")
@@ -40,9 +40,28 @@ class TimelineAnchorRestorerTest {
         var cancelled=false
         val restorer=TimelineAnchorRestorer(object: TimelinePlacement {
             override suspend fun place(index: Int,offset: Int) { }
-            override suspend fun align(key: String,offset: Int) { try { awaitCancellation() } finally { cancelled=true } }
+            override suspend fun align(key: String,offset: Int): Boolean { try { awaitCancellation() } finally { cancelled=true } }
         })
         val result=async { restorer.restore(anchor,MutableStateFlow(listOf("photo:anchor"))) }
         runCurrent();result.cancelAndJoin();assertTrue(result.isCancelled);assertTrue(cancelled)
     }
+    @Test fun missingPlacementRetriesEvenWhenTheRetainedCanonicalKeysStayUnchanged()=runTest {
+        var attempts=0
+        val restorer=TimelineAnchorRestorer(object: TimelinePlacement {
+            override suspend fun place(index: Int,offset: Int) { assertEquals(1,index);attempts++ }
+            override suspend fun align(key: String,offset: Int): Boolean = attempts>=3
+        })
+        assertTrue(restorer.restore(anchor,MutableStateFlow(listOf("first","photo:anchor"))))
+        assertEquals(3,attempts)
+    }
+    @Test fun impossibleStablePlacementFailsFastInsteadOfShowingUnendingRestoration()=runTest {
+        var attempts=0
+        val restorer=TimelineAnchorRestorer(object: TimelinePlacement {
+            override suspend fun place(index: Int,offset: Int) { attempts++ }
+            override suspend fun align(key: String,offset: Int): Boolean = false
+        })
+        try { restorer.restore(anchor,MutableStateFlow(listOf("photo:anchor")));fail("Must fail the violated layout invariant") }
+        catch(expected: IllegalStateException) { assertTrue(requireNotNull(expected.message).contains("photo:anchor"));assertEquals(8,attempts) }
+    }
+
 }

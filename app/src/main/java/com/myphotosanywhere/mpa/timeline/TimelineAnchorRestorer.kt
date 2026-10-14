@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.transformLatest
 /** A new retained identity snapshot cancels any placement based on its obsolete row index. */
 internal interface TimelinePlacement {
     suspend fun place(index: Int,offset: Int)
-    suspend fun align(key: String,offset: Int)
+    suspend fun align(key: String,offset: Int): Boolean
 }
 
 internal class TimelineAnchorRestorer(private val placement: TimelinePlacement) {
@@ -18,9 +18,12 @@ internal class TimelineAnchorRestorer(private val placement: TimelinePlacement) 
         snapshots.distinctUntilChanged().transformLatest { keys ->
             val index=keys.indexOf(anchor.cursor.key)
             if(index<0) emit(false) else {
-                placement.place(index,anchor.offset)
-                placement.align(anchor.cursor.key,anchor.offset)
-                emit(true)
+                repeat(MAX_ATTEMPTS) {
+                    placement.place(index,anchor.offset)
+                    if(placement.align(anchor.cursor.key,anchor.offset)) { emit(true);return@transformLatest }
+                }
+                error("Canonical anchor ${anchor.cursor.key} could not be placed after $MAX_ATTEMPTS completed layout attempts")
             }
         }.first()
+    private companion object { const val MAX_ATTEMPTS=8 }
 }
