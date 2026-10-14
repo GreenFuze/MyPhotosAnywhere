@@ -33,6 +33,10 @@ EOF
 # A fresh CI host has no previous update check or snapshot. Configure that
 # explicitly, along with metrics opt-out, instead of relying on GUI prompts.
 printf '# Fresh CI host\n' > "$HOME/.android/emu-update-last-check.ini"
+# Compile both APKs before boot: cold Google APIs images can starve their SIM
+# broadcast receiver when Kotlin/DEX compilation competes with system startup.
+# Keep the same strict gate; connectedDebugAndroidTest still executes every test.
+python3 scripts/gradle_checks.py --log build/diagnostics/device-build.log -- assembleDebug assembleDebugAndroidTest
 adb start-server
 emulator -avd mpa -port 5554 -no-window -gpu swiftshader -noaudio -no-boot-anim \
   -camera-back none -camera-front none -no-metrics -no-snapshot \
