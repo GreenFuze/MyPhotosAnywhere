@@ -64,5 +64,10 @@ fi
 adb shell settings put global window_animation_scale 0
 adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
-adb shell input keyevent 82
+# Do not send MENU to the still-starting launcher: its input ANR dialog can
+# steal focus from otherwise healthy app tests. Unlock through WindowManager.
+adb shell settings put system screen_off_timeout 1800000
+adb shell settings put global stay_on_while_plugged_in 7
+adb shell input keyevent KEYCODE_WAKEUP
+adb shell wm dismiss-keyguard
 bash scripts/run_device_checks.sh
