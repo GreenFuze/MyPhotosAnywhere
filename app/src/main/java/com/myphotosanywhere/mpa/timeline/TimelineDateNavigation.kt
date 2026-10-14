@@ -55,7 +55,7 @@ internal fun GridDensityControls(selected: GridDensity,onSelect: (GridDensity)->
 
 @Composable
 internal fun BoxScope.TimelineDateRail(state: LazyGridState,items: List<TimelineRow>,query: TimelineQuery,zone: ZoneId,onOpen: ()->Unit) {
-    val media=remember(items,query) { items.filterIsInstance<TimelineRow.Media>().filter { it.query==query }.associateBy { it.entry.key } }
+    val media=remember(items,query) { items.filter { it.query==query }.associateBy { it.entry.key } }
     val indicator by remember(state,media,zone) { derivedStateOf {
         val layout=state.layoutInfo
         // Choose the first intersecting media row before interpreting its timestamp. Skipping

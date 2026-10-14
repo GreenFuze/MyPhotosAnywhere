@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.timeline
 
+import androidx.room.withTransaction
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -122,6 +123,62 @@ class MosaicDeviceTest {
             assertEquals(photos.size+2,photos.count { app.database.photos().find(it.id)!=null }+additions.count { app.database.photos().find(it.id)!=null })
         } finally { (photos+additions).forEach { app.database.photos().find(it.id)?.let { row -> app.database.photos().update(row.copy(archived=true)) } };files.forEach { it.delete() };app.galleryPresentation.updateLayout(previous);app.galleryPresentation.update(density) }
     }
+    @Test fun calendarBoundariesShareRowsAndDateSeekRetainsViewerAnchor()=runBlocking<Unit> {
+        val previous=app.galleryPresentation.layout.value;val density=app.galleryPresentation.density.value
+        val files=listOf(picture(160,240,Color.BLUE),picture(240,240,Color.GREEN),picture(360,240,Color.RED))
+        val base=Instant.parse("2999-01-02T12:00:00Z").toEpochMilli()
+        val photos=(0 until 90).map { i ->
+            val file=files[i%files.size];val id="continuous-${i.toString().padStart(3,'0')}"
+            Photo(id,"$id.png",file.path,file.path,"image/png",file.length(),base,"continuous-$i",capturedAt=base-i*86_400_000L)
+        }
+        val hashes=files.associateWith { com.myphotosanywhere.mpa.drive.DriveBackupWorker.digest(it,"SHA-256") }
+        try {
+            app.galleryPresentation.update(GridDensity.DEFAULT);app.galleryPresentation.updateLayout(GalleryLayout.MOSAIC)
+            app.database.withTransaction { photos.forEach { app.database.photos().insert(it) } }
+            waitPhoto("photo:continuous-002");val model=timeline()
+            val zone=java.time.ZoneId.systemDefault();val locale=compose.activity.resources.configuration.locales[0]
+            for(layout in listOf(GalleryLayout.MOSAIC,GalleryLayout.SQUARE)) {
+                compose.runOnUiThread { model.changeLayout(layout) }
+                compose.waitUntil(30000) { app.galleryPresentation.layout.value==layout && compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() }
+                compose.waitForIdle()
+                val cells=(0..2).map { compose.onNodeWithTag("photo:continuous-00$it").assertIsDisplayed().fetchSemanticsNode() }
+                cells.forEachIndexed { index,node ->
+                    assertEquals(cells[0].boundsInWindow.top,node.boundsInWindow.top,2f)
+                    assertEquals(0,node.config[SemanticsProperties.CollectionItemInfo].rowIndex)
+                    assertEquals(index,node.config[SemanticsProperties.CollectionItemInfo].columnIndex)
+                    val date=Instant.ofEpochMilli(requireNotNull(photos[index].capturedAt)).atZone(zone).toLocalDate().toString()
+                    compose.onNodeWithTag("photo:continuous-00$index").assert(hasContentDescription(date,substring=true))
+                }
+                compose.onAllNodes(hasAnyAncestor(hasTestTag("photos:grid")) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertCountEquals(0)
+                compose.onNodeWithTag("timeline:date-rail").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,TimelineDateIndicator.from(base,zone).description(locale)))
+                screenshot(if(layout==GalleryLayout.MOSAIC) "continuous-mosaic" else "continuous-square")
+            }
+            val selected=photos[2];val key="photo:${selected.id}"
+            val day=Instant.ofEpochMilli(requireNotNull(selected.capturedAt)).atZone(zone).toLocalDate()
+            compose.runOnUiThread { model.jump(day,zone) }
+            compose.waitUntil(30000) {
+                model.refreshedGeneration.value==model.restoration.value && compose.runOnUiThread { model.anchor()?.cursor?.key }==key &&
+                    compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() &&
+                    compose.onAllNodesWithTag(key).fetchSemanticsNodes().singleOrNull()!=null
+            }
+            compose.waitForIdle()
+            compose.onNodeWithTag("timeline:date-rail").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,TimelineDateIndicator.from(selected.capturedAt,zone).description(locale)))
+            val before=compose.onNodeWithTag(key).fetchSemanticsNode().boundsInWindow.top
+            compose.onNodeWithTag(key).performClick();compose.waitUntil(30000) { compose.onAllNodesWithTag("viewer-screen").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("viewer-close").performClick();waitPhoto(key);compose.waitForIdle()
+            assertEquals(before,compose.onNodeWithTag(key).fetchSemanticsNode().boundsInWindow.top,4f)
+            compose.activityRule.scenario.recreate();waitPhoto(key)
+            compose.waitUntil(30000) { compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() }
+            compose.waitForIdle();assertEquals(before,compose.onNodeWithTag(key).fetchSemanticsNode().boundsInWindow.top,4f)
+            assertEquals(key,compose.runOnUiThread { timeline().anchor()?.cursor?.key })
+            photos.forEach { assertEquals(it,app.database.photos().find(it.id)?.copy(lastAccess=it.lastAccess)) }
+            hashes.forEach { (file,hash) -> assertEquals(hash,com.myphotosanywhere.mpa.drive.DriveBackupWorker.digest(file,"SHA-256")) }
+        } finally {
+            app.database.withTransaction { photos.forEach { app.database.photos().find(it.id)?.let { row -> app.database.photos().update(row.copy(archived=true)) } } }
+            files.forEach { it.delete() };app.galleryPresentation.updateLayout(previous);app.galleryPresentation.update(density)
+        }
+    }
+
     private fun screenshot(name: String) {
         val instrumentation=InstrumentationRegistry.getInstrumentation();val image=requireNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {

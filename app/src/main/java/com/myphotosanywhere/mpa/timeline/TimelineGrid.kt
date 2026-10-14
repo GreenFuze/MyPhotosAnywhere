@@ -31,7 +31,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.insertSeparators
 import androidx.paging.map
 import coil.compose.AsyncImage
 import com.myphotosanywhere.mpa.library.LibraryFeaturesModel
@@ -39,15 +38,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import java.io.File
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 
-internal sealed interface TimelineRow {
-    data class Media(val entry: TimelineEntry,val generation: Long,val query: TimelineQuery,val aspect: Float): TimelineRow
-    data class Day(val date: LocalDate?,val label: String): TimelineRow
-}
+/** One retained photo per grid item; calendar boundaries do not consume layout slots. */
+internal data class TimelineRow(val entry: TimelineEntry,val generation: Long,val query: TimelineQuery,val aspect: Float)
 
 @Composable
 internal fun deviceTimelineZone(model: TimelineViewModel): ZoneId {
@@ -80,19 +74,12 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     // that cache between incompatible slot structures; restore the canonical model anchor.
     val state=key(density,layout) { rememberLazyGridState() }
     var dateNavigation by remember(query) { mutableStateOf(false) }
-    val rowsFlow=remember(model,zone) {
-        model.paging.map { data -> data.map<TimelineItem,TimelineRow> { TimelineRow.Media(it.entry,it.generation,it.query,it.aspect) }.insertSeparators { before,after ->
-            val media=after as? TimelineRow.Media
-            if(media==null) null else {
-                val date=media.entry.millis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
-                val previous=(before as? TimelineRow.Media)?.entry?.millis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
-                if(before==null || previous!=date) TimelineRow.Day(date,date?.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)) ?: "Unknown date") else null
-            }
-        } }
+    val rowsFlow=remember(model) {
+        model.paging.map { data -> data.map { TimelineRow(it.entry,it.generation,it.query,it.aspect) } }
     }
     val rows=rowsFlow.collectAsLazyPagingItems()
     val retained=rows.itemSnapshotList.items
-    val mediaByKey=remember(retained) { retained.filterIsInstance<TimelineRow.Media>().associateBy { it.entry.key } }
+    val mediaByKey=remember(retained) { retained.associateBy { it.entry.key } }
     val restoration by model.restoration.collectAsStateWithLifecycle()
     val refreshedGeneration by model.refreshedGeneration.collectAsStateWithLifecycle()
     val viewer by model.viewer.collectAsStateWithLifecycle()
@@ -151,16 +138,13 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             }
             val snapshots=snapshotFlow { Triple(rows.itemSnapshotList.items,rows.loadState.refresh,refreshedGeneration) }
                 .filter { (items,load,generation) ->
-                    load is LoadState.NotLoading && ((items.isEmpty() && generation==restoration) || items.any { (it as? TimelineRow.Media)?.generation==restoration }) || load is LoadState.Error
-                }.map { (items,_,_) -> items.map { row -> when(row) {
-                    is TimelineRow.Media -> row.entry.key
-                    is TimelineRow.Day -> "day:${row.date}"
-                } } }
+                    load is LoadState.NotLoading && ((items.isEmpty() && generation==restoration) || items.any { it.generation==restoration }) || load is LoadState.Error
+                }.map { (items,_,_) -> items.map { it.entry.key } }
             val restored=TimelineAnchorRestorer(placement).restore(anchor,snapshots)
             if(!restored) {
                 // A real removal restores the nearest remaining identity, never a mutable old index.
                 val candidates=rows.itemSnapshotList.items.mapIndexedNotNull { position,row ->
-                    (row as? TimelineRow.Media)?.takeIf { it.generation==restoration }?.let { position to it.entry }
+                    row.takeIf { it.generation==restoration }?.let { position to it.entry }
                 }
                 val nearest=candidates.firstOrNull { (_,entry) -> TimelineOrder.compare(entry.cursor,anchor.cursor)>=0 }
                     ?: candidates.lastOrNull()
@@ -204,10 +188,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             }
         } else BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
         val plan=remember(retained,density,layout,maxWidth) {
-            JustifiedMosaic().plan(retained.map { row -> when(row) {
-                is TimelineRow.Media -> MosaicInput(row.entry.key,row.aspect)
-                is TimelineRow.Day -> MosaicInput("day:${row.date}",heading=true)
-            } },density.columns,(maxWidth.value-4f).coerceAtLeast(1f),layout)
+            JustifiedMosaic().plan(retained.map { MosaicInput(it.entry.key,it.aspect) },density.columns,(maxWidth.value-4f).coerceAtLeast(1f),layout)
         }
         val physicalColumns=if(layout==GalleryLayout.SQUARE) plan.columns else JustifiedMosaic.SLOTS
         // Square and packed Mosaic use different slot structures. Give their layout nodes
@@ -234,24 +215,18 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             },
             contentPadding=PaddingValues(start=2.dp,top=2.dp,end=2.dp,bottom=bottomClearance+2.dp),
             horizontalArrangement=Arrangement.spacedBy(2.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
-            items(retained.size,key={ index -> when(val row=retained[index]) {
-                is TimelineRow.Media -> row.entry.key
-                is TimelineRow.Day -> "day:${row.date}"
-            } },span={ index -> GridItemSpan(if(layout==GalleryLayout.SQUARE) { if(plan.cells[index].heading) plan.columns else 1 } else plan.cells[index].span) },
-                contentType={ index -> if(retained[index] is TimelineRow.Day) "date" else "media" }) { index ->
+            items(retained.size,key={ index -> retained[index].entry.key },
+                span={ index -> GridItemSpan(if(layout==GalleryLayout.SQUARE) 1 else plan.cells[index].span) },contentType={ "media" }) { index ->
                 // Signal Paging access, but render one immutable row/geometry snapshot together.
                 // A concurrent prepend must never apply another identity's cell dimensions/actions.
                 if(index<rows.itemCount) rows[index]
-                when(val row=retained[index]) {
-                    is TimelineRow.Day -> Text(row.label,Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=10.dp)
-                        .semantics { heading();plan.cells.getOrNull(index)?.let { collectionItemInfo=CollectionItemInfo(it.row,1,0,plan.columns) } }.testTag("timeline:date:${row.date}"),style=MaterialTheme.typography.titleSmall)
-                    is TimelineRow.Media -> TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || row.query!=query,
-                        Modifier.height(requireNotNull(plan.cells.getOrNull(index)?.height).dp).semantics {
-                            val cell=plan.cells[index];collectionItemInfo=CollectionItemInfo(cell.row,1,cell.column,1)
-                        }) {
-                        val offset=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==row.entry.key }?.offset?.y
-                        model.open(row.entry,offset?.let { -it },viewport())
-                    }
+                val row=retained[index]
+                TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || row.query!=query,zone,
+                    Modifier.height(requireNotNull(plan.cells.getOrNull(index)?.height).dp).semantics {
+                        val cell=plan.cells[index];collectionItemInfo=CollectionItemInfo(cell.row,1,cell.column,1)
+                    }) {
+                    val offset=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==row.entry.key }?.offset?.y
+                    model.open(row.entry,offset?.let { -it },viewport())
                 }
             }
             if(rows.loadState.append is LoadState.Loading) item(span={ GridItemSpan(maxLineSpan) }) {
@@ -266,7 +241,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
 }
 
 @Composable
-private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,features: LibraryFeaturesModel,selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,modifier: Modifier=Modifier,onOpen: ()->Unit) {
+private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,features: LibraryFeaturesModel,selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,zone: ZoneId,modifier: Modifier=Modifier,onOpen: ()->Unit) {
     val context=LocalContext.current
     var problem by remember(entry) { mutableStateOf<String?>(null) }
     val thumbnail by produceState<File?>(null,entry) {
@@ -284,7 +259,7 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
     val target=SelectionTarget.from(entry)
     val chosen=selection.any { it.matches(target) }
     val selecting=selection.isNotEmpty()
-    val date=entry.millis?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toString() } ?: "Unknown date"
+    val date=entry.millis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toString() } ?: "Unknown date"
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)
         .testTag(entry.photoId?.let { "photo:$it" } ?: "cloud:${entry.cloudKey}")
         .combinedClickable(enabled=!selectionLocked,role=Role.Button,onClick={ if(selecting) onToggle(target) else onOpen() },
