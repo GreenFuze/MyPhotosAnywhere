@@ -35,10 +35,9 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
     }
     suspend fun api(active: DriveConnection, client: okhttp3.OkHttpClient?=null): DriveGateway {
         val auth=DriveAuthorization(context)
-        val token=auth.token(active.email,DriveMode.valueOf(active.mode))
-        val api=if(client==null) DriveGateway(token) else DriveGateway(token,client)
-        try { val user=api.user(); if(user.id!=active.accountId || !user.email.equals(active.email,true)) throw DriveAuthorizationNeeded() }
-        catch(e: DriveHttpException) { if(e.status==401) auth.invalidate(token); throw e }
+        val api=auth.gateway(active.email,DriveMode.valueOf(active.mode),client)
+        val user=api.user()
+        if(user.id!=active.accountId || !user.email.equals(active.email,true)) throw DriveAuthorizationNeeded()
         return api
     }
     private suspend fun ensureBinding(binding: String) {

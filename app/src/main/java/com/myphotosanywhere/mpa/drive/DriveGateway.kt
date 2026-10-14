@@ -19,13 +19,16 @@ import okhttp3.Response
 
 /** Small REST boundary. Tokens never appear in URLs, database rows, or error messages. */
 class DriveGateway(
-    private val token: String,
+    token: String,
     private val client: OkHttpClient = OkHttpClient.Builder()
         .followRedirects(false).followSslRedirects(false)
         .connectTimeout(20, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build(),
     private val api: HttpUrl = "https://www.googleapis.com/drive/v3/".toHttpUrl(),
     private val upload: HttpUrl = "https://www.googleapis.com/upload/drive/v3/files".toHttpUrl(),
+    refreshToken: (suspend (String) -> String)? = null,
 ) {
+    private val access = DriveAccessSession(token, refreshToken)
+
     suspend fun user(): DriveUser {
         val json = json(Request.Builder().url(url("about", "fields" to "user(permissionId,emailAddress)")))
             .getAsJsonObject("user") ?: error("Drive did not return an account.")
@@ -264,7 +267,24 @@ class DriveGateway(
     }
 
     private suspend fun <T> execute(builder: Request.Builder, read: (Response) -> T): T = withContext(Dispatchers.IO) {
-        try { client.newCall(builder.header("Authorization", "Bearer $token").build()).execute().use(read) }
+        try {
+            val request = builder.build()
+            val token = access.current()
+            var response = client.newCall(request.newBuilder().header("Authorization", "Bearer $token").build()).execute()
+            if (response.code == 401 && access.canRefresh) {
+                // Close the rejected response before awaiting Google. No body/file/checkpoint has been read.
+                response.close()
+                currentCoroutineContext().ensureActive()
+                check(request.body?.isOneShot() != true && request.body?.isDuplex() != true) {
+                    "Drive request cannot be replayed safely."
+                }
+                val replacement = access.rejected(token)
+                currentCoroutineContext().ensureActive()
+                response = client.newCall(request.newBuilder().header("Authorization", "Bearer $replacement").build()).execute()
+            }
+            // Exactly one retry, only after an explicit 401. Never replay a timeout, 403 or server failure.
+            response.use(read)
+        }
         catch(e: IOException) {
             currentCoroutineContext().ensureActive()
             throw (DriveConnectionException.from(e) ?: e)

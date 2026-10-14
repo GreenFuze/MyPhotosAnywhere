@@ -22,7 +22,6 @@ class DriveBackupWorker(context: Context, parameters: WorkerParameters) : Corout
         var task = dao.backup(id) ?: return@withContext Result.success()
         if (task.state == "COMPLETE") return@withContext Result.success()
         val auth = DriveAuthorization(applicationContext)
-        var token: String? = null
         suspend fun stillActive(): Boolean {
             val active = dao.source(task.bindingKey)?.connection() ?: return false
             return active.backupEnabled && active.binding()?.key == task.bindingKey &&
@@ -33,8 +32,7 @@ class DriveBackupWorker(context: Context, parameters: WorkerParameters) : Corout
             val photo = app.database.photos().find(task.photoId) ?: error("The local photo is missing.")
             val original = File(photo.originalPath)
             check(original.isFile && original.length() == photo.bytes) { "The local original is missing or changed." }
-            token = auth.token(task.email, DriveMode.valueOf(task.mode))
-            val api = DriveGateway(token)
+            val api = auth.gateway(task.email, DriveMode.valueOf(task.mode))
             val user = api.user()
             if (user.id != task.accountId || !user.email.equals(task.email, ignoreCase = true)) throw DriveAuthorizationNeeded()
             val folder = api.file(task.folderId)
@@ -93,7 +91,6 @@ class DriveBackupWorker(context: Context, parameters: WorkerParameters) : Corout
             Result.success() // UI reconnect schedules a fresh task; never launch consent from the background.
         } catch (error: DriveHttpException) {
             if (error.status == 401) {
-                token?.let { runCatching { auth.invalidate(it) } }
                 dao.updateBackup(task.copy(state = "AUTH_REQUIRED", errorMessage = error.message)); Result.success()
             } else {
                 val retry = error.retryable && runAttemptCount < 5

@@ -70,7 +70,7 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         val mode = DriveMode.valueOf(saved.get<String>("mode") ?: error("Choose a Drive access mode again."))
         val email = saved.get<String>("email") ?: error("Choose your Google account again.")
         if (!result.grantedScopes.contains(mode.scope)) throw DriveAuthorizationNeeded()
-        val api = DriveGateway(result.accessToken ?: throw DriveAuthorizationNeeded())
+        val api = auth.gateway(email, mode, initialToken = result.accessToken ?: throw DriveAuthorizationNeeded())
         val user = api.user()
         check(user.email.equals(email, ignoreCase = true)) { "Google returned a different account. Please reconnect." }
         val previous = dao.connection()
@@ -216,14 +216,9 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
     }
 
     private suspend fun authorizedApi(active: DriveConnection): DriveGateway {
-        val token = auth.token(active.email, DriveMode.valueOf(active.mode))
-        val api = DriveGateway(token)
-        try {
-            check(api.user().id == active.accountId) { "Google account changed. Reconnect Drive." }
-        } catch (error: DriveHttpException) {
-            if (error.status == 401) auth.invalidate(token)
-            throw error
-        }
+        val api = auth.gateway(active.email, DriveMode.valueOf(active.mode))
+        val user = api.user()
+        if (user.id != active.accountId || !user.email.equals(active.email, true)) throw DriveAuthorizationNeeded()
         return api
     }
 

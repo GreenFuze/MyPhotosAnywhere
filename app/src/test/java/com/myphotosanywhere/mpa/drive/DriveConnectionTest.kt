@@ -22,12 +22,14 @@ class DriveConnectionTest {
         }
     }
     @Test fun socketTimeoutIsRecoverableWithoutClaimingSourceFailure() = runBlocking<Unit> {
-        val client=OkHttpClient.Builder().addInterceptor { throw SocketTimeoutException("secret") }.build()
-        try { DriveGateway("test",client=client).user(); fail() }
+        var requests=0
+        val client=OkHttpClient.Builder().addInterceptor { requests++;throw SocketTimeoutException("secret") }.build()
+        try { DriveGateway("test",client=client,refreshToken={ error("Transport failures must never renew authorization") }).user(); fail() }
         catch(e: DriveConnectionException) {
             assertTrue(requireNotNull(e.message).contains("timed out"))
             assertTrue(requireNotNull(e.message).contains("files and upload checkpoints are preserved"))
         }
+        assertEquals(1,requests)
     }
     @Test fun genericIoAndHttpErrorsAreNotClassifiedAsRetryableTransportFailures() = runBlocking<Unit> {
         val local=IOException("Local storage failed")

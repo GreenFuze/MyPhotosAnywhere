@@ -42,9 +42,9 @@ data class UploadProgress(val offset: Long, val complete: Boolean)
 
 class DriveHttpException(val status: Int, val reason: String? = null) : java.io.IOException(
     when (status) {
-        401 -> "Google authorization expired. Reconnect Drive."
+        401 -> "Google Drive could not renew access. Reconnect this account to continue."
         403 -> if (reason == "rateLimitExceeded" || reason == "userRateLimitExceeded")
-            "Drive is temporarily limiting requests. Backup will retry." else "Drive denied access. Check folder permissions and reconnect."
+            "Drive is temporarily limiting requests. Backup will retry." else "Drive denied access to this file or folder. Check its permissions and the granted Drive access."
         404 -> "The Drive file or folder is no longer available."
         429 -> "Drive is temporarily limiting requests. Backup will retry."
         else -> "Drive request failed (HTTP $status)."
@@ -53,7 +53,7 @@ class DriveHttpException(val status: Int, val reason: String? = null) : java.io.
     val retryable: Boolean get() = status == 429 || status in 500..599 ||
         (status == 403 && reason in listOf("rateLimitExceeded", "userRateLimitExceeded"))
 }
-class DriveAuthorizationNeeded : java.io.IOException("Reconnect Drive to resume backup.")
+class DriveAuthorizationNeeded : java.io.IOException("Google Drive needs your permission. Reconnect this account to continue.")
 
 object UploadRanges {
     fun nextOffset(range: String?, total: Long): Long {

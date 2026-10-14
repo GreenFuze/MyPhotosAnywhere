@@ -20,6 +20,17 @@ class DriveAuthorization(private val context: Context) {
         return result.accessToken ?: throw DriveAuthorizationNeeded()
     }
 
+    suspend fun gateway(email: String, mode: DriveMode, client: okhttp3.OkHttpClient? = null,
+        initialToken: String? = null): DriveGateway {
+        val access = initialToken ?: token(email, mode)
+        val refresh: suspend (String) -> String = { rejected ->
+            invalidate(rejected)
+            token(email, mode)
+        }
+        return if (client == null) DriveGateway(access, refreshToken = refresh)
+            else DriveGateway(access, client, refreshToken = refresh)
+    }
+
     suspend fun invalidate(token: String) {
         Identity.getAuthorizationClient(context).clearToken(ClearTokenRequest.builder().setToken(token).build()).await()
     }

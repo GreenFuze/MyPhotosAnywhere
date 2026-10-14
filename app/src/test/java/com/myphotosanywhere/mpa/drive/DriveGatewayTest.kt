@@ -127,4 +127,73 @@ class DriveGatewayTest {
         catch(_: IllegalStateException) { }
     }
 
+    private fun renewing(refresh: suspend (String) -> String) = DriveGateway("old-token",
+        OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build(),
+        server.url("/drive/v3/"),server.url("/upload/drive/v3/files"),refresh)
+
+    @Test fun expiredAccessRenewsSilentlyAndTheSameGatewayUsesItsReplacement() = runBlocking {
+        var calls=0
+        val renewing=renewing { rejected -> assertEquals("old-token",rejected);calls++;"new-token" }
+        server.enqueue(MockResponse().setResponseCode(401).setBody("rejected"))
+        server.enqueue(MockResponse().setBody("""{"user":{"permissionId":"account","emailAddress":"user@example.test"}}"""))
+        server.enqueue(MockResponse().setBody("""{"id":"photo","name":"photo.jpg"}"""))
+        assertEquals("account",renewing.user().id);assertEquals("photo",renewing.file("photo").id)
+        assertEquals("Bearer old-token",server.takeRequest().getHeader("Authorization"))
+        assertEquals("Bearer new-token",server.takeRequest().getHeader("Authorization"))
+        assertEquals("Bearer new-token",server.takeRequest().getHeader("Authorization"));assertEquals(1,calls)
+    }
+    @Test fun repeatedUnauthorizedResponseStopsAfterOneRefresh() = runBlocking {
+        var calls=0;val renewing=renewing { calls++;"new-token" }
+        repeat(2) { server.enqueue(MockResponse().setResponseCode(401)) }
+        try { renewing.user();fail("Repeated unauthorized must surface") }
+        catch(error: DriveHttpException) { assertEquals(401,error.status);assertFalse(error.retryable) }
+        assertEquals(2,server.requestCount);assertEquals(1,calls)
+    }
+    @Test fun permissionAndServerFailuresNeverRefreshOrReplay() = runBlocking {
+        val renewing=renewing { error("Must not refresh") }
+        for(status in listOf(403,500)) {
+            server.enqueue(MockResponse().setResponseCode(status))
+            try { renewing.user();fail("HTTP failure must surface") }
+            catch(error: DriveHttpException) { assertEquals(status,error.status) }
+        }
+        assertEquals(2,server.requestCount)
+    }
+    @Test fun tokenRenewalDuringUploadReplaysOnlyTheRejectedChunkWithIdenticalBytesAndRange() = runBlocking {
+        val renewing=renewing { "new-token" };val bytes=byteArrayOf(0,1,2,3,4)
+        server.enqueue(MockResponse().setResponseCode(401));server.enqueue(MockResponse().setResponseCode(308).setHeader("Range","bytes=0-9"))
+        val session=server.url("/upload/drive/v3/files?upload_id=reserved-session").toString()
+        assertEquals(10L,renewing.chunk(session,20,5,bytes).offset)
+        val first=server.takeRequest();val retry=server.takeRequest()
+        assertEquals(first.path,retry.path);assertEquals("PUT",retry.method)
+        assertEquals("bytes 5-9/20",retry.getHeader("Content-Range"))
+        assertArrayEquals(bytes,first.body.readByteArray());assertArrayEquals(bytes,retry.body.readByteArray())
+        assertEquals("Bearer new-token",retry.getHeader("Authorization"));assertEquals(2,server.requestCount)
+    }
+    @Test fun rejectedDownloadBodyNeverReplacesTheOriginalAndVerifiedRetryIsReadOnce() = runBlocking {
+        val renewing=renewing { "new-token" };val file=File.createTempFile("mpa-auth",".part")
+        try {
+            file.writeText("preserved")
+            server.enqueue(MockResponse().setResponseCode(401).setBody("not-photo"));server.enqueue(MockResponse().setBody("photo"))
+            renewing.download("photo",file,5)
+            assertEquals("photo",file.readText());assertEquals(2,server.requestCount)
+        } finally { file.delete() }
+    }
+    @Test fun cancellationWhileRenewingClosesRejectedResponseAndNeverReplaysOrWrites() = runBlocking {
+        val expected=kotlinx.coroutines.CancellationException("cancelled")
+        val renewing=renewing { throw expected };val file=File.createTempFile("mpa-cancel",".part")
+        try {
+            file.writeText("preserved");server.enqueue(MockResponse().setResponseCode(401).setBody("not-photo"))
+            try { renewing.download("photo",file,50);fail("Cancellation must propagate") }
+            catch(error: kotlinx.coroutines.CancellationException) { assertSame(expected,error) }
+            assertEquals("preserved",file.readText());assertEquals(1,server.requestCount)
+        } finally { file.delete() }
+    }
+    @Test fun realConsentRequirementDuringRenewalIsPreservedWithoutAnotherRequest() = runBlocking {
+        val expected=DriveAuthorizationNeeded();val renewing=renewing { throw expected }
+        server.enqueue(MockResponse().setResponseCode(401))
+        try { renewing.user();fail("Real permission loss must surface") }
+        catch(error: DriveAuthorizationNeeded) { assertSame(expected,error) }
+        assertEquals(1,server.requestCount)
+    }
+
 }
