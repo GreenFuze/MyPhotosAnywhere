@@ -65,12 +65,15 @@ internal fun deviceTimelineZone(model: TimelineViewModel): ZoneId {
 
 @Composable
 internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features: LibraryFeaturesModel,
-    state: LazyGridState,bottomClearance: Dp,modifier: Modifier=Modifier,
+    bottomClearance: Dp,modifier: Modifier=Modifier,
     selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,
     hasSources: Boolean,onConnect: ()->Unit,onClearFilters: ()->Unit,onRefresh: ()->Unit,emptyActionLabel: String="Clear filters") {
     val zone=deviceTimelineZone(model)
     val density by model.density.collectAsStateWithLifecycle()
     val layout by model.layout.collectAsStateWithLifecycle()
+    // LazyGridState owns measured placeables as well as scroll coordinates. Never move
+    // that cache between incompatible slot structures; restore the canonical model anchor.
+    val state=key(density,layout) { rememberLazyGridState() }
     var dateNavigation by remember(query) { mutableStateOf(false) }
     val rowsFlow=remember(model,zone) {
         model.paging.map { data -> data.map<TimelineItem,TimelineRow> { TimelineRow.Media(it.entry,it.generation,it.query,it.aspect) }.insertSeparators { before,after ->
@@ -182,7 +185,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         }
         val physicalColumns=if(layout==GalleryLayout.SQUARE) plan.columns else JustifiedMosaic.SLOTS
         // Square and packed Mosaic use different slot structures. Give their layout nodes
-        // distinct lifetimes while the externally owned scroll state/anchor is retained.
+        // distinct lifetimes with matching scroll-state lifetimes. The model retains the anchor.
         key(physicalColumns) {
         LazyVerticalGrid(GridCells.Fixed(physicalColumns),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
             .semantics { stateDescription="${plan.columns} columns";collectionInfo=CollectionInfo(plan.rowCount,plan.columns) }

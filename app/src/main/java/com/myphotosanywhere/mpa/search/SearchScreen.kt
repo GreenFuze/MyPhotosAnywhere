@@ -48,7 +48,7 @@ internal fun SearchTopBar(text: String,filtered: Boolean,onText: (String)->Unit,
 
 @Composable
 internal fun SearchScreen(draft: SearchCriteria,applied: SearchCriteria,recents: List<String>,model: SearchViewModel,
-    timeline: TimelineViewModel,features: LibraryFeaturesModel,state: LazyGridState,suggestions: LazyGridState,
+    timeline: TimelineViewModel,features: LibraryFeaturesModel,suggestions: LazyGridState,
     albums: List<Album>,sources: List<DriveSource>,bottomClearance: Dp,selection: List<SelectionTarget>,
     onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,onFilters: ()->Unit,onPeople: ()->Unit,onPlaces: ()->Unit,
     onAlbums: ()->Unit,onSubmit: ()->Unit,onConnect: ()->Unit,modifier: Modifier=Modifier) {
@@ -69,7 +69,7 @@ internal fun SearchScreen(draft: SearchCriteria,applied: SearchCriteria,recents:
                 applied.source?.let { key -> add(sources.find { it.key==key }?.folderName ?: "Source disconnected") }
                 applied.dates?.let { add("${it.first} – ${it.last}") }
             }.joinToString(" · "),Modifier.padding(horizontal=12.dp,vertical=4.dp).testTag("search:filter-summary"),style=MaterialTheme.typography.bodySmall)
-            TimelineGrid(query,timeline,features,state,bottomClearance,Modifier.weight(1f).fillMaxWidth(),selection,onToggle,selectionLocked,
+            TimelineGrid(query,timeline,features,bottomClearance,Modifier.weight(1f).fillMaxWidth(),selection,onToggle,selectionLocked,
                 sources.isNotEmpty(),onConnect,onClearFilters={
                     if(applied.filtered) model.clearFilters() else { model.text("");model.submit() }
                 },onRefresh=features::refreshCloud,emptyActionLabel=if(applied.filtered) "Clear filters" else "Clear search")

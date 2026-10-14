@@ -126,10 +126,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         model.legacyLoading(tab !in listOf(0,1,5) || viewerId!=null || pendingViewKey!=null);features.legacyLoading(legacy)
     }
     var jumpToDate by rememberSaveable { mutableStateOf(false) }
-    val photosGrid=rememberLazyGridState()
-    val searchGrid=rememberLazyGridState()
     val searchSuggestions=rememberLazyGridState()
-    val collectionGrid=rememberLazyGridState()
     val collectionsHubGrid=rememberLazyGridState()
     var exportId by rememberSaveable { mutableStateOf<String?>(null) }
     val snackbar=remember { SnackbarHostState() }
@@ -225,14 +222,14 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                 0 -> {
                     ShellImportActivity(onOpen={ navigation.open(ShellDestination.ACTIVITY) },sync=sync)
                     TimelineGrid(TimelineQuery(filter,sourceKey,albumId,personId,importedPerson=importedLabel),timeline,features,
-                        if(albumId!=null || personId!=null || importedLabel!=null) collectionGrid else photosGrid,scrollClearance,
+                        scrollClearance,
                         modifier=Modifier.weight(1f).fillMaxWidth(),selection=selectedTargets,onToggle=selection::toggle,selectionLocked=selectionLocked,hasSources=sources.isNotEmpty(),
                         onConnect={ navigation.open(ShellDestination.STORAGE) },
                         onClearFilters={ filter="All";sourceKey=null;albumId=null;personId=null;importedPersonKey=null },onRefresh=features::refreshCloud)
                 }
                 5 -> {
                     ShellImportActivity(onOpen={ navigation.open(ShellDestination.ACTIVITY) },sync=sync)
-                    SearchScreen(searchDraft,searchApplied,searchRecents,search,searchTimeline,features,searchGrid,searchSuggestions,
+                    SearchScreen(searchDraft,searchApplied,searchRecents,search,searchTimeline,features,searchSuggestions,
                         albums,sources,scrollClearance,selectedTargets,selection::toggle,selectionLocked,onFilters={ showFilters=true },
                         onPeople={ navigation.open(ShellDestination.PEOPLE) },onPlaces={ navigation.open(ShellDestination.PLACES) },
                         onAlbums={ navigation.open(ShellDestination.COLLECTIONS) },onSubmit=::submitSearch,
