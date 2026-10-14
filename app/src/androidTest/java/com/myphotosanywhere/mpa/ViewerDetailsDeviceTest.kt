@@ -259,7 +259,7 @@ class ViewerDetailsDeviceTest {
                 swipe(Offset(center.x,center.y+height*.1f),Offset(center.x,center.y-height*.2f),400)
             }
             waitTag("photo-details")
-            compose.onNodeWithTag("details:availability").assertTextEquals("Original unavailable on this phone")
+            compose.onNodeWithTag("details:availability").assertTextEquals("Original unavailable on this device")
             compose.onNodeWithTag("photo-details-close").performClick();waitGone("photo-details")
             compose.onNodeWithTag("viewer-details").assertIsDisplayed()
             runBlocking {

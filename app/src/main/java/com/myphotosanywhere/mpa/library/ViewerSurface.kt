@@ -33,6 +33,14 @@ internal class ViewerChromeController(initiallyVisible: Boolean=true) {
     }
 }
 
+/** Gesture ownership follows the active identity, never a mutable pager index. */
+internal class ViewerGestureState {
+    private var mediaKey: String?=null
+    private var zoomed=false
+    fun update(key: String,value: Boolean) { mediaKey=key;zoomed=value }
+    fun isZoomed(key: String)=mediaKey==key && zoomed
+}
+
 /** The media always receives the same viewport. Only caption clearance changes. */
 @Composable
 internal fun ViewerSurface(chrome: ViewerChromeController,modifier: Modifier=Modifier,

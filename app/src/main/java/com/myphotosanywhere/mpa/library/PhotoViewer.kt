@@ -44,10 +44,12 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
     val pager=rememberPagerState(initialPage=available.indexOfFirst { it.id==selectedId }.coerceAtLeast(0),pageCount={ available.size })
     val current=available.getOrNull(pager.currentPage) ?: available.first()
     val chrome=rememberSaveable(saver=ViewerChromeController.saver) { ViewerChromeController() }
+    val gestures=remember { ViewerGestureState() }
     LaunchedEffect(current.id) { onCurrent(current.id) }
     Dialog(onDismissRequest=onClose,properties=DialogProperties(usePlatformDefaultWidth=false)) {
         Surface(Modifier.fillMaxSize().testTag("viewer-screen"),color=Color.Black,contentColor=Color.White) {
-            ViewerSurface(chrome,Modifier.fillMaxSize().safeDrawingPadding(),
+            ViewerSurface(chrome,Modifier.fillMaxSize().safeDrawingPadding().viewerDetailsSwipe(current.id,
+                !obscured && current.mimeType.startsWith("image/"),{ gestures.isZoomed(current.id) },{ chrome.show();onDetails(current.id) }),
                 topBar={ ViewerTopBar(current.capturedAt ?: current.importedAt,current.displayName,onClose,{ chrome.show();onDetails(current.id) },{ chrome.hide() }) },
                 bottomBar={
                     ViewerActions(current,model,onEdit,showStatus=false)
@@ -57,7 +59,7 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
                 HorizontalPager(state=pager,key={ available[it].id },modifier=Modifier.fillMaxSize()) { page ->
                     val photo=available[page]
                     ViewerMediaContent(photo,model,pager.currentPage==page,interactive=!obscured,
-                        onDetails={ chrome.show();onDetails(photo.id) },onToggleControls={ chrome.toggle() },captionInset=captionInset)
+                        onToggleControls={ chrome.toggle() },captionInset=captionInset,onZoomChanged={ gestures.update(photo.id,it) })
                 }
             }
         }
@@ -66,7 +68,7 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
 
 /** The existing bounded renderer and gesture/lifecycle contract is shared by both viewer adapters. */
 @Composable
-internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active: Boolean,preview: File?=null,interactive: Boolean=true,onDetails: (()->Unit)?=null,onToggleControls: (()->Unit)?=null,captionInset: Dp=0.dp) {
+internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active: Boolean,preview: File?=null,interactive: Boolean=true,onDetails: (()->Unit)?=null,onToggleControls: (()->Unit)?=null,captionInset: Dp=0.dp,onZoomChanged: ((Boolean)->Unit)?=null) {
     Box(Modifier.fillMaxSize()) {
         if(preview!=null) coil.compose.AsyncImage(preview,"Preview",Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
     val original by produceState<ViewerOriginal>(ViewerOriginal.Loading,photo.id,photo.originalPath,photo.cachedVersion) {
@@ -85,6 +87,7 @@ internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active:
     var zoom by remember(photo.id) { mutableFloatStateOf(1f) }
     var x by remember(photo.id) { mutableFloatStateOf(0f) }
     var y by remember(photo.id) { mutableFloatStateOf(0f) }
+    SideEffect { if(active) onZoomChanged?.invoke(zoom>1f) }
     LaunchedEffect(active) { if(!active) { zoom=1f;x=0f;y=0f } }
     val previewTap=if(photo.mimeType.startsWith("image/")) Modifier.pointerInput(photo.id,active,interactive) {
         detectTapGestures(onTap={ if(active && interactive) toggleControls?.invoke() })

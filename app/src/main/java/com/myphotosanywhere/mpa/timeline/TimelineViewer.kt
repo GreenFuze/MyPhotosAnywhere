@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
+import com.myphotosanywhere.mpa.library.ViewerGestureState
 import com.myphotosanywhere.mpa.library.ViewerChromeController
 import com.myphotosanywhere.mpa.library.ViewerSurface
 import com.myphotosanywhere.mpa.library.ViewerStatus
@@ -46,10 +47,12 @@ internal fun TimelineViewer(state: TimelineViewerState,model: TimelineViewModel,
     val session=state.session
     val pager=session?.let { key(it.id) { rememberPagerState(initialPage=it.initialPage,pageCount={ it.count }) } }
     val pageScope=rememberCoroutineScope()
+    val gestures=remember { ViewerGestureState() }
     val interactive=!obscured && remoteDetailsKey==null
     Dialog(onDismissRequest={ model.closeViewer() },properties=DialogProperties(usePlatformDefaultWidth=false)) {
         Surface(Modifier.fillMaxSize().testTag("viewer-screen"),color=Color.Black,contentColor=Color.White) {
-            ViewerSurface(chrome,Modifier.fillMaxSize().safeDrawingPadding(),
+            ViewerSurface(chrome,Modifier.fillMaxSize().safeDrawingPadding().viewerDetailsSwipe(current.key,
+                interactive && current.mimeType.startsWith("image/"),{ gestures.isZoomed(currentMedia?.photo?.id ?: current.key) },openDetails),
                 topBar={ ViewerTopBar(current.millis,current.name,{ model.closeViewer() },openDetails,{ chrome.hide() }) },
                 bottomBar={
                     if(session!=null && pager!=null) {
@@ -69,12 +72,12 @@ internal fun TimelineViewer(state: TimelineViewerState,model: TimelineViewModel,
                     }
                     if(interactive) ViewerStatus(features,Color.White)
                 }) { captionInset ->
-                if(session==null || pager==null) TimelineViewerPage(state.selected,true,model,features,onSource,interactive,openDetails,{ chrome.toggle() },captionInset)
+                if(session==null || pager==null) TimelineViewerPage(state.selected,true,model,features,onSource,interactive,{ chrome.toggle() },captionInset,gestures)
                 else HorizontalPager(state=pager,key={ "${session.id}:$it" },modifier=Modifier.fillMaxSize()) { page ->
                     val entry by produceState<TimelineEntry?>(null,session.id,page) { value=session.entry(page) }
                     val item=entry
                     LaunchedEffect(item,pager.currentPage) { if(item!=null && pager.currentPage==page) current=item }
-                    if(item!=null) TimelineViewerPage(item,pager.currentPage==page,model,features,onSource,interactive,openDetails,{ chrome.toggle() },captionInset)
+                    if(item!=null) TimelineViewerPage(item,pager.currentPage==page,model,features,onSource,interactive,{ chrome.toggle() },captionInset,gestures)
                 }
             }
         }
@@ -111,7 +114,7 @@ private fun rememberTimelineMedia(entry: TimelineEntry,repository: TimelineRepos
 }
 
 @Composable
-private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: TimelineViewModel,features: LibraryFeaturesModel,onSource: ()->Unit,interactive: Boolean,onDetails: ()->Unit,onToggleControls: ()->Unit,captionInset: Dp) {
+private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: TimelineViewModel,features: LibraryFeaturesModel,onSource: ()->Unit,interactive: Boolean,onToggleControls: ()->Unit,captionInset: Dp,gestures: ViewerGestureState) {
     val resolution=rememberTimelineMedia(entry,model.repository)
     val media=resolution.media
     val busy by features.busy.collectAsStateWithLifecycle()
@@ -131,13 +134,12 @@ private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: Timel
     }
     val preview=entry.thumbnailPath.takeIf { it.isNotBlank() }?.let(::File)
     val toggleControls by rememberUpdatedState(onToggleControls)
-    Box(Modifier.fillMaxSize().then(if(media?.photo==null) Modifier.viewerDetailsSwipe(entry.key,active && interactive,onDetails=onDetails) else Modifier)
-        .then(if(media?.photo==null && entry.mimeType.startsWith("image/")) Modifier.pointerInput(entry.key,active,interactive) {
+    Box(Modifier.fillMaxSize().then(if(media?.photo==null && entry.mimeType.startsWith("image/")) Modifier.pointerInput(entry.key,active,interactive) {
             detectTapGestures(onTap={ if(active && interactive) toggleControls() })
         } else Modifier)) {
         if(preview!=null) AsyncImage(preview,"Preview",Modifier.fillMaxSize(),contentScale=ContentScale.Fit)
         val photo=media?.photo
-        if(photo!=null) ViewerMediaContent(photo,features,active,preview,interactive,onDetails,onToggleControls,captionInset)
+        if(photo!=null) ViewerMediaContent(photo,features,active,preview,interactive,onToggleControls=onToggleControls,captionInset=captionInset,onZoomChanged={ gestures.update(photo.id,it) })
         if(!available) Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom=captionInset).padding(12.dp),horizontalAlignment=Alignment.CenterHorizontally) {
             Text(when {
                 resolution.problem!=null -> requireNotNull(resolution.problem)
