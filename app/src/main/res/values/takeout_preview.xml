@@ -16,7 +16,7 @@
         <item quantity="one">%d unreadable media record</item>
         <item quantity="other">%d unreadable media records</item>
     </plurals>
-    <string name="takeout_preview_metadata_totals">%1$s with metadata · %2$d without metadata</string>
+    <string name="takeout_preview_metadata_totals">%1$s with metadata · %2$s without metadata</string>
     <string name="takeout_preview_people_totals">%1$s with people labels · %2$s</string>
     <string name="takeout_preview_review_totals">%1$s · %2$s</string>
 </resources>

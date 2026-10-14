@@ -88,7 +88,7 @@ internal fun ImportPreviewDialog(job: ImportJob?,entries: List<ImportItem>,busy:
 private fun TakeoutPreviewOverview(snapshot: TakeoutPreviewSnapshot) {
     Column(Modifier.testTag("takeout-metadata-summary"),verticalArrangement=Arrangement.spacedBy(4.dp)) {
         Text("Takeout metadata",style=MaterialTheme.typography.titleSmall,modifier=Modifier.semantics { heading() })
-        Text(stringResource(R.string.takeout_preview_metadata_totals,pluralStringResource(R.plurals.takeout_preview_media_items,snapshot.withMetadata,snapshot.withMetadata),snapshot.withoutMetadata))
+        Text(stringResource(R.string.takeout_preview_metadata_totals,pluralStringResource(R.plurals.takeout_preview_media_items,snapshot.withMetadata,snapshot.withMetadata),pluralStringResource(R.plurals.takeout_preview_media_items,snapshot.withoutMetadata,snapshot.withoutMetadata)))
         Text(stringResource(R.string.takeout_preview_people_totals,pluralStringResource(R.plurals.takeout_preview_media_items,snapshot.withPeople,snapshot.withPeople),pluralStringResource(R.plurals.takeout_preview_names,snapshot.differentNames,snapshot.differentNames)))
         Text("Selected media: ${snapshot.selectedMedia} · with people labels: ${snapshot.selectedWithPeople}",Modifier.testTag("takeout-selected-summary"))
         Text(stringResource(R.string.takeout_preview_review_totals,pluralStringResource(R.plurals.takeout_preview_review_items,snapshot.reviewCount,snapshot.reviewCount),pluralStringResource(R.plurals.takeout_preview_unreadable_records,snapshot.invalidMetadata,snapshot.invalidMetadata)))
