@@ -76,7 +76,12 @@ class TimelineContinuityTest {
             compose.onNodeWithText("Previous").performClick()
             compose.waitUntil(10000) { compose.onAllNodesWithText("timeline-ui-70.png").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("viewer-close").performClick()
-            waitTag("photo:timeline-ui-70")
+            // A retained pre-refresh tile can appear before the new anchored generation
+            // finishes its asynchronous seek. Measure only the completed restoration.
+            compose.waitUntil(30000) {
+                compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() &&
+                    compose.onAllNodes(hasTestTag("photo:timeline-ui-70") and isEnabled()).fetchSemanticsNodes().size==1
+            }
             compose.waitForIdle()
             val after=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInWindow.top
             val afterGridTop=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow.top

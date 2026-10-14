@@ -20,7 +20,7 @@ internal fun IconLabelAction(@DrawableRes icon: Int,label: String,onClick: ()->U
         colors=ButtonDefaults.textButtonColors(contentColor=color,disabledContentColor=color.copy(alpha=.38f))) {
         Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
             ShellIcon(icon)
-            Text(label,style=MaterialTheme.typography.labelMedium,textAlign=TextAlign.Center,modifier=Modifier.clearAndSetSemantics {})
+            Text(label,style=MaterialTheme.typography.labelMedium,textAlign=TextAlign.Center)
         }
     }
 }
