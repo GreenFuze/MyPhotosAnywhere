@@ -100,24 +100,28 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     LaunchedEffect(query,restoration,zone,density,layout) {
         val anchor=model.anchor(query)
         if(anchor!=null) {
-            snapshotFlow { Triple(rows.itemSnapshotList.items,rows.loadState.refresh,refreshedGeneration) }.first { (items,load,generation) ->
-                load is LoadState.NotLoading && ((items.isEmpty() && generation==restoration) || items.any { (it as? TimelineRow.Media)?.generation==restoration }) || load is LoadState.Error
+            val placement=object: TimelinePlacement {
+                override suspend fun place(index: Int,offset: Int) {
+                    state.scrollToItem(index,offset)
+                    // Complete measurement before correcting against actual media bounds.
+                    withFrameNanos { }
+                    withFrameNanos { }
+                }
+                override suspend fun align(key: String,offset: Int) {
+                    val placed=snapshotFlow { state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key } }
+                        .filterNotNull().first()
+                    state.scrollBy((placed.offset.y+offset).toFloat())
+                }
             }
-            val index=rows.itemSnapshotList.items.indexOfFirst { (it as? TimelineRow.Media)?.entry?.key==anchor.cursor.key }
-            if(index>=0) {
-                state.scrollToItem(index,anchor.offset)
-                // A target already visible before a seek can still have old bounds while a new
-                // page/density is applied. Observe a completed layout frame before correcting pixels.
-                withFrameNanos { }
-                withFrameNanos { }
-                // Full-span date rows can change the line selected by scrollToItem.
-                // Correct against the actual media bounds after measurement.
-                val placed=snapshotFlow {
-                    state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==anchor.cursor.key }
-                }.filterNotNull().first()
-                state.scrollBy((placed.offset.y+anchor.offset).toFloat())
-            }
-            else {
+            val snapshots=snapshotFlow { Triple(rows.itemSnapshotList.items,rows.loadState.refresh,refreshedGeneration) }
+                .filter { (items,load,generation) ->
+                    load is LoadState.NotLoading && ((items.isEmpty() && generation==restoration) || items.any { (it as? TimelineRow.Media)?.generation==restoration }) || load is LoadState.Error
+                }.map { (items,_,_) -> items.map { row -> when(row) {
+                    is TimelineRow.Media -> row.entry.key
+                    is TimelineRow.Day -> "day:${row.date}"
+                } } }
+            val restored=TimelineAnchorRestorer(placement).restore(anchor,snapshots)
+            if(!restored) {
                 // A real removal restores the nearest remaining identity, never a mutable old index.
                 val candidates=rows.itemSnapshotList.items.mapIndexedNotNull { position,row ->
                     (row as? TimelineRow.Media)?.takeIf { it.generation==restoration }?.let { position to it.entry }

@@ -1,0 +1,26 @@
+package com.myphotosanywhere.mpa.timeline
+
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.transformLatest
+
+/** A new retained identity snapshot cancels any placement based on its obsolete row index. */
+internal interface TimelinePlacement {
+    suspend fun place(index: Int,offset: Int)
+    suspend fun align(key: String,offset: Int)
+}
+
+internal class TimelineAnchorRestorer(private val placement: TimelinePlacement) {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    suspend fun restore(anchor: TimelineAnchor,snapshots: Flow<List<String>>): Boolean =
+        snapshots.distinctUntilChanged().transformLatest { keys ->
+            val index=keys.indexOf(anchor.cursor.key)
+            if(index<0) emit(false) else {
+                placement.place(index,anchor.offset)
+                placement.align(anchor.cursor.key,anchor.offset)
+                emit(true)
+            }
+        }.first()
+}
