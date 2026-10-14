@@ -57,7 +57,7 @@ class ViewerChromeDeviceTest {
         }
         assertFalse(back.overlaps(info))
         if(direction==LayoutDirection.Rtl) assertTrue(info.right<=back.left) else assertTrue(back.right<=info.left)
-        compose.onNodeWithTag("viewer-details").performClick();assertTrue(details)
+        compose.onNodeWithTag("viewer-details").assertContentDescriptionEquals("Photo details").performClick();assertTrue(details)
         compose.onNodeWithTag("viewer-close").assertContentDescriptionEquals("Close").performClick();assertTrue(close)
     }
 

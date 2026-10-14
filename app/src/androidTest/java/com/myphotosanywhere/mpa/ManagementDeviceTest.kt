@@ -38,13 +38,13 @@ class ManagementDeviceTest {
     @Test fun sourcesSettingsAndFocusedPagesRestoreTheirOriginAcrossRotation() {
         compose.onNodeWithTag("nav:Collections").performClick();compose.onNodeWithTag("shell:storage").performClick()
         compose.onNodeWithText("MyPhotosAnywhere").assertIsDisplayed();screenshotManagement("management-sources")
-        compose.onNodeWithTag("management:Settings").performClick();compose.onNodeWithTag("management:Storage and cache").performClick()
+        compose.onNodeWithTag("management:Settings").performClick();screenshotManagement("management-menu");compose.onNodeWithTag("management:Storage and cache").performClick()
         compose.onNodeWithText("Offline storage").assertIsDisplayed();back()
         compose.onNodeWithTag("management:Recognition").performClick();compose.onNodeWithTag("scan-now").assertIsDisplayed();back()
         compose.onNodeWithTag("management:Backup and metadata").performClick();compose.onNodeWithText("Portable annotations").assertIsDisplayed();back()
         compose.onNodeWithTag("management:Privacy and permissions").performClick();compose.onNodeWithText("Allow online maps").assertIsDisplayed();back()
-        compose.onNodeWithTag("management:About MPA").performClick();compose.onNodeWithText("MPA 0.5.17 (28)",substring=true).assertExists()
-        compose.activityRule.scenario.recreate();compose.onNodeWithText("MPA 0.5.17 (28)",substring=true).assertExists();back();back();back()
+        compose.onNodeWithTag("management:About MPA").performClick();compose.onNodeWithText("MPA 0.5.18 (29)",substring=true).assertExists()
+        compose.activityRule.scenario.recreate();compose.onNodeWithText("MPA 0.5.18 (29)",substring=true).assertExists();back();back();back()
         compose.onNodeWithTag("nav:Collections").assertIsSelected()
     }
     @Test fun activityDetailsDoNotMutateCapturedJobsOrChangeNewImportDestination() {
@@ -144,6 +144,7 @@ class ManagementChromeDeviceTest {
                 }
             }
         }
+        for(group in listOf("Library","Backup and privacy","Application")) compose.onNodeWithText(group).assertExists()
         for(title in listOf("Storage and cache","Recognition","Backup and metadata","Privacy and permissions","About MPA")) {
             val node=compose.onNodeWithTag("management:$title").performScrollTo().assertIsDisplayed();val bounds=node.fetchSemanticsNode().boundsInRoot
             assertTrue(bounds.width>=48*pixels-1);assertTrue(bounds.height>=48*pixels-1);node.performClick();assertEquals(title,opened)

@@ -42,8 +42,9 @@ class SelectionChromeDeviceTest {
             val node=compose.onNodeWithTag("selection:${kind.name}").assertIsDisplayed()
             val bounds=node.fetchSemanticsNode().boundsInRoot
             assertTrue(bounds.width>=48*pixels-1);assertTrue(bounds.height>=48*pixels-1)
-            node.performClick();assertEquals(kind,action)
+            node.assertContentDescriptionEquals(when(kind) { BulkKind.ALBUM -> "Add to album";BulkKind.OFFLINE -> "Make available offline";else -> kind.name.lowercase().replaceFirstChar { it.uppercase() } });node.performClick();assertEquals(kind,action)
         }
+        compose.onNodeWithTag("selection:REMOVE_ALBUM").assertIsDisplayed().assertContentDescriptionEquals("Remove from album").performClick();assertEquals(BulkKind.REMOVE_ALBUM,action)
         compose.onNodeWithTag("selection:close").assertIsDisplayed().assertContentDescriptionEquals("Exit selection")
     }
 }
