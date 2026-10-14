@@ -248,26 +248,7 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
     preview?.let { jobId ->
         val job=jobs.find { it.id==jobId }
         val entries=items.filter { it.job==jobId }
-        AlertDialog(onDismissRequest={ preview=null },title={ Text("Import preview") },text={
-            LazyColumn(Modifier.heightIn(max=480.dp)) {
-                item {
-                Text("${entries.count { it.selected }} selected · %.1f MiB known media size".format(entries.filter { it.selected }.sumOf { it.size }/(1024.0*1024)))
-                Text("Picker sizes are unknown until downloaded. Exact duplicates are checked against verified bytes in this destination before upload.")
-                }
-                items(entries,key={ it.id }) { item ->
-                    Row { Checkbox(item.selected,{ selected -> model.run { model.app.imports.select(item.id,selected) } },
-                        enabled=!busy && job?.state in listOf("PREVIEW","PAUSED","FAILED") && item.state !in listOf("COMPLETE","UNSUPPORTED","MATCHED","UNRESOLVED","INFORMATION"))
-                        Column { Text(item.path.take(250)); Text("${item.state.lowercase()} · ${if(item.metadata!=null) "metadata present" else "no supplemental metadata"}",style=MaterialTheme.typography.bodySmall) }
-                    }
-                    item.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-                    if(item.mime.startsWith("image/") || item.mime.startsWith("video/")) item.metadata?.let { raw ->
-                        if(job?.kind=="TAKEOUT") runCatching { TakeoutCodec().parse(raw) }.getOrNull()?.let { metadata ->
-                            Text(metadata.description.take(500)); Text("Incoming date: ${metadata.captured?.let { java.util.Date(it) } ?: "absent"}; GPS: ${metadata.latitude}, ${metadata.longitude}")
-                            if(metadata.people.isNotEmpty()) Text("People hints (unconfirmed): ${metadata.people.joinToString()}")
-                        }
-                    }
-                }
-            }
-        },confirmButton={ TextButton(onClick={ preview=null }) { Text("Close") } })
+        ImportPreviewDialog(job,entries,busy,
+            onSelect={ id,selected -> model.run { model.app.imports.select(id,selected) } },onClose={ preview=null })
     }
 }
