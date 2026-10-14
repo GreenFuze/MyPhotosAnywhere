@@ -123,7 +123,10 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                     withFrameNanos { }
                     withFrameNanos { }
                     val corrected=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key }
-                    return corrected!=null && kotlin.math.abs(corrected.offset.y+offset)<=1
+                    if(corrected==null) return false
+                    val viewport=state.layoutInfo
+                    val visible=corrected.offset.y+corrected.size.height>viewport.viewportStartOffset && corrected.offset.y<viewport.viewportEndOffset
+                    return visible && TimelineAnchorAlignment.satisfied(corrected.offset.y,offset,state.canScrollForward,state.canScrollBackward)
                 }
             }
             val snapshots=snapshotFlow { Triple(rows.itemSnapshotList.items,rows.loadState.refresh,refreshedGeneration) }

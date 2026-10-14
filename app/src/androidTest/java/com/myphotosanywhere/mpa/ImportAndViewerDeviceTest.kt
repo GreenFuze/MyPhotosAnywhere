@@ -124,6 +124,9 @@ class ImportAndViewerDeviceTest {
             assertEquals(file.absolutePath,app.database.photos().find(id)?.originalPath)
             compose.onNodeWithTag("viewer-close").performClick()
             compose.onNodeWithTag("viewer-screen").assertDoesNotExist()
+            // Finish the user-visible return before fixture teardown removes its anchor.
+            compose.waitUntil(10000) { compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() }
+            compose.onNodeWithTag("photo:$id").assertIsDisplayed()
         } finally {
             app.database.imports().job(id)?.let { app.database.imports().saveJob(it.copy(state="CANCELLED")) }
             app.database.openHelper.writableDatabase.execSQL("DELETE FROM import_jobs WHERE id=?",arrayOf(id))

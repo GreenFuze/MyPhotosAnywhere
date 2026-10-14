@@ -64,4 +64,17 @@ class TimelineAnchorRestorerTest {
         catch(expected: IllegalStateException) { assertTrue(requireNotNull(expected.message).contains("photo:anchor"));assertEquals(8,attempts) }
     }
 
+    @Test fun exactPixelAlignmentDoesNotRequireScrollableContent() {
+        assertTrue(TimelineAnchorAlignment.satisfied(8,-8,true,true))
+        assertTrue(TimelineAnchorAlignment.satisfied(9,-8,false,false))
+    }
+    @Test fun realViewportBoundariesAcceptTheNearestReachableOffset() {
+        assertTrue(TimelineAnchorAlignment.satisfied(60,-8,false,true))
+        assertTrue(TimelineAnchorAlignment.satisfied(0,-8,true,false))
+    }
+    @Test fun anOffsetThatCanStillBeReachedMustNotBeAcceptedAsRestored() {
+        assertFalse(TimelineAnchorAlignment.satisfied(60,-8,true,false))
+        assertFalse(TimelineAnchorAlignment.satisfied(0,-8,false,true))
+    }
+
 }
