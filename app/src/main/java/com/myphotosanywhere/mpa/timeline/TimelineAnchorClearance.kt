@@ -9,7 +9,8 @@ internal class TimelineAnchorClearance(heights: List<Int>,private val gap: Int,p
         if(anchorRow==null) return normal
         require(anchorRow in rows.indices)
         val offset=TimelineAnchorAlignment.visibleOffset(savedOffset,rows[anchorRow],viewport)
-        val start=top.toLong()+rows.take(anchorRow).sumOf { it.toLong() }+anchorRow.toLong()*gap
+        // Lazy-grid item offsets exclude leading content padding.
+        val start=rows.take(anchorRow).sumOf { it.toLong() }+anchorRow.toLong()*gap
         val scroll=start+offset
         if(scroll<=0) return normal
         val total=top.toLong()+rows.sumOf { it.toLong() }+maxOf(0,rows.size-1).toLong()*gap
