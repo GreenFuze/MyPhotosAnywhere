@@ -130,8 +130,8 @@ class DriveGatewayTest {
         catch(_: IllegalStateException) { }
     }
 
-    private fun renewing(refresh: suspend (String) -> String) = DriveGateway("old-token",
-        OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build(),
+    private fun renewing(client: OkHttpClient = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build(),
+        refresh: suspend (String) -> String) = DriveGateway("old-token",client,
         server.url("/drive/v3/"),server.url("/upload/drive/v3/files"),refresh)
 
     @Test fun expiredAccessRenewsSilentlyAndTheSameGatewayUsesItsReplacement() = runBlocking {
@@ -183,11 +183,20 @@ class DriveGatewayTest {
     }
     @Test fun cancellationWhileRenewingClosesRejectedResponseAndNeverReplaysOrWrites() = runBlocking {
         val expected=kotlinx.coroutines.CancellationException("cancelled")
-        val renewing=renewing { throw expected };val file=File.createTempFile("mpa-cancel",".part")
+        var released=false
+        val client=OkHttpClient.Builder().eventListener(object: okhttp3.EventListener() {
+            override fun connectionReleased(call: okhttp3.Call, connection: okhttp3.Connection) { released=true }
+        }).build()
+        val renewing=renewing(client) { assertTrue("Close rejected response before renewal",released);throw expected }
+        val file=File.createTempFile("mpa-cancel",".part")
         try {
             file.writeText("preserved");server.enqueue(MockResponse().setResponseCode(401).setBody("not-photo"))
             try { renewing.download("photo",file,50);fail("Cancellation must propagate") }
-            catch(error: kotlinx.coroutines.CancellationException) { assertSame(expected,error) }
+            catch(error: kotlinx.coroutines.CancellationException) {
+                assertEquals(expected.message,error.message)
+                // Debug stack-trace recovery can copy an exception across withContext, retaining its cause.
+                assertSame(expected,error.cause ?: error)
+            }
             assertEquals("preserved",file.readText());assertEquals(1,server.requestCount)
         } finally { file.delete() }
     }
@@ -195,7 +204,9 @@ class DriveGatewayTest {
         val expected=DriveAuthorizationNeeded();val renewing=renewing { throw expected }
         server.enqueue(MockResponse().setResponseCode(401))
         try { renewing.user();fail("Real permission loss must surface") }
-        catch(error: DriveAuthorizationNeeded) { assertSame(expected,error) }
+        catch(error: DriveAuthorizationNeeded) {
+            assertEquals(expected.message,error.message);assertSame(expected,error.cause ?: error)
+        }
         assertEquals(1,server.requestCount)
     }
 
