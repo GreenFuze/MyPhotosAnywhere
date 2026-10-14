@@ -57,6 +57,9 @@ class JustifiedMosaicTest {
         val later=TimelineAnchor(TimelineCursor(1,"photo:later"),-100)
         assertEquals(held,TimelineViewport.choose(listOf(first,held,later),held))
         assertEquals(first,TimelineViewport.choose(listOf(first,held,later),later))
+        assertEquals(held,TimelineViewport.opening(first,held))
+        assertEquals(first,TimelineViewport.opening(first,later))
+        assertEquals(first,TimelineViewport.opening(first,null))
     }
     @Test fun scrollingBeyondHeldRowAdvancesAnchorAndEmptyHasNoAnchor() {
         val held=TimelineAnchor(TimelineCursor(3,"photo:held"),40)

@@ -21,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
@@ -190,6 +191,18 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         val plan=remember(retained,density,layout,maxWidth) {
             JustifiedMosaic().plan(retained.map { MosaicInput(it.entry.key,it.aspect) },density.columns,(maxWidth.value-4f).coerceAtLeast(1f),layout)
         }
+        val pixels=LocalDensity.current
+        val clearance=remember(plan,pixels) {
+            TimelineAnchorClearance(plan.cells.distinctBy { it.row }.map { with(pixels) { requireNotNull(it.height).dp.roundToPx() } },
+                with(pixels) { 2.dp.roundToPx() },with(pixels) { 2.dp.roundToPx() })
+        }
+        val held=model.anchor(query)
+        val heldIndex=retained.indexOfFirst { it.entry.key==held?.cursor?.key }
+        val viewportPixels=with(pixels) { maxHeight.roundToPx() }
+        val normalBottomPixels=with(pixels) { (bottomClearance+2.dp).roundToPx() }
+        val bottomPixels=if(viewportPixels>0) clearance.bottom(plan.cells.getOrNull(heldIndex)?.row,held?.offset ?: 0,
+            viewportPixels,normalBottomPixels) else normalBottomPixels
+        val bottomPadding=with(pixels) { bottomPixels.toDp() }
         val physicalColumns=if(layout==GalleryLayout.SQUARE) plan.columns else JustifiedMosaic.SLOTS
         // Square and packed Mosaic use different slot structures. Give their layout nodes
         // distinct lifetimes with matching scroll-state lifetimes. The model retains the anchor.
@@ -213,7 +226,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                     if(selection.isEmpty() && transformed && scale.isFinite() && scale>0) pinch(scale)
                 }
             },
-            contentPadding=PaddingValues(start=2.dp,top=2.dp,end=2.dp,bottom=bottomClearance+2.dp),
+            contentPadding=PaddingValues(start=2.dp,top=2.dp,end=2.dp,bottom=bottomPadding),
             horizontalArrangement=Arrangement.spacedBy(2.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
             items(retained.size,key={ index -> retained[index].entry.key },
                 span={ index -> GridItemSpan(if(layout==GalleryLayout.SQUARE) 1 else plan.cells[index].span) },contentType={ "media" }) { index ->
@@ -221,12 +234,12 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 // A concurrent prepend must never apply another identity's cell dimensions/actions.
                 if(index<rows.itemCount) rows[index]
                 val row=retained[index]
-                TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || row.query!=query,zone,
+                TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || restoring || row.query!=query,zone,
                     Modifier.height(requireNotNull(plan.cells.getOrNull(index)?.height).dp).semantics {
                         val cell=plan.cells[index];collectionItemInfo=CollectionItemInfo(cell.row,1,cell.column,1)
                     }) {
                     val offset=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==row.entry.key }?.offset?.y
-                    model.open(row.entry,offset?.let { -it },viewport())
+                    model.open(row.entry,offset?.let { -it },TimelineViewport.opening(viewport(),offset?.let { TimelineAnchor(row.entry.cursor,-it) }))
                 }
             }
             if(rows.loadState.append is LoadState.Loading) item(span={ GridItemSpan(maxLineSpan) }) {
