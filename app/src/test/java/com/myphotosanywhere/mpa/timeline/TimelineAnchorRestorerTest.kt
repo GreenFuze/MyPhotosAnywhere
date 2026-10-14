@@ -77,4 +77,13 @@ class TimelineAnchorRestorerTest {
         assertFalse(TimelineAnchorAlignment.satisfied(0,-8,false,true))
     }
 
+    @Test fun aCropLargerThanTheShrunkenPhotoKeepsThatPhotoVisible() {
+        assertEquals(299,TimelineAnchorAlignment.visibleOffset(800,300,1000))
+        assertEquals(25,TimelineAnchorAlignment.visibleOffset(25,300,1000))
+    }
+    @Test fun aSavedPositionBelowTheResizedViewportKeepsTheCanonicalPhotoVisible() {
+        assertEquals(-999,TimelineAnchorAlignment.visibleOffset(-1500,300,1000))
+        assertEquals(-25,TimelineAnchorAlignment.visibleOffset(-25,300,1000))
+    }
+
 }

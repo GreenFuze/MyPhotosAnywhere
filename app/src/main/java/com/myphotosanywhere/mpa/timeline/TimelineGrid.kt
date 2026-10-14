@@ -111,7 +111,9 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         val anchor=model.anchor(query)
         if(anchor!=null) {
             val placement=object: TimelinePlacement {
+                private var requestedIndex=0
                 override suspend fun place(index: Int,offset: Int) {
+                    requestedIndex=index
                     // A Compose frame advances recomposition, but Android measurement is
                     // separate (including under the native test clock). Count actual measures.
                     withFrameNanos { }
@@ -129,15 +131,22 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 override suspend fun align(key: String,offset: Int): Boolean {
                     // A completed layout can still reflect the preceding span/index cache.
                     // Missing placement must retry, even when the retained keys did not change.
-                    val placed=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key } ?: return false
-                    val correction=placed.offset.y+offset
+                    var placed=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key }
+                    if(placed==null) {
+                        // Shrinking cells may consume the entire anchored item with its
+                        // formerly valid crop offset. Probe that canonical index at zero.
+                        place(requestedIndex,0)
+                        placed=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key } ?: return false
+                    }
+                    val target=TimelineAnchorAlignment.visibleOffset(offset,placed.size.height,state.layoutInfo.viewportEndOffset)
+                    val correction=placed.offset.y+target
                     if(correction!=0) state.scrollBy(correction.toFloat())
                     // scrollBy completes its synchronous remeasure before returning.
                     val corrected=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key }
                     if(corrected==null) return false
                     val viewport=state.layoutInfo
                     val visible=corrected.offset.y+corrected.size.height>viewport.viewportStartOffset && corrected.offset.y<viewport.viewportEndOffset
-                    return visible && TimelineAnchorAlignment.satisfied(corrected.offset.y,offset,state.canScrollForward,state.canScrollBackward)
+                    return visible && TimelineAnchorAlignment.satisfied(corrected.offset.y,target,state.canScrollForward,state.canScrollBackward)
                 }
             }
             val snapshots=snapshotFlow { Triple(rows.itemSnapshotList.items,rows.loadState.refresh,refreshedGeneration) }

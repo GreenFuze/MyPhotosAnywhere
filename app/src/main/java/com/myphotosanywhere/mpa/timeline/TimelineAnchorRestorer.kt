@@ -31,6 +31,10 @@ internal class TimelineAnchorRestorer(private val placement: TimelinePlacement) 
 
 /** A viewport edge may make the saved offset unreachable even while its photo is visible. */
 internal object TimelineAnchorAlignment {
+    fun visibleOffset(savedOffset: Int,itemHeight: Int,viewportEnd: Int): Int {
+        require(itemHeight>0 && viewportEnd>0)
+        return savedOffset.coerceIn(1-viewportEnd,itemHeight-1)
+    }
     fun satisfied(actualY: Int,savedOffset: Int,canScrollForward: Boolean,canScrollBackward: Boolean): Boolean {
         val correction=actualY.toLong()+savedOffset
         return kotlin.math.abs(correction)<=1 || correction>0 && !canScrollForward || correction<0 && !canScrollBackward

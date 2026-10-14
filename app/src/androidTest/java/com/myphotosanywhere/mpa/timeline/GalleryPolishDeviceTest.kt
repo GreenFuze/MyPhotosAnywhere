@@ -76,7 +76,12 @@ class GalleryPolishDeviceTest {
             compose.onNodeWithTag("timeline:date-rail").assertDoesNotExist();pinch(false);assertEquals(GridDensity.LARGE,app.galleryPresentation.density.value)
             compose.onNodeWithTag("photo:polish-30").assertIsSelected()
             compose.onNodeWithTag("selection:close").performClick()
-            waitTag("timeline:date-rail");pinch(false);columns(3)
+            waitTag("timeline:date-rail")
+            val shrinkAnchor=compose.runOnUiThread { requireNotNull(timeline.anchor()) }
+            pinch(false);columns(3);waitTag(shrinkAnchor.cursor.key)
+            compose.waitUntil(15000) { compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() }
+            assertEquals("Shrinking cells must retain the canonical photo",shrinkAnchor.cursor.key,compose.runOnUiThread { timeline.anchor()?.cursor?.key })
+            compose.onNodeWithTag(shrinkAnchor.cursor.key).assertIsDisplayed()
             compose.onNodeWithTag("photo:polish-30").performClick();waitTag("viewer-screen");compose.onNodeWithTag("viewer-close").performClick();waitTag("photo:polish-30")
             photos.forEach { assertEquals(it,app.database.photos().find(it.id)?.copy(lastAccess=it.lastAccess)) }
         } finally { photos.forEach { app.database.photos().find(it.id)?.let { row -> app.database.photos().update(row.copy(archived=true)) } };file.delete();app.galleryPresentation.update(original) }
