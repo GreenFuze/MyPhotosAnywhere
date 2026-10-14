@@ -8,6 +8,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.myphotosanywhere.mpa.R
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -85,10 +88,10 @@ internal fun ImportPreviewDialog(job: ImportJob?,entries: List<ImportItem>,busy:
 private fun TakeoutPreviewOverview(snapshot: TakeoutPreviewSnapshot) {
     Column(Modifier.testTag("takeout-metadata-summary"),verticalArrangement=Arrangement.spacedBy(4.dp)) {
         Text("Takeout metadata",style=MaterialTheme.typography.titleSmall,modifier=Modifier.semantics { heading() })
-        Text("${snapshot.withMetadata} media items with metadata · ${snapshot.withoutMetadata} without metadata")
-        Text("${snapshot.withPeople} media items with people labels · ${snapshot.differentNames} different names")
+        Text(stringResource(R.string.takeout_preview_metadata_totals,pluralStringResource(R.plurals.takeout_preview_media_items,snapshot.withMetadata,snapshot.withMetadata),snapshot.withoutMetadata))
+        Text(stringResource(R.string.takeout_preview_people_totals,pluralStringResource(R.plurals.takeout_preview_media_items,snapshot.withPeople,snapshot.withPeople),pluralStringResource(R.plurals.takeout_preview_names,snapshot.differentNames,snapshot.differentNames)))
         Text("Selected media: ${snapshot.selectedMedia} · with people labels: ${snapshot.selectedWithPeople}",Modifier.testTag("takeout-selected-summary"))
-        Text("${snapshot.reviewCount} items need review · ${snapshot.invalidMetadata} unreadable media records")
+        Text(stringResource(R.string.takeout_preview_review_totals,pluralStringResource(R.plurals.takeout_preview_review_items,snapshot.reviewCount,snapshot.reviewCount),pluralStringResource(R.plurals.takeout_preview_unreadable_records,snapshot.invalidMetadata,snapshot.invalidMetadata)))
         Text("After import, exported names appear in Collections > People > Imported people. They are photo labels, not confirmed face assignments. No face recognition is started.",style=MaterialTheme.typography.bodySmall)
     }
 }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="takeout_preview_media_items">
+        <item quantity="one">%d media item</item>
+        <item quantity="other">%d media items</item>
+    </plurals>
+    <plurals name="takeout_preview_names">
+        <item quantity="one">%d different name</item>
+        <item quantity="other">%d different names</item>
+    </plurals>
+    <plurals name="takeout_preview_review_items">
+        <item quantity="one">%d item needs review</item>
+        <item quantity="other">%d items need review</item>
+    </plurals>
+    <plurals name="takeout_preview_unreadable_records">
+        <item quantity="one">%d unreadable media record</item>
+        <item quantity="other">%d unreadable media records</item>
+    </plurals>
+    <string name="takeout_preview_metadata_totals">%1$s with metadata · %2$d without metadata</string>
+    <string name="takeout_preview_people_totals">%1$s with people labels · %2$s</string>
+    <string name="takeout_preview_review_totals">%1$s · %2$s</string>
+</resources>

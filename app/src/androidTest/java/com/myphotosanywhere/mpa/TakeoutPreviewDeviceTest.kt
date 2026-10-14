@@ -36,7 +36,7 @@ class TakeoutPreviewDeviceTest {
             }
         }
         compose.waitUntil(10000) { compose.onAllNodesWithTag("takeout-metadata-summary").fetchSemanticsNodes().size==1 }
-        scrollToText("1 media items with people labels · 1 different names").assertIsDisplayed()
+        scrollToText("1 media item with people labels · 1 different name").assertIsDisplayed()
         compose.onNodeWithText("Selected media: 3 · with people labels: 1").assertExists()
         val people=scrollToTag("takeout-filter:PEOPLE").assertIsDisplayed()
         val bounds=people.fetchSemanticsNode().boundsInRoot
