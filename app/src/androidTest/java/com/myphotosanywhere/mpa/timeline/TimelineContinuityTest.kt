@@ -93,6 +93,20 @@ class TimelineContinuityTest {
             recordViewport("after")
             assertEquals("Viewer return must restore the same pixel offset (grid origin $beforeGridTop -> $afterGridTop)",before,after,3f)
             assertEquals("Viewer return must preserve the offset within the grid",before-beforeGridTop,after-afterGridTop,3f)
+            val model=compose.runOnUiThread { androidx.lifecycle.ViewModelProvider(compose.activity)[TimelineViewModel::class.java] }
+            val backgroundAnchor=compose.runOnUiThread { model.anchor(TimelineQuery(source=source.key)) }
+            compose.runOnUiThread { model.restoreAnchor() }
+            compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            // A real background interval exceeds the measurement guard. Hidden Android
+            // windows need not measure; foreground lifecycle must cancel and resume work.
+            Thread.sleep(5500)
+            compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            compose.waitUntil(30000) {
+                compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() &&
+                    compose.onAllNodes(hasTestTag("photo:timeline-ui-70") and isEnabled()).fetchSemanticsNodes().size==1
+            }
+            assertEquals(backgroundAnchor,compose.runOnUiThread { model.anchor(TimelineQuery(source=source.key)) })
+            assertEquals("Foreground return preserves photo and pixels",after,compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInWindow.top,3f)
             compose.onNodeWithTag("nav:Collections").performClick()
             compose.onNodeWithTag("nav:Photos").performClick()
             // Source filtering and its anchor survive a primary-destination round trip.

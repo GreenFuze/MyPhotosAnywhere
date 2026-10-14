@@ -27,6 +27,8 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.insertSeparators
@@ -69,6 +71,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,
     hasSources: Boolean,onConnect: ()->Unit,onClearFilters: ()->Unit,onRefresh: ()->Unit,emptyActionLabel: String="Clear filters") {
     val zone=deviceTimelineZone(model)
+    val lifecycleOwner=LocalLifecycleOwner.current
     // Content/span callbacks must capture one immutable geometry snapshot. A delegated
     // State read inside an old callback can mix new spans with the preceding slot count.
     val density=model.density.collectAsStateWithLifecycle().value
@@ -102,7 +105,9 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         return TimelineViewport.choose(visible,model.anchor(query))
     }
     LaunchedEffect(query) { model.configure(query) }
-    LaunchedEffect(query,restoration,zone,density,layout) {
+    LaunchedEffect(lifecycleOwner,query,restoration,zone,density,layout) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+        restoring=true
         val anchor=model.anchor(query)
         if(anchor!=null) {
             val placement=object: TimelinePlacement {
@@ -156,6 +161,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         if(anchor==null && query.search!=null) state.requestScrollToItem(0)
         model.restored(restoration)
         restoring=false
+        }
     }
     LaunchedEffect(query,restoring,viewer,mediaByKey) {
         if(restoring || viewer!=null) return@LaunchedEffect
