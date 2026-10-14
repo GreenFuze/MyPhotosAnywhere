@@ -1,3 +1,7 @@
+## MPA 0.5.20: immersive viewer
+
+Application `37d8aebc19abb6fdfd157467971e8cb95ffae46f` passed 338 unit/integration tests, zero lint findings and 105 native tests on each of API 29/35/37 (315 total), with no failures/errors/skips. Exact CI APK, signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.20.md). S23 Ultra acceptance remains pending.
+
 ## MPA 0.5.19: Takeout metadata preview
 
 Application `6ef6bed197cd0efdb5a1c5a4f13aae60101f4b3a` passed 338 unit/integration tests, zero lint findings and 101 native tests on each of API 29/35/37 (303 total), with no failures/errors/skips. Exact CI APK, signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.19.md). S23 Ultra acceptance remains pending.
