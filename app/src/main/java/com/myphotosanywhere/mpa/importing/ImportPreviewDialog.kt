@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -60,7 +61,7 @@ internal fun ImportPreviewDialog(job: ImportJob?,entries: List<ImportItem>,busy:
                     Row {
                         Checkbox(item.selected,{ selected -> onSelect(item.id,selected) },
                             enabled=!busy && job?.state in listOf("PREVIEW","PAUSED","FAILED") && item.state !in listOf("COMPLETE","UNSUPPORTED","MATCHED","UNRESOLVED","INFORMATION"),
-                            modifier=Modifier.testTag("import-preview-select:${item.id}"))
+                            modifier=Modifier.testTag("import-preview-select:${item.id}").semantics { contentDescription="Include ${item.name}" })
                         Column(Modifier.weight(1f)) {
                             Text(item.path.take(250))
                             Text("${item.state.lowercase()} · ${if(item.metadata!=null) "metadata present" else "no supplemental metadata"}",style=MaterialTheme.typography.bodySmall)

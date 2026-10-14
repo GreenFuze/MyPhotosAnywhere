@@ -4,7 +4,11 @@ import com.google.gson.JsonParseException
 
 internal data class TakeoutPreviewInput(val id: String,val raw: String?)
 internal data class TakeoutPreviewMetadata(val inputs: List<TakeoutPreviewInput>,
-    val records: Map<String,TakeoutMetadata>,val invalidIds: Set<String>)
+    val records: Map<String,TakeoutMetadata>,val invalidIds: Set<String>) {
+    val namesById=records.mapValues { (_,record) -> record.people.map(String::trim).filter(String::isNotBlank).distinct() }
+    val withPeople=namesById.count { it.value.isNotEmpty() }
+    val differentNames=namesById.values.flatten().toSet().size
+}
 
 /** Read-only inspection. A malformed provider record is explicit; internal failures propagate. */
 internal class TakeoutPreviewAnalyzer {
@@ -18,7 +22,7 @@ internal class TakeoutPreviewAnalyzer {
             try { records[input.id]=codec.parse(raw) }
             catch(error: RuntimeException) {
                 if(error !is JsonParseException && error !is IllegalArgumentException && error !is IllegalStateException &&
-                    error !is UnsupportedOperationException && error !is ArithmeticException) throw error
+                    error !is UnsupportedOperationException && error !is ArithmeticException && error !is ClassCastException) throw error
                 invalid.add(input.id)
             }
         }
@@ -42,8 +46,8 @@ internal class TakeoutPreviewSnapshot(val entries: List<ImportItem>,val metadata
     val withMetadata get()=metadata.records.size
     val withoutMetadata get()=media.count { it.metadata==null }
     val invalidMetadata get()=metadata.invalidIds.size
-    val withPeople get()=media.count { names(it).isNotEmpty() }
-    val differentNames get()=media.flatMap(::names).toSet().size
+    val withPeople get()=metadata.withPeople
+    val differentNames get()=metadata.differentNames
     val selectedMedia get()=media.count { it.selected }
     val selectedWithPeople get()=media.count { it.selected && names(it).isNotEmpty() }
     val reviewCount get()=entries.count(::needsReview)
@@ -53,7 +57,7 @@ internal class TakeoutPreviewSnapshot(val entries: List<ImportItem>,val metadata
         TakeoutPreviewFilter.MISSING -> isMedia(entry) && entry.metadata==null
         TakeoutPreviewFilter.REVIEW -> needsReview(entry)
     } }
-    private fun names(entry: ImportItem)=metadata.records[entry.id]?.people.orEmpty().map(String::trim).filter(String::isNotBlank).distinct()
+    private fun names(entry: ImportItem)=metadata.namesById[entry.id].orEmpty()
     private fun needsReview(entry: ImportItem)=entry.id in metadata.invalidIds || entry.error!=null || entry.state in setOf("UNRESOLVED","UNSUPPORTED","FAILED")
     companion object {
         fun isMedia(entry: ImportItem)=entry.mime.startsWith("image/") || entry.mime.startsWith("video/")
