@@ -4,6 +4,7 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,6 +23,10 @@ import com.myphotosanywhere.mpa.drive.DriveStorageScreen
 import com.myphotosanywhere.mpa.importing.*
 import com.myphotosanywhere.mpa.library.*
 import com.myphotosanywhere.mpa.ui.ShellDestination
+import com.myphotosanywhere.mpa.ui.ShellIcon
+import com.myphotosanywhere.mpa.R
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
 
 /** Focused destinations share existing state holders. Their workers, persistence and captured destinations are unchanged. */
 @Composable
@@ -75,16 +80,54 @@ internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,
     }
 }
 
+/** Menu ownership stays in presentation; opening a section cannot mutate settings. */
+private object SettingsMenu {
+    val groups=listOf(
+        "Library" to listOf(ShellDestination.CACHE,ShellDestination.RECOGNITION),
+        "Backup and privacy" to listOf(ShellDestination.ANNOTATIONS,ShellDestination.PRIVACY),
+        "Application" to listOf(ShellDestination.ABOUT)
+    )
+    fun icon(destination: ShellDestination)=when(destination) {
+        ShellDestination.CACHE -> R.drawable.ic_shell_offline
+        ShellDestination.RECOGNITION -> R.drawable.ic_shell_people
+        ShellDestination.ANNOTATIONS -> R.drawable.ic_action_backup
+        ShellDestination.PRIVACY -> R.drawable.ic_action_privacy
+        ShellDestination.ABOUT -> R.drawable.ic_action_info
+        ShellDestination.IMPORTS -> R.drawable.ic_shell_add
+        ShellDestination.IMPORT_HISTORY -> R.drawable.ic_shell_archive
+        else -> error("No menu icon for $destination")
+    }
+}
+
 @Composable
 internal fun ManagementSettingsMenu(onOpen: (ShellDestination)->Unit) {
-    Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        listOf(ShellDestination.CACHE,ShellDestination.RECOGNITION,ShellDestination.ANNOTATIONS,ShellDestination.PRIVACY,ShellDestination.ABOUT).forEach { ManagementLink(it,onOpen) }
+    Column(verticalArrangement=Arrangement.spacedBy(20.dp)) {
+        SettingsMenu.groups.forEach { (heading,destinations) ->
+            Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text(heading,style=MaterialTheme.typography.titleSmall,modifier=Modifier.semantics { heading() })
+                Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surfaceContainer) {
+                    Column {
+                        destinations.forEachIndexed { index,destination ->
+                            ManagementLink(destination,onOpen)
+                            if(index<destinations.lastIndex) HorizontalDivider(Modifier.padding(start=56.dp,end=16.dp))
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun ManagementLink(destination: ShellDestination,onOpen: (ShellDestination)->Unit) {
-    OutlinedButton(onClick={ onOpen(destination) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("management:${destination.title}")) { Text(destination.title) }
+    Surface(onClick={ onOpen(destination) },modifier=Modifier.fillMaxWidth().heightIn(min=64.dp)
+        .testTag("management:${destination.title}").semantics { role=Role.Button },color=MaterialTheme.colorScheme.surfaceContainer) {
+        Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+            ShellIcon(SettingsMenu.icon(destination))
+            Text(destination.title,Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)
+            ShellIcon(R.drawable.ic_action_chevron)
+        }
+    }
 }
 
 @Composable

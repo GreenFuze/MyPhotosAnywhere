@@ -15,6 +15,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import com.myphotosanywhere.mpa.data.Album
 import com.myphotosanywhere.mpa.ui.ShellIcon
+import com.myphotosanywhere.mpa.ui.IconLabelAction
 import com.myphotosanywhere.mpa.R
 
 @Composable
@@ -38,12 +39,19 @@ internal fun SelectionTopBar(count: Int,busy: Boolean,onClose: ()->Unit) {
 internal fun SelectionBottomBar(busy: Boolean,archived: Boolean,inAlbum: Boolean,onAction: (BulkKind)->Unit,modifier: Modifier=Modifier) {
     Surface(modifier.fillMaxWidth(),color=MaterialTheme.colorScheme.surfaceContainer,shadowElevation=3.dp) {
         FlowRow(Modifier.padding(horizontal=8.dp,vertical=4.dp).navigationBarsPadding(),horizontalArrangement=Arrangement.SpaceEvenly) {
-            listOf("Share" to BulkKind.SHARE,"Album" to BulkKind.ALBUM,"Favorite" to BulkKind.FAVORITE,
-                (if(archived) "Restore" else "Archive") to (if(archived) BulkKind.RESTORE else BulkKind.ARCHIVE),
-                "Offline" to BulkKind.OFFLINE,"Unfavorite" to BulkKind.UNFAVORITE).forEach { (label,kind) ->
-                TextButton(enabled=!busy,onClick={ onAction(kind) },modifier=Modifier.heightIn(min=48.dp).testTag("selection:${kind.name}")) { Text(label) }
+            listOf(
+                Triple(BulkKind.SHARE,"Share",R.drawable.ic_action_share),
+                Triple(BulkKind.ALBUM,"Album",R.drawable.ic_shell_collections),
+                Triple(BulkKind.FAVORITE,"Favorite",R.drawable.ic_shell_favorite),
+                if(archived) Triple(BulkKind.RESTORE,"Restore",R.drawable.ic_action_restore) else Triple(BulkKind.ARCHIVE,"Archive",R.drawable.ic_shell_archive),
+                Triple(BulkKind.OFFLINE,"Offline",R.drawable.ic_shell_offline),
+                Triple(BulkKind.UNFAVORITE,"Unfavorite",R.drawable.ic_action_unfavorite)
+            ).forEach { (kind,label,icon) ->
+                IconLabelAction(icon,label,{ onAction(kind) },Modifier.testTag("selection:${kind.name}"),enabled=!busy,
+                    description=when(kind) { BulkKind.ALBUM -> "Add to album";BulkKind.OFFLINE -> "Make available offline";else -> label })
             }
-            if(inAlbum) TextButton(enabled=!busy,onClick={ onAction(BulkKind.REMOVE_ALBUM) },modifier=Modifier.heightIn(min=48.dp)) { Text("Remove from album") }
+            if(inAlbum) IconLabelAction(R.drawable.ic_action_remove_album,"Remove from album",{ onAction(BulkKind.REMOVE_ALBUM) },
+                Modifier.testTag("selection:REMOVE_ALBUM"),enabled=!busy)
         }
     }
 }

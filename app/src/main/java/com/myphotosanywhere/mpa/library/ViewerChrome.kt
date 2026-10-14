@@ -18,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.myphotosanywhere.mpa.R
 import com.myphotosanywhere.mpa.data.Photo
 import com.myphotosanywhere.mpa.ui.ShellIcon
+import com.myphotosanywhere.mpa.ui.IconLabelAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -33,7 +34,7 @@ internal fun ViewerTopBar(millis: Long?,name: String,onClose: ()->Unit,onDetails
                 color=Color.White,style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })
             Text(name,color=Color.White.copy(alpha=.8f),style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis)
         }
-        TextButton(onClick=onDetails,modifier=Modifier.heightIn(min=48.dp).testTag("viewer-details")) { Text("Details",color=Color.White) }
+        IconButton(onClick=onDetails,modifier=Modifier.size(48.dp).testTag("viewer-details")) { ShellIcon(R.drawable.ic_action_info,"Photo details") }
     }
 }
 
@@ -50,13 +51,13 @@ internal fun ViewerActions(photo: Photo?,model: LibraryFeaturesModel,onEdit: (St
     }
     FlowRow(Modifier.fillMaxWidth().padding(horizontal=12.dp),horizontalArrangement=Arrangement.SpaceEvenly,
         verticalArrangement=Arrangement.spacedBy(4.dp)) {
-        TextButton(enabled=available && !busy,onClick={ item?.let { model.share(it) { intent -> context.startActivity(intent) } } },
-            modifier=Modifier.heightIn(min=48.dp).testTag("viewer-share")) { Text("Share",color=if(available && !busy) Color.White else Color.Gray) }
-        if(photo?.mimeType?.startsWith("image/")!=false) TextButton(enabled=available && !busy,onClick={ item?.let { onEdit(it.id) } },
-            modifier=Modifier.heightIn(min=48.dp).testTag("viewer-edit")) { Text("Edit",color=if(available && !busy) Color.White else Color.Gray) }
-        if(item!=null) FilterChip(selected=item.favorite,enabled=!busy,onClick={ model.updatePhoto(item.id) { it.copy(favorite=!it.favorite) } },
-            label={ Text("Favorite") },modifier=Modifier.heightIn(min=48.dp).testTag("viewer-favorite"),
-            colors=FilterChipDefaults.filterChipColors(labelColor=Color.White,selectedContainerColor=Color(0xFF8BD5BE),selectedLabelColor=Color.Black))
+        IconLabelAction(R.drawable.ic_action_share,"Share",{ item?.let { model.share(it) { intent -> context.startActivity(intent) } } },
+            Modifier.testTag("viewer-share"),enabled=available && !busy,color=Color.White)
+        if(photo?.mimeType?.startsWith("image/")!=false) IconLabelAction(R.drawable.ic_shell_edit,"Edit",{ item?.let { onEdit(it.id) } },
+            Modifier.testTag("viewer-edit"),enabled=available && !busy,color=Color.White)
+        if(item!=null) IconLabelAction(if(item.favorite) R.drawable.ic_shell_favorite else R.drawable.ic_action_favorite_outline,"Favorite",{ model.updatePhoto(item.id) { it.copy(favorite=!it.favorite) } },
+            Modifier.testTag("viewer-favorite"),enabled=!busy,description=if(item.favorite) "Remove from favorites" else "Add to favorites",selected=item.favorite,
+            color=if(item.favorite) Color(0xFF8BD5BE) else Color.White)
         if(showStatus) ViewerStatus(model,Color.White)
     }
 }

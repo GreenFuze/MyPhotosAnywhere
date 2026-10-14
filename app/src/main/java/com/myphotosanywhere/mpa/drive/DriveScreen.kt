@@ -40,6 +40,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.common.AccountPicker
 import com.myphotosanywhere.mpa.data.Photo
+import com.myphotosanywhere.mpa.ui.IconLabelAction
+import com.myphotosanywhere.mpa.R
 
 @Composable
 fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->Unit,onSettings: ()->Unit,model: DriveViewModel = viewModel()) {
@@ -76,9 +78,9 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
         Text("MyPhotosAnywhere",style=MaterialTheme.typography.headlineSmall)
         Text("Your gallery combines ${sources.size} connected sources. Managing a source does not filter Photos.",style=MaterialTheme.typography.bodySmall)
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick=onActivity,modifier=Modifier.heightIn(min=48.dp).testTag("management:Activity")) { Text("Activity") }
-            TextButton(onClick=onImports,modifier=Modifier.heightIn(min=48.dp).testTag("management:Import photos")) { Text("Import photos") }
-            TextButton(onClick=onSettings,modifier=Modifier.heightIn(min=48.dp).testTag("management:Settings")) { Text("Settings") }
+            IconLabelAction(R.drawable.ic_shell_activity,"Activity",onActivity,Modifier.testTag("management:Activity"))
+            IconLabelAction(R.drawable.ic_shell_add,"Import",onImports,Modifier.testTag("management:Import photos"),description="Import photos")
+            IconLabelAction(R.drawable.ic_action_settings,"Settings",onSettings,Modifier.testTag("management:Settings"))
         }
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let {

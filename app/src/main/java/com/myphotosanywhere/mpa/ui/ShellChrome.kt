@@ -52,10 +52,10 @@ fun ShellTopBar(title: String,canGoBack: Boolean,onBack: ()->Unit,canAddPhotos: 
         Box {
             IconButton(onClick={ add=true },modifier=Modifier.testTag("shell:add")) { ShellIcon(R.drawable.ic_shell_add,"Add photos or import") }
             DropdownMenu(expanded=add,onDismissRequest={ add=false }) {
-                DropdownMenuItem(text={ Text("Add photos") },enabled=canAddPhotos,onClick={ add=false;onAddPhotos() })
-                DropdownMenuItem(text={ Text("Import photos") },onClick={ add=false;onImport() })
-                if(compact) DropdownMenuItem(text={ Text("Imports and activity") },onClick={ add=false;onActivity() })
-                DropdownMenuItem(text={ Text("Connect Google Drive") },onClick={ add=false;onStorage() })
+                DropdownMenuItem(text={ Text("Add photos") },leadingIcon={ ShellIcon(R.drawable.ic_shell_photos) },enabled=canAddPhotos,onClick={ add=false;onAddPhotos() })
+                DropdownMenuItem(text={ Text("Import photos") },leadingIcon={ ShellIcon(R.drawable.ic_shell_add) },onClick={ add=false;onImport() })
+                if(compact) DropdownMenuItem(text={ Text("Imports and activity") },leadingIcon={ ShellIcon(R.drawable.ic_shell_activity) },onClick={ add=false;onActivity() })
+                DropdownMenuItem(text={ Text("Connect Google Drive") },leadingIcon={ ShellIcon(R.drawable.ic_shell_account) },onClick={ add=false;onStorage() })
             }
         }
         if(!compact) IconButton(onClick=onActivity,modifier=Modifier.testTag("shell:activity")) {
