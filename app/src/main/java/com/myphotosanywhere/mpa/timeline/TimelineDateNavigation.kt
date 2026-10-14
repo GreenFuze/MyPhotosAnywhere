@@ -54,17 +54,20 @@ internal fun GridDensityControls(selected: GridDensity,onSelect: (GridDensity)->
 }
 
 @Composable
-internal fun BoxScope.TimelineDateRail(state: LazyGridState,items: List<TimelineRow>,query: TimelineQuery,zone: ZoneId,onOpen: ()->Unit) {
+internal fun BoxScope.TimelineDateRail(state: LazyGridState,items: List<TimelineRow>,query: TimelineQuery,zone: ZoneId,preferred: ()->TimelineAnchor?,onOpen: ()->Unit) {
     val media=remember(items,query) { items.filter { it.query==query }.associateBy { it.entry.key } }
+    val currentPreferred by rememberUpdatedState(preferred)
     val indicator by remember(state,media,zone) { derivedStateOf {
         val layout=state.layoutInfo
-        // Choose the first intersecting media row before interpreting its timestamp. Skipping
-        // null timestamps would incorrectly label unknown-date photos with a later photo's date.
-        layout.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-            media[visible.key]?.takeIf {
-                it.query==query && visible.offset.y+visible.size.height>layout.viewportStartOffset && visible.offset.y<layout.viewportEndOffset
-            }
-        }?.let { TimelineDateIndicator.from(it.entry.millis,zone) }
+        // A date seek can anchor a photo beside newer dates on the same top row.
+        // Share the viewport's canonical identity policy; interpret the chosen timestamp
+        // only afterwards so unknown dates never borrow a neighbor's known date.
+        val visible=layout.visibleItemsInfo.mapNotNull { item ->
+            media[item.key]?.takeIf {
+                item.offset.y+item.size.height>layout.viewportStartOffset && item.offset.y<layout.viewportEndOffset
+            }?.entry?.let { TimelineAnchor(it.cursor,-item.offset.y) }
+        }
+        TimelineViewport.choose(visible,currentPreferred())?.let { TimelineDateIndicator.from(it.cursor.millis,zone) }
     } }
     TimelineFloatingDateChip(indicator,onOpen,Modifier.align(Alignment.TopCenter).padding(8.dp))
 }
