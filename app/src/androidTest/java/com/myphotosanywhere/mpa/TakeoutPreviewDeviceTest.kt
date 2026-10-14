@@ -36,27 +36,27 @@ class TakeoutPreviewDeviceTest {
             }
         }
         compose.waitUntil(10000) { compose.onAllNodesWithTag("takeout-metadata-summary").fetchSemanticsNodes().size==1 }
-        compose.onNodeWithText("1 media items with people labels · 1 different names").performScrollTo().assertIsDisplayed()
+        scrollToText("1 media items with people labels · 1 different names").assertIsDisplayed()
         compose.onNodeWithText("Selected media: 3 · with people labels: 1").assertExists()
-        val people=compose.onNodeWithTag("takeout-filter:PEOPLE").performScrollTo().assertIsDisplayed()
+        val people=scrollToTag("takeout-filter:PEOPLE").assertIsDisplayed()
         val bounds=people.fetchSemanticsNode().boundsInRoot
         assertTrue(bounds.width>=48*pixels-1);assertTrue(bounds.height>=48*pixels-1)
         people.performClick().assertIsSelected()
-        compose.onNodeWithTag("import-preview-item:named").performScrollTo().assertIsDisplayed()
+        scrollToTag("import-preview-item:named").assertIsDisplayed()
         compose.onNodeWithTag("import-preview-item:missing").assertDoesNotExist()
         compose.runOnIdle { assertEquals(original,entries.value);assertEquals(0,selections) }
         compose.onNodeWithTag("import-preview-select:named").performClick()
-        compose.onNodeWithText("Selected media: 2 · with people labels: 0").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("takeout-filter:MISSING").performScrollTo().performClick()
-        compose.onNodeWithTag("import-preview-item:missing").performScrollTo().assertIsDisplayed()
+        scrollToText("Selected media: 2 · with people labels: 0").assertIsDisplayed()
+        scrollToTag("takeout-filter:MISSING").performClick()
+        scrollToTag("import-preview-item:missing").assertIsDisplayed()
         compose.onNodeWithTag("import-preview-item:named").assertDoesNotExist()
-        compose.onNodeWithTag("takeout-filter:REVIEW").performScrollTo().performClick()
-        compose.onNodeWithTag("import-preview-item:invalid").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Metadata could not be read. Source retained; review this item.").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("import-preview-item:unmatched").performScrollTo().assertIsDisplayed()
+        scrollToTag("takeout-filter:REVIEW").performClick()
+        scrollToTag("import-preview-item:invalid").assertIsDisplayed()
+        scrollToText("Metadata could not be read. Source retained; review this item.").assertIsDisplayed()
+        scrollToTag("import-preview-item:unmatched").assertIsDisplayed()
         compose.onNodeWithTag("import-preview-select:unmatched").assertIsNotEnabled()
-        compose.onNodeWithTag("takeout-filter:ALL").performScrollTo().performClick()
-        compose.onNodeWithTag("takeout-metadata-summary").performScrollTo().assertIsDisplayed()
+        scrollToTag("takeout-filter:ALL").performClick()
+        scrollToTag("takeout-metadata-summary").assertIsDisplayed()
         compose.waitForIdle()
         screenshot(if(dark) "takeout-preview-dark-rtl" else "takeout-preview-light")
         compose.runOnIdle {
@@ -71,6 +71,14 @@ class TakeoutPreviewDeviceTest {
         compose.onNodeWithTag("import-preview-select:picker").assertIsNotEnabled()
         compose.onNodeWithTag("takeout-filter:PEOPLE").assertDoesNotExist()
         compose.onNodeWithTag("takeout-metadata-summary").assertDoesNotExist()
+    }
+    private fun scrollToTag(tag: String): SemanticsNodeInteraction {
+        compose.onNodeWithTag("import-preview-list").performScrollToNode(hasTestTag(tag))
+        return compose.onNodeWithTag(tag).performScrollTo()
+    }
+    private fun scrollToText(text: String): SemanticsNodeInteraction {
+        compose.onNodeWithTag("import-preview-list").performScrollToNode(hasText(text))
+        return compose.onNodeWithText(text).performScrollTo()
     }
     private fun screenshot(name: String) {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
