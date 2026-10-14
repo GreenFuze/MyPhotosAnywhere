@@ -87,7 +87,8 @@ internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active:
     var zoom by remember(photo.id) { mutableFloatStateOf(1f) }
     var x by remember(photo.id) { mutableFloatStateOf(0f) }
     var y by remember(photo.id) { mutableFloatStateOf(0f) }
-    SideEffect { if(active) onZoomChanged?.invoke(zoom>1f) }
+    val zoomedNow=zoom>1f
+    SideEffect { if(active) onZoomChanged?.invoke(zoomedNow) }
     LaunchedEffect(active) { if(!active) { zoom=1f;x=0f;y=0f } }
     val previewTap=if(photo.mimeType.startsWith("image/")) Modifier.pointerInput(photo.id,active,interactive) {
         detectTapGestures(onTap={ if(active && interactive) toggleControls?.invoke() })
