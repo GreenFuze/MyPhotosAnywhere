@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.transformLatest
 internal interface TimelinePlacement {
     suspend fun place(index: Int,offset: Int)
     suspend fun align(key: String,offset: Int): Boolean
+    fun diagnostic(): String = ""
 }
 
 internal class TimelineAnchorRestorer(private val placement: TimelinePlacement) {
@@ -22,7 +23,7 @@ internal class TimelineAnchorRestorer(private val placement: TimelinePlacement) 
                     placement.place(index,anchor.offset)
                     if(placement.align(anchor.cursor.key,anchor.offset)) { emit(true);return@transformLatest }
                 }
-                error("Canonical anchor ${anchor.cursor.key} could not be placed after $MAX_ATTEMPTS completed layout attempts")
+                error("Canonical anchor ${anchor.cursor.key} could not be placed after $MAX_ATTEMPTS completed layout attempts; ${placement.diagnostic()}")
             }
         }.first()
     private companion object { const val MAX_ATTEMPTS=8 }

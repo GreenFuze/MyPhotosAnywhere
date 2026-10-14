@@ -107,21 +107,27 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         if(anchor!=null) {
             val placement=object: TimelinePlacement {
                 override suspend fun place(index: Int,offset: Int) {
+                    // A Compose frame advances recomposition, but Android measurement is
+                    // separate (including under the native test clock). Count actual measures.
+                    withFrameNanos { }
+                    val before=state.layoutInfo
                     state.requestScrollToItem(index,offset)
-                    // Defer the request until the item provider and its new index snapshot are
-                    // applied together; a synchronous remeasure can use the preceding provider.
-                    // Complete measurement before correcting against actual media bounds.
-                    withFrameNanos { }
-                    withFrameNanos { }
+                    val measured=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        kotlinx.coroutines.withTimeoutOrNull(5000) {
+                            snapshotFlow { state.layoutInfo }.first { it !== before }
+                            true
+                        }
+                    }
+                    check(measured==true) { "Timeline measure did not complete for index $index; ${diagnostic()}" }
                 }
+                override fun diagnostic(): String = "visible=${state.layoutInfo.visibleItemsInfo.map { it.key to it.offset.y }} scroll=${state.canScrollBackward}/${state.canScrollForward}"
                 override suspend fun align(key: String,offset: Int): Boolean {
                     // A completed layout can still reflect the preceding span/index cache.
                     // Missing placement must retry, even when the retained keys did not change.
                     val placed=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key } ?: return false
                     val correction=placed.offset.y+offset
                     if(correction!=0) state.scrollBy(correction.toFloat())
-                    withFrameNanos { }
-                    withFrameNanos { }
+                    // scrollBy completes its synchronous remeasure before returning.
                     val corrected=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key }
                     if(corrected==null) return false
                     val viewport=state.layoutInfo
