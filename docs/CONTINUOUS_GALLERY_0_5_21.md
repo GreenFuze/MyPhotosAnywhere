@@ -7,3 +7,7 @@ The change removes separator insertion from the existing paged presentation and 
 When different dates share the first visible row, the capsule follows the retained canonical anchor in that row, using the same policy as scroll restoration. After scrolling beyond that row it advances to the next visible photo. Date seeking therefore retains its target date; an unknown-date anchor never borrows a neighbor's known timestamp.
 
 Viewer return retains the tapped canonical identity when it shares the first visible row. When an import moves that photo to a later row in a short grid, calculated trailing clearance allows its saved pixel position to remain reachable. Clearance is bounded by one viewport; long libraries and an already-aligned top boundary retain normal navigation padding. Existing Search/import/rotation pixel assertions remain required.
+
+## Final publication evidence
+
+[Immutable source, exact CI APK, validation and remaining acceptance](releases/v0.5.21.md). Publication metadata changes no application, toolchain or workflow objects.

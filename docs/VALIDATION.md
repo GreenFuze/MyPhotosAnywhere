@@ -1,3 +1,7 @@
+## MPA 0.5.21: continuous photo grid
+
+Application `7c6d2cf1ef220581843c381a64588269afadf033` passed 342 unit/integration tests, zero lint findings and 106 native tests on each of API 29/35/37 (318 total), with no failures/errors/skips. Exact CI APK, signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.21.md). S23 Ultra acceptance remains pending.
+
 ## MPA 0.5.20: immersive viewer
 
 Application `37d8aebc19abb6fdfd157467971e8cb95ffae46f` passed 338 unit/integration tests, zero lint findings and 105 native tests on each of API 29/35/37 (315 total), with no failures/errors/skips. Exact CI APK, signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.20.md). S23 Ultra acceptance remains pending.
