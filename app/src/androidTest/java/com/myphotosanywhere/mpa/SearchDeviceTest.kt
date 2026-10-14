@@ -75,9 +75,9 @@ class SearchDeviceTest {
             val added=fixture.photos[0].copy(id="search-next-viewer-import",displayName="search-next-viewer-import.png",capturedAt=fixture.time+2*86400000L)
             try {
                 runBlocking { app.database.photos().insert(added) }
-                compose.onNodeWithText("Next").performClick();waitText(fixture.photos[2].displayName);compose.onNodeWithText("4 / 4").assertExists()
+                compose.onNodeWithContentDescription("Next photo").performClick();waitText(fixture.photos[2].displayName);compose.onNodeWithText("4 / 4").assertExists()
                 compose.activityRule.scenario.recreate();waitTag("viewer-screen");waitText(fixture.photos[2].displayName)
-                compose.onNodeWithText("Previous").performClick();waitText(fixture.photos[1].displayName)
+                compose.onNodeWithContentDescription("Previous photo").performClick();waitText(fixture.photos[1].displayName)
                 compose.onNodeWithTag("viewer-close").performClick();waitTag("photo:${fixture.photos[1].id}")
                 val after=compose.onNodeWithTag("photo:${fixture.photos[1].id}").fetchSemanticsNode().boundsInWindow.top
                 val afterGrid=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow.top

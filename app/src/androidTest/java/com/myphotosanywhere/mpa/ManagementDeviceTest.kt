@@ -38,7 +38,8 @@ class ManagementDeviceTest {
     @Test fun sourcesSettingsAndFocusedPagesRestoreTheirOriginAcrossRotation() {
         compose.onNodeWithTag("nav:Collections").performClick();compose.onNodeWithTag("shell:storage").performClick()
         compose.onNodeWithText("MyPhotosAnywhere").assertIsDisplayed();screenshotManagement("management-sources")
-        compose.onNodeWithTag("management:Settings").performClick();screenshotManagement("management-menu");compose.onNodeWithTag("management:Storage and cache").performClick()
+        compose.onNodeWithTag("management:Settings").performClick()
+        waitTag("management:10");compose.onNodeWithTag("management:Storage and cache").assertIsDisplayed();compose.waitForIdle();screenshotManagement("management-menu");compose.onNodeWithTag("management:Storage and cache").performClick()
         compose.onNodeWithText("Offline storage").assertIsDisplayed();back()
         compose.onNodeWithTag("management:Recognition").performClick();compose.onNodeWithTag("scan-now").assertIsDisplayed();back()
         compose.onNodeWithTag("management:Backup and metadata").performClick();compose.onNodeWithText("Portable annotations").assertIsDisplayed();back()

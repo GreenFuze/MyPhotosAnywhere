@@ -1,6 +1,6 @@
 # MPA 0.5.18 — icons and organized Settings
 
-Settings uses icon-led menu rows grouped into Library, Backup and privacy, and Application. The existing section destinations and Back/rotation history remain. Sources provides Activity, Import and Settings icon shortcuts; the Add menu has leading icons. Selection and viewer actions use bundled vector icons with short visible labels. The viewer Info icon opens the same Details sheet, also available by swipe up.
+Settings uses icon-led menu rows grouped into Library, Backup and privacy, and Application. The existing section destinations and Back/rotation history remain. Sources provides Activity, Import and Settings icon shortcuts; the Add menu has leading icons. Selection and viewer actions use bundled vector icons with short visible labels. Viewer previous/next controls are 48dp labeled arrow icons around the position indicator, retaining gesture alternatives. The viewer Info icon opens the same Details sheet, also available by swipe up.
 
 Each action keeps one complete accessible name, disabled state and selected state where relevant. Labels wrap at enlarged font sizes; actions wrap into more rows rather than becoming gesture-only or clipped. Menu rows are at least 64dp tall, actions at least 64dp, and icon-only Info remains 48dp. Destructive source and file actions retain explicit text and existing confirmation contracts.
 

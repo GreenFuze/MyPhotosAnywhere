@@ -8,6 +8,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.myphotosanywhere.mpa.library.ViewerTopBar
 import com.myphotosanywhere.mpa.library.ViewerActions
+import com.myphotosanywhere.mpa.ui.ShellIcon
+import com.myphotosanywhere.mpa.R
 import com.myphotosanywhere.mpa.library.viewerDetailsSwipe
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,12 +60,11 @@ internal fun TimelineViewer(state: TimelineViewerState,model: TimelineViewModel,
                     }
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
                         val coroutine=rememberCoroutineScope()
-                        TextButton(enabled=pager.currentPage>0,onClick={ coroutine.launchPage(pager,pager.currentPage-1) }) { Text("Previous") }
-                        TextButton(enabled=pager.currentPage<session.count-1,onClick={ coroutine.launchPage(pager,pager.currentPage+1) }) { Text("Next") }
+                        IconButton(enabled=pager.currentPage>0,onClick={ coroutine.launchPage(pager,pager.currentPage-1) },modifier=Modifier.size(48.dp).testTag("viewer-previous")) { ShellIcon(R.drawable.ic_shell_back,"Previous photo") }
+                        Text("${pager.currentPage+1} / ${session.count}",style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("viewer-position"))
+                        IconButton(enabled=pager.currentPage<session.count-1,onClick={ coroutine.launchPage(pager,pager.currentPage+1) },modifier=Modifier.size(48.dp).testTag("viewer-next")) { ShellIcon(R.drawable.ic_action_next,"Next photo") }
                     }
                     ViewerActions(currentMedia?.photo,features,onEdit,showStatus=interactive)
-                    Text("${pager.currentPage+1} / ${session.count}",
-                        style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(horizontal=16.dp,vertical=8.dp).testTag("viewer-position"))
                 }
             }
         }

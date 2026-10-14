@@ -65,7 +65,7 @@ class TimelineContinuityTest {
             waitTag("viewer-screen");waitTag("original-image")
             compose.waitUntil(30000) { compose.onAllNodesWithText("71 / 120",substring=true).fetchSemanticsNodes().isNotEmpty() }
             app.database.photos().insert(added);app.database.photos().insert(older)
-            compose.onNodeWithText("Next").performClick()
+            compose.onNodeWithContentDescription("Next photo").performClick()
             compose.waitUntil(10000) { compose.onAllNodesWithText("timeline-ui-71.png").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("72 / 120",substring=true).assertExists()
             compose.activityRule.scenario.recreate()
@@ -73,7 +73,7 @@ class TimelineContinuityTest {
             compose.waitUntil(10000) { compose.onAllNodesWithText("timeline-ui-71.png").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("timeline-ui-71.png").assertExists()
             compose.onNodeWithText("72 / 120",substring=true).assertExists()
-            compose.onNodeWithText("Previous").performClick()
+            compose.onNodeWithContentDescription("Previous photo").performClick()
             compose.waitUntil(10000) { compose.onAllNodesWithText("timeline-ui-70.png").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("viewer-close").performClick()
             // A retained pre-refresh tile can appear before the new anchored generation

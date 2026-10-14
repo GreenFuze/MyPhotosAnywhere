@@ -67,6 +67,7 @@ class ViewerDetailsDeviceTest {
     @Test fun detailsRetainsViewerAcrossMetadataEditsBackAndRotation() {
         Fixture("metadata").use { fixture ->
             fixture.open()
+            waitTag("viewer-next");compose.onNodeWithTag("viewer-previous").assertIsNotEnabled();compose.onNodeWithTag("viewer-next").assertIsEnabled();compose.waitForIdle();saveScreenshot("viewer-actions")
             compose.onNodeWithTag("viewer-details").performClick();waitTag("photo-details")
             compose.onNodeWithTag("viewer-screen").assertExists()
             compose.onNodeWithTag("details:availability").assertTextEquals("Original available on this device")
@@ -84,7 +85,7 @@ class ViewerDetailsDeviceTest {
             compose.onNodeWithTag("viewer-screen").assertExists()
             compose.onNodeWithText(fixture.photos[0].displayName).assertExists()
             compose.onNodeWithTag("viewer-favorite").assertIsSelected()
-            compose.onNodeWithText("Next").performClick();waitName(fixture.photos[1].displayName)
+            compose.onNodeWithContentDescription("Next photo").performClick();waitName(fixture.photos[1].displayName)
             waitTag("viewer-favorite")
             compose.onNodeWithTag("viewer-favorite").assertIsNotSelected().performClick()
             compose.waitUntil(10000) { runBlocking { app.database.photos().find(fixture.photos[1].id)?.favorite==true } }
