@@ -51,15 +51,38 @@ class MosaicDeviceTest {
             assertEquals(3,compose.onNodeWithTag("photos:grid").fetchSemanticsNode().config[SemanticsProperties.CollectionInfo].columnCount)
             assertEquals(2,cells[2].config[SemanticsProperties.CollectionItemInfo].columnIndex)
             screenshot("mosaic-gallery")
+            android.util.Log.i("MosaicTransitions","Enter selection")
             compose.onNodeWithTag("photo:mosaic-000").performTouchInput { longClick() };compose.onNodeWithTag("photo:mosaic-000").assertIsSelected()
             compose.onNodeWithTag("timeline:date-rail").assertDoesNotExist();compose.onNodeWithTag("selection:close").performClick()
             val model=timeline();val anchor=compose.runOnUiThread { requireNotNull(model.anchor()) }
             val before=compose.onNodeWithTag(anchor.cursor.key).fetchSemanticsNode().boundsInWindow.top
+            android.util.Log.i("MosaicTransitions","Switch to Square")
             compose.runOnUiThread { model.changeLayout(GalleryLayout.SQUARE) }
-            compose.waitUntil(30000) { app.galleryPresentation.layout.value==GalleryLayout.SQUARE && kotlin.math.abs(compose.onNodeWithTag(anchor.cursor.key).fetchSemanticsNode().boundsInWindow.top-before)<4f }
+            compose.waitUntil(30000) {
+                val target=compose.onAllNodesWithTag(anchor.cursor.key).fetchSemanticsNodes().singleOrNull()
+                app.galleryPresentation.layout.value==GalleryLayout.SQUARE &&
+                    compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() && target!=null &&
+                    kotlin.math.abs(target.boundsInWindow.top-before)<4f
+            }
             compose.waitForIdle();val square=(0..2).map { compose.onNodeWithTag("photo:mosaic-00$it").fetchSemanticsNode().boundsInWindow.width }
             assertEquals(square[0],square[2],2f);screenshot("mosaic-square")
-            compose.runOnUiThread { model.changeLayout(GalleryLayout.MOSAIC) };compose.waitUntil(30000) { app.galleryPresentation.layout.value==GalleryLayout.MOSAIC }
+            // Repeated physical slot changes must dispose the preceding grid's layout
+            // nodes while retaining the same canonical photo and its measured offset.
+            repeat(3) {
+                for(layout in listOf(GalleryLayout.MOSAIC,GalleryLayout.SQUARE)) {
+                    android.util.Log.i("MosaicTransitions","Repeat $it switch to $layout")
+                    compose.runOnUiThread { model.changeLayout(layout) }
+                    compose.waitUntil(30000) {
+                        app.galleryPresentation.layout.value==layout &&
+                            compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() &&
+                            compose.onAllNodes(hasTestTag(anchor.cursor.key) and isEnabled()).fetchSemanticsNodes().size==1
+                    }
+                    compose.waitForIdle();assertEquals(before,compose.onNodeWithTag(anchor.cursor.key).fetchSemanticsNode().boundsInWindow.top,4f)
+                    assertEquals(anchor.cursor.key,compose.runOnUiThread { model.anchor()?.cursor?.key })
+                }
+            }
+            compose.runOnUiThread { model.changeLayout(GalleryLayout.MOSAIC) }
+            compose.waitUntil(30000) { app.galleryPresentation.layout.value==GalleryLayout.MOSAIC && compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() }
             compose.activityRule.scenario.recreate();waitPhoto(anchor.cursor.key)
             compose.onNodeWithTag("photo:mosaic-000").performClick();compose.waitUntil(30000) { compose.onAllNodesWithTag("viewer-screen").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("viewer-close").performClick();waitPhoto(anchor.cursor.key)

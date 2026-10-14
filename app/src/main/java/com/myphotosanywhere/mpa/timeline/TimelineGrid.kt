@@ -172,7 +172,11 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 is TimelineRow.Day -> MosaicInput("day:${row.date}",heading=true)
             } },density.columns,(maxWidth.value-4f).coerceAtLeast(1f),layout)
         }
-        LazyVerticalGrid(GridCells.Fixed(if(layout==GalleryLayout.SQUARE) plan.columns else JustifiedMosaic.SLOTS),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
+        val physicalColumns=if(layout==GalleryLayout.SQUARE) plan.columns else JustifiedMosaic.SLOTS
+        // Square and packed Mosaic use different slot structures. Give their layout nodes
+        // distinct lifetimes while the externally owned scroll state/anchor is retained.
+        key(physicalColumns) {
+        LazyVerticalGrid(GridCells.Fixed(physicalColumns),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
             .semantics { stateDescription="${plan.columns} columns";collectionInfo=CollectionInfo(plan.rowCount,plan.columns) }
             .pointerInput(selection.isEmpty(),selectionLocked,restoring) {
                 if(selectionLocked || restoring) return@pointerInput
@@ -216,6 +220,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             if(rows.loadState.append is LoadState.Loading) item(span={ GridItemSpan(maxLineSpan) }) {
                 LinearProgressIndicator(Modifier.fillMaxWidth().padding(8.dp))
             }
+        }
         }
         if(restoring || refresh is LoadState.Loading) LinearProgressIndicator(Modifier.align(Alignment.TopCenter).fillMaxWidth().testTag("timeline:refreshing"))
         if(selection.isEmpty() && !selectionLocked && !restoring) TimelineDateRail(state,retained,query,zone) { dateNavigation=true }
