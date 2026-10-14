@@ -205,6 +205,73 @@ class ViewerDetailsDeviceTest {
         }
     }
 
+    @Test fun immersiveControlsPreserveCanvasZoomPagingDetailsRotationAndReturn() {
+        Fixture("immersive").use { fixture ->
+            fixture.open();waitTag("viewer-next")
+            val before=currentImage().fetchSemanticsNode().boundsInRoot
+            currentImage().performTouchInput { click() };waitTag("viewer-show-controls")
+            compose.onNodeWithTag("viewer-details").assertDoesNotExist()
+            val after=currentImage().fetchSemanticsNode().boundsInRoot
+            assertEquals(before.left,after.left,1f);assertEquals(before.top,after.top,1f)
+            assertEquals(before.width,after.width,1f);assertEquals(before.height,after.height,1f)
+            saveScreenshot("viewer-immersive")
+            currentImage().performTouchInput { doubleClick() }
+            compose.onNodeWithTag("viewer-show-controls").assertIsDisplayed()
+            currentImage().performTouchInput { swipeLeft() }
+            compose.onNodeWithTag("viewer-show-controls").performClick()
+            compose.onNodeWithTag("viewer-position").assertTextEquals("1 / 3")
+            currentImage().performTouchInput { doubleClick() }
+            compose.onNodeWithTag("viewer-details").assertIsDisplayed()
+            currentImage().performTouchInput { swipeLeft() };waitName(fixture.photos[1].displayName)
+            compose.onNodeWithTag("viewer-hide-controls").performClick();waitTag("viewer-show-controls")
+            compose.activityRule.scenario.recreate();waitTag("viewer-show-controls")
+            compose.onNodeWithTag("viewer-details").assertDoesNotExist()
+            currentImage().performTouchInput { swipeUp() };waitTag("photo-details")
+            compose.onNodeWithTag("photo-details-close").performClick();waitGone("photo-details")
+            waitName(fixture.photos[1].displayName)
+            compose.onNodeWithTag("viewer-position").assertTextEquals("2 / 3")
+            systemBack();waitGone("viewer-screen");waitTag("photo:${fixture.photos[1].id}")
+            compose.onNodeWithTag("photo:${fixture.photos[1].id}").assertIsDisplayed()
+            assertEquals(fixture.hash,DriveBackupWorker.digest(fixture.file,"SHA-256"))
+            runBlocking { fixture.photos.forEach { expected ->
+                val actual=requireNotNull(app.database.photos().find(expected.id))
+                assertEquals(expected.sha256,actual.sha256);assertEquals(expected.capturedAt,actual.capturedAt)
+                assertEquals(expected.sourceBindingKey,actual.sourceBindingKey);assertFalse(actual.favorite)
+            } }
+        }
+    }
+
+    @Test fun immersiveRemotePreviewRetainsRecoveryAndUpwardDetails() {
+        Fixture("immersive-remote").use { fixture ->
+            val cloud=CloudPhoto("${fixture.source.key}:remote",fixture.source.key,"remote",fixture.source.folderId,"remote-immersive.png","image/png",500,
+                null,"1",null,2_000_100_000_000L,null,null,thumbnailPath=fixture.file.path,thumbnailVersion="1")
+            runBlocking {
+                app.database.cloud().savePhoto(cloud)
+                app.database.cloud().saveDownload(DownloadTask(cloud.key,cloud.bindingKey,cloud.remoteId,state="AUTH_REQUIRED",error="Fixture authorization expired"))
+            }
+            fixture.filter();waitTag("cloud:${cloud.key}");compose.onNodeWithTag("cloud:${cloud.key}").performClick();waitTag("viewer-next")
+            compose.onNodeWithTag("viewer-hide-controls").performClick();waitTag("viewer-show-controls")
+            compose.onNodeWithText("Preview only — reconnect this Drive source.").assertIsDisplayed()
+            compose.onNodeWithText("Manage source").assertIsDisplayed()
+            compose.onNodeWithTag("viewer-media").performTouchInput { click(center) };waitTag("viewer-details")
+            compose.onNodeWithTag("viewer-hide-controls").performClick();waitTag("viewer-show-controls")
+            compose.onNodeWithTag("viewer-media").performTouchInput {
+                swipe(Offset(center.x,center.y+height*.1f),Offset(center.x,center.y-height*.2f),400)
+            }
+            waitTag("photo-details")
+            compose.onNodeWithTag("details:availability").assertTextEquals("Original unavailable on this phone")
+            compose.onNodeWithTag("photo-details-close").performClick();waitGone("photo-details")
+            compose.onNodeWithTag("viewer-details").assertIsDisplayed()
+            runBlocking {
+                assertNull(app.database.cloud().photo(cloud.key)?.photoId)
+                assertEquals("AUTH_REQUIRED",app.database.cloud().download(cloud.key)?.state)
+            }
+            compose.onNodeWithTag("viewer-close").performClick();waitGone("viewer-screen")
+            assertEquals(fixture.hash,DriveBackupWorker.digest(fixture.file,"SHA-256"))
+            runBlocking { app.database.cloud().savePhoto(cloud.copy(removed=true)) }
+        }
+    }
+
     private fun saveScreenshot(name: String) {
         val bitmap=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         try {

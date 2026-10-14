@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -26,7 +27,7 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-internal fun ViewerTopBar(millis: Long?,name: String,onClose: ()->Unit,onDetails: ()->Unit) {
+internal fun ViewerTopBar(millis: Long?,name: String,onClose: ()->Unit,onDetails: ()->Unit,onHide: (()->Unit)?=null) {
     Row(Modifier.fillMaxWidth().heightIn(min=56.dp).padding(horizontal=4.dp),verticalAlignment=Alignment.CenterVertically) {
         IconButton(onClick=onClose,modifier=Modifier.size(48.dp).testTag("viewer-close")) { ShellIcon(R.drawable.ic_shell_back,"Close") }
         Column(Modifier.weight(1f).padding(horizontal=8.dp)) {
@@ -35,6 +36,9 @@ internal fun ViewerTopBar(millis: Long?,name: String,onClose: ()->Unit,onDetails
             Text(name,color=Color.White.copy(alpha=.8f),style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis)
         }
         IconButton(onClick=onDetails,modifier=Modifier.size(48.dp).testTag("viewer-details")) { ShellIcon(R.drawable.ic_action_info,"Photo details") }
+        if(onHide!=null) IconButton(onClick=onHide,modifier=Modifier.size(48.dp).testTag("viewer-hide-controls")) {
+            ShellIcon(R.drawable.ic_viewer_hide,stringResource(R.string.viewer_hide_controls))
+        }
     }
 }
 

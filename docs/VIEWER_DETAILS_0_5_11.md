@@ -1,5 +1,7 @@
 # 0.5.11 viewer and Photo Details increment
 
+Historical specification: the gesture was corrected in 0.5.12. Current MPA opens Details with **swipe up**, never swipe down.
+
 ## Behavior
 
 - On a photo at fit zoom, drag down to open Photo Details, or use the visible Details button. A horizontal swipe pages through photos. Pinch/zoomed panning retains control of its gesture.

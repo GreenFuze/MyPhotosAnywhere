@@ -11,6 +11,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
@@ -41,18 +43,22 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
     if(available.isEmpty()) { LaunchedEffect(Unit) { onClose() }; return }
     val pager=rememberPagerState(initialPage=available.indexOfFirst { it.id==selectedId }.coerceAtLeast(0),pageCount={ available.size })
     val current=available.getOrNull(pager.currentPage) ?: available.first()
+    val chrome=rememberSaveable(saver=ViewerChromeController.saver) { ViewerChromeController() }
     LaunchedEffect(current.id) { onCurrent(current.id) }
     Dialog(onDismissRequest=onClose,properties=DialogProperties(usePlatformDefaultWidth=false)) {
         Surface(Modifier.fillMaxSize().testTag("viewer-screen"),color=Color.Black,contentColor=Color.White) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                ViewerTopBar(current.capturedAt ?: current.importedAt,current.displayName,onClose,{ onDetails(current.id) })
-                HorizontalPager(state=pager,key={ available[it].id },modifier=Modifier.fillMaxWidth().weight(1f)) { page ->
+            ViewerSurface(chrome,Modifier.fillMaxSize().safeDrawingPadding(),
+                topBar={ ViewerTopBar(current.capturedAt ?: current.importedAt,current.displayName,onClose,{ chrome.show();onDetails(current.id) },{ chrome.hide() }) },
+                bottomBar={
+                    ViewerActions(current,model,onEdit,showStatus=false)
+                    Text("${pager.currentPage+1} / ${available.size}",style=MaterialTheme.typography.bodySmall,
+                        modifier=Modifier.padding(16.dp).testTag("viewer-position"))
+                },status={ if(!obscured) ViewerStatus(model,Color.White) }) { captionInset ->
+                HorizontalPager(state=pager,key={ available[it].id },modifier=Modifier.fillMaxSize()) { page ->
                     val photo=available[page]
-                    ViewerMediaContent(photo,model,pager.currentPage==page,interactive=!obscured,onDetails={ onDetails(photo.id) })
+                    ViewerMediaContent(photo,model,pager.currentPage==page,interactive=!obscured,
+                        onDetails={ chrome.show();onDetails(photo.id) },onToggleControls={ chrome.toggle() },captionInset=captionInset)
                 }
-                ViewerActions(current,model,onEdit,showStatus=!obscured)
-                Text("${pager.currentPage+1} / ${available.size}",
-                    style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(16.dp).testTag("viewer-position"))
             }
         }
     }
@@ -60,7 +66,7 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
 
 /** The existing bounded renderer and gesture/lifecycle contract is shared by both viewer adapters. */
 @Composable
-internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active: Boolean,preview: File?=null,interactive: Boolean=true,onDetails: (()->Unit)?=null) {
+internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active: Boolean,preview: File?=null,interactive: Boolean=true,onDetails: (()->Unit)?=null,onToggleControls: (()->Unit)?=null,captionInset: Dp=0.dp) {
     Box(Modifier.fillMaxSize()) {
         if(preview!=null) coil.compose.AsyncImage(preview,"Preview",Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
     val original by produceState<ViewerOriginal>(ViewerOriginal.Loading,photo.id,photo.originalPath,photo.cachedVersion) {
@@ -74,22 +80,27 @@ internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active:
         awaitDispose { read?.close() }
     }
     val reader=(original as? ViewerOriginal.Ready)?.read
+    val toggleControls by rememberUpdatedState(onToggleControls)
     var quality by remember(photo.id) { mutableStateOf("Loading original…") }
     var zoom by remember(photo.id) { mutableFloatStateOf(1f) }
     var x by remember(photo.id) { mutableFloatStateOf(0f) }
     var y by remember(photo.id) { mutableFloatStateOf(0f) }
     LaunchedEffect(active) { if(!active) { zoom=1f;x=0f;y=0f } }
-    if(original is ViewerOriginal.Unavailable) Box(Modifier.fillMaxSize()) {
+    val previewTap=if(photo.mimeType.startsWith("image/")) Modifier.pointerInput(photo.id,active,interactive) {
+        detectTapGestures(onTap={ if(active && interactive) toggleControls?.invoke() })
+    } else Modifier
+    if(original is ViewerOriginal.Unavailable) Box(Modifier.fillMaxSize().then(previewTap)) {
         Text((original as ViewerOriginal.Unavailable).message,color=Color.White,
             modifier=Modifier.align(androidx.compose.ui.Alignment.Center).padding(20.dp))
-    } else if(reader==null) Box(Modifier.fillMaxSize()) { CircularProgressIndicator() }
+    } else if(reader==null) Box(Modifier.fillMaxSize().then(previewTap)) { CircularProgressIndicator() }
     else if(photo.mimeType.startsWith("video/")) AndroidView(factory={ context -> VideoView(context).apply {
         setVideoPath(reader.file.absolutePath)
         val controls=android.widget.MediaController(context);controls.setAnchorView(this);setMediaController(controls)
         setOnPreparedListener { seekTo(1) }
     } },modifier=Modifier.fillMaxSize(),update={ if(!active || !interactive) it.pause() },onRelease={ it.stopPlayback() })
-    else Box(Modifier.fillMaxSize().clipToBounds().viewerDetailsSwipe(photo.id,active && interactive,{ zoom>1f },onDetails).pointerInput(photo.id) {
-        detectTapGestures(onDoubleTap={ zoom=if(zoom>1f) 1f else 2.5f;x=0f;y=0f })
+    else Box(Modifier.fillMaxSize().clipToBounds().viewerDetailsSwipe(photo.id,active && interactive,{ zoom>1f },onDetails).pointerInput(photo.id,active,interactive) {
+        detectTapGestures(onTap={ if(active && interactive) toggleControls?.invoke() },
+            onDoubleTap={ if(active && interactive) { zoom=if(zoom>1f) 1f else 2.5f;x=0f;y=0f } })
     }.pointerInput(photo.id) {
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed=false)
@@ -120,7 +131,7 @@ internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active:
             onQuality={ quality=it };setActive(active);load(reader.file)
         } },modifier=Modifier.fillMaxSize().testTag("original-image"),update={ it.setActive(active && interactive);it.transform(zoom,x,y) },onRelease={ it.close() })
         Text(quality,color=Color.White,style=MaterialTheme.typography.bodySmall,
-            modifier=Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(8.dp))
+            modifier=Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(bottom=captionInset).padding(8.dp))
     }
     }
 }

@@ -1,0 +1,4 @@
+<resources>
+    <string name="viewer_hide_controls">Hide controls</string>
+    <string name="viewer_show_controls">Show controls</string>
+</resources>

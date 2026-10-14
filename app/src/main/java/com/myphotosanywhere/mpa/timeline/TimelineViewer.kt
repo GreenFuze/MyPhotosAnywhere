@@ -1,6 +1,12 @@
 package com.myphotosanywhere.mpa.timeline
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
+import com.myphotosanywhere.mpa.library.ViewerChromeController
+import com.myphotosanywhere.mpa.library.ViewerSurface
+import com.myphotosanywhere.mpa.library.ViewerStatus
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
@@ -35,36 +41,40 @@ internal fun TimelineViewer(state: TimelineViewerState,model: TimelineViewModel,
     var current by remember(state.session?.id) { mutableStateOf(state.selected) }
     val currentMedia=rememberTimelineMedia(current,model.repository).media
     var remoteDetailsKey by rememberSaveable { mutableStateOf<String?>(null) }
-    val openDetails: ()->Unit={ currentMedia?.photo?.let { onDetails(it.id) } ?: run { remoteDetailsKey=current.key } }
+    val chrome=rememberSaveable(saver=ViewerChromeController.saver) { ViewerChromeController() }
+    val openDetails: ()->Unit={ chrome.show();currentMedia?.photo?.let { onDetails(it.id) } ?: run { remoteDetailsKey=current.key } }
+    val session=state.session
+    val pager=session?.let { key(it.id) { rememberPagerState(initialPage=it.initialPage,pageCount={ it.count }) } }
+    val pageScope=rememberCoroutineScope()
     val interactive=!obscured && remoteDetailsKey==null
     Dialog(onDismissRequest={ model.closeViewer() },properties=DialogProperties(usePlatformDefaultWidth=false)) {
         Surface(Modifier.fillMaxSize().testTag("viewer-screen"),color=Color.Black,contentColor=Color.White) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                ViewerTopBar(current.millis,current.name,{ model.closeViewer() },openDetails)
-                val session=state.session
-                if(session==null) {
-                    Box(Modifier.fillMaxWidth().weight(1f)) { TimelineViewerPage(state.selected,true,model,features,onSource,interactive,openDetails) }
-                    if(state.problem!=null) {
-                        Text(state.problem,Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall)
-                        TextButton(onClick={ model.open(state.selected) },modifier=Modifier.heightIn(min=48.dp)) { Text("Retry browsing") }
-                    } else Text("Preparing photo sequence…",Modifier.padding(16.dp),style=MaterialTheme.typography.bodySmall)
-                } else {
-                    val pager=rememberPagerState(initialPage=session.initialPage,pageCount={ session.count })
-                    HorizontalPager(state=pager,key={ "${session.id}:$it" },modifier=Modifier.fillMaxWidth().weight(1f)) { page ->
-                        val entry by produceState<TimelineEntry?>(null,session.id,page) { value=session.entry(page) }
-                        val item=entry
-                        LaunchedEffect(item,pager.currentPage) {
-                            if(item!=null && pager.currentPage==page) { current=item }
+            ViewerSurface(chrome,Modifier.fillMaxSize().safeDrawingPadding(),
+                topBar={ ViewerTopBar(current.millis,current.name,{ model.closeViewer() },openDetails,{ chrome.hide() }) },
+                bottomBar={
+                    if(session!=null && pager!=null) {
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
+                            IconButton(enabled=pager.currentPage>0,onClick={ pageScope.launchPage(pager,pager.currentPage-1) },modifier=Modifier.size(48.dp).testTag("viewer-previous")) { ShellIcon(R.drawable.ic_shell_back,"Previous photo") }
+                            Text("${pager.currentPage+1} / ${session.count}",style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("viewer-position"))
+                            IconButton(enabled=pager.currentPage<session.count-1,onClick={ pageScope.launchPage(pager,pager.currentPage+1) },modifier=Modifier.size(48.dp).testTag("viewer-next")) { ShellIcon(R.drawable.ic_action_next,"Next photo") }
                         }
-                        if(item!=null) TimelineViewerPage(item,pager.currentPage==page,model,features,onSource,interactive,openDetails)
+                        ViewerActions(currentMedia?.photo,features,onEdit,showStatus=false)
                     }
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-                        val coroutine=rememberCoroutineScope()
-                        IconButton(enabled=pager.currentPage>0,onClick={ coroutine.launchPage(pager,pager.currentPage-1) },modifier=Modifier.size(48.dp).testTag("viewer-previous")) { ShellIcon(R.drawable.ic_shell_back,"Previous photo") }
-                        Text("${pager.currentPage+1} / ${session.count}",style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("viewer-position"))
-                        IconButton(enabled=pager.currentPage<session.count-1,onClick={ coroutine.launchPage(pager,pager.currentPage+1) },modifier=Modifier.size(48.dp).testTag("viewer-next")) { ShellIcon(R.drawable.ic_action_next,"Next photo") }
+                },status={
+                    if(session==null) {
+                        if(state.problem!=null) {
+                            Text(state.problem,Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall)
+                            TextButton(onClick={ model.open(state.selected) },modifier=Modifier.heightIn(min=48.dp)) { Text("Retry browsing") }
+                        } else Text("Preparing photo sequence…",Modifier.padding(16.dp),style=MaterialTheme.typography.bodySmall)
                     }
-                    ViewerActions(currentMedia?.photo,features,onEdit,showStatus=interactive)
+                    if(interactive) ViewerStatus(features,Color.White)
+                }) { captionInset ->
+                if(session==null || pager==null) TimelineViewerPage(state.selected,true,model,features,onSource,interactive,openDetails,{ chrome.toggle() },captionInset)
+                else HorizontalPager(state=pager,key={ "${session.id}:$it" },modifier=Modifier.fillMaxSize()) { page ->
+                    val entry by produceState<TimelineEntry?>(null,session.id,page) { value=session.entry(page) }
+                    val item=entry
+                    LaunchedEffect(item,pager.currentPage) { if(item!=null && pager.currentPage==page) current=item }
+                    if(item!=null) TimelineViewerPage(item,pager.currentPage==page,model,features,onSource,interactive,openDetails,{ chrome.toggle() },captionInset)
                 }
             }
         }
@@ -101,7 +111,7 @@ private fun rememberTimelineMedia(entry: TimelineEntry,repository: TimelineRepos
 }
 
 @Composable
-private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: TimelineViewModel,features: LibraryFeaturesModel,onSource: ()->Unit,interactive: Boolean,onDetails: ()->Unit) {
+private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: TimelineViewModel,features: LibraryFeaturesModel,onSource: ()->Unit,interactive: Boolean,onDetails: ()->Unit,onToggleControls: ()->Unit,captionInset: Dp) {
     val resolution=rememberTimelineMedia(entry,model.repository)
     val media=resolution.media
     val busy by features.busy.collectAsStateWithLifecycle()
@@ -120,11 +130,15 @@ private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: Timel
         }
     }
     val preview=entry.thumbnailPath.takeIf { it.isNotBlank() }?.let(::File)
-    Box(Modifier.fillMaxSize().then(if(media?.photo==null) Modifier.viewerDetailsSwipe(entry.key,active && interactive,onDetails=onDetails) else Modifier)) {
+    val toggleControls by rememberUpdatedState(onToggleControls)
+    Box(Modifier.fillMaxSize().then(if(media?.photo==null) Modifier.viewerDetailsSwipe(entry.key,active && interactive,onDetails=onDetails) else Modifier)
+        .then(if(media?.photo==null && entry.mimeType.startsWith("image/")) Modifier.pointerInput(entry.key,active,interactive) {
+            detectTapGestures(onTap={ if(active && interactive) toggleControls() })
+        } else Modifier)) {
         if(preview!=null) AsyncImage(preview,"Preview",Modifier.fillMaxSize(),contentScale=ContentScale.Fit)
         val photo=media?.photo
-        if(photo!=null) ViewerMediaContent(photo,features,active,preview,interactive,onDetails)
-        if(!available) Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+        if(photo!=null) ViewerMediaContent(photo,features,active,preview,interactive,onDetails,onToggleControls,captionInset)
+        if(!available) Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom=captionInset).padding(12.dp),horizontalAlignment=Alignment.CenterHorizontally) {
             Text(when {
                 resolution.problem!=null -> requireNotNull(resolution.problem)
                 task?.state=="AUTH_REQUIRED" -> "Preview only — reconnect this Drive source."
