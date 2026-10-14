@@ -1,3 +1,7 @@
+## MPA 0.5.19: Takeout metadata preview
+
+Application `6ef6bed197cd0efdb5a1c5a4f13aae60101f4b3a` passed 338 unit/integration tests, zero lint findings and 101 native tests on each of API 29/35/37 (303 total), with no failures/errors/skips. Exact CI APK, signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.19.md). S23 Ultra acceptance remains pending.
+
 ## MPA 0.5.18: icon-led actions and organized Settings
 
 Application `4fef4bdc1dba263dd7b7c03692233d17e219923a` passed 330 unit/integration tests, zero lint findings and 98 native tests on each of API 29/35/37 (294 total), with no failures/errors/skips. Exact CI APK, signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.18.md).

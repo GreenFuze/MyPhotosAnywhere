@@ -1,0 +1,11 @@
+{
+  "tag": "v0.5.19",
+  "source_sha": "6ef6bed197cd0efdb5a1c5a4f13aae60101f4b3a",
+  "build_run_id": 38592715119,
+  "device_run_id": 38592716288,
+  "apk_sha256": "7648fbf97cc70bcd91a3b48bccf6e0d5076742d585d65141119b28ac97ddc332",
+  "certificate_sha256": "1262430ed1e257b54a4c09697cbc63bc148af11755485bcf7b2c66492f0379b4",
+  "version_code": 30,
+  "room_schema": 9,
+  "owner_approved_emulator_diagnostics": true
+}
