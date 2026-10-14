@@ -102,6 +102,9 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 private var requestedIndex=0
                 override suspend fun place(index: Int,offset: Int) {
                     requestedIndex=index
+                    // Let paging/query recomposition install its immutable item provider before
+                    // each bounded attempt; synchronous retries in one frame can measure old keys.
+                    withFrameNanos { }
                     // Await attachment and force a synchronous measure through the scroll API.
                     // A deferred request can be coalesced when this position is already current;
                     // waiting for layout object identity then falsely reports a stalled measure.
