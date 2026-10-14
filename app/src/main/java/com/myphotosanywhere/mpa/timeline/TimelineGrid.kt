@@ -102,18 +102,14 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 private var requestedIndex=0
                 override suspend fun place(index: Int,offset: Int) {
                     requestedIndex=index
-                    // A Compose frame advances recomposition, but Android measurement is
-                    // separate (including under the native test clock). Count actual measures.
-                    withFrameNanos { }
-                    val before=state.layoutInfo
-                    state.requestScrollToItem(index,offset)
-                    val measured=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                        kotlinx.coroutines.withTimeoutOrNull(5000) {
-                            snapshotFlow { state.layoutInfo }.first { it !== before }
-                            true
-                        }
+                    // Await attachment and force a synchronous measure through the scroll API.
+                    // A deferred request can be coalesced when this position is already current;
+                    // waiting for layout object identity then falsely reports a stalled measure.
+                    val positioned=kotlinx.coroutines.withTimeoutOrNull(5000) {
+                        state.scrollToItem(index,offset)
+                        true
                     }
-                    check(measured==true) { "Timeline measure did not complete for index $index; ${diagnostic()}" }
+                    check(positioned==true) { "Timeline scroll did not complete for index $index; ${diagnostic()}" }
                 }
                 override fun diagnostic(): String = "visible=${state.layoutInfo.visibleItemsInfo.map { it.key to it.offset.y }} scroll=${state.canScrollBackward}/${state.canScrollForward}"
                 override suspend fun align(key: String,offset: Int): Boolean {
