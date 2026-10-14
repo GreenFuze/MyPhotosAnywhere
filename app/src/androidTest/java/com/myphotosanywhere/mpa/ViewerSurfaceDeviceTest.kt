@@ -33,7 +33,7 @@ class ViewerSurfaceDeviceTest {
                 MaterialTheme(colorScheme=if(dark) darkColorScheme() else lightColorScheme()) {
                     val chrome=rememberSaveable(saver=ViewerChromeController.saver) { ViewerChromeController() }
                     Surface(color=Color.Black,contentColor=Color.White,modifier=Modifier.width(320.dp).fillMaxHeight()) {
-                        ViewerSurface(chrome,
+                        ViewerSurface(chrome,Modifier.safeDrawingPadding(),
                             topBar={ ViewerTopBar(null,"צילום.png",{},{ chrome.show() },{ chrome.hide() }) },
                             bottomBar={ Text("Viewer actions",Modifier.heightIn(min=48.dp).testTag("surface:actions")) },
                             status={ Text("Preview only — retry remains available",Modifier.testTag("surface:status")) }) { inset ->
