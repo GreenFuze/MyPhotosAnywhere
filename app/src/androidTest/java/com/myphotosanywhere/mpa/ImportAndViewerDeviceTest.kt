@@ -100,7 +100,17 @@ class ImportAndViewerDeviceTest {
             compose.onNodeWithTag("photo:$id").performClick()
             compose.waitUntil(10000) { compose.onAllNodes(hasText("Original · 640 × 480",substring=true)).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(photo.displayName).assertIsDisplayed()
-            fun footer()=compose.onNodeWithTag("viewer-position").fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
+            fun footer(): String {
+                try { return compose.onNodeWithTag("viewer-position").fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text } }
+                catch(error: AssertionError) {
+                    val roots=compose.onAllNodes(isRoot(),useUnmergedTree=true)
+                    for(index in roots.fetchSemanticsNodes().indices) roots[index].printToLog("ViewerDiagnostics")
+                    throw error
+                }
+            }
+            // Opening a preview is deliberately independent of snapshot preparation.
+            // Compare sequence positions only once its accessible footer is ready.
+            compose.waitUntil(10000) { compose.onAllNodesWithTag("viewer-position").fetchSemanticsNodes().size==1 }
             val before=footer()
             for((index,newId) in added.withIndex()) {
                 app.database.photos().insert(photo.copy(id=newId,displayName="$newId.png",importedAt=photo.importedAt+index+1,

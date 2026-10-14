@@ -75,12 +75,17 @@ class TimelineContinuityTest {
             compose.onNodeWithText("72 / 120",substring=true).assertExists()
             compose.onNodeWithContentDescription("Previous photo").performClick()
             compose.waitUntil(10000) { compose.onAllNodesWithText("timeline-ui-70.png").fetchSemanticsNodes().isNotEmpty() }
+            recordDiagnostics(source,"before-close")
             compose.onNodeWithTag("viewer-close").performClick()
             // A retained pre-refresh tile can appear before the new anchored generation
             // finishes its asynchronous seek. Measure only the completed restoration.
-            compose.waitUntil(30000) {
+            try {
+                compose.waitUntil(30000) {
                 compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() &&
                     compose.onAllNodes(hasTestTag("photo:timeline-ui-70") and isEnabled()).fetchSemanticsNodes().size==1
+            }
+            } catch(error: Throwable) {
+                recordDiagnostics(source,"failed-return");screenshotViewport("timeline-failed-return");throw error
             }
             compose.waitForIdle()
             val after=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode().boundsInWindow.top
@@ -112,11 +117,24 @@ class TimelineContinuityTest {
         val photo=compose.onNodeWithTag("photo:timeline-ui-70").fetchSemanticsNode()
         val grid=compose.onNodeWithTag("photos:grid").fetchSemanticsNode()
         android.util.Log.i("TimelineViewport","$name photo root=${photo.boundsInRoot} window=${photo.boundsInWindow}; grid root=${grid.boundsInRoot} window=${grid.boundsInWindow}")
+        screenshotViewport("timeline-$name")
+    }
+
+    private fun recordDiagnostics(source: DriveSource,label: String) {
+        val model=androidx.lifecycle.ViewModelProvider(compose.activity)[TimelineViewModel::class.java]
+        android.util.Log.i("TimelineDiagnostics","$label anchor=${model.anchor(TimelineQuery(source=source.key))}; generation=${model.restoration.value}; refreshed=${model.refreshedGeneration.value}; viewer=${model.viewer.value}")
+        if(label=="failed-return") {
+            val roots=compose.onAllNodes(isRoot(),useUnmergedTree=true)
+            for(index in roots.fetchSemanticsNodes().indices) roots[index].printToLog("TimelineDiagnostics")
+        }
+    }
+
+    private fun screenshotViewport(name: String) {
         if(android.os.Build.VERSION.SDK_INT<29) return
         val bitmap=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         try {
             val values=android.content.ContentValues().apply {
-                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"timeline-$name.png")
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"$name.png")
                 put(android.provider.MediaStore.MediaColumns.MIME_TYPE,"image/png")
                 put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA")
             }
