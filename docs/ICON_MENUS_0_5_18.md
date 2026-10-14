@@ -23,3 +23,7 @@ Restoration waits for a changed measured LazyGridLayoutInfo after each deferred 
 Restoration runs only while the screen lifecycle is STARTED. Backgrounding cancels pending measurement and its wall-clock guard; foregrounding restores the same canonical anchor. The existing continuity test includes a real background interval longer than the guard and verifies the returned photo/pixels. CI unlocks through WindowManager instead of sending MENU to a starting launcher, preventing the observed unrelated Pixel Launcher input ANR from covering native tests.
 
 When density shrinks a cell below its saved crop offset, restoration probes the same canonical index at zero and clamps to the closest visible offset using its measured size. Reachable offsets remain exact; the photo cannot disappear above/below the viewport. Two unit cases and the density regression protect this boundary. The partial-selection native test awaits the actual Activity window focus after its result dialog disappears before injecting one system Back; its assertions remain unchanged.
+
+## Final publication evidence
+
+[Immutable source, exact CI APK, validation and remaining acceptance](releases/v0.5.18.md). Publication metadata changes no application, toolchain or workflow objects.
