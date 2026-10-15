@@ -121,17 +121,23 @@ class ReducedMotionDeviceTest {
     })
     @Test fun zeroDurationScaleKeepsRecoveryAndReachesFinalControlState() {
         lateinit var chrome: ViewerChromeController
+        var observedScale=-1f
+        var pixels=0f
         compose.setContent { MaterialTheme {
+            pixels=LocalDensity.current.density
+            LaunchedEffect(Unit) { observedScale=kotlinx.coroutines.currentCoroutineContext()[androidx.compose.ui.MotionDurationScale]?.scaleFactor ?: 1f }
             chrome=remember { ViewerChromeController() }
             ViewerSurface(chrome,topBar={ ViewerTopBar(null,"Fixture",{},{},chrome::hide) },
                 bottomBar={ Text("Actions") },status={ Text("Retry",Modifier.testTag("reduced:retry"),color=androidx.compose.ui.graphics.Color.White) }) { Box(Modifier.fillMaxSize()) }
         } }
+        compose.waitForIdle();assertEquals(0f,observedScale,0f)
         compose.mainClock.autoAdvance=false
-        compose.runOnUiThread { chrome.hide() };compose.mainClock.advanceTimeByFrame()
+        compose.runOnUiThread { chrome.hide() };repeat(2) { compose.mainClock.advanceTimeByFrame() }
         compose.onNodeWithTag("viewer-details").assertDoesNotExist()
-        compose.onNodeWithTag("viewer-show-controls").assertIsDisplayed()
+        val show=compose.onNodeWithTag("viewer-show-controls").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue("Reduced motion reaches a full touch target",show.width>=48*pixels-1 && show.height>=48*pixels-1)
         compose.onNodeWithTag("reduced:retry").assertIsDisplayed()
-        compose.runOnUiThread { chrome.show() };compose.mainClock.advanceTimeByFrame()
+        compose.runOnUiThread { chrome.show() };repeat(2) { compose.mainClock.advanceTimeByFrame() }
         compose.onNodeWithTag("viewer-details").assertIsDisplayed()
         compose.onNodeWithTag("viewer-show-controls").assertDoesNotExist()
         compose.mainClock.autoAdvance=true
