@@ -1,3 +1,7 @@
+## MPA 0.5.23: Google Drive Trash and Restore
+
+Application `00a7efbc2503eb5d15414a2e9741a70b84b47d99` passed 373 unit/integration and 109 native tests per API29/35/37 (327 total), zero failures/errors/skips and zero lint findings. Additive Room schema10 migration and established upgrade signer verified. [Evidence and remaining physical acceptance](releases/v0.5.23.md).
+
 ## MPA 0.5.22: Drive access recovery
 
 Application `eb041dbb4985a1d27a8eb7b68af2467be3d77070` passed 354 unit/integration and 106 native tests per API29/35/37 (318 total), no failures/errors/skips, zero lint findings, unchanged schema9 and verified upgrade signer. [Evidence and limits](releases/v0.5.22.md). Real S23 Ultra authorization acceptance remains pending.
