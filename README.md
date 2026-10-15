@@ -6,6 +6,8 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
+The [0.5.27 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.27) adds continuous drag selection across all gallery layouts. All 392 unit/integration and 375 native tests passed with zero lint findings; schema 10 and the upgrade signer remain unchanged. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.27/MPA-0.5.27-debug.apk) · [Evidence and limits](docs/releases/v0.5.27.md).
+
 The [0.5.26 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.26) adds a taller portrait mosaic and sharper size-aware previews. All 384 unit/integration and 366 native tests passed with zero lint findings; schema 10 and the upgrade signer remain unchanged. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.26/MPA-0.5.26-debug.apk) · [Evidence and limits](docs/releases/v0.5.26.md).
 
 The [0.5.25 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.25) adds compact visual Collections, real People covers and grouped swipe-up Details. All 374 unit/integration and 348 native tests passed with zero lint findings; schema10 and the upgrade signer remain unchanged. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.25/MPA-0.5.25-debug.apk) · [Evidence and limits](docs/releases/v0.5.25.md).

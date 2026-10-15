@@ -1,3 +1,7 @@
+## MPA 0.5.27: Continuous drag selection
+
+Application `6be8d783c8014e2aa58bb115b5be4a8b75b55ff7` passed 392 unit/integration and 125 native tests per API29/35/37 (375 total), zero failures/errors/skips and zero lint findings. Schema 10 and established signer unchanged. [Evidence and pending physical acceptance](releases/v0.5.27.md).
+
 ## MPA 0.5.26: Adaptive previews and portrait mosaic
 
 Application `54e83a55d52659927168d64f9b727161d43a5422` passed 384 unit/integration and 122 native tests per API29/35/37 (366 total), zero failures/errors/skips and zero lint findings. Schema 10 and established signer unchanged. [Evidence and pending physical acceptance](releases/v0.5.26.md).

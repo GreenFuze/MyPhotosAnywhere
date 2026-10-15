@@ -10,8 +10,8 @@ Baseline: published MPA 0.5.22/code 33, Room schema 9. Updated October 15, 2026.
 | 0.5.24 / 35 | Scrolling app bar and shared motion | [Published](releases/v0.5.24.md), tested `2655497b6f9de6f7a4e7e13beb3e2cb758402c3f` |
 | 0.5.25 / 36 | Visual Collections, People, albums and Details | [Published](releases/v0.5.25.md), tested `016222142c36886f05b7f8a6c8bfa1c775b55f0f` |
 | 0.5.26 / 37 | Sharper adaptive thumbnails and richer mosaic | [Published](releases/v0.5.26.md), tested `54e83a55d52659927168d64f9b727161d43a5422` |
-| 0.5.27 / 38 | Continuous drag selection | In implementation |
-| 0.5.28 / 39 | Direct date scrubbing | Planned |
+| 0.5.27 / 38 | Continuous drag selection | [Published](releases/v0.5.27.md), tested `6be8d783c8014e2aa58bb115b5be4a8b75b55ff7` |
+| 0.5.28 / 39 | Direct date scrubbing | In implementation |
 | 0.5.29 / 40 | Management refinement and complete UX audit | Planned |
 
 Version allocations express delivery order, not a reason to skip a blocking fix. Update this ledger with tested commits, release links and pending physical-device evidence after each stage. Prefer focused changes and preserve each published upgrade path.
