@@ -1,5 +1,8 @@
 package com.myphotosanywhere.mpa.library
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -66,7 +69,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
         items(importedState.groups,key={ "provider-label:${it.label.key}" }) { group ->
             Card(onClick={ onImported(group.label.key) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("imported-person:${group.label.key}")) {
                 Row(Modifier.padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                    if(group.thumbnail.isNotBlank()) AsyncImage(File(group.thumbnail),null,Modifier.size(64.dp))
+                    if(group.thumbnail.isNotBlank()) AsyncImage(File(group.thumbnail),null,Modifier.size(72.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),contentScale=ContentScale.Crop)
                     Column { Text(group.label.name,style=MaterialTheme.typography.titleMedium)
                         Text("${group.photos} ${if(group.photos==1) "photo" else "photos"} · imported label",style=MaterialTheme.typography.bodySmall)
                         Text(sources.find { it.key==group.label.binding }?.let { "${it.folderName} · ${it.email}" } ?: if(group.label.binding==null) "Imported source not recorded" else "Original import source disconnected",style=MaterialTheme.typography.bodySmall)
@@ -95,8 +98,10 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
         item { Text("Named faces",style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() }) }
         items(people,key={ "reviewed-person:${it.id}" }) { person ->
             Card(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(12.dp),horizontalArrangement=Arrangement.SpaceBetween) {
-                    Column(Modifier.weight(1f).clickable { onPerson(person.id) }) {
+                Row(Modifier.padding(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                    val cover=faces.firstOrNull { it.personId==person.id && it.cropPath.isNotBlank() }
+                    if(cover!=null) AsyncImage(File(cover.cropPath),null,Modifier.size(72.dp).clip(CircleShape),contentScale=ContentScale.Crop)
+                    Column(Modifier.weight(1f).heightIn(min=48.dp).clickable(role=androidx.compose.ui.semantics.Role.Button) { onPerson(person.id) }) {
                         Text(person.name,style=MaterialTheme.typography.titleMedium)
                         Text("${faces.filter { it.personId==person.id }.map { it.photoId }.distinct().size} photos")
                         val candidates=pending.filter { it.suggestedPersonId==person.id }

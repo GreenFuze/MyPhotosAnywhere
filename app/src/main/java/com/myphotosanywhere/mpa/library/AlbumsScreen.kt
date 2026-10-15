@@ -34,12 +34,12 @@ fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGrid
     LazyVerticalGrid(GridCells.Adaptive(148.dp),Modifier.fillMaxSize().testTag("collections:grid"),state=state,
         contentPadding=PaddingValues(start=16.dp,top=12.dp,end=16.dp,bottom=16.dp+bottomClearance),
         verticalArrangement=Arrangement.spacedBy(16.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-        item { CollectionCard("Favorites",com.myphotosanywhere.mpa.R.drawable.ic_shell_favorite,repository,TimelineQuery("Favorites"),onFavorites) }
-        if(onTrash!=null) item { CollectionCard("Trash",com.myphotosanywhere.mpa.R.drawable.ic_action_trash,repository,null,onTrash) }
-        item { CollectionCard("Archive",com.myphotosanywhere.mpa.R.drawable.ic_shell_archive,repository,TimelineQuery("Archive"),onArchive) }
+        item { CollectionCard("Favorites",com.myphotosanywhere.mpa.R.drawable.ic_shell_favorite,repository,TimelineQuery("Favorites"),onFavorites,compact=true) }
+        if(onTrash!=null) item { CollectionCard("Trash",com.myphotosanywhere.mpa.R.drawable.ic_action_trash,repository,null,onTrash,compact=true) }
+        item { CollectionCard("Archive",com.myphotosanywhere.mpa.R.drawable.ic_shell_archive,repository,TimelineQuery("Archive"),onArchive,compact=true) }
+        item { CollectionCard("Offline available",com.myphotosanywhere.mpa.R.drawable.ic_shell_offline,repository,TimelineQuery("Offline"),onOffline,compact=true) }
         item { CollectionCard("People",com.myphotosanywhere.mpa.R.drawable.ic_shell_people,repository,null,onPeople) }
         item { CollectionCard("Places",com.myphotosanywhere.mpa.R.drawable.ic_shell_places,repository,null,onPlaces) }
-        item { CollectionCard("Offline available",com.myphotosanywhere.mpa.R.drawable.ic_shell_offline,repository,TimelineQuery("Offline"),onOffline) }
         item { CollectionCard("Edited photos",com.myphotosanywhere.mpa.R.drawable.ic_shell_edit,repository,TimelineQuery("Edits"),onEdits) }
         item(span={ GridItemSpan(maxLineSpan) }) { Row(verticalAlignment=Alignment.CenterVertically) {
             Text("Albums",Modifier.weight(1f).semantics { heading() },style=MaterialTheme.typography.titleLarge)
@@ -48,9 +48,10 @@ fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGrid
         if(albums.isEmpty()) item(span={ GridItemSpan(maxLineSpan) }) { Text("Create an album, then long-press photos to add them.") }
         items(albums,key={ it.id }) { album -> Column {
             CollectionCard(album.name,com.myphotosanywhere.mpa.R.drawable.ic_shell_collections,repository,TimelineQuery(album=album.id),{ onAlbum(album.id) },"album:${album.id}")
-            FlowRow {
-                TextButton(onClick={ model.pinAlbum(album,!album.pinned) },modifier=Modifier.heightIn(min=48.dp)) { Text(if(album.pinned) "Unpin offline album" else "Keep offline") }
-                TextButton(onClick={ manage=album;name=album.name;delete=false },modifier=Modifier.heightIn(min=48.dp).testTag("album:manage:${album.id}")) { Text("Manage") }
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
+                IconButton(onClick={ manage=album;name=album.name;delete=false },modifier=Modifier.testTag("album:manage:${album.id}")) {
+                    com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_action_settings,"Manage ${album.name}")
+                }
             }
         } }
         item(span={ GridItemSpan(maxLineSpan) }) { OutlinedButton(onClick=onActivity,modifier=Modifier.heightIn(min=48.dp)) { Text("AI activity") } }
@@ -59,6 +60,7 @@ fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGrid
         text={ Column {
             OutlinedTextField(name,{ if(it.length<=100) name=it },label={ Text("Album name") })
             manage?.let { album ->
+                TextButton(onClick={ model.pinAlbum(album,!album.pinned) },modifier=Modifier.heightIn(min=48.dp)) { Text(if(album.pinned) "Unpin offline album" else "Keep offline") }
                 if(delete) TextButton(onClick={ model.deleteAlbum(album); manage=null }) { Text("Confirm removal; keep photos") }
                 else TextButton(onClick={ delete=true }) { Text("Remove album") }
             }
@@ -84,7 +86,7 @@ internal fun CollectionCard(title: String,icon: Int,repository: CollectionsRepos
         Card(Modifier.fillMaxWidth().testTag(tag).clickable(role=Role.Button,onClick=onClick),shape=RoundedCornerShape(24.dp)) {
             val covers=preview?.paths.orEmpty()
             if(compact) Row(Modifier.fillMaxWidth().padding(12.dp).heightIn(min=56.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.size(56.dp),contentAlignment=Alignment.Center) {
+                Box(Modifier.size(40.dp),contentAlignment=Alignment.Center) {
                     val cover=covers.firstOrNull()
                     if(cover==null) com.myphotosanywhere.mpa.ui.ShellIcon(icon)
                     else AsyncImage(cover,null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)

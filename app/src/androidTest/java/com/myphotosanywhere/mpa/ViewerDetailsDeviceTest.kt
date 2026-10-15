@@ -70,9 +70,12 @@ class ViewerDetailsDeviceTest {
             waitTag("viewer-next");compose.onNodeWithTag("viewer-previous").assertIsNotEnabled();compose.onNodeWithTag("viewer-next").assertIsEnabled();compose.waitForIdle();saveScreenshot("viewer-actions")
             compose.onNodeWithTag("viewer-details").performClick();waitTag("photo-details")
             compose.onNodeWithTag("viewer-screen").assertExists()
+            compose.waitUntil(10000) { compose.onAllNodesWithTag("details:dimensions").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("details:dimensions").assertTextEquals("240 × 360")
+            saveScreenshot("details-overview")
             compose.onNodeWithTag("details:availability").assertTextEquals("Original available on this device")
             compose.onNodeWithTag("details:source").assertTextEquals("Source: Details fixture · fixture@test")
-            compose.onNodeWithTag("details:favorite").performClick()
+            compose.onNodeWithTag("details:favorite").performScrollTo().performClick()
             compose.waitUntil(10000) { runBlocking { app.database.photos().find(fixture.photos[0].id)?.favorite==true } }
             compose.onNodeWithText("Name or set location").performScrollTo().performClick()
             compose.onNodeWithText("Place name").performTextReplacement("Garden")

@@ -12,8 +12,8 @@ android {
         applicationId = "com.myphotosanywhere.mpa"
         minSdk = 26
         targetSdk = 37
-        versionCode = 35
-        versionName = "0.5.24"
+        versionCode = 36
+        versionName = "0.5.25"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     // CI keeps the upgrade key outside every cache and artifact path.

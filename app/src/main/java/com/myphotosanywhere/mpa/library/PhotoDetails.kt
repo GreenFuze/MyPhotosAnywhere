@@ -14,6 +14,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import kotlinx.coroutines.launch
+import com.myphotosanywhere.mpa.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.testTag
@@ -38,6 +40,21 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
     val busy by model.busy.collectAsStateWithLifecycle()
     val cloud by model.cloud.collectAsStateWithLifecycle()
     val sources by model.sources.collectAsStateWithLifecycle()
+    val factsRepository=remember(model) { PhotoFactsRepository(model.app.timeline,model.app.cache) }
+    var factsFailure by remember(photo.id) { mutableStateOf(false) }
+    var factsRetry by remember(photo.id) { mutableIntStateOf(0) }
+    val linkedCapture=remember(cloud,photo.id,photo.sourceBindingKey,photo.sourceRemoteId) {
+        cloud.asSequence().filter { it.photoId==photo.id && it.capturedAt!=null }
+            .minWithOrNull(compareBy<com.myphotosanywhere.mpa.drive.CloudPhoto> {
+                if(it.bindingKey==photo.sourceBindingKey && it.remoteId==photo.sourceRemoteId) 0 else 1
+            }.thenBy { it.key })?.capturedAt
+    }
+    val facts by produceState<PhotoFacts?>(null,photo.id,photo.capturedAt,photo.archived,photo.originalPath,photo.cachedVersion,linkedCapture,factsRetry) {
+        factsFailure=false
+        try { value=factsRepository.read(photo) }
+        catch(_: android.database.sqlite.SQLiteException) { factsFailure=true }
+    }
+    val shownMillis=facts?.millis ?: photo.capturedAt ?: photo.importedAt
     val available by produceState(false,photo.id,photo.originalPath,photo.cachedVersion,busy) {
         value=withContext(Dispatchers.IO) { photo.originalPath.isNotBlank() && File(photo.originalPath).isFile }
     }
@@ -50,25 +67,38 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
     var naming by remember { mutableStateOf<FaceRecord?>(null) }
     var name by remember { mutableStateOf("") }
     val sheet=rememberModalBottomSheetState(skipPartiallyExpanded=true)
+    val scope=rememberCoroutineScope()
+    val close: ()->Unit={ scope.launch { sheet.hide();onClose() } }
     ModalBottomSheet(onDismissRequest=onClose,sheetState=sheet,modifier=Modifier.testTag("photo-details")) {
         Column(Modifier.fillMaxWidth().heightIn(max=with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp()*.7f })) {
             FlowRow(Modifier.fillMaxWidth().padding(horizontal=16.dp),horizontalArrangement=Arrangement.SpaceBetween) {
                 Text("Photo details",style=MaterialTheme.typography.titleLarge,modifier=Modifier.padding(vertical=12.dp).semantics { heading() })
                 TextButton(modifier=Modifier.testTag("photo-edit").heightIn(min=48.dp),enabled=available && !busy && photo.mimeType.startsWith("image/"),onClick=onEdit) { Text("Edit") }
-                TextButton(onClick=onClose,modifier=Modifier.heightIn(min=48.dp).testTag("photo-details-close")) { Text("Close") }
+                TextButton(onClick=close,modifier=Modifier.heightIn(min=48.dp).testTag("photo-details-close")) { Text("Close") }
             }
             ViewerStatus(model)
             Column(Modifier.weight(1f,fill=false).verticalScroll(rememberScrollState()).padding(horizontal=20.dp).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-            Text(photo.displayName,style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })
+            DetailSection("Date and file",R.drawable.ic_action_info) {
+                Text(DateFormat.getDateInstance(DateFormat.FULL).format(Date(shownMillis)),style=MaterialTheme.typography.titleLarge)
+                Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(shownMillis)),style=MaterialTheme.typography.bodyMedium)
+                when(facts?.provenance) {
+                    com.myphotosanywhere.mpa.timeline.TimestampProvenance.IMPORT -> Text("Import date · capture date unavailable",style=MaterialTheme.typography.bodySmall)
+                    com.myphotosanywhere.mpa.timeline.TimestampProvenance.LINKED_CAPTURE -> Text("Capture date from linked source",style=MaterialTheme.typography.bodySmall)
+                    else -> Unit
+                }
+                facts?.dimensions?.let { (width,height) -> Text("$width × $height",style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("details:dimensions")) }
+                Text(photo.displayName,style=MaterialTheme.typography.bodyMedium)
+                if(factsFailure) TextButton(onClick={ factsRetry++ }) { Text("Retry file details") }
+                Text("${photo.mimeType} · %.1f MiB".format(photo.bytes/(1024.0*1024)),style=MaterialTheme.typography.bodySmall)
+            }
             if(showPreview) AsyncImage(coil.request.ImageRequest.Builder(context)
                 .data(File(if(photo.thumbnailPath.isNotBlank()) photo.thumbnailPath else if(available && reader!=null) photo.originalPath else ""))
                 .size(480).build(),photo.displayName,modifier=Modifier.fillMaxWidth().height(160.dp),contentScale=ContentScale.Fit)
             if(available && onView!=null) TextButton(onClick=onView) { Text("View full screen") }
-            Text("${DateFormat.getDateTimeInstance().format(Date(photo.capturedAt ?: photo.importedAt))} · %.1f MiB".format(photo.bytes/(1024.0*1024)))
-            val importedNames=remember(photo.importedMetadata) { com.myphotosanywhere.mpa.people.ImportedPeopleCodec().names(photo.importedMetadata) }
-            if(importedNames.isNotEmpty()) Text("Imported people labels: ${importedNames.joinToString()}",modifier=Modifier.testTag("details:imported-people"))
+            DetailSection("Original and source",R.drawable.ic_shell_account) {
+
             Text(if(photo.parentId==null) "Original preserved" else "Edited copy · original preserved")
-            Text("Type: ${photo.mimeType}")
+
             Text(if(available) "Original available on this device" else "Original unavailable on this device",
                 modifier=Modifier.testTag("details:availability"))
             val source=sources.find { it.key==photo.sourceBindingKey }
@@ -83,6 +113,8 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
                     Button(enabled=!busy && !row.removed,onClick={ model.download(row,photo.pinned) }) { Text("Download original") }
                 }
             }
+            }
+            DetailSection("Organize",R.drawable.ic_shell_collections) {
             FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 FilterChip(modifier=Modifier.heightIn(min=48.dp).testTag("details:favorite"),selected=photo.favorite,enabled=!busy,onClick={ model.updatePhoto(photo.id) { it.copy(favorite=!it.favorite) } },label={ Text("Favorite") })
                 FilterChip(modifier=Modifier.heightIn(min=48.dp),selected=photo.pinned,enabled=!busy,onClick={
@@ -91,6 +123,8 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
             }
             TextButton(onClick={ collections=true }) { Text("Albums") }
             TextButton(enabled=!busy,onClick={ model.updatePhoto(photo.id) { it.copy(archived=!it.archived) } }) { Text(if(photo.archived) "Unarchive" else "Archive") }
+            }
+            DetailSection("Location",R.drawable.ic_shell_places) {
             if(photo.placeLabel.isNotBlank()) Text(photo.placeLabel,style=MaterialTheme.typography.titleMedium)
             if(LibrarySearch.validCoordinates(photo.latitude,photo.longitude)) {
                 Text("GPS: %.5f, %.5f".format(photo.latitude,photo.longitude))
@@ -100,6 +134,10 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
                 }) { Text("Open in Maps") }
             }
             TextButton(onClick={ place=photo.placeLabel; latitude=photo.latitude?.toString() ?: ""; longitude=photo.longitude?.toString() ?: ""; locationError=null; location=true }) { Text("Name or set location") }
+            }
+            if(photo.labels.isNotBlank() || photo.importedMetadata.isNotBlank()) DetailSection("Photo metadata",R.drawable.ic_action_info) {
+            val importedNames=remember(photo.importedMetadata) { com.myphotosanywhere.mpa.people.ImportedPeopleCodec().names(photo.importedMetadata) }
+            if(importedNames.isNotEmpty()) Text("Imported people labels: ${importedNames.joinToString()}",modifier=Modifier.testTag("details:imported-people"))
             if(photo.labels.isNotBlank()) Text("Objects: ${photo.labels}",style=MaterialTheme.typography.bodySmall)
             if(photo.importedMetadata.isNotBlank()) {
                 val provider=remember(photo.importedMetadata) { runCatching { com.google.gson.JsonParser.parseString(photo.importedMetadata).asJsonObject }.getOrNull() }
@@ -112,9 +150,9 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
                     Text("Existing MPA date and location take precedence. The full Google record is retained in MPA metadata.",style=MaterialTheme.typography.bodySmall)
                 }
             }
+            }
             val detected=faces.filter { it.photoId==photo.id }
-            if(detected.isNotEmpty()) {
-                Text("People",style=MaterialTheme.typography.titleMedium)
+            if(detected.isNotEmpty()) DetailSection("People",R.drawable.ic_shell_people) {
                 detected.forEach { face ->
                     Row { AsyncImage(File(face.cropPath),"Face",Modifier.size(56.dp))
                         TextButton(onClick={ naming=face; name=people.find { it.id==face.personId }?.name ?: "" }) {
@@ -123,8 +161,8 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
                     }
                 }
             }
-            if(available) {
-                Row { TextButton(enabled=!busy,onClick={ model.share(photo) { context.startActivity(it) } }) { Text("Share") }
+            if(available) DetailSection("Share and edit",R.drawable.ic_action_share) {
+                FlowRow { TextButton(enabled=!busy,onClick={ model.share(photo) { context.startActivity(it) } }) { Text("Share") }
                     TextButton(enabled=!busy,onClick=onExport) { Text("Export original") } }
                 Text("Image sharing removes GPS. Export original preserves its metadata.",style=MaterialTheme.typography.bodySmall)
                 if(photo.mimeType.startsWith("image/")) OutlinedButton(enabled=!busy,onClick=onAI) { Text("Edit with AI") }
