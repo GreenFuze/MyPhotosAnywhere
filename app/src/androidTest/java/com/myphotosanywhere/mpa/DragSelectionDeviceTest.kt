@@ -115,12 +115,13 @@ class DragSelectionDeviceTest {
             val root=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow
             compose.mainClock.autoAdvance=false
             compose.onNodeWithTag("photos:grid").performTouchInput { moveTo(Offset(root.width/2,root.height-8)) }
-            compose.mainClock.advanceTimeBy(8000)
+            // Let native SQLite prefetch and Android layout run between simulated frames.
+            repeat(32) { compose.mainClock.advanceTimeBy(250);compose.waitForIdle() }
             compose.onNodeWithTag("photos:grid").performTouchInput { up() }
             compose.mainClock.autoAdvance=true;compose.waitForIdle()
             val ids=selected.targets.value.map { requireNotNull(it.photoId).removePrefix("drag-edge-").toInt() }.sorted()
             assertTrue(ids.size>15);assertTrue(ids.size<=MediaSelection.MAX_ITEMS);assertEquals((0..ids.last()).toList(),ids)
-            assertTrue("Edge selection must cross the 90-item initial paging window",ids.size>90)
+            assertTrue("Edge selection must cross the 90-item initial paging window; count=${ids.size}, last=${ids.last()}",ids.size>90)
             androidx.test.espresso.Espresso.pressBack();compose.waitForIdle();assertTrue(selected.targets.value.isEmpty())
             fixture.photos.forEach { assertEquals(it,app.database.photos().find(it.id)) }
             assertTrue(fixture.file.isFile)

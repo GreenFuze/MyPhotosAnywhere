@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 
 /** Actual measured window rectangles handle portrait spans, RTL and moving app chrome. */
 internal class TimelineSelectionHits {
@@ -99,7 +100,21 @@ internal fun Modifier.dragRangeSelection(registry: TimelineSelectionHits,token: 
                             while(active && !atLimit && edgeVelocity()!=0f) {
                                 val now=withFrameNanos { it };val elapsed=((now-previous)/1_000_000_000f).coerceIn(0f,0.032f);previous=now
                                 val amount=edgeVelocity()*elapsed
-                                if(amount!=0f && scroll(amount)==0f) break
+                                val beforePage=latestWindow
+                                if(amount!=0f && scroll(amount)==0f) {
+                                    // The loaded page can end before its prefetched successor
+                                    // is installed. Keep a stationary edge drag alive without
+                                    // spinning, while retaining a bounded wait at a real end/error.
+                                    withFrameNanos { }
+                                    if(latestWindow==beforePage) {
+                                        val changed=kotlinx.coroutines.withTimeoutOrNull(5000) {
+                                            snapshotFlow { latestWindow }.first { it!=beforePage };true
+                                        }
+                                        if(changed!=true) break
+                                    }
+                                    previous=withFrameNanos { it }
+                                    continue
+                                }
                                 reconcile(registry.hit(finger,inset))
                             }
                         }
