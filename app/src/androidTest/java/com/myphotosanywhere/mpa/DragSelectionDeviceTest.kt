@@ -122,7 +122,7 @@ class DragSelectionDeviceTest {
             val ids=selected.targets.value.map { requireNotNull(it.photoId).removePrefix("drag-edge-").toInt() }.sorted()
             assertTrue(ids.size>15);assertTrue(ids.size<=MediaSelection.MAX_ITEMS);assertEquals((0..ids.last()).toList(),ids)
             assertTrue("Edge selection must cross the 90-item initial paging window; count=${ids.size}, last=${ids.last()}",ids.size>90)
-            androidx.test.espresso.Espresso.pressBack();compose.waitForIdle();assertTrue(selected.targets.value.isEmpty())
+            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);compose.waitForIdle();assertTrue(selected.targets.value.isEmpty())
             fixture.photos.forEach { assertEquals(it,app.database.photos().find(it.id)) }
             assertTrue(fixture.file.isFile)
         } finally { compose.mainClock.autoAdvance=true;compose.runOnUiThread { selected.clear() };fixture.close() }
