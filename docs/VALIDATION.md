@@ -1,3 +1,7 @@
+## MPA 0.5.25: Visual Collections and Details
+
+Application `016222142c36886f05b7f8a6c8bfa1c775b55f0f` passed 374 unit/integration and 116 native tests per API29/35/37 (348 total), zero failures/errors/skips and zero lint findings. Schema10 and established upgrade signer unchanged. [Evidence and pending physical acceptance](releases/v0.5.25.md).
+
 ## MPA 0.5.24: Gallery bar and motion
 
 Application `2655497b6f9de6f7a4e7e13beb3e2cb758402c3f` passed 373 unit/integration and 113 native tests per API29/35/37 (339 total), zero failures/errors/skips and zero lint findings. Schema10 and established upgrade signer unchanged. [Evidence and pending physical acceptance](releases/v0.5.24.md).
