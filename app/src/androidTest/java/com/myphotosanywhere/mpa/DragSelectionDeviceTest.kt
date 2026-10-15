@@ -93,6 +93,11 @@ class DragSelectionDeviceTest {
                 compose.onNodeWithTag("photos:grid").performTouchInput { moveTo(reverse);up() }
                 compose.waitForIdle()
                 assertEquals((listOf(8)+listOf(0,1,2,3)).map { fixture.photos[it].id }.toSet(),selected.targets.value.map { it.photoId }.toSet())
+                compose.waitUntil(10000) { compose.onAllNodesWithText("5 selected").fetchSemanticsNodes().size==1 }
+                for(index in listOf(8,0,1,2,3)) compose.onNodeWithTag("photo:${fixture.photos[index].id}").assertIsSelected()
+                compose.onNodeWithTag("photo:${fixture.photos[4].id}").assertIsNotSelected()
+                compose.onNodeWithTag("photo:${fixture.photos[5].id}").assertIsNotSelected()
+                compose.mainClock.advanceTimeByFrame();compose.waitForIdle()
                 screenshot("drag-selection-${layout.name.lowercase()}")
                 compose.onNodeWithTag("selection:close").performClick();assertTrue(selected.targets.value.isEmpty())
             }
@@ -110,11 +115,12 @@ class DragSelectionDeviceTest {
             val root=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow
             compose.mainClock.autoAdvance=false
             compose.onNodeWithTag("photos:grid").performTouchInput { moveTo(Offset(root.width/2,root.height-8)) }
-            compose.mainClock.advanceTimeBy(1800)
+            compose.mainClock.advanceTimeBy(8000)
             compose.onNodeWithTag("photos:grid").performTouchInput { up() }
             compose.mainClock.autoAdvance=true;compose.waitForIdle()
             val ids=selected.targets.value.map { requireNotNull(it.photoId).removePrefix("drag-edge-").toInt() }.sorted()
             assertTrue(ids.size>15);assertTrue(ids.size<=MediaSelection.MAX_ITEMS);assertEquals((0..ids.last()).toList(),ids)
+            assertTrue("Edge selection must cross the 90-item initial paging window",ids.size>90)
             androidx.test.espresso.Espresso.pressBack();compose.waitForIdle();assertTrue(selected.targets.value.isEmpty())
             fixture.photos.forEach { assertEquals(it,app.database.photos().find(it.id)) }
             assertTrue(fixture.file.isFile)
