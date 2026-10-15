@@ -63,6 +63,14 @@ class GalleryMotionDeviceTest {
             compose.onNodeWithTag("shell:storage").assertIsDisplayed()
             assertEquals(expanded.top,compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow.top,4f)
             motionScreenshot("gallery-bar-returned")
+            compose.onNodeWithTag("photos:grid").performTouchInput { swipeUp() };compose.waitForIdle()
+            compose.onNodeWithTag("shell:storage").assertIsNotDisplayed()
+            // Actual keyboard navigation pins and reveals actions; a recreated root's
+            // default input mode must not erase the saved touch-scrolling position.
+            repeat(2) { InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_TAB) }
+            compose.waitForIdle()
+            compose.onNodeWithTag("shell:storage").assertIsDisplayed()
+            assertEquals(expanded.top,compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow.top,4f)
             compose.onNodeWithTag("nav:Search").performClick();waitTag("search:query")
             compose.onNodeWithTag("search:query").assertIsDisplayed()
         } finally {

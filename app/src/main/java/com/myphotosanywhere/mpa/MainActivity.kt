@@ -42,6 +42,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -214,12 +221,27 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val primaryBrand=navigation.destination==navigation.primary && tab in listOf(0,1)
     val galleryBarState=rememberTopAppBarState()
     val accessibleGallery=touchExplorationEnabled()
-    val keyboardNavigation=LocalInputModeManager.current.inputMode==InputMode.Keyboard
+    // Android 10 can reset the root's input mode to Keyboard when recreating a
+    // touch-driven activity. Only actual navigation keys request pinned keyboard chrome.
+    var keyboardRequested by rememberSaveable { mutableStateOf(false) }
+    val rootInputMode=LocalInputModeManager.current.inputMode
+    val keyboardNavigation=keyboardRequested && rootInputMode==InputMode.Keyboard
+    val galleryInput=Modifier.onPreviewKeyEvent { event ->
+        if(event.type==KeyEventType.KeyDown && GalleryBarPolicy.navigationKey(event.nativeKeyEvent.keyCode)) keyboardRequested=true
+        false
+    }.pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed=false,pass=PointerEventPass.Initial)
+            keyboardRequested=false
+            do { val event=awaitPointerEvent(PointerEventPass.Initial) } while(event.changes.any { it.pressed })
+        }
+    }
     val galleryScrolling=GalleryBarPolicy.canCollapse(tab,selecting,accessibleGallery,keyboardNavigation)
     val galleryScroll=TopAppBarDefaults.enterAlwaysScrollBehavior(galleryBarState,canScroll={ galleryScrolling })
     val galleryContext=listOf(filter,sourceKey,albumId,personId,importedPersonKey).joinToString("|") { value -> value?.let { "${it.length}:$it" } ?: "-" }
     var previousGalleryContext by rememberSaveable { mutableStateOf(galleryContext) }
     LaunchedEffect(galleryContext,accessibleGallery,keyboardNavigation) {
+        if(BuildConfig.DEBUG) android.util.Log.i("GalleryBarRestoration","changed=${previousGalleryContext!=galleryContext} assisted=$accessibleGallery input=$rootInputMode requested=$keyboardRequested offset=${galleryBarState.heightOffset}")
         if(previousGalleryContext!=galleryContext || accessibleGallery || keyboardNavigation) {
             galleryBarState.heightOffset=0f;galleryBarState.contentOffset=0f
             previousGalleryContext=galleryContext
@@ -227,7 +249,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     }
     var lastSelectionCount by remember { mutableIntStateOf(0) }
     SideEffect { if(selecting) lastSelectionCount=selectedTargets.size }
-    Scaffold(modifier=if(galleryScrolling) Modifier.nestedScroll(galleryScroll.nestedScrollConnection) else Modifier,topBar={ MotionSwap(selecting) { selectionMode -> if(selectionMode) SelectionTopBar(if(selecting) selectedTargets.size else lastSelectionCount,selectionBusy,selection::clear) else if(tab==5) SearchTopBar(searchDraft.text,searchDraft.filtered,search::text,::submitSearch,
+    Scaffold(modifier=if(galleryScrolling) galleryInput.nestedScroll(galleryScroll.nestedScrollConnection) else galleryInput,topBar={ MotionSwap(selecting) { selectionMode -> if(selectionMode) SelectionTopBar(if(selecting) selectedTargets.size else lastSelectionCount,selectionBusy,selection::clear) else if(tab==5) SearchTopBar(searchDraft.text,searchDraft.filtered,search::text,::submitSearch,
         onBack={ if(!dismissKeyboardIfOpen()) back() },onFilters={ showFilters=true }) else ShellTopBar(title,navigation.canGoBack && !primaryBrand,::back,canAddPhotos=!busy,
         onAddPhotos={ if(!busy) addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
         onStorage={ navigation.open(ShellDestination.STORAGE) },onActivity={ navigation.open(ShellDestination.ACTIVITY) },onImport={ navigation.open(ShellDestination.IMPORTS) },
