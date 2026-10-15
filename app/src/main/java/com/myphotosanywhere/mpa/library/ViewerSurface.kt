@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.myphotosanywhere.mpa.R
 import com.myphotosanywhere.mpa.ui.ShellIcon
+import com.myphotosanywhere.mpa.ui.MotionVisibility
+import com.myphotosanywhere.mpa.ui.MotionEdge
 
 /** Session UI only. Visibility never owns media, paging, decoders or durable work. */
 internal class ViewerChromeController(initiallyVisible: Boolean=true) {
@@ -53,14 +55,18 @@ internal fun ViewerSurface(chrome: ViewerChromeController,modifier: Modifier=Mod
         Box(Modifier.fillMaxSize().testTag("viewer-media").semantics {
             customActions=listOf(CustomAccessibilityAction(toggleLabel) { chrome.toggle();true })
         }) { media(with(density) { footerPixels.toDp() }) }
-        if(chrome.visible) Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().background(Color.Black.copy(alpha=.72f))) { topBar() }
-        else IconButton(onClick={ chrome.show() },modifier=Modifier.align(Alignment.TopEnd).padding(4.dp).size(48.dp)
+        MotionVisibility(chrome.visible,MotionEdge.TOP,Modifier.align(Alignment.TopCenter)) {
+            Box(Modifier.fillMaxWidth().background(Color.Black.copy(alpha=.72f))) { topBar() }
+        }
+        MotionVisibility(!chrome.visible,MotionEdge.TOP,Modifier.align(Alignment.TopEnd)) {
+        IconButton(onClick={ chrome.show() },modifier=Modifier.align(Alignment.TopEnd).padding(4.dp).size(48.dp)
             .background(Color.Black.copy(alpha=.72f),CircleShape).testTag("viewer-show-controls")) {
             ShellIcon(R.drawable.ic_viewer_show,stringResource(R.string.viewer_show_controls))
         }
+        }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha=.72f))
             .onSizeChanged { footerPixels=it.height }) {
-            if(chrome.visible) bottomBar()
+            MotionVisibility(chrome.visible,MotionEdge.BOTTOM) { bottomBar() }
             status()
         }
     }

@@ -39,6 +39,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -209,14 +212,30 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val navigationClearance=with(LocalDensity.current) { navigationHeight.toDp() }
     val scrollClearance=if(selecting) 0.dp else navigationClearance
     val primaryBrand=navigation.destination==navigation.primary && tab in listOf(0,1)
-    Scaffold(topBar={ if(selecting) SelectionTopBar(selectedTargets.size,selectionBusy,selection::clear) else if(tab==5) SearchTopBar(searchDraft.text,searchDraft.filtered,search::text,::submitSearch,
+    val galleryBarState=rememberTopAppBarState()
+    val accessibleGallery=touchExplorationEnabled()
+    val keyboardNavigation=LocalInputModeManager.current.inputMode==InputMode.Keyboard
+    val galleryScrolling=GalleryBarPolicy.canCollapse(tab,selecting,accessibleGallery,keyboardNavigation)
+    val galleryScroll=TopAppBarDefaults.enterAlwaysScrollBehavior(galleryBarState,canScroll={ galleryScrolling })
+    val galleryContext=listOf(filter,sourceKey,albumId,personId,importedPersonKey).joinToString("|") { value -> value?.let { "${it.length}:$it" } ?: "-" }
+    var previousGalleryContext by rememberSaveable { mutableStateOf(galleryContext) }
+    LaunchedEffect(galleryContext,accessibleGallery,keyboardNavigation) {
+        if(previousGalleryContext!=galleryContext || accessibleGallery || keyboardNavigation) {
+            galleryBarState.heightOffset=0f;galleryBarState.contentOffset=0f
+            previousGalleryContext=galleryContext
+        }
+    }
+    var lastSelectionCount by remember { mutableIntStateOf(0) }
+    SideEffect { if(selecting) lastSelectionCount=selectedTargets.size }
+    Scaffold(modifier=if(galleryScrolling) Modifier.nestedScroll(galleryScroll.nestedScrollConnection) else Modifier,topBar={ MotionSwap(selecting) { selectionMode -> if(selectionMode) SelectionTopBar(if(selecting) selectedTargets.size else lastSelectionCount,selectionBusy,selection::clear) else if(tab==5) SearchTopBar(searchDraft.text,searchDraft.filtered,search::text,::submitSearch,
         onBack={ if(!dismissKeyboardIfOpen()) back() },onFilters={ showFilters=true }) else ShellTopBar(title,navigation.canGoBack && !primaryBrand,::back,canAddPhotos=!busy,
         onAddPhotos={ if(!busy) addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
         onStorage={ navigation.open(ShellDestination.STORAGE) },onActivity={ navigation.open(ShellDestination.ACTIVITY) },onImport={ navigation.open(ShellDestination.IMPORTS) },
         onFilters={ showFilters=true },showFilters=tab==0 || tab==5,
         filtersActive=filter!="All" || sourceKey!=null,needsAttention=sync.any { it.error!=null },
-        showTitle=!primaryBrand || filter!="All" || albumId!=null || personId!=null || importedLabel!=null)
-    },snackbarHost={ SnackbarHost(snackbar,Modifier.padding(bottom=navigationClearance)) }) { padding ->
+        showTitle=!primaryBrand || filter!="All" || albumId!=null || personId!=null || importedLabel!=null,
+        scrollBehavior=if(galleryScrolling) galleryScroll else null)
+    } },snackbarHost={ SnackbarHost(snackbar,Modifier.padding(bottom=navigationClearance)) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
         // Browsing scrolls beneath floating navigation. Selection reserves the opaque toolbar viewport.
         Column(Modifier.fillMaxSize().then(if(selecting || tab !in listOf(0,1,5)) Modifier.padding(bottom=navigationClearance) else Modifier)) {
@@ -264,16 +283,20 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                 4,7,8,9,10,11,12,13,14,15 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
             }
         }
-        if(selecting) SelectionBottomBar(selectionBusy,(if(tab==5) searchApplied.filter else filter)=="Archive",tab==0 && albumId!=null,onAction={ kind ->
+        MotionVisibility(selecting,MotionEdge.BOTTOM,Modifier.align(Alignment.BottomCenter)) {
+        SelectionBottomBar(selectionBusy,(if(tab==5) searchApplied.filter else filter)=="Archive",tab==0 && albumId!=null,onAction={ kind ->
             if(kind==BulkKind.ALBUM) selectionAlbums=true
             else selection.execute(BulkAction(kind,if(kind==BulkKind.REMOVE_ALBUM) albumId else null))
-        },onTrash={ trash.request(selectedTargets) },modifier=Modifier.align(Alignment.BottomCenter).onSizeChanged { navigationHeight=it.height })
-        else ShellBottomBar(navigation.activePrimary,onSelect={ destination ->
+        },onTrash={ trash.request(selectedTargets) },modifier=Modifier.onSizeChanged { if(selecting) navigationHeight=it.height })
+        }
+        MotionVisibility(!selecting,MotionEdge.BOTTOM,Modifier.align(Alignment.BottomCenter)) {
+        ShellBottomBar(navigation.activePrimary,onSelect={ destination ->
             if(destination==ShellDestination.SEARCH && navigation.activePrimary!=ShellDestination.SEARCH)
                 searchOrigin=GalleryContext(filter,sourceKey,albumId,personId,importedPersonKey).save()
             if(destination.primary && destination!=ShellDestination.SEARCH) { albumId=null;personId=null;importedPersonKey=null;filter="All";searchOrigin=null }
             navigation.select(destination)
-        },modifier=Modifier.align(Alignment.BottomCenter).testTag("shell:navigation").onSizeChanged { navigationHeight=it.height })
+        },modifier=Modifier.testTag("shell:navigation").onSizeChanged { if(!selecting) navigationHeight=it.height })
+        }
         }
     }
     SelectionDialogs(selection,albums,selectionAlbums,{ selectionAlbums=false },selectionResult,selectionBusy,selectionProgress,selectionTotal)

@@ -36,11 +36,11 @@ fun ShellIcon(@DrawableRes resource: Int, description: String?=null) {
 @Composable
 fun ShellTopBar(title: String,canGoBack: Boolean,onBack: ()->Unit,canAddPhotos: Boolean,onAddPhotos: ()->Unit,
     onStorage: ()->Unit,onActivity: ()->Unit,onImport: ()->Unit,onFilters: ()->Unit,showFilters: Boolean,
-    filtersActive: Boolean,needsAttention: Boolean,showTitle: Boolean=true) {
+    filtersActive: Boolean,needsAttention: Boolean,showTitle: Boolean=true,scrollBehavior: TopAppBarScrollBehavior?=null) {
     var add by remember { mutableStateOf(false) }
     BoxWithConstraints {
     val compact=maxWidth<360.dp
-    TopAppBar(title={ if(showTitle) Text(title,maxLines=1,overflow=TextOverflow.Ellipsis) },navigationIcon={
+    TopAppBar(modifier=Modifier.testTag("shell:top-bar"),scrollBehavior=scrollBehavior,title={ if(showTitle) Text(title,maxLines=1,overflow=TextOverflow.Ellipsis) },navigationIcon={
         if(canGoBack) IconButton(onClick=onBack) { ShellIcon(R.drawable.ic_shell_back,"Back") }
         else Image(painterResource(R.drawable.ic_launcher_foreground),"MyPhotosAnywhere",Modifier.size(48.dp))
     },actions={
@@ -126,9 +126,13 @@ fun ShellImportActivity(onOpen: ()->Unit,sync: List<com.myphotosanywhere.mpa.dri
     val dismissed by model.dismissed.collectAsStateWithLifecycle()
     val visible=jobs.filter { it.id !in dismissed || !ImportHistory.canDismiss(it.state) }
     val label=com.myphotosanywhere.mpa.management.ActivitySummary(visible,sync).label
-    if(label!=null) TextButton(onClick=onOpen,modifier=Modifier.fillMaxWidth().testTag("shell:import-activity")) {
+    var lastLabel by remember { mutableStateOf("") }
+    SideEffect { if(label!=null) lastLabel=label }
+    MotionVisibility(label!=null,MotionEdge.TOP) {
+    TextButton(onClick=onOpen,enabled=label!=null,modifier=Modifier.fillMaxWidth().testTag("shell:import-activity")) {
         ShellIcon(R.drawable.ic_shell_activity)
         Spacer(Modifier.width(8.dp))
-        Text(label,maxLines=1,overflow=TextOverflow.Ellipsis)
+        Text(label ?: lastLabel,maxLines=1,overflow=TextOverflow.Ellipsis)
+    }
     }
 }
