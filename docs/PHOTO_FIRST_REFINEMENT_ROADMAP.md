@@ -7,8 +7,8 @@ Baseline: published MPA 0.5.22/code 33, Room schema 9. Updated October 15, 2026.
 | Release | Scope | Status |
 | --- | --- | --- |
 | 0.5.23 / 34 | Google Drive Trash and Restore | [Published](releases/v0.5.23.md), tested `00a7efbc2503eb5d15414a2e9741a70b84b47d99` |
-| 0.5.24 / 35 | Scrolling app bar and shared motion | In implementation |
-| 0.5.25 / 36 | Visual Collections, People, albums and Details | Planned |
+| 0.5.24 / 35 | Scrolling app bar and shared motion | [Published](releases/v0.5.24.md), tested `2655497b6f9de6f7a4e7e13beb3e2cb758402c3f` |
+| 0.5.25 / 36 | Visual Collections, People, albums and Details | In implementation |
 | 0.5.26 / 37 | Sharper adaptive thumbnails and richer mosaic | Planned |
 | 0.5.27 / 38 | Continuous drag selection | Planned |
 | 0.5.28 / 39 | Direct date scrubbing | Planned |

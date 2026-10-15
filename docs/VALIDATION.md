@@ -1,3 +1,7 @@
+## MPA 0.5.24: Gallery bar and motion
+
+Application `2655497b6f9de6f7a4e7e13beb3e2cb758402c3f` passed 373 unit/integration and 113 native tests per API29/35/37 (339 total), zero failures/errors/skips and zero lint findings. Schema10 and established upgrade signer unchanged. [Evidence and pending physical acceptance](releases/v0.5.24.md).
+
 ## MPA 0.5.23: Google Drive Trash and Restore
 
 Application `00a7efbc2503eb5d15414a2e9741a70b84b47d99` passed 373 unit/integration and 109 native tests per API29/35/37 (327 total), zero failures/errors/skips and zero lint findings. Additive Room schema10 migration and established upgrade signer verified. [Evidence and remaining physical acceptance](releases/v0.5.23.md).

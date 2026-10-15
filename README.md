@@ -6,6 +6,8 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
+The [0.5.24 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.24) adds a sliding gallery app bar and shared control motion. All 373 unit/integration and 339 native tests passed with zero lint findings; schema10 and the upgrade signer are unchanged. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.24/MPA-0.5.24-debug.apk) · [Evidence and limits](docs/releases/v0.5.24.md).
+
 The [0.5.23 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.23) adds source-bound Google Drive Trash and Restore. All 373 unit/integration and 327 native tests passed with zero lint findings; additive schema10 migration and upgrade signer verified. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.23/MPA-0.5.23-debug.apk) · [Evidence and limits](docs/releases/v0.5.23.md).
 
 The [0.5.22 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.22) renews rejected Drive access once without losing upload state and fixes in-app Open MPA instructions. All 354 unit/integration and 318 native tests passed on API29/35/37 with zero lint findings; schema9 and upgrade signer unchanged. Real-device authorization acceptance remains pending. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.22/MPA-0.5.22-debug.apk) · [Evidence and limits](docs/releases/v0.5.22.md).
