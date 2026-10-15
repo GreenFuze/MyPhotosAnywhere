@@ -45,6 +45,9 @@ interface CloudDao {
     @Query("SELECT * FROM sync_states") fun observeSync(): Flow<List<SyncState>>
     @Query("SELECT * FROM downloads") fun observeDownloads(): Flow<List<DownloadTask>>
     @Query("SELECT * FROM cloud_photos WHERE bindingKey = :binding") suspend fun photos(binding: String): List<CloudPhoto>
+    @Query("""SELECT c.* FROM cloud_photos c WHERE c.key IN
+        (SELECT s.key||':'||:remote FROM drive_sources s WHERE s.accountId=:account) AND c.remoteId=:remote""")
+    suspend fun accountCopies(account: String,remote: String): List<CloudPhoto>
     @Query("SELECT * FROM cloud_photos WHERE key = :key") suspend fun photo(key: String): CloudPhoto?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun savePhoto(photo: CloudPhoto)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun saveFolder(folder: CloudFolder)

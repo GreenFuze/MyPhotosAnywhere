@@ -18,7 +18,7 @@ class DriveCoordinator(private val context: Context, private val database: Photo
     val backups = database.drive().observeBackups()
 
     suspend fun enqueue(photo: Photo) {
-        if (photo.sourceRemoteId != null || photo.originalPath.isBlank()) return
+        if (photo.sourceRemoteId != null || photo.originalPath.isBlank() || database.trash().hidesPhoto(photo.id)) return
         val active = database.drive().backupDestination()?.connection() ?: return
         val binding = active.binding() ?: return
         if (!active.backupEnabled) return
@@ -38,7 +38,7 @@ class DriveCoordinator(private val context: Context, private val database: Photo
         val binding = active.binding() ?: return
         database.photos().all().forEach { enqueue(it) }
         database.drive().backups(binding.key).filter {
-            it.state != "COMPLETE" && (retryFailures || it.state !in listOf("FAILED", "AUTH_REQUIRED"))
+            it.state != "COMPLETE" && !database.trash().hidesPhoto(it.photoId) && (retryFailures || it.state !in listOf("FAILED", "AUTH_REQUIRED"))
         }.forEach {
             schedule(it, active.unmeteredOnly, replace)
         }

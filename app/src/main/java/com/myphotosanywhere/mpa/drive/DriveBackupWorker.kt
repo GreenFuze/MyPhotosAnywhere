@@ -30,6 +30,10 @@ class DriveBackupWorker(context: Context, parameters: WorkerParameters) : Corout
         try {
             if (!stillActive()) return@withContext Result.success()
             val photo = app.database.photos().find(task.photoId) ?: error("The local photo is missing.")
+            if(app.database.trash().hidesPhoto(photo.id)) {
+                dao.updateBackup(task.copy(state="PAUSED",errorMessage="This original is in Drive Trash. Restore it before backing up."))
+                return@withContext Result.success()
+            }
             val original = File(photo.originalPath)
             check(original.isFile && original.length() == photo.bytes) { "The local original is missing or changed." }
             val api = auth.gateway(task.email, DriveMode.valueOf(task.mode))
@@ -48,7 +52,7 @@ class DriveBackupWorker(context: Context, parameters: WorkerParameters) : Corout
                 if (error.status == 404) null else throw error
             }
             if (existing != null) {
-                check(existing.md5 == md5 && existing.bytes == photo.bytes && task.folderId in existing.parents) {
+                check(!existing.trashed && existing.md5 == md5 && existing.bytes == photo.bytes && task.folderId in existing.parents) {
                     "The reserved Drive file differs from this photo. Backup stopped without overwriting it."
                 }
             } else {
@@ -77,7 +81,7 @@ class DriveBackupWorker(context: Context, parameters: WorkerParameters) : Corout
                 }
             }
             val uploaded = api.file(remoteId)
-            check(uploaded.bytes == photo.bytes && uploaded.md5 == md5 && task.folderId in uploaded.parents) {
+            check(!uploaded.trashed && uploaded.bytes == photo.bytes && uploaded.md5 == md5 && task.folderId in uploaded.parents) {
                 "Drive checksum verification failed. The local original is preserved."
             }
             dao.updateBackup(task.copy(state = "COMPLETE", uploadedBytes = photo.bytes, sessionUri = null,

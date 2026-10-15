@@ -6,7 +6,7 @@ enum class DriveMode(val scope: String, val title: String, val explanation: Stri
     APP_FILES("https://www.googleapis.com/auth/drive.file", "New MPA folder",
         "Access files created by MPA. Existing photo collections are not included."),
     EXISTING_LIBRARY("https://www.googleapis.com/auth/drive", "Existing photo collection",
-        "Google grants access to your whole Drive. MPA works inside selected folders and preserves media originals. Optional metadata conversion moves verified Google JSON to Drive trash."),
+        "Google grants access to your whole Drive. MPA works inside selected folders. Originals change only when you explicitly confirm a move to Google Drive Trash. Optional metadata conversion moves verified Google JSON to Drive trash."),
 }
 
 data class DriveBinding(val accountId: String, val folderId: String) {
@@ -36,6 +36,8 @@ data class DriveFile(
     val assetId: String? = null,
     val sourceAssetId: String? = null,
     val sha256: String? = null,
+    val canTrash: Boolean = false,
+    val canUntrash: Boolean = false,
 )
 data class DrivePage(val files: List<DriveFile>, val nextPage: String?, val incompleteSearch: Boolean = false)
 data class UploadProgress(val offset: Long, val complete: Boolean)

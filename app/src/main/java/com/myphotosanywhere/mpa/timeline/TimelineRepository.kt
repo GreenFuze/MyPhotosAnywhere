@@ -133,7 +133,7 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
                     else -> current.version==entry.version
                 }
             }
-            val photo=(entry.photoId ?: cloud?.photoId)?.let { database.photos().find(it) }?.takeIf {
+            val photo=(entry.photoId ?: cloud?.photoId)?.let { database.photos().find(it)?.takeUnless { photo -> database.trash().hidesPhoto(photo.id) } }?.takeIf {
                 it.bytes==entry.bytes && (entry.photoId==null || it.sha256==entry.sha256)
             }
             TimelineMedia(entry,photo,cloud)
@@ -141,7 +141,7 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
     }
 
     internal fun observe(onChanged: ()->Unit): AutoCloseable {
-        val observer=object: InvalidationTracker.Observer("photos","cloud_photos","drive_sources","album_photos","faces","people","albums") {
+        val observer=object: InvalidationTracker.Observer("photos","cloud_photos","drive_sources","album_photos","faces","people","albums","drive_trash") {
             override fun onInvalidated(tables: Set<String>)=onChanged()
         }
         database.invalidationTracker.addObserver(observer)

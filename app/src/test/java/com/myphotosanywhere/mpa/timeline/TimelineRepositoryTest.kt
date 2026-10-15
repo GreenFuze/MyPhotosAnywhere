@@ -285,7 +285,7 @@ class TimelineRepositoryTest {
         assertEquals(before,db.photos().all())
         assertEquals(remote,db.cloud().photo(remote.key))
         assertEquals(face,db.library().face(face.id))
-        assertEquals(9,db.openHelper.readableDatabase.version)
+        assertEquals(10,db.openHelper.readableDatabase.version)
     }
 
     @Test fun lowStoragePreparationPreservesOriginalRecordsAndCleansIndex()=runBlocking {

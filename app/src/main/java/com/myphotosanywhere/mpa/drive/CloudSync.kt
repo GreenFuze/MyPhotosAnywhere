@@ -90,6 +90,9 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
                 .addTag("$SYNC_TAG:$binding").build())
     }
     internal suspend fun save(binding: String,parent: String,file: DriveFile,generation: String) {
+        val trash=com.myphotosanywhere.mpa.trash.DriveTrashIndex(database)
+        if(!trash.accepts(binding,file)) return
+        trash.verified(binding,file)
         val old=cloud.photo("$binding:${file.id}")
         val backup=database.drive().backupForRemote(binding,file.id)
         val account=database.drive().source(binding)?.accountId

@@ -86,6 +86,25 @@ class DriveGateway(
     suspend fun file(id: String): DriveFile = parseFile(json(Request.Builder()
         .url(url("files/$id", "fields" to FILE_FIELDS, "supportsAllDrives" to "true"))))
 
+    /** Capture the conditional metadata revision without reading original media bytes. */
+    suspend fun mediaRevision(id: String): Pair<DriveFile,String> = execute(Request.Builder()
+        .url(url("files/$id","fields" to FILE_FIELDS,"supportsAllDrives" to "true"))) { response ->
+        checkSuccess(response)
+        val etag=response.header("ETag")?.takeIf(String::isNotBlank)
+            ?: throw IOException("Drive did not return a conditional revision. The original is preserved.")
+        parseFile(JsonParser.parseString(response.body.string()).asJsonObject) to etag
+    }
+
+    /** Media-only, conditional mutation. Metadata cleanup retains its separate strict boundary. */
+    suspend fun setMediaTrashed(expected: DriveFile,etag: String,trashed: Boolean) {
+        require(expected.id.isNotBlank() && etag.isNotBlank() && expected.version!=null)
+        require(expected.mimeType.startsWith("image/") || expected.mimeType.startsWith("video/"))
+        require(expected.trashed!=trashed)
+        require(if(trashed) expected.canTrash else expected.canUntrash)
+        execute(Request.Builder().url(url("files/${expected.id}","supportsAllDrives" to "true"))
+            .header("If-Match",etag).patch("{\"trashed\":$trashed}".toRequestBody(JSON))) { checkSuccess(it) }
+    }
+
     /** Explicit archive browser; ZIPs remain excluded from ordinary gallery discovery. */
     suspend fun archiveChildren(parent: String, page: String?=null): DrivePage = list(
         "'${literal(parent)}' in parents and trashed = false and (mimeType = '$FOLDER_MIME' or name contains '.zip')",page)
@@ -302,7 +321,7 @@ class DriveGateway(
 
     companion object {
         const val FOLDER_MIME = "application/vnd.google-apps.folder"
-        private const val FILE_FIELDS = "id,name,mimeType,size,md5Checksum,sha256Checksum,version,parents,capabilities(canAddChildren),modifiedTime,thumbnailLink,trashed,imageMediaMetadata(time,location(latitude,longitude)),appProperties"
+        private const val FILE_FIELDS = "id,name,mimeType,size,md5Checksum,sha256Checksum,version,parents,capabilities(canAddChildren,canTrash,canUntrash),modifiedTime,thumbnailLink,trashed,imageMediaMetadata(time,location(latitude,longitude)),appProperties"
         private val JSON = "application/json; charset=utf-8".toMediaType()
         fun literal(value: String) = value.replace("\\", "\\\\").replace("'", "\\'")
         private fun JsonObject.string(key: String): String? = get(key)?.takeUnless { it.isJsonNull }?.asString
@@ -314,6 +333,8 @@ class DriveGateway(
             canAddChildren = j.getAsJsonObject("capabilities")?.get("canAddChildren")?.asBoolean ?: false,
             modifiedTime = j.string("modifiedTime"), thumbnailLink = j.string("thumbnailLink"),
             trashed = j.get("trashed")?.asBoolean ?: false,
+            canTrash = j.getAsJsonObject("capabilities")?.get("canTrash")?.asBoolean ?: false,
+            canUntrash = j.getAsJsonObject("capabilities")?.get("canUntrash")?.asBoolean ?: false,
             capturedAt = j.getAsJsonObject("imageMediaMetadata")?.string("time")?.let { time ->
                 runCatching { java.time.Instant.parse(time).toEpochMilli() }.getOrNull() ?:
                 runCatching { java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss", java.util.Locale.US).apply { isLenient=false }.parse(time)?.time }.getOrNull()

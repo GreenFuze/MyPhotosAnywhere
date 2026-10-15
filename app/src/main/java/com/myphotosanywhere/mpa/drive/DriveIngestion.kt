@@ -145,6 +145,11 @@ internal class DriveIngestion(
                 ensureSource(binding)
                 page.changes.forEach { change ->
                     val file = change.file
+                    if(file!=null) {
+                        val trash=com.myphotosanywhere.mpa.trash.DriveTrashIndex(database)
+                        if(!trash.accepts(binding,file)) return@forEach
+                        trash.verified(binding,file)
+                    }
                     if(file!=null && !file.trashed && file.parents.any { it in folders } && file.name.endsWith(".json",true))
                         discoverJson(binding,file.parents.first { it in folders },file)
                     if (change.removed || file == null || file.trashed ||

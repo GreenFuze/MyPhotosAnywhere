@@ -46,7 +46,7 @@ class TakeoutDownloadMigrationTest {
         var db: PhotoDatabase?=null
         try {
             helper.writableDatabase; helper.close()
-            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(TAKEOUT_DOWNLOAD_MIGRATION_7_8, com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9).allowMainThreadQueries().build()
+            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(TAKEOUT_DOWNLOAD_MIGRATION_7_8, com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9, com.myphotosanywhere.mpa.trash.TRASH_MIGRATION_9_10).allowMainThreadQueries().build()
             db=opened
             assertEquals("PAUSED",opened.imports().job("existing-job")?.state)
             assertEquals("upload-session",opened.imports().item("existing-item")?.sessionUri)

@@ -62,7 +62,7 @@ data class Handoff(
 
 @Dao
 interface PhotoDao {
-    @Query("SELECT * FROM photos ORDER BY importedAt DESC, id DESC")
+    @Query("SELECT p.* FROM photos p WHERE "+com.myphotosanywhere.mpa.trash.TrashVisibility.PHOTO_SQL+" ORDER BY importedAt DESC, id DESC")
     fun observeAll(): Flow<List<Photo>>
 
     @Update
@@ -99,8 +99,10 @@ interface PhotoDao {
     com.myphotosanywhere.mpa.drive.ScanFolder::class, com.myphotosanywhere.mpa.metadata.MetadataState::class,
     com.myphotosanywhere.mpa.importing.ImportJob::class, com.myphotosanywhere.mpa.importing.ImportItem::class,
     com.myphotosanywhere.mpa.importing.TakeoutSidecar::class,
-    com.myphotosanywhere.mpa.importing.TakeoutDownload::class], version = 9, exportSchema = true)
+    com.myphotosanywhere.mpa.importing.TakeoutDownload::class,
+    com.myphotosanywhere.mpa.trash.DriveTrashRecord::class], version = 10, exportSchema = true)
 abstract class PhotoDatabase : RoomDatabase() {
+    internal abstract fun trash(): com.myphotosanywhere.mpa.trash.DriveTrashDao
     abstract fun photos(): PhotoDao
     abstract fun drive(): DriveDao
     abstract fun library(): LibraryDao

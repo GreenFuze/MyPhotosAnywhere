@@ -9,6 +9,7 @@ internal class TimelineSql(private val query: TimelineQuery) {
         WITH connected AS (
           SELECT c.* FROM cloud_photos c JOIN drive_sources s ON s.key=c.bindingKey
           WHERE s.enabled=1 AND (?1 IS NULL OR c.bindingKey=?1)
+          AND NOT EXISTS(SELECT 1 FROM drive_trash t WHERE t.accountId=s.accountId AND t.remoteId=c.remoteId AND t.confirmed=1)
         ), byPhoto AS (
           SELECT photoId,MAX(CASE WHEN removed=0 THEN 1 ELSE 0 END) AS live
           FROM connected WHERE photoId IS NOT NULL GROUP BY photoId
@@ -47,6 +48,7 @@ internal class TimelineSql(private val query: TimelineQuery) {
           AND (p.sourceRemoteId IS NULL OR p.originalPath<>'' OR bp.live=1
             OR ?3 IS NOT NULL OR ?2 IN ('Favorites','Archive'))
           AND (?1 IS NULL OR p.sourceBindingKey=?1 OR bp.live=1)
+          AND ${com.myphotosanywhere.mpa.trash.TrashVisibility.PHOTO_SQL}
           AND p.archived=CASE WHEN ?2='Archive' THEN 1 ELSE 0 END
           AND (?2<>'Favorites' OR p.favorite=1) AND (?2<>'Videos' OR p.mimeType LIKE 'video/%')
           AND (?2<>'Edits' OR p.parentId IS NOT NULL) AND (?2<>'Offline' OR p.originalPath<>'')
