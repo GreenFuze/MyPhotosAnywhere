@@ -108,16 +108,27 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
     suspend fun thumbnail(photo: Photo): File? = withContext(Dispatchers.IO) {
         val target=File(photo.thumbnailPath)
         if(target.isFile) { target.setLastModified(System.currentTimeMillis()); return@withContext target }
-        if(photo.originalPath.isBlank()) {
-            val row=database.cloud().photo("${photo.sourceBindingKey}:${photo.sourceRemoteId}")
-            return@withContext row?.thumbnailPath?.let { File(it) }?.takeIf { it.isFile }
-        }
-        withOriginal(photo.id) { _,file ->
+        // Missing bytes are an operational availability state. Recheck the current row
+        // under the same lock as eviction, retaining the existing serial/bounded decoder.
+        lock.withLock {
+            val latest=database.photos().find(photo.id) ?: return@withLock null
+            if(latest.sha256!=photo.sha256 || latest.bytes!=photo.bytes || latest.thumbnailPath!=photo.thumbnailPath) return@withLock null
+            val file=File(latest.originalPath)
+            if(latest.originalPath.isBlank() || !file.isFile || latest.thumbnailPath.isBlank()) return@withLock cloudThumbnail(latest)
+            database.photos().update(latest.copy(lastAccess=System.currentTimeMillis()))
             target.parentFile?.mkdirs()
-            val bitmap=PhotoRepository.mediaPreview(file,photo.mimeType,480)
+            val bitmap=PhotoRepository.mediaPreview(file,latest.mimeType,480)
             try { target.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,it)) } }
             finally { bitmap.recycle() }
             target
         }
+    }
+    private suspend fun cloudThumbnail(photo: Photo): File? {
+        val binding=photo.sourceBindingKey ?: return null
+        val remote=photo.sourceRemoteId ?: return null
+        val row=database.cloud().photo("$binding:$remote") ?: return null
+        if(row.photoId!=photo.id || row.bytes!=photo.bytes ||
+            (row.sha256?.let { it!=photo.sha256 } ?: (row.version!=photo.cachedVersion))) return null
+        return row.thumbnailPath.takeIf(String::isNotBlank)?.let(::File)?.takeIf { it.isFile }
     }
 }
