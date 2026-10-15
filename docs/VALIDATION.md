@@ -1,3 +1,7 @@
+## MPA 0.5.26: Adaptive previews and portrait mosaic
+
+Application `54e83a55d52659927168d64f9b727161d43a5422` passed 384 unit/integration and 122 native tests per API29/35/37 (366 total), zero failures/errors/skips and zero lint findings. Schema 10 and established signer unchanged. [Evidence and pending physical acceptance](releases/v0.5.26.md).
+
 ## MPA 0.5.25: Visual Collections and Details
 
 Application `016222142c36886f05b7f8a6c8bfa1c775b55f0f` passed 374 unit/integration and 116 native tests per API29/35/37 (348 total), zero failures/errors/skips and zero lint findings. Schema10 and established upgrade signer unchanged. [Evidence and pending physical acceptance](releases/v0.5.25.md).

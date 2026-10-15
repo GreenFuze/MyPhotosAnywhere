@@ -1,0 +1,10 @@
+{
+  "tag": "v0.5.26",
+  "source_sha": "54e83a55d52659927168d64f9b727161d43a5422",
+  "build_run_id": 38761188557,
+  "device_run_id": 38761188529,
+  "apk_sha256": "7d777d8c1dff3e85e22baf980035f937e488a5ac4782fdc3f3ba388a36adce0d",
+  "certificate_sha256": "1262430ed1e257b54a4c09697cbc63bc148af11755485bcf7b2c66492f0379b4",
+  "version_code": 37,
+  "room_schema": 10
+}

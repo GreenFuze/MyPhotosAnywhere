@@ -1,0 +1,25 @@
+# MPA 0.5.26 — Portrait mosaic and sharper previews
+
+Mosaic now gives portrait photos taller tiles alongside smaller photos, following the owner's visual reference while retaining one chronological sequence and the floating date capsule. Square and the previous layout, now called Justified rows, remain explicit options. Packing is deterministic and bounded to retained pages. Canonical tile coordinates preserve viewer return, date context and pixel anchors through layout/density changes, recreation and import updates. Chronological traversal and selection semantics retain each distinct media identity once.
+
+Larger tiles can upgrade the existing small preview to a sharper, size-aware cached variant from an available original. Physical crop demand, EXIF orientation, content identity and revision determine the bounded request; decoding is serial and protected by original cache leases. Variants are private, atomic and budgeted, with no retained bitmap collection. The existing small preview stays usable during an upgrade or an operational failure. Grid work does not download originals. Authenticated Drive thumbnail URLs remain unchanged: MPA preserves the detail the provider supplies, without claiming access to Google's private thumbnail system or enlarging a low-resolution source.
+
+Preview-only reads no longer update original-access metadata or invalidate the timeline on every cell. Original files reused as thumbnail paths are protected from thumbnail cleanup and cache timestamp touches. Provider work is limited to two slots; incomplete owned cache files recover safely, and low storage keeps the existing preview. Local variants preserve fine text and transparency. Existing missing-file recovery and exact linked-cloud preview checks remain intact.
+
+## Validation
+
+Immutable application `54e83a55d52659927168d64f9b727161d43a5422` passed **384 unit/integration tests**, **zero lint findings**, and **122 native tests on each API29/35/37 (366 total)**, with no failures, errors or skips. [Host checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38761188557) · [Native checks](https://github.com/GreenFuze/MyPhotosAnywhere/actions/runs/38761188529).
+
+Native calibration compares an enlarged 480px base with a 768px variant at the same output size and verifies greater stripe contrast. Tests cover rotated provider previews, alpha, no upscaling, corrupt-cache regeneration, revision mismatch, original bytes/metadata/mtime preservation, original eviction, low space, zero budgets, provider cancellation and the two-slot bound. Portrait geometry, all legacy row assertions, selection, density changes, recreation, viewer return and concurrent import anchors pass. All 52 previous captures remain, plus four new captures per API, including exact-pixel quality evidence. Twelve new captures were directly reviewed. Bounded layout metrics accompany existing 10,000/100,000-item query, seeking, snapshot and memory fixtures; these emulator measurements do not establish physical-phone frame performance.
+
+Room **schema 10 and all 22 tables are unchanged**, including the historical schema 9 file. Original bytes, metadata, identities, relationships, consent, source authorization, durable imports/checkpoints, Trash, timeline SQL/paging, viewer sessions and rendering/lifecycle contracts are preserved. No dependency, SDK or warning severity changes are bundled. All Kotlin/Java/lint/Gradle gates remain enforced, with the previously approved exact AGP deprecation. Complete logs and individually traced platform observations remain in the evidence. The first API37 execution reported a pre-test Google Play services SIM_STATE_CHANGED ANR; it was archived, and only API37 was repeated on the same application revision. The retry reproduced that exact previously authorized platform condition before MPA's first test. The existing narrow human exception is explicitly bound to the final source/log/line; no new approval or broader waiver is claimed, and every MPA crash/ANR/OOM or other unapproved fatal remains blocking. Final evidence identifies the actual executed jobs and timestamp-matched artifacts; no first-attempt API37 capture substitutes the accepted run.
+
+The APK is the exact signed host CI artifact, with the established upgrade signer and no rebuild. Publication changes documentation only. Physical S23 Ultra, real Google operations, human TalkBack and translated Hebrew acceptance remain unverified. The earlier JPEG crash remains unreproduced with its root cause unconfirmed. The existing 250MiB import/large-video limitation remains separate backend work.
+
+Three stages continue unattended: continuous drag selection, direct date scrubbing, and management refinement with the complete UX audit. [Delivery ledger](https://github.com/GreenFuze/MyPhotosAnywhere/blob/main/docs/PHOTO_FIRST_REFINEMENT_ROADMAP.md).
+
+Version **0.5.26**, code **37**, minimum SDK **26**, target SDK **37**, Room schema **10**.
+
+APK SHA-256: `7d777d8c1dff3e85e22baf980035f937e488a5ac4782fdc3f3ba388a36adce0d`.
+
+Upgrade certificate SHA-256: `1262430ed1e257b54a4c09697cbc63bc148af11755485bcf7b2c66492f0379b4`.
