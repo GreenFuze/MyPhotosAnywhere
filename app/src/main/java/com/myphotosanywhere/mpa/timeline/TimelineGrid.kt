@@ -38,6 +38,7 @@ import androidx.paging.map
 import coil.compose.AsyncImage
 import com.myphotosanywhere.mpa.library.LibraryFeaturesModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.*
 import java.io.File
 import java.time.Instant
@@ -76,6 +77,8 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     // LazyGridState owns measured placeables as well as scroll coordinates. Never move
     // that cache between incompatible slot structures; restore the canonical model anchor.
     val state=key(density,layout) { rememberLazyGridState() }
+    val tiles=remember(state) { TimelineGridViewport(state) }
+    val scrollScope=rememberCoroutineScope()
     var dateNavigation by remember(query) { mutableStateOf(false) }
     val rowsFlow=remember(model) {
         model.paging.map { data -> data.map { TimelineRow(it.entry,it.generation,it.query,it.aspect) } }
@@ -88,7 +91,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     val viewer by model.viewer.collectAsStateWithLifecycle()
     var restoring by remember(query,restoration,zone,density,layout) { mutableStateOf(true) }
     fun viewport(): TimelineAnchor? {
-        val visible=state.layoutInfo.visibleItemsInfo.mapNotNull { item ->
+        val visible=tiles.visible().mapNotNull { item ->
             mediaByKey[item.key]?.takeIf { it.query==query && item.offset.y+item.size.height>state.layoutInfo.viewportStartOffset && item.offset.y<state.layoutInfo.viewportEndOffset }
                 ?.entry?.let { TimelineAnchor(it.cursor,-item.offset.y) }
         }
@@ -111,27 +114,27 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                     // A deferred request can be coalesced when this position is already current;
                     // waiting for layout object identity then falsely reports a stalled measure.
                     val positioned=kotlinx.coroutines.withTimeoutOrNull(5000) {
-                        state.scrollToItem(index,offset)
+                        tiles.scrollToItem(index,offset)
                         true
                     }
                     check(positioned==true) { "Timeline scroll did not complete for index $index; ${diagnostic()}" }
                 }
-                override fun diagnostic(): String = "visible=${state.layoutInfo.visibleItemsInfo.map { it.key to it.offset.y }} scroll=${state.canScrollBackward}/${state.canScrollForward}"
+                override fun diagnostic(): String = "visible=${tiles.visible().map { it.key to it.offset.y }} scroll=${state.canScrollBackward}/${state.canScrollForward}"
                 override suspend fun align(key: String,offset: Int): Boolean {
                     // A completed layout can still reflect the preceding span/index cache.
                     // Missing placement must retry, even when the retained keys did not change.
-                    var placed=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key }
+                    var placed=tiles.visible().firstOrNull { it.key==key }
                     if(placed==null) {
                         // Shrinking cells may consume the entire anchored item with its
                         // formerly valid crop offset. Probe that canonical index at zero.
                         place(requestedIndex,0)
-                        placed=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key } ?: return false
+                        placed=tiles.visible().firstOrNull { it.key==key } ?: return false
                     }
                     val target=TimelineAnchorAlignment.visibleOffset(offset,placed.size.height,state.layoutInfo.viewportEndOffset)
                     val correction=placed.offset.y+target
                     if(correction!=0) state.scrollBy(correction.toFloat())
                     // scrollBy completes its synchronous remeasure before returning.
-                    val corrected=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==key }
+                    val corrected=tiles.visible().firstOrNull { it.key==key }
                     if(corrected==null) return false
                     val viewport=state.layoutInfo
                     val visible=corrected.offset.y+corrected.size.height>viewport.viewportStartOffset && corrected.offset.y<viewport.viewportEndOffset
@@ -150,10 +153,10 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 }
                 val nearest=candidates.firstOrNull { (_,entry) -> TimelineOrder.compare(entry.cursor,anchor.cursor)>=0 }
                     ?: candidates.lastOrNull()
-                if(nearest!=null) state.requestScrollToItem(nearest.first,anchor.offset)
+                if(nearest!=null) tiles.requestScrollToItem(nearest.first,anchor.offset)
             }
         }
-        if(anchor==null && query.search!=null) state.requestScrollToItem(0)
+        if(anchor==null && query.search!=null) tiles.requestScrollToItem(0)
         model.restored(restoration)
         restoring=false
         }
@@ -193,23 +196,42 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             JustifiedMosaic().plan(retained.map { MosaicInput(it.entry.key,it.aspect) },density.columns,(maxWidth.value-4f).coerceAtLeast(1f),layout)
         }
         val pixels=LocalDensity.current
-        val clearance=remember(plan,pixels) {
-            TimelineAnchorClearance(plan.cells.distinctBy { it.row }.map { with(pixels) { requireNotNull(it.height).dp.roundToPx() } },
+        val blocks=remember(retained,density,layout,maxWidth,rows.loadState.append) {
+            if(layout==GalleryLayout.MOSAIC) BlockMosaic().plan(retained.map { MosaicInput(it.entry.key,it.aspect) },density.columns,
+                (maxWidth.value-4f).coerceAtLeast(48f),(rows.loadState.append as? LoadState.NotLoading)?.endOfPaginationReached==true) else null
+        }
+        SideEffect {
+            val held=tiles.install(blocks,pixels.density,model.anchor(query))
+            if(held!=null && !restoring && viewer==null) mediaByKey[held.cursor.key]?.entry?.let {
+                restoring=true;model.rememberAnchor(it,held.offset);model.restoreAnchor()
+            }
+        }
+        val clearance=remember(plan,blocks,pixels) {
+            TimelineAnchorClearance((blocks?.blocks?.map { it.height } ?: plan.cells.distinctBy { it.row }.map { requireNotNull(it.height) }).map { with(pixels) { it.dp.roundToPx() } },
                 with(pixels) { 2.dp.roundToPx() },with(pixels) { 2.dp.roundToPx() })
         }
         val held=model.anchor(query)
         val heldIndex=retained.indexOfFirst { it.entry.key==held?.cursor?.key }
         val viewportPixels=with(pixels) { maxHeight.roundToPx() }
         val normalBottomPixels=with(pixels) { (bottomClearance+2.dp).roundToPx() }
-        val bottomPixels=if(viewportPixels>0) clearance.bottom(plan.cells.getOrNull(heldIndex)?.row,held?.offset ?: 0,
+        val bottomPixels=if(viewportPixels>0) clearance.bottom(blocks?.locations?.get(held?.cursor?.key)?.first ?: plan.cells.getOrNull(heldIndex)?.row,
+            (held?.offset ?: 0)+(blocks?.locations?.get(held?.cursor?.key)?.second?.y?.let { with(pixels) { it.dp.roundToPx() } } ?: 0),
             viewportPixels,normalBottomPixels) else normalBottomPixels
         val bottomPadding=with(pixels) { bottomPixels.toDp() }
-        val physicalColumns=if(layout==GalleryLayout.SQUARE) plan.columns else JustifiedMosaic.SLOTS
+        val physicalColumns=if(blocks!=null) 1 else if(layout==GalleryLayout.SQUARE) plan.columns else JustifiedMosaic.SLOTS
         // Square and packed Mosaic use different slot structures. Give their layout nodes
         // distinct lifetimes with matching scroll-state lifetimes. The model retains the anchor.
         key(physicalColumns) {
         LazyVerticalGrid(GridCells.Fixed(physicalColumns),state=state,modifier=Modifier.fillMaxSize().testTag("photos:grid")
-            .semantics { stateDescription="${plan.columns} columns";collectionInfo=CollectionInfo(plan.rowCount,plan.columns) }
+            .semantics {
+                stateDescription="${plan.columns} columns";collectionInfo=CollectionInfo(blocks?.rows ?: plan.rowCount,plan.columns)
+                if(blocks!=null) {
+                    indexForKey { key -> retained.indexOfFirst { it.entry.key==key } }
+                    scrollToIndex { index ->
+                        if(index !in retained.indices) false else { scrollScope.launch { tiles.scrollToItem(index) };true }
+                    }
+                }
+            }
             .pointerInput(selection.isEmpty(),selectionLocked,restoring) {
                 if(selectionLocked || restoring) return@pointerInput
                 awaitEachGesture {
@@ -229,6 +251,27 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             },
             contentPadding=PaddingValues(start=2.dp,top=2.dp,end=2.dp,bottom=bottomPadding),
             horizontalArrangement=Arrangement.spacedBy(2.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
+            if(blocks!=null) {
+                items(blocks.blocks.size,key={ blocks.blocks[it].key },span={ GridItemSpan(maxLineSpan) },contentType={ "photo-block" }) { blockIndex ->
+                    val block=blocks.blocks[blockIndex]
+                    Box(Modifier.fillMaxWidth().height(block.height.dp).semantics { isTraversalGroup=true }) {
+                        block.tiles.forEach { tile ->
+                            key(tile.key) {
+                                if(tile.index<rows.itemCount) rows[tile.index]
+                                val row=retained[tile.index]
+                                TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || restoring || row.query!=query,zone,row.aspect,
+                                    Modifier.offset(tile.x.dp,tile.y.dp).width(tile.width.dp).height(tile.height.dp).semantics {
+                                        traversalIndex=tile.index.toFloat()
+                                        collectionItemInfo=CollectionItemInfo(tile.row,tile.rowSpan,tile.column,1)
+                                    }) {
+                                    val offset=tiles.visible().firstOrNull { it.key==row.entry.key }?.offset?.y
+                                    model.open(row.entry,offset?.let { -it },TimelineViewport.opening(viewport(),offset?.let { TimelineAnchor(row.entry.cursor,-it) }))
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
             items(retained.size,key={ index -> retained[index].entry.key },
                 span={ index -> GridItemSpan(if(layout==GalleryLayout.SQUARE) 1 else plan.cells[index].span) },contentType={ "media" }) { index ->
                 // Signal Paging access, but render one immutable row/geometry snapshot together.
@@ -239,9 +282,10 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                     Modifier.height(requireNotNull(plan.cells.getOrNull(index)?.height).dp).semantics {
                         val cell=plan.cells[index];collectionItemInfo=CollectionItemInfo(cell.row,1,cell.column,1)
                     }) {
-                    val offset=state.layoutInfo.visibleItemsInfo.firstOrNull { it.key==row.entry.key }?.offset?.y
+                    val offset=tiles.visible().firstOrNull { it.key==row.entry.key }?.offset?.y
                     model.open(row.entry,offset?.let { -it },TimelineViewport.opening(viewport(),offset?.let { TimelineAnchor(row.entry.cursor,-it) }))
                 }
+            }
             }
             if(rows.loadState.append is LoadState.Loading) item(span={ GridItemSpan(maxLineSpan) }) {
                 LinearProgressIndicator(Modifier.fillMaxWidth().padding(8.dp))
@@ -249,7 +293,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         }
         }
         if(restoring || refresh is LoadState.Loading) LinearProgressIndicator(Modifier.align(Alignment.TopCenter).fillMaxWidth().testTag("timeline:refreshing"))
-        if(selection.isEmpty() && !selectionLocked && !restoring) TimelineDateRail(state,retained,query,zone,{ model.anchor(query) }) { dateNavigation=true }
+        if(selection.isEmpty() && !selectionLocked && !restoring) TimelineDateRail(tiles,retained,query,zone,{ model.anchor(query) }) { dateNavigation=true }
         }
     }
 }

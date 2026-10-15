@@ -43,7 +43,7 @@ class MosaicDeviceTest {
         val files=listOf(picture(160,240,Color.rgb(42,120,165)),picture(240,240,Color.rgb(70,145,90)),picture(360,240,Color.rgb(195,130,60)))
         var photos=emptyList<Photo>()
         try {
-            app.galleryPresentation.update(GridDensity.DEFAULT);app.galleryPresentation.updateLayout(GalleryLayout.MOSAIC);photos=fixture(files)
+            app.galleryPresentation.update(GridDensity.DEFAULT);app.galleryPresentation.updateLayout(GalleryLayout.ROWS);photos=fixture(files)
             waitPhoto("photo:mosaic-002");compose.waitForIdle()
             val cells=(0..2).map { compose.onNodeWithTag("photo:mosaic-00$it").fetchSemanticsNode() }
             assertTrue(cells[0].boundsInWindow.width<cells[1].boundsInWindow.width && cells[1].boundsInWindow.width<cells[2].boundsInWindow.width)
@@ -70,7 +70,7 @@ class MosaicDeviceTest {
             // Repeated physical slot changes must dispose the preceding grid's layout
             // nodes while retaining the same canonical photo and its measured offset.
             repeat(3) {
-                for(layout in listOf(GalleryLayout.MOSAIC,GalleryLayout.SQUARE)) {
+                for(layout in listOf(GalleryLayout.ROWS,GalleryLayout.SQUARE)) {
                     android.util.Log.i("MosaicTransitions","Repeat $it switch to $layout")
                     compose.runOnUiThread { model.changeLayout(layout) }
                     compose.waitUntil(30000) {
@@ -83,8 +83,8 @@ class MosaicDeviceTest {
                 }
             }
             android.util.Log.i("MosaicTransitions","Final Mosaic before recreation")
-            compose.runOnUiThread { model.changeLayout(GalleryLayout.MOSAIC) }
-            compose.waitUntil(30000) { app.galleryPresentation.layout.value==GalleryLayout.MOSAIC && compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() }
+            compose.runOnUiThread { model.changeLayout(GalleryLayout.ROWS) }
+            compose.waitUntil(30000) { app.galleryPresentation.layout.value==GalleryLayout.ROWS && compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() }
             android.util.Log.i("MosaicTransitions","Recreate activity")
             compose.activityRule.scenario.recreate();waitPhoto(anchor.cursor.key)
             android.util.Log.i("MosaicTransitions","Open viewer")
@@ -100,7 +100,7 @@ class MosaicDeviceTest {
         val files=listOf(picture(160,240,Color.BLUE),picture(240,240,Color.GREEN),picture(360,240,Color.RED))
         var photos=emptyList<Photo>();val additions=mutableListOf<Photo>()
         try {
-            app.galleryPresentation.updateLayout(GalleryLayout.MOSAIC);photos=fixture(files,"mosaic-continuity");waitPhoto("photo:mosaic-continuity-000")
+            app.galleryPresentation.updateLayout(GalleryLayout.ROWS);photos=fixture(files,"mosaic-continuity");waitPhoto("photo:mosaic-continuity-000")
             val model=timeline();val focused=requireNotNull(app.timeline.find(TimelineQuery(),"photo:mosaic-continuity-045"))
             compose.runOnUiThread { model.rememberAnchor(focused,0);model.restoreAnchor() }
             waitPhoto(focused.key)
@@ -133,11 +133,11 @@ class MosaicDeviceTest {
         }
         val hashes=files.associateWith { com.myphotosanywhere.mpa.drive.DriveBackupWorker.digest(it,"SHA-256") }
         try {
-            app.galleryPresentation.update(GridDensity.DEFAULT);app.galleryPresentation.updateLayout(GalleryLayout.MOSAIC)
+            app.galleryPresentation.update(GridDensity.DEFAULT);app.galleryPresentation.updateLayout(GalleryLayout.ROWS)
             app.database.withTransaction { photos.forEach { app.database.photos().insert(it) } }
             waitPhoto("photo:continuous-002");val model=timeline()
             val zone=java.time.ZoneId.systemDefault();val locale=compose.activity.resources.configuration.locales[0]
-            for(layout in listOf(GalleryLayout.MOSAIC,GalleryLayout.SQUARE)) {
+            for(layout in listOf(GalleryLayout.ROWS,GalleryLayout.SQUARE)) {
                 compose.runOnUiThread { model.changeLayout(layout) }
                 compose.waitUntil(30000) { app.galleryPresentation.layout.value==layout && compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() }
                 compose.waitForIdle()
@@ -151,7 +151,7 @@ class MosaicDeviceTest {
                 }
                 compose.onAllNodes(hasAnyAncestor(hasTestTag("photos:grid")) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertCountEquals(0)
                 compose.onNodeWithTag("timeline:date-rail").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,TimelineDateIndicator.from(base,zone).description(locale)))
-                screenshot(if(layout==GalleryLayout.MOSAIC) "continuous-mosaic" else "continuous-square")
+                screenshot(if(layout==GalleryLayout.ROWS) "continuous-mosaic" else "continuous-square")
             }
             val selected=photos[2];val key="photo:${selected.id}"
             val day=Instant.ofEpochMilli(requireNotNull(selected.capturedAt)).atZone(zone).toLocalDate()

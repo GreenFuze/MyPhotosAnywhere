@@ -3,7 +3,7 @@ package com.myphotosanywhere.mpa.timeline
 import kotlin.math.ceil
 import kotlin.math.floor
 
-internal enum class GalleryLayout(val title: String) { MOSAIC("Mosaic"), SQUARE("Square") }
+internal enum class GalleryLayout(val title: String) { MOSAIC("Mosaic"), ROWS("Justified rows"), SQUARE("Square") }
 internal data class MosaicInput(val key: String,val aspect: Float=1f,val heading: Boolean=false) {
     init { require(key.isNotBlank() && aspect.isFinite() && aspect>0) }
 }

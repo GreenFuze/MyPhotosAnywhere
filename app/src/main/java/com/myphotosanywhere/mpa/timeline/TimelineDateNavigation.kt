@@ -1,7 +1,6 @@
 package com.myphotosanywhere.mpa.timeline
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
@@ -54,15 +53,15 @@ internal fun GridDensityControls(selected: GridDensity,onSelect: (GridDensity)->
 }
 
 @Composable
-internal fun BoxScope.TimelineDateRail(state: LazyGridState,items: List<TimelineRow>,query: TimelineQuery,zone: ZoneId,preferred: ()->TimelineAnchor?,onOpen: ()->Unit) {
+internal fun BoxScope.TimelineDateRail(state: TimelineGridViewport,items: List<TimelineRow>,query: TimelineQuery,zone: ZoneId,preferred: ()->TimelineAnchor?,onOpen: ()->Unit) {
     val media=remember(items,query) { items.filter { it.query==query }.associateBy { it.entry.key } }
     val currentPreferred by rememberUpdatedState(preferred)
     val indicator by remember(state,media,zone) { derivedStateOf {
-        val layout=state.layoutInfo
+        val layout=state.state.layoutInfo
         // A date seek can anchor a photo beside newer dates on the same top row.
         // Share the viewport's canonical identity policy; interpret the chosen timestamp
         // only afterwards so unknown dates never borrow a neighbor's known date.
-        val visible=layout.visibleItemsInfo.mapNotNull { item ->
+        val visible=state.visible().mapNotNull { item ->
             media[item.key]?.takeIf {
                 item.offset.y+item.size.height>layout.viewportStartOffset && item.offset.y<layout.viewportEndOffset
             }?.entry?.let { TimelineAnchor(it.cursor,-item.offset.y) }
