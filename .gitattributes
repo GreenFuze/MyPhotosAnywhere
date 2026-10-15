@@ -1,0 +1,4 @@
+
+
+# Room schema hashes must be reproducible on Windows and CI.
+app/schemas/** text eol=lf
