@@ -13,3 +13,7 @@ Version 0.5.22/code 33; Room schema 9 and dependency versions unchanged. Visual 
 A full native check also exposed a gallery restoration race during repeated layout switches: waiting for a changed layout-info object after a deferred scroll could time out at an already-current position. Placement retains a Compose frame boundary so paging/query recomposition can install its current immutable item provider, then uses Compose scrollToItem, which awaits attachment and forces synchronous remeasurement. The bounded timeout, canonical-ID alignment, eight-attempt invariant and all existing pixel-anchor assertions remain. No SQL, paging or viewer-session behavior is replaced.
 
 API37 logs also exposed Google Play services SIM-state broadcast ANR before the first MPA test, while CI compiled APKs concurrently with emulator startup. Native CI now builds both APKs under the existing strict diagnostic gate before booting the emulator, then still runs the complete connected test suite and collects full boot/runtime logs. No Google service, test, assertion or diagnostic is disabled. Application code remains identical to the previously tested revision; final source validation still includes the CI ordering change.
+
+## Final publication evidence
+
+[Exact immutable CI APK, checks, diagnostic evidence and remaining acceptance](releases/v0.5.22.md). Publication metadata does not change tested application/toolchain/workflow objects.

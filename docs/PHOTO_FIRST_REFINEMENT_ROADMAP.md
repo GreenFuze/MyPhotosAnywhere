@@ -1,6 +1,6 @@
 # Google Photos-familiar refinement roadmap
 
-Baseline: MPA 0.5.21/code 32, Room schema 9. Owner authorizes writing this roadmap, then implementing and publishing the next version after the existing checks. The original six refinements include the shipped immersive viewer and continuous grid; five UX refinements remain after the focused Drive recovery release. These are proposed refinement releases, not six unfinished original architecture phases. Adjust later scopes when real-device evidence warrants it.
+Baseline: MPA 0.5.21/code 32, Room schema 9. Owner authorizes writing this roadmap, then implementing and publishing the next version after the existing checks. Five planned UX refinements remain after the focused Drive recovery release. These are refinement releases, not unfinished original architecture phases. Adjust later scopes when real-device evidence warrants it.
 
 ## Shipped foundation
 

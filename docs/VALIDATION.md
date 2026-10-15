@@ -1,3 +1,7 @@
+## MPA 0.5.22: Drive access recovery
+
+Application `eb041dbb4985a1d27a8eb7b68af2467be3d77070` passed 354 unit/integration and 106 native tests per API29/35/37 (318 total), no failures/errors/skips, zero lint findings, unchanged schema9 and verified upgrade signer. [Evidence and limits](releases/v0.5.22.md). Real S23 Ultra authorization acceptance remains pending.
+
 ## MPA 0.5.21: continuous photo grid
 
 Application `7c6d2cf1ef220581843c381a64588269afadf033` passed 342 unit/integration tests, zero lint findings and 106 native tests on each of API 29/35/37 (318 total), with no failures/errors/skips. Exact CI APK, signer and schema 9 independently verified. [Scope and remaining acceptance](releases/v0.5.21.md). S23 Ultra acceptance remains pending.

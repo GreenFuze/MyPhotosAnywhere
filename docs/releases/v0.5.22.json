@@ -1,0 +1,24 @@
+{
+  "tag": "v0.5.22",
+  "source_sha": "eb041dbb4985a1d27a8eb7b68af2467be3d77070",
+  "build_run_id": 38649192868,
+  "device_run_id": 38649192843,
+  "apk_sha256": "abe869be22d3e987015188c17a5bc1ca8140408429e175258a20f680a49c6dc5",
+  "certificate_sha256": "1262430ed1e257b54a4c09697cbc63bc148af11755485bcf7b2c66492f0379b4",
+  "version_code": 33,
+  "room_schema": 9,
+  "owner_approved_emulator_diagnostics": true,
+  "owner_approved_pretest_gms_anr": {
+    "source_sha": "eb041dbb4985a1d27a8eb7b68af2467be3d77070",
+    "logSha256": "e55fc78c5bdb7fa6bc00f3d9e59ca103aad3ca83ae6afc444bd6ba4aefe77e8f",
+    "approvalDate": "2026-10-15",
+    "questionItemId": "[\"request_user_input_async\",\"call_6a44f61729894e099f722c6795959a1a\",0]",
+    "answer": "Allow this specific emulator exception and publish",
+    "scope": "Only this exact API37 pre-test Google Play services ANR. Every other fatal marker remains blocking; raw logs and fatal inventory retained.",
+    "path": "device\\MPA-device-checks-37.0\\build\\diagnostics\\logcat.txt",
+    "line": 28339,
+    "marker": "10-14 22:45:43.202   619  2998 E ActivityManager: ANR in com.google.android.gms.persistent",
+    "reason": "10-14 22:45:43.202   619  2998 E ActivityManager: Reason: Broadcast of Intent { act=android.intent.action.SIM_STATE_CHANGED flg=0x15000010 xflg=0x4 cmp=com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver (has extras) }",
+    "firstMpaTest": "10-14 22:46:07.750  3967  4240 I TestRunner: started: driveConnectionRecoveryPreservesCheckpointsAndPostsWaitingStatus(com.myphotosanywhere.mpa.DeviceSmokeTest)"
+  }
+}
