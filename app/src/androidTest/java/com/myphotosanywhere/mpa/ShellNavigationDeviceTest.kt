@@ -21,7 +21,14 @@ import java.io.File
 class ShellNavigationDeviceTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
-    private fun back()=compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+    private fun back() {
+        compose.runOnIdle {
+            android.util.Log.i("ShellNavigationBack","lifecycle=${compose.activity.lifecycle.currentState} enabled=${compose.activity.onBackPressedDispatcher.hasEnabledCallbacks()}")
+        }
+        compose.onRoot().printToLog("ShellNavigationBack")
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        compose.waitForIdle()
+    }
 
     @Test fun collectionsKeepPeoplePlacesAndAiActivityReachableWithBackHistory() {
         compose.onNodeWithTag("nav:Collections").performClick().assertIsSelected()
