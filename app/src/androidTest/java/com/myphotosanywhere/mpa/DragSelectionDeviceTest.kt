@@ -80,7 +80,15 @@ class DragSelectionDeviceTest {
                 begin(first.key)
                 val forward=point("photo:${fixture.photos[5].id}")
                 compose.onNodeWithTag("photos:grid").performTouchInput { moveTo(forward);advanceEventTime(100) }
-                compose.waitUntil(10000) { selected.targets.value.size==7 }
+                try { compose.waitUntil(10000) { selected.targets.value.size==7 } }
+                catch(error: ComposeTimeoutException) {
+                    screenshot("drag-selection-failed-${layout.name.lowercase()}")
+                    val bounds=(0..8).map { index ->
+                        val key="photo:${fixture.photos[index].id}"
+                        key to compose.onAllNodesWithTag(key).fetchSemanticsNodes().map { it.boundsInWindow }
+                    }
+                    throw AssertionError("Drag extension failed: layout=$layout forward=$forward selected=${selected.targets.value.map { it.key }} bounds=$bounds",error)
+                }
                 val reverse=point("photo:${fixture.photos[3].id}")
                 compose.onNodeWithTag("photos:grid").performTouchInput { moveTo(reverse);up() }
                 compose.waitForIdle()
