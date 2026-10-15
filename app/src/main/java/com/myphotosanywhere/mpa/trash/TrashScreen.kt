@@ -58,7 +58,7 @@ internal fun TrashScreen(model: TrashViewModel,bottomClearance: Dp,onSources: ()
                         AsyncImage(coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current).data(File(row.thumbnailPath)).size(480).build(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
                         if(checked) com.myphotosanywhere.mpa.selection.SelectionMark(true)
                     }
-                    if(row.desired!=null) Text(if(row.desired) "Moving to Trash…" else "Restoring…",style=MaterialTheme.typography.labelSmall)
+                    if(row.desired!=null) Text(if(row.error!=null) "Waiting to retry" else if(row.desired) "Trash pending" else "Restore pending",style=MaterialTheme.typography.labelSmall)
                     else if(row.error!=null) Text("Needs attention",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.error)
                 }
             } }

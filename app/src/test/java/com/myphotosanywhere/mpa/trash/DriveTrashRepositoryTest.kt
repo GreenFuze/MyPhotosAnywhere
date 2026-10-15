@@ -33,7 +33,7 @@ class DriveTrashRepositoryTest {
             favorite=true,sourceBindingKey=source.key,sourceRemoteId="media",cachedVersion="1",pinned=true,importedMetadata="synthetic metadata")
         val cloud=CloudPhoto("${source.key}:media",source.key,"media","root","p.jpg","image/jpeg",8,"md5","1",null,1,null,null,photoId=photo.id,sha256=sha)
         var trashed=false;var version="1";var remoteSha=sha;var canTrash=true;var canUntrash=true
-        var user="account";var patchStatus=200;var commitThenFail=false;var patches=0;var rootTrashed=false
+        var user="account";var patchStatus=200;var commitThenFail=false;var patches=0;var rootTrashed=false;var missingRevision=false
         val requests=mutableListOf<String>()
         val repository: DriveTrashRepository
         init {
@@ -54,7 +54,7 @@ class DriveTrashRepositoryTest {
                             if(commitThenFail) return MockResponse().setResponseCode(500)
                             return MockResponse().setBody("{}")
                         }
-                        return MockResponse().setHeader("ETag","etag-$version").setBody("""{"id":"media","name":"p.jpg","mimeType":"image/jpeg","size":"8","md5Checksum":"md5","sha256Checksum":"$remoteSha","version":"$version","parents":["root"],"trashed":$trashed,"capabilities":{"canTrash":$canTrash,"canUntrash":$canUntrash}}""")
+                        return MockResponse().apply { if(!missingRevision) setHeader("ETag","etag-$version") }.setBody("""{"id":"media","name":"p.jpg","mimeType":"image/jpeg","size":"8","md5Checksum":"md5","sha256Checksum":"$remoteSha","version":"$version","parents":["root"],"trashed":$trashed,"capabilities":{"canTrash":$canTrash,"canUntrash":$canUntrash}}""")
                     }
                     return MockResponse().setResponseCode(404)
                 }
@@ -225,6 +225,16 @@ class DriveTrashRepositoryTest {
             f.queue();f.repository.process(f.cloud.key)
             assertEquals(1,f.patches);assertTrue(requireNotNull(f.db.cloud().photo(alias.key)).removed)
             assertTrue(f.db.trash().hidesPhoto(f.photo.id));assertEquals("original",f.file.readText())
+        }
+    }
+
+    @Test fun missingConditionalRevisionIsAnActionableFailureWithoutMutationOrEndlessRetry()=runBlocking<Unit> {
+        Fixture().use { f -> f.seed();f.queue();f.missingRevision=true
+            try { f.repository.process(f.cloud.key);fail() } catch(error: DriveRevisionUnavailable) {
+                assertFalse(DriveTrashFailures.retryable(error));f.repository.failure(f.cloud.key,error,false)
+            }
+            assertEquals(0,f.patches);assertFalse(f.trashed);assertEquals("original",f.file.readText())
+            assertNull(f.db.trash().find(f.cloud.key)?.desired);assertNotNull(f.db.trash().find(f.cloud.key)?.error)
         }
     }
 

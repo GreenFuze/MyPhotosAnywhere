@@ -91,7 +91,7 @@ class DriveGateway(
         .url(url("files/$id","fields" to FILE_FIELDS,"supportsAllDrives" to "true"))) { response ->
         checkSuccess(response)
         val etag=response.header("ETag")?.takeIf(String::isNotBlank)
-            ?: throw IOException("Drive did not return a conditional revision. The original is preserved.")
+            ?: throw DriveRevisionUnavailable()
         parseFile(JsonParser.parseString(response.body.string()).asJsonObject) to etag
     }
 

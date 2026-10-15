@@ -55,6 +55,7 @@ class DriveHttpException(val status: Int, val reason: String? = null) : java.io.
     val retryable: Boolean get() = status == 429 || status in 500..599 ||
         (status == 403 && reason in listOf("rateLimitExceeded", "userRateLimitExceeded"))
 }
+class DriveRevisionUnavailable : java.io.IOException("Drive did not return a conditional revision. The original is preserved; refresh this source before retrying.")
 class DriveAuthorizationNeeded : java.io.IOException("Google Drive needs your permission. Reconnect this account to continue.")
 
 object UploadRanges {

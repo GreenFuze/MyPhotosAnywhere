@@ -3,8 +3,6 @@ package com.myphotosanywhere.mpa.trash
 import android.content.Context
 import androidx.work.*
 import com.myphotosanywhere.mpa.MpaApplication
-import com.myphotosanywhere.mpa.drive.DriveAuthorizationNeeded
-import com.myphotosanywhere.mpa.drive.DriveHttpException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
@@ -25,12 +23,14 @@ class DriveTrashWorker(context: Context,params: WorkerParameters): CoroutineWork
                 return@withContext Result.retry()
             }
             catch(cancelled: CancellationException) { throw cancelled }
+            catch(error: com.google.android.gms.common.api.ApiException) {
+                val failure=DriveTrashFailures.google(error.statusCode)
+                val transient=DriveTrashFailures.retryable(failure)
+                app.trash.failure(row.key,failure,transient)
+                if(transient) return@withContext Result.retry()
+            }
             catch(error: IOException) {
-                val transient=when(error) {
-                    is DriveHttpException -> error.retryable
-                    is TrashUnavailable,is DriveAuthorizationNeeded -> false
-                    else -> true // A lost reply requires a fresh state read before any replay.
-                }
+                val transient=DriveTrashFailures.retryable(error)
                 app.trash.failure(row.key,error,transient)
                 if(transient) return@withContext Result.retry()
             }
