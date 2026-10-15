@@ -77,11 +77,11 @@ fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGrid
 
 @Composable
 internal fun CollectionCard(title: String,icon: Int,repository: CollectionsRepository,query: TimelineQuery?,onClick: ()->Unit,tag: String="collections:$title",compact: Boolean=false) {
-    var failure by remember(query) { mutableStateOf(false) }
-    var retry by remember(query) { mutableIntStateOf(0) }
-    val preview by produceState<CollectionPreview?>(null,repository,query,retry) {
+    var failure by remember(query,title,compact) { mutableStateOf(false) }
+    var retry by remember(query,title,compact) { mutableIntStateOf(0) }
+    val preview by produceState<CollectionPreview?>(null,repository,query,title,compact,retry) {
         failure=false
-        try { (query?.let { repository.preview(it) } ?: repository.special(title)).collect { value=it } }
+        try { if(!compact) (query?.let { repository.preview(it) } ?: repository.special(title)).collect { value=it } }
         catch(cancelled: CancellationException) { throw cancelled }
         catch(_: android.database.sqlite.SQLiteException) { failure=true }
         catch(_: java.io.IOException) { failure=true }
@@ -91,9 +91,7 @@ internal fun CollectionCard(title: String,icon: Int,repository: CollectionsRepos
             val covers=preview?.paths.orEmpty()
             if(compact) Row(Modifier.fillMaxWidth().padding(12.dp).heightIn(min=56.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.size(40.dp),contentAlignment=Alignment.Center) {
-                    val cover=covers.firstOrNull()
-                    if(cover==null) com.myphotosanywhere.mpa.ui.ShellIcon(icon)
-                    else AsyncImage(cover,null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+                    com.myphotosanywhere.mpa.ui.ShellIcon(icon)
                 }
                 Text(title,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,maxLines=3,overflow=TextOverflow.Ellipsis)
             } else {
