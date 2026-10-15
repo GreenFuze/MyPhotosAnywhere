@@ -35,7 +35,14 @@ class ShellNavigationDeviceTest {
         compose.onNode(hasText("People") and hasClickAction()).performClick()
         compose.onNodeWithTag("scan-now").assertIsDisplayed()
         back()
+        val before=compose.onNodeWithTag("collections:Places").fetchSemanticsNode().boundsInRoot
+        val navigation=compose.onNodeWithTag("shell:navigation").fetchSemanticsNode().boundsInRoot
+        android.util.Log.i("ShellNavigationBack","Before scroll Places=$before navigation=$navigation overlap=${navigation.contains(before.center)}")
+        compose.onNodeWithTag("collections:Places").performScrollTo()
+        val target=compose.onNodeWithTag("collections:Places").fetchSemanticsNode().boundsInRoot
+        assertFalse("Places tap target must clear floating navigation",navigation.contains(target.center))
         compose.onNode(hasText("Places") and hasClickAction()).assertIsDisplayed().performClick()
+        compose.onNodeWithText("Search saved place names").assertIsDisplayed()
         back()
         compose.onNodeWithTag("collections:grid").performScrollToNode(hasText("AI activity"))
         compose.onNodeWithText("AI activity").performClick()
