@@ -267,7 +267,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                     ShellImportActivity(onOpen={ navigation.open(ShellDestination.ACTIVITY) },sync=sync)
                     TimelineGrid(TimelineQuery(filter,sourceKey,albumId,personId,importedPerson=importedLabel),timeline,features,
                         scrollClearance,
-                        modifier=Modifier.weight(1f).fillMaxWidth(),selection=selectedTargets,onToggle=selection::toggle,selectionLocked=selectionLocked,hasSources=sources.isNotEmpty(),
+                        modifier=Modifier.weight(1f).fillMaxWidth(),selection=selectedTargets,onToggle=selection::toggle,onRangeChange=selection::replaceDrag,onBeginSelection=selection::ensureSelected,onSelectionLimit=selection::dragLimit,selectionLocked=selectionLocked,hasSources=sources.isNotEmpty(),
                         onConnect={ navigation.open(ShellDestination.STORAGE) },
                         onClearFilters={ filter="All";sourceKey=null;albumId=null;personId=null;importedPersonKey=null },onRefresh=features::refreshCloud)
                 }
@@ -277,7 +277,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                         albums,sources,scrollClearance,selectedTargets,selection::toggle,selectionLocked,onFilters={ showFilters=true },
                         onPeople={ navigation.open(ShellDestination.PEOPLE) },onPlaces={ navigation.open(ShellDestination.PLACES) },
                         onAlbums={ navigation.open(ShellDestination.COLLECTIONS) },onSubmit=::submitSearch,
-                        onConnect={ navigation.open(ShellDestination.STORAGE) },modifier=Modifier.weight(1f).fillMaxWidth())
+                        onConnect={ navigation.open(ShellDestination.STORAGE) },modifier=Modifier.weight(1f).fillMaxWidth(),onRangeChange=selection::replaceDrag,onBeginSelection=selection::ensureSelected,onSelectionLimit=selection::dragLimit)
                 }
                 1 -> AlbumsScreen(features,albums,collectionsHubGrid,onAlbum={ albumId=it;personId=null;importedPersonKey=null;filter="All";navigation.open(ShellDestination.PHOTOS) },
                     onFavorites={ filter="Favorites";albumId=null;personId=null;importedPersonKey=null;navigation.open(ShellDestination.PHOTOS) },

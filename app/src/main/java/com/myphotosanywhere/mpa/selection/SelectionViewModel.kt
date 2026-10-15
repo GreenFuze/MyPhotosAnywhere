@@ -37,6 +37,15 @@ internal class SelectionViewModel(application: Application,private val saved: Sa
         val selection=MediaSelection(_targets.value)
         if(selection.toggle(target)) store(selection.snapshot()) else _notice.value="Select up to ${MediaSelection.MAX_ITEMS} photos per operation."
     }
+    fun ensureSelected(target: SelectionTarget) {
+        if(_targets.value.none { it.matches(target) }) toggle(target)
+    }
+    fun replaceDrag(items: List<SelectionTarget>) {
+        if(_busy.value || _result.value!=null) return
+        check(items.size<=MediaSelection.MAX_ITEMS && items.map { it.key }.distinct().size==items.size)
+        if(items!=_targets.value) store(items)
+    }
+    fun dragLimit() { _notice.value="Select up to ${MediaSelection.MAX_ITEMS} photos per operation." }
     fun clear() { if(!_busy.value) { store(emptyList());_result.value=null } }
     fun clearNotice() { _notice.value=null }
     fun dismissResult() { _result.value=null }

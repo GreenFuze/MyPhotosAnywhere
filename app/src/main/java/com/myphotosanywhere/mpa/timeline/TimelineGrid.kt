@@ -67,7 +67,8 @@ internal fun deviceTimelineZone(model: TimelineViewModel): ZoneId {
 internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features: LibraryFeaturesModel,
     bottomClearance: Dp,modifier: Modifier=Modifier,
     selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,
-    hasSources: Boolean,onConnect: ()->Unit,onClearFilters: ()->Unit,onRefresh: ()->Unit,emptyActionLabel: String="Clear filters") {
+    hasSources: Boolean,onConnect: ()->Unit,onClearFilters: ()->Unit,onRefresh: ()->Unit,emptyActionLabel: String="Clear filters",
+    onRangeChange: ((List<SelectionTarget>)->Unit)?=null,onBeginSelection: (SelectionTarget)->Unit=onToggle,onSelectionLimit: ()->Unit={}) {
     val zone=deviceTimelineZone(model)
     val lifecycleOwner=LocalLifecycleOwner.current
     // Content/span callbacks must capture one immutable geometry snapshot. A delegated
@@ -79,6 +80,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     val state=key(density,layout) { rememberLazyGridState() }
     val tiles=remember(state) { TimelineGridViewport(state) }
     val scrollScope=rememberCoroutineScope()
+    val selectionHits=remember(query,density,layout) { TimelineSelectionHits() }
     var dateNavigation by remember(query) { mutableStateOf(false) }
     val rowsFlow=remember(model) {
         model.paging.map { data -> data.map { TimelineRow(it.entry,it.generation,it.query,it.aspect) } }
@@ -232,6 +234,10 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                     }
                 }
             }
+            .dragRangeSelection(selectionHits,listOf(query,density,layout,restoration),
+                onRangeChange!=null && !selectionLocked && !restoring && refresh !is LoadState.Loading,
+                retained.map { SelectionTarget.from(it.entry) },selection,bottomClearance,
+                { onRangeChange?.invoke(it) },onSelectionLimit,{ state.scrollBy(it) })
             .pointerInput(selection.isEmpty(),selectionLocked,restoring) {
                 if(selectionLocked || restoring) return@pointerInput
                 awaitEachGesture {
@@ -259,8 +265,8 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                             key(tile.key) {
                                 if(tile.index<rows.itemCount) rows[tile.index]
                                 val row=retained[tile.index]
-                                TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || restoring || row.query!=query,zone,row.aspect,
-                                    Modifier.offset(tile.x.dp,tile.y.dp).width(tile.width.dp).height(tile.height.dp).semantics {
+                                TimelineThumbnail(row.entry,model,features,selection,onToggle,onBeginSelection,selectionLocked || restoring || row.query!=query,zone,row.aspect,
+                                    Modifier.selectionHit(selectionHits,SelectionTarget.from(row.entry)).offset(tile.x.dp,tile.y.dp).width(tile.width.dp).height(tile.height.dp).semantics {
                                         traversalIndex=tile.index.toFloat()
                                         collectionItemInfo=CollectionItemInfo(tile.row,tile.rowSpan,tile.column,1)
                                     }) {
@@ -278,8 +284,8 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 // A concurrent prepend must never apply another identity's cell dimensions/actions.
                 if(index<rows.itemCount) rows[index]
                 val row=retained[index]
-                TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || restoring || row.query!=query,zone,row.aspect,
-                    Modifier.height(requireNotNull(plan.cells.getOrNull(index)?.height).dp).semantics {
+                TimelineThumbnail(row.entry,model,features,selection,onToggle,onBeginSelection,selectionLocked || restoring || row.query!=query,zone,row.aspect,
+                    Modifier.selectionHit(selectionHits,SelectionTarget.from(row.entry)).height(requireNotNull(plan.cells.getOrNull(index)?.height).dp).semantics {
                         val cell=plan.cells[index];collectionItemInfo=CollectionItemInfo(cell.row,1,cell.column,1)
                     }) {
                     val offset=tiles.visible().firstOrNull { it.key==row.entry.key }?.offset?.y
@@ -301,7 +307,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
 private data class ThumbnailArtifact(val revision: String,val file: File?)
 
 @Composable
-private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,features: LibraryFeaturesModel,selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,zone: ZoneId,aspect: Float,modifier: Modifier=Modifier,onOpen: ()->Unit) {
+private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,features: LibraryFeaturesModel,selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,onBeginSelection: (SelectionTarget)->Unit,selectionLocked: Boolean,zone: ZoneId,aspect: Float,modifier: Modifier=Modifier,onOpen: ()->Unit) {
     val context=LocalContext.current
     var problem by remember(entry) { mutableStateOf<String?>(null) }
     val revision=listOf(entry.key,entry.sha256,entry.version,entry.thumbnailRevision.toString(),entry.originalPath).joinToString("|") { it?.let { value -> "${value.length}:$value" } ?: "-" }
@@ -339,7 +345,7 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant).onSizeChanged { measured=it }
         .testTag(entry.photoId?.let { "photo:$it" } ?: "cloud:${entry.cloudKey}")
         .combinedClickable(enabled=!selectionLocked,role=Role.Button,onClick={ if(selecting) onToggle(target) else onOpen() },
-            onLongClickLabel="Select photo",onLongClick={ onToggle(target) }).semantics(mergeDescendants=true) {
+            onLongClickLabel="Select photo",onLongClick={ onBeginSelection(target) }).semantics(mergeDescendants=true) {
             if(selecting) selected=chosen
             customActions=listOf(CustomAccessibilityAction(if(chosen) "Deselect photo" else "Select photo") { if(!selectionLocked) onToggle(target);!selectionLocked })
             contentDescription="${if(entry.mimeType.startsWith("video/")) "Video" else "Photo"}, $date, ${entry.name}"

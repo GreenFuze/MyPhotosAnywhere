@@ -51,7 +51,8 @@ internal fun SearchScreen(draft: SearchCriteria,applied: SearchCriteria,recents:
     timeline: TimelineViewModel,features: LibraryFeaturesModel,suggestions: LazyGridState,
     albums: List<Album>,sources: List<DriveSource>,bottomClearance: Dp,selection: List<SelectionTarget>,
     onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,onFilters: ()->Unit,onPeople: ()->Unit,onPlaces: ()->Unit,
-    onAlbums: ()->Unit,onSubmit: ()->Unit,onConnect: ()->Unit,modifier: Modifier=Modifier) {
+    onAlbums: ()->Unit,onSubmit: ()->Unit,onConnect: ()->Unit,modifier: Modifier=Modifier,onRangeChange: ((List<SelectionTarget>)->Unit)?=null,
+    onBeginSelection: (SelectionTarget)->Unit=onToggle,onSelectionLimit: ()->Unit={}) {
     val settings by features.settings.collectAsStateWithLifecycle()
     val zone=deviceTimelineZone(timeline)
     val query=remember(applied,zone) { applied.timeline(zone) }
@@ -72,7 +73,7 @@ internal fun SearchScreen(draft: SearchCriteria,applied: SearchCriteria,recents:
             TimelineGrid(query,timeline,features,bottomClearance,Modifier.weight(1f).fillMaxWidth(),selection,onToggle,selectionLocked,
                 sources.isNotEmpty(),onConnect,onClearFilters={
                     if(applied.filtered) model.clearFilters() else { model.text("");model.submit() }
-                },onRefresh=features::refreshCloud,emptyActionLabel=if(applied.filtered) "Clear filters" else "Clear search")
+                },onRefresh=features::refreshCloud,emptyActionLabel=if(applied.filtered) "Clear filters" else "Clear search",onRangeChange=onRangeChange,onBeginSelection=onBeginSelection,onSelectionLimit=onSelectionLimit)
         } else {
             val repository=remember(features) { CollectionsRepository(features.app.database,features.app.timeline) }
             LazyVerticalGrid(GridCells.Adaptive(148.dp),state=suggestions,modifier=Modifier.fillMaxSize().testTag("search:suggestions"),
