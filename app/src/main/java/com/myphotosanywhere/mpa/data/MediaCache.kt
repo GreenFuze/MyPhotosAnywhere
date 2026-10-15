@@ -19,13 +19,16 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
         override fun close()=lease.close()
     }
     /** Validate the latest row and protect its file under the same lock as eviction. */
-    suspend fun openOriginal(id: String): OriginalRead? {
+    suspend fun openOriginal(id: String): OriginalRead?=readOriginal(id,trackAccess=true)
+    /** Grid derivation protects bytes without invalidating the Photos query on every tile. */
+    internal suspend fun openThumbnailOriginal(id: String): OriginalRead?=readOriginal(id,trackAccess=false)
+    private suspend fun readOriginal(id: String,trackAccess: Boolean): OriginalRead? {
         var opened: OriginalRead?=null
         try { return withContext(Dispatchers.IO) { lock.withLock {
             val photo=database.photos().find(id) ?: return@withLock null
             val file=File(photo.originalPath)
             if(photo.originalPath.isBlank() || !file.isFile) return@withLock null
-            database.photos().update(photo.copy(lastAccess=System.currentTimeMillis()))
+            if(trackAccess) database.photos().update(photo.copy(lastAccess=System.currentTimeMillis()))
             OriginalRead(photo,file,reader(id)).also { opened=it }
         } } } catch(e: kotlinx.coroutines.CancellationException) {
             // withContext may discard a result when the UI closes during dispatch back.
@@ -97,17 +100,26 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
     private suspend fun cleanThumbnails() {
         val all=database.photos().all()
         val cloud=database.cloud().observePhotos().first()
-        val paths=(all.map { it.thumbnailPath } + cloud.map { it.thumbnailPath }).filter { it.isNotBlank() }.distinct()
+        // An imported/restored row may reuse an original path as its preview. Such bytes
+        // remain originals and must never enter the disposable-thumbnail eviction set.
+        val originalPaths=all.mapNotNull { it.originalPath.takeIf(String::isNotBlank)?.let { path -> File(path).canonicalPath } }.toSet()
+        val paths=(all.map { it.thumbnailPath } + cloud.map { it.thumbnailPath }).filter { it.isNotBlank() }
+            .distinct().filter { File(it).canonicalPath !in originalPaths }
         var total=paths.sumOf { File(it).length() }
+        val thumbnailBudget=settings.state.value.thumbnailBudget
+        val baseBudget=thumbnailBudget-com.myphotosanywhere.mpa.thumbnails.ThumbnailPolicy().diskBudget(thumbnailBudget)
         for(path in paths.sortedBy { File(it).lastModified() }) {
-            if(total<=settings.state.value.thumbnailBudget) break
+            if(total<=baseBudget) break
             val file=File(path); val size=file.length()
             if(file.delete()) total-=size
         }
     }
     suspend fun thumbnail(photo: Photo): File? = withContext(Dispatchers.IO) {
         val target=File(photo.thumbnailPath)
-        if(target.isFile) { target.setLastModified(System.currentTimeMillis()); return@withContext target }
+        if(target.isFile) {
+            if(photo.originalPath.isBlank() || target.canonicalPath!=File(photo.originalPath).canonicalPath) target.setLastModified(System.currentTimeMillis())
+            return@withContext target
+        }
         // Missing bytes are an operational availability state. Recheck the current row
         // under the same lock as eviction, retaining the existing serial/bounded decoder.
         lock.withLock {
@@ -115,7 +127,7 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
             if(latest.sha256!=photo.sha256 || latest.bytes!=photo.bytes || latest.thumbnailPath!=photo.thumbnailPath) return@withLock null
             val file=File(latest.originalPath)
             if(latest.originalPath.isBlank() || !file.isFile || latest.thumbnailPath.isBlank()) return@withLock cloudThumbnail(latest)
-            database.photos().update(latest.copy(lastAccess=System.currentTimeMillis()))
+            // Preview-only reads must not invalidate every retained paging row.
             target.parentFile?.mkdirs()
             val bitmap=PhotoRepository.mediaPreview(file,latest.mimeType,480)
             try { target.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,it)) } }

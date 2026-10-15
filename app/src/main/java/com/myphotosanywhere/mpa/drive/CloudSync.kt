@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.work.*
 import com.myphotosanywhere.mpa.MpaApplication
 import com.myphotosanywhere.mpa.data.PhotoDatabase
-import com.myphotosanywhere.mpa.data.PhotoRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -115,23 +114,23 @@ class CloudSync(private val context: Context, private val database: PhotoDatabas
     }
     suspend fun thumbnail(api: DriveGateway,binding: String,file: DriveFile) {
         val row=cloud.photo("$binding:${file.id}") ?: return
-        if(file.version!=null && row.thumbnailVersion==file.version && File(row.thumbnailPath).isFile) return
+        if(com.myphotosanywhere.mpa.thumbnails.ThumbnailPolicy.currentProvider(row.thumbnailVersion,file.version) && File(row.thumbnailPath).isFile) return
         val link=file.thumbnailLink ?: return
-        val target=File(row.thumbnailPath); target.parentFile?.mkdirs()
-        val temp=File(target.parentFile,"${file.id}.part")
         try {
-            api.thumbnail(link,temp)
-            val bitmap=PhotoRepository.preview(temp,480)
-            try { temp.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,it)) } }
-            finally { bitmap.recycle() }
-            app.cache.lock.withLock {
-                ensureBinding(binding)
-                val current=cloud.photo(row.key) ?: return@withLock
-                if(current.version==file.version && temp.renameTo(target)) cloud.savePhoto(current.copy(thumbnailVersion=file.version,thumbnailUpdatedAt=System.currentTimeMillis()))
+            app.thumbnailVariants.withProviderTemp { temp ->
+                api.thumbnail(link,temp)
+                app.thumbnailVariants.normalizeProvider(temp)
+                val target=app.thumbnailVariants.commitProvider(temp,row.key,"${file.version}:${file.md5}:${file.bytes}") ?: return@withProviderTemp
+                app.cache.lock.withLock {
+                    ensureBinding(binding)
+                    val current=cloud.photo(row.key) ?: return@withLock
+                    if(current.version==file.version) {
+                        cloud.savePhoto(current.copy(thumbnailPath=target.path,thumbnailVersion=com.myphotosanywhere.mpa.thumbnails.ThumbnailPolicy.providerVersion(file.version),thumbnailUpdatedAt=System.currentTimeMillis()))
+                    }
+                }
             }
         } catch(e: CancellationException) { throw e }
-        catch(_: Exception) { /* The metadata remains browsable when a thumbnail is unavailable. */ }
-        finally { temp.delete() }
+        catch(_: java.io.IOException) { /* Cached previews/metadata remain usable; the next visible request may retry. */ }
     }
     suspend fun inside(api: DriveGateway,file: DriveFile,root: String): Boolean {
         val queue=ArrayDeque<String>(); file.parents.forEach { queue.add(it) }; val visited=mutableSetOf<String>()

@@ -21,6 +21,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -233,7 +235,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                 // A concurrent prepend must never apply another identity's cell dimensions/actions.
                 if(index<rows.itemCount) rows[index]
                 val row=retained[index]
-                TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || restoring || row.query!=query,zone,
+                TimelineThumbnail(row.entry,model,features,selection,onToggle,selectionLocked || restoring || row.query!=query,zone,row.aspect,
                     Modifier.height(requireNotNull(plan.cells.getOrNull(index)?.height).dp).semantics {
                         val cell=plan.cells[index];collectionItemInfo=CollectionItemInfo(cell.row,1,cell.column,1)
                     }) {
@@ -252,14 +254,17 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     }
 }
 
+private data class ThumbnailArtifact(val revision: String,val file: File?)
+
 @Composable
-private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,features: LibraryFeaturesModel,selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,zone: ZoneId,modifier: Modifier=Modifier,onOpen: ()->Unit) {
+private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,features: LibraryFeaturesModel,selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,zone: ZoneId,aspect: Float,modifier: Modifier=Modifier,onOpen: ()->Unit) {
     val context=LocalContext.current
     var problem by remember(entry) { mutableStateOf<String?>(null) }
-    val thumbnail by produceState<File?>(null,entry) {
+    val revision=listOf(entry.key,entry.sha256,entry.version,entry.thumbnailRevision.toString(),entry.originalPath).joinToString("|") { it?.let { value -> "${value.length}:$value" } ?: "-" }
+    val baseArtifact by produceState<ThumbnailArtifact?>(null,entry) {
         try {
             val media=model.repository.resolve(entry)
-            value=media.photo?.let { features.app.cache.thumbnail(it) }
+            value=ThumbnailArtifact(revision,media.photo?.let { features.app.cache.thumbnail(it) })
             media.cloud?.let { cloud ->
                 val source=features.app.database.drive().source(cloud.bindingKey)
                 com.myphotosanywhere.mpa.drive.ThumbnailWorker.request(context,cloud,source?.connection())
@@ -268,11 +273,26 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
         catch(error: java.io.IOException) { problem=error.message ?: "Thumbnail unavailable" }
         catch(error: android.database.sqlite.SQLiteException) { problem=error.message ?: "Cannot read thumbnail availability" }
     }
+    val thumbnail=baseArtifact?.takeIf { it.revision==revision }?.file
+    var measured by remember(entry.key) { mutableStateOf(IntSize.Zero) }
+    var rejectedVariant by remember(entry.key,entry.sha256,entry.version) { mutableStateOf<String?>(null) }
+    val widthBucket=if(measured.width==0) 0 else ((measured.width.toLong()+63)/64*64).coerceAtMost(2048).toInt()
+    val heightBucket=if(measured.height==0) 0 else ((measured.height.toLong()+63)/64*64).coerceAtMost(2048).toInt()
+    val upgradeArtifact by produceState<ThumbnailArtifact?>(null,revision,widthBucket,heightBucket,aspect) {
+        if(widthBucket>0 && heightBucket>0) try {
+            value=ThumbnailArtifact(revision,features.app.thumbnailVariants.variant(entry,widthBucket,heightBucket,aspect))
+        } catch(cancelled: CancellationException) { throw cancelled }
+        catch(_: java.io.IOException) { value=null } // The cached small preview remains available.
+        catch(_: android.database.sqlite.SQLiteException) { value=null }
+    }
+    val upgraded=upgradeArtifact?.takeIf { it.revision==revision }?.file
+    val preferred=upgraded?.takeUnless { it.path==rejectedVariant }
+    val preview=preferred ?: thumbnail ?: entry.thumbnailPath.takeIf { it.isNotBlank() }?.let(::File)
     val target=SelectionTarget.from(entry)
     val chosen=selection.any { it.matches(target) }
     val selecting=selection.isNotEmpty()
     val date=entry.millis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toString() } ?: "Unknown date"
-    Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+    Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant).onSizeChanged { measured=it }
         .testTag(entry.photoId?.let { "photo:$it" } ?: "cloud:${entry.cloudKey}")
         .combinedClickable(enabled=!selectionLocked,role=Role.Button,onClick={ if(selecting) onToggle(target) else onOpen() },
             onLongClickLabel="Select photo",onLongClick={ onToggle(target) }).semantics(mergeDescendants=true) {
@@ -280,10 +300,12 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
             customActions=listOf(CustomAccessibilityAction(if(chosen) "Deselect photo" else "Select photo") { if(!selectionLocked) onToggle(target);!selectionLocked })
             contentDescription="${if(entry.mimeType.startsWith("video/")) "Video" else "Photo"}, $date, ${entry.name}"
         }) {
-        AsyncImage(coil.request.ImageRequest.Builder(context).data(thumbnail ?: entry.thumbnailPath.takeIf { it.isNotBlank() }?.let(::File))
-            .memoryCacheKey("${entry.key}:${entry.thumbnailRevision}:${entry.originalPath}").build(),null,
+        AsyncImage(coil.request.ImageRequest.Builder(context).data(preview)
+            .memoryCacheKey("${entry.key}:${entry.thumbnailRevision}:${entry.originalPath}:${preview?.path}:$widthBucket:$heightBucket")
+            .crossfade(if(android.animation.ValueAnimator.areAnimatorsEnabled()) 160 else 0).build(),null,
             modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,
-            onError={ problem="Thumbnail unavailable. Open photo to retry." })
+            onSuccess={ problem=null },
+            onError={ if(preferred!=null) rejectedVariant=preferred.path else problem="Thumbnail unavailable. Open photo to retry." })
         if(selecting) SelectionMark(chosen)
         problem?.let { message -> Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
             com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_shell_warning,message)

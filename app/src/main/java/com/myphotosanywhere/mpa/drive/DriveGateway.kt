@@ -67,11 +67,11 @@ class DriveGateway(
     })) { r ->
         checkSuccess(r)
         val body=r.body
-        require(body.contentLength()<=2*1024*1024) { "Drive thumbnail too large." }
+        if(body.contentLength()>2*1024*1024) throw java.io.IOException("Drive thumbnail too large.")
         body.byteStream().use { input -> target.outputStream().use { output ->
             val data=ByteArray(16384); var total=0
             while(true) { val n=input.read(data); if(n<0) break; total+=n
-                require(total<=2*1024*1024); output.write(data,0,n) }
+                if(total>2*1024*1024) throw java.io.IOException("Drive thumbnail too large."); output.write(data,0,n) }
         } }
     }
 

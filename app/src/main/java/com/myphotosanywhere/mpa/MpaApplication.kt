@@ -26,6 +26,7 @@ class MpaApplication : Application(), androidx.work.Configuration.Provider {
     val settings by lazy { com.myphotosanywhere.mpa.core.LibrarySettings(this) }
     val storage by lazy { com.myphotosanywhere.mpa.data.StorageBudget(this) }
     val cache by lazy { com.myphotosanywhere.mpa.data.MediaCache(this, database, settings) }
+    internal val thumbnailVariants by lazy { com.myphotosanywhere.mpa.thumbnails.AdaptiveThumbnailStore(java.io.File(cacheDir,"thumbnail-variants"),cache,storage,settings) }
     val downloads by lazy { com.myphotosanywhere.mpa.drive.CloudDownloads(this) }
     val sync by lazy { com.myphotosanywhere.mpa.drive.CloudSync(this, database) }
     val metadata by lazy { com.myphotosanywhere.mpa.metadata.MetadataRepository(this) }

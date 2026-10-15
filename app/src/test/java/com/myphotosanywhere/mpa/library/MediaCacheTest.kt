@@ -102,4 +102,30 @@ class MediaCacheTest {
         } finally { db.close(); file.delete() }
     }
 
+    @Test fun previewCleanupAndCacheTouchesNeverDeleteOrRetimestampLocalOriginals()=runBlocking<Unit> {
+        val context=RuntimeEnvironment.getApplication()
+        val db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).build()
+        val original=File.createTempFile("shared-original-preview",".jpg",context.filesDir)
+        val second=File.createTempFile("second-local-original",".jpg",context.filesDir)
+        val derived=File.createTempFile("disposable-preview",".jpg",context.cacheDir)
+        val settings=LibrarySettings(context);val previous=settings.state.value
+        try {
+            original.writeText("local original one");second.writeText("local original two");derived.writeText("derived preview")
+            check(original.setLastModified(1_600_000_000_000L));val stamp=original.lastModified()
+            val first=Photo("shared-original","One.jpg",original.path,original.path,"image/jpeg",original.length(),1,"first")
+            val other=Photo("second-original","Two.jpg",second.path,derived.path,"image/jpeg",second.length(),1,"second")
+            db.photos().insert(first);db.photos().insert(other)
+            db.cloud().savePhoto(CloudPhoto("source:preview","source","preview","folder","Preview.jpg","image/jpeg",original.length(),null,null,null,null,null,null,thumbnailPath=original.path))
+            settings.update(previous.copy(originalBudget=0,thumbnailBudget=0,faceIndexing=false,objectIndexing=false))
+            val cache=MediaCache(context,db,settings) { _,_ -> throw AssertionError("A local-only original cannot be evicted") }
+            assertEquals(original,cache.thumbnail(first));assertEquals(stamp,original.lastModified())
+            cache.openThumbnailOriginal(first.id)?.use { assertEquals(original,it.file) } ?: fail("Expected protected thumbnail reader")
+            assertEquals(first,db.photos().find(first.id))
+            cache.enforce(clear=true)
+            assertEquals("local original one",original.readText());assertEquals("local original two",second.readText())
+            assertEquals(stamp,original.lastModified());assertFalse(derived.exists())
+            assertEquals(first,db.photos().find(first.id));assertEquals(other,db.photos().find(other.id))
+        } finally { settings.update(previous);db.close();original.delete();second.delete();derived.delete() }
+    }
+
 }
