@@ -241,7 +241,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val galleryContext=listOf(filter,sourceKey,albumId,personId,importedPersonKey).joinToString("|") { value -> value?.let { "${it.length}:$it" } ?: "-" }
     var previousGalleryContext by rememberSaveable { mutableStateOf(galleryContext) }
     LaunchedEffect(galleryContext,accessibleGallery,keyboardNavigation) {
-        if(BuildConfig.DEBUG) android.util.Log.i("GalleryBarRestoration","changed=${previousGalleryContext!=galleryContext} assisted=$accessibleGallery input=$rootInputMode requested=$keyboardRequested offset=${galleryBarState.heightOffset}")
+        if(context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE!=0) android.util.Log.i("GalleryBarRestoration","changed=${previousGalleryContext!=galleryContext} assisted=$accessibleGallery input=$rootInputMode requested=$keyboardRequested offset=${galleryBarState.heightOffset}")
         if(previousGalleryContext!=galleryContext || accessibleGallery || keyboardNavigation) {
             galleryBarState.heightOffset=0f;galleryBarState.contentOffset=0f
             previousGalleryContext=galleryContext
