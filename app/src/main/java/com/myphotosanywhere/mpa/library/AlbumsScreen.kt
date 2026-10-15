@@ -16,6 +16,7 @@ import coil.compose.AsyncImage
 import com.myphotosanywhere.mpa.timeline.TimelineQuery
 import kotlinx.coroutines.CancellationException
 import androidx.compose.material3.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -30,6 +31,8 @@ fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGrid
     var name by remember { mutableStateOf("") }
     var manage by remember { mutableStateOf<Album?>(null) }
     var delete by remember { mutableStateOf(false) }
+    val busy by model.busy.collectAsStateWithLifecycle()
+    val managedAlbum=manage?.let { selected -> albums.find { it.id==selected.id } }
     val repository=remember(model) { CollectionsRepository(model.app.database,model.app.timeline) }
     LazyVerticalGrid(GridCells.Adaptive(148.dp),Modifier.fillMaxSize().testTag("collections:grid"),state=state,
         contentPadding=PaddingValues(start=16.dp,top=12.dp,end=16.dp,bottom=16.dp+bottomClearance),
@@ -59,13 +62,14 @@ fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGrid
     if(create || manage!=null) AlertDialog(onDismissRequest={ create=false; manage=null },title={ Text(if(create) "New album" else "Manage album") },
         text={ Column {
             OutlinedTextField(name,{ if(it.length<=100) name=it },label={ Text("Album name") })
-            manage?.let { album ->
-                TextButton(onClick={ model.pinAlbum(album,!album.pinned) },modifier=Modifier.heightIn(min=48.dp)) { Text(if(album.pinned) "Unpin offline album" else "Keep offline") }
-                if(delete) TextButton(onClick={ model.deleteAlbum(album); manage=null }) { Text("Confirm removal; keep photos") }
+            if(manage!=null && managedAlbum==null) Text("This album is no longer available.")
+            managedAlbum?.let { album ->
+                TextButton(enabled=!busy,onClick={ model.pinAlbum(album,!album.pinned) },modifier=Modifier.heightIn(min=48.dp)) { Text(if(album.pinned) "Unpin offline album" else "Keep offline") }
+                if(delete) TextButton(enabled=!busy,onClick={ model.deleteAlbum(album); manage=null }) { Text("Confirm removal; keep photos") }
                 else TextButton(onClick={ delete=true }) { Text("Remove album") }
             }
-        } },confirmButton={ Button(enabled=name.isNotBlank(),onClick={
-            val album=manage; if(album==null) model.createAlbum(name) else model.renameAlbum(album,name)
+        } },confirmButton={ Button(enabled=!busy && name.isNotBlank() && (create || managedAlbum!=null),onClick={
+            if(create) model.createAlbum(name) else managedAlbum?.let { model.renameAlbum(it,name) }
             create=false; manage=null
         }) { Text("Save") } },dismissButton={ TextButton(onClick={ create=false; manage=null }) { Text("Cancel") } })
 }

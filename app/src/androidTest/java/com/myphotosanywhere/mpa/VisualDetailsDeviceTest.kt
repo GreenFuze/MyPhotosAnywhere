@@ -69,6 +69,45 @@ class VisualDetailsDeviceTest {
         screenshot("people-visual")
     }
 
+    @Test fun albumMenuReflectsPinChangesAndRemovalKeepsOriginal()=runBlocking<Unit> {
+        val file=File.createTempFile("album-menu",".png",app.filesDir)
+        val bitmap=Bitmap.createBitmap(160,240,Bitmap.Config.ARGB_8888)
+        try { file.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it)) } } finally { bitmap.recycle() }
+        val hash=com.myphotosanywhere.mpa.drive.DriveBackupWorker.digest(file,"SHA-256")
+        val photo=Photo("visual-album-photo","Album photo.png",file.path,file.path,"image/png",file.length(),4_000_000_000_000L,hash)
+        val album=com.myphotosanywhere.mpa.data.Album("visual-album-menu","Visual album",4_000_000_000_000L)
+        fun saved()=runBlocking { app.database.library().allAlbums().find { it.id==album.id } }
+        try {
+            app.database.photos().insert(photo);app.database.library().saveAlbum(album)
+            app.database.library().addToAlbum(com.myphotosanywhere.mpa.data.AlbumPhoto(album.id,photo.id))
+            compose.onNodeWithTag("nav:Collections").performClick()
+            val model=compose.runOnUiThread { androidx.lifecycle.ViewModelProvider(compose.activity)[com.myphotosanywhere.mpa.library.LibraryFeaturesModel::class.java] }
+            compose.waitUntil(10000) { model.albums.value.any { it.id==album.id } }
+            compose.onNodeWithTag("collections:grid").performScrollToNode(hasTestTag("album:manage:${album.id}"))
+            compose.onNodeWithTag("album:manage:${album.id}").performClick()
+            compose.onNodeWithText("Keep offline").performClick()
+            compose.waitUntil(10000) { saved()?.pinned==true && !model.busy.value && compose.onAllNodesWithText("Unpin offline album").fetchSemanticsNodes().isNotEmpty() }
+            screenshot("album-management")
+            compose.onNodeWithText("Album name").performTextReplacement("Renamed visual album")
+            compose.onNodeWithText("Save").performClick()
+            compose.waitUntil(10000) { !model.busy.value && model.albums.value.any { it.id==album.id && it.name=="Renamed visual album" && it.pinned } }
+            assertEquals(album.copy(name="Renamed visual album",pinned=true),saved())
+            assertEquals(listOf(com.myphotosanywhere.mpa.data.AlbumPhoto(album.id,photo.id)),app.database.library().members(album.id))
+            compose.onNodeWithTag("album:manage:${album.id}").performClick()
+            compose.onNodeWithText("Unpin offline album").performClick()
+            compose.waitUntil(10000) { saved()?.pinned==false && !model.busy.value && compose.onAllNodesWithText("Keep offline").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Remove album").performClick()
+            compose.onNodeWithText("Confirm removal; keep photos").performClick()
+            compose.waitUntil(10000) { saved()==null }
+            assertTrue(app.database.library().members(album.id).isEmpty())
+            assertEquals(photo,app.database.photos().find(photo.id)?.copy(lastAccess=photo.lastAccess))
+            assertTrue(file.isFile);assertEquals(hash,com.myphotosanywhere.mpa.drive.DriveBackupWorker.digest(file,"SHA-256"))
+        } finally {
+            app.database.library().clearAlbum(album.id);app.database.library().deleteAlbum(album.id)
+            app.database.photos().find(photo.id)?.let { app.database.photos().update(it.copy(archived=true,originalPath="")) };file.delete()
+        }
+    }
+
     private fun screenshot(name: String) {
         val bitmap=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         try {
