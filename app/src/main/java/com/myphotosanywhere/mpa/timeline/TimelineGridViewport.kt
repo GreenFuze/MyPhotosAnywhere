@@ -29,8 +29,8 @@ internal class TimelineGridViewport(val state: LazyGridState) {
         if(previous==null || next==null) { blocks=next;scale=pixelsPerDp;return null }
         val visible=visible()
         val held=TimelineViewport.choose(visible.map { TimelineAnchor(TimelineCursor(null,it.key),-it.offset.y) },preferred)
-        val old=held?.let { previous?.locations?.get(it.cursor.key) }
-        val fresh=held?.let { next?.locations?.get(it.cursor.key) }
+        val old=held?.let { previous.locations[it.cursor.key] }
+        val fresh=held?.let { next.locations[it.cursor.key] }
         val changed=old!=null && fresh!=null &&
             (old.first!=fresh.first || old.second.y!=fresh.second.y || old.second.height!=fresh.second.height || old.second.width!=fresh.second.width)
         blocks=next;scale=pixelsPerDp
