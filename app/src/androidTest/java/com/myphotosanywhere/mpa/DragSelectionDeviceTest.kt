@@ -35,7 +35,7 @@ class DragSelectionDeviceTest {
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
     private fun timeline()=compose.runOnUiThread { ViewModelProvider(compose.activity)[TimelineViewModel::class.java] }
     private fun selection()=compose.runOnUiThread { ViewModelProvider(compose.activity)[SelectionViewModel::class.java] }
-    private class Fixture(val app: MpaApplication,val prefix: String) {
+    private class Fixture(val app: MpaApplication,val prefix: String,val count: Int=150) {
         val file=File.createTempFile("drag-fixture-",".png",app.filesDir)
         val layout=app.galleryPresentation.layout.value
         val density=app.galleryPresentation.density.value
@@ -44,7 +44,7 @@ class DragSelectionDeviceTest {
             val bitmap=Bitmap.createBitmap(160,240,Bitmap.Config.ARGB_8888)
             try { bitmap.eraseColor(android.graphics.Color.rgb(45,135,170));file.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it)) } } finally { bitmap.recycle() }
             val base=Instant.parse("8990-05-15T12:00:00Z").toEpochMilli()
-            app.database.withTransaction { repeat(150) { index ->
+            app.database.withTransaction { repeat(count) { index ->
                 val id="$prefix-${index.toString().padStart(3,'0')}"
                 val photo=Photo(id,"$id.png",file.path,file.path,"image/png",file.length(),base,"drag-hash",capturedAt=base-index*60000L)
                 app.database.photos().insert(photo);photos.add(photo)
@@ -106,7 +106,7 @@ class DragSelectionDeviceTest {
     }
 
     @Test fun edgeAutoscrollAddsContinuousCanonicalRangeAndBackLeavesOriginals()=runBlocking<Unit> {
-        val fixture=Fixture(app,"drag-edge");fixture.create();val selected=selection();val model=timeline()
+        val fixture=Fixture(app,"drag-edge",450);fixture.create();val selected=selection();val model=timeline()
         try {
             compose.runOnUiThread { model.changeLayout(GalleryLayout.SQUARE) }
             val first=requireNotNull(app.timeline.find(TimelineQuery(),"photo:${fixture.photos[0].id}"))
