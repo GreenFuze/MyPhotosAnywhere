@@ -21,7 +21,7 @@ import java.io.File
 class ShellNavigationDeviceTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
-    private fun back()=compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+    private fun back()=compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
 
     @Test fun collectionsKeepPeoplePlacesAndAiActivityReachableWithBackHistory() {
         compose.onNodeWithTag("nav:Collections").performClick().assertIsSelected()
