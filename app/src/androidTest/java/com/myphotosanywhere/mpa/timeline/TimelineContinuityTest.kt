@@ -110,7 +110,13 @@ class TimelineContinuityTest {
             compose.onNodeWithTag("nav:Collections").performClick()
             compose.onNodeWithTag("nav:Photos").performClick()
             // Source filtering and its anchor survive a primary-destination round trip.
-            compose.onNodeWithTag("shell:filters").performClick()
+            // Reverse-scroll reveals the retained collapsed bar before using its controls.
+            val reveal=compose.activity.resources.displayMetrics.density*96f
+            compose.onNodeWithTag("photos:grid").performTouchInput {
+                swipe(start=androidx.compose.ui.geometry.Offset(center.x,height*.25f),
+                    end=androidx.compose.ui.geometry.Offset(center.x,height*.25f+reveal),durationMillis=1000)
+            }
+            compose.onNodeWithTag("shell:filters").assertIsDisplayed().performClick()
             compose.onNodeWithText("Timeline fixture · timeline@test").performScrollTo().performClick()
             compose.onNodeWithText("Done").performScrollTo().performClick()
             waitTag("photo:timeline-ui-70")
