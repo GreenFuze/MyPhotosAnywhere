@@ -59,6 +59,7 @@ internal fun Modifier.dragRangeSelection(registry: TimelineSelectionHits,token: 
                     val down=awaitFirstDown(requireUnconsumed=false,pass=PointerEventPass.Initial)
                     val downWindow=down.position+registry.origin
                     val first=registry.hit(downWindow,inset) ?: return@awaitEachGesture
+                    android.util.Log.i("RangeGesture","down=$downWindow bounds=${registry.bounds} firstIndex=${latestWindow.indexOfFirst { it.key==first.key }} enabled=$enabled")
                     val baseline=latestSelection.toList()
                     // Child combinedClickable consumes its down/long-press events. Observe
                     // Initial-pass motion and our own timeout, so that consumption cannot
@@ -73,7 +74,11 @@ internal fun Modifier.dragRangeSelection(registry: TimelineSelectionHits,token: 
                             if(!aborted) latest=requireNotNull(pointer)
                         }
                     }
-                    if(early!=null || aborted || latestWindow.none { it.key==first.key }) return@awaitEachGesture
+                    if(early!=null || aborted || latestWindow.none { it.key==first.key }) {
+                        android.util.Log.i("RangeGesture","longPressCancelled early=$early aborted=$aborted")
+                        return@awaitEachGesture
+                    }
+                    android.util.Log.i("RangeGesture","longPressReady")
                     val press=latest
                     val range=DragRangeSelection(baseline,latestWindow,first.key)
                     var finger=press.position+registry.origin
@@ -112,7 +117,9 @@ internal fun Modifier.dragRangeSelection(registry: TimelineSelectionHits,token: 
                             val pointer=event.changes.firstOrNull { it.id==press.id }
                             if(pointer==null || !pointer.pressed) break
                             finger=pointer.position+registry.origin
-                            reconcile(registry.hit(finger,inset))
+                            val hit=registry.hit(finger,inset)
+                            android.util.Log.i("RangeGesture","move=$finger hitIndex=${latestWindow.indexOfFirst { it.key==hit?.key }} active=$active")
+                            reconcile(hit)
                             updateScrolling()
                             event.changes.forEach { it.consume() }
                         } while(true)
