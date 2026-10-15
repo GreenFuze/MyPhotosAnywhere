@@ -54,7 +54,7 @@ class AdaptiveThumbnailDeviceTest {
             photo.displayName,photo.mimeType,photo.originalPath,photo.thumbnailPath,0,photo.bytes,photo.sha256,null,null,null,null)
         override fun close() {
             settings.update(before);db.close()
-            check(directory.parentFile.canonicalFile==context.cacheDir.canonicalFile && directory.name.startsWith("thumbnail-fixture-"))
+            check(requireNotNull(directory.parentFile).canonicalFile==context.cacheDir.canonicalFile && directory.name.startsWith("thumbnail-fixture-"))
             check(directory.deleteRecursively())
         }
     }

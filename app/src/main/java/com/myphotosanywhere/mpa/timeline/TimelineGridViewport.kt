@@ -26,11 +26,12 @@ internal class TimelineGridViewport(val state: LazyGridState) {
     /** Capture old coordinates before installing new membership; the caller restores by ID. */
     fun install(next: BlockMosaicPlan?,pixelsPerDp: Float,preferred: TimelineAnchor?): TimelineAnchor? {
         val previous=blocks
+        if(previous==null || next==null) { blocks=next;scale=pixelsPerDp;return null }
         val visible=visible()
         val held=TimelineViewport.choose(visible.map { TimelineAnchor(TimelineCursor(null,it.key),-it.offset.y) },preferred)
         val old=held?.let { previous?.locations?.get(it.cursor.key) }
         val fresh=held?.let { next?.locations?.get(it.cursor.key) }
-        val changed=previous!=null && next!=null && old!=null && fresh!=null &&
+        val changed=old!=null && fresh!=null &&
             (old.first!=fresh.first || old.second.y!=fresh.second.y || old.second.height!=fresh.second.height || old.second.width!=fresh.second.width)
         blocks=next;scale=pixelsPerDp
         return held.takeIf { changed }
