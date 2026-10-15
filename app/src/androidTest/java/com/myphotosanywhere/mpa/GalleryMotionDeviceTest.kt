@@ -110,14 +110,19 @@ class MotionChromeDeviceTest {
             CompositionLocalProvider(LocalDensity provides Density(pixels,2f),LocalLayoutDirection provides LayoutDirection.Rtl) {
                 MaterialTheme(colorScheme=darkColorScheme()) {
                     val chrome=remember { ViewerChromeController() }
-                    ViewerSurface(chrome,Modifier.width(320.dp).background(androidx.compose.ui.graphics.Color.Black),topBar={ ViewerTopBar(null,"צילום.png",{},{},chrome::hide) },
-                        bottomBar={ Text("פעולות",Modifier.heightIn(min=48.dp),color=androidx.compose.ui.graphics.Color.White) },status={ Text("Preview only — Retry",Modifier.testTag("motion:status"),color=androidx.compose.ui.graphics.Color.White) }) { Box(Modifier.fillMaxSize()) }
+                    Surface(Modifier.fillMaxSize(),color=androidx.compose.ui.graphics.Color.Black,contentColor=androidx.compose.ui.graphics.Color.White) {
+                        Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                            ViewerSurface(chrome,Modifier.width(320.dp),topBar={ ViewerTopBar(null,"צילום.png",{},{},chrome::hide) },
+                                bottomBar={ Text("פעולות",Modifier.heightIn(min=48.dp)) },status={ Text("Preview only — Retry",Modifier.testTag("motion:status")) }) { Box(Modifier.fillMaxSize()) }
+                        }
+                    }
                 }
             }
         }
         compose.onNodeWithTag("viewer-hide-controls").performClick()
         compose.onNodeWithTag("viewer-show-controls").assertIsDisplayed().assertHasClickAction()
-        compose.onNodeWithTag("motion:status").assertIsDisplayed();motionScreenshot("motion-dark-rtl")
+        compose.onNodeWithTag("motion:status").assertIsDisplayed()
+        compose.waitForIdle();motionScreenshot("motion-dark-rtl")
         compose.onNodeWithTag("viewer-show-controls").performClick();compose.onNodeWithTag("viewer-details").assertIsDisplayed()
     }
 }
