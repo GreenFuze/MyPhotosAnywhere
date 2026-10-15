@@ -64,7 +64,8 @@ class VisualDetailsDeviceTest {
         compose.onNodeWithTag("nav:Collections").performClick()
         compose.onNodeWithTag("collections:People").performScrollTo().performClick()
         compose.onNodeWithText("Imported people").assertExists()
-        compose.onNodeWithText("Named faces").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("people-list").performScrollToNode(hasText("Named faces"))
+        compose.onNodeWithText("Named faces").assertIsDisplayed()
         screenshot("people-visual")
     }
 
