@@ -2,7 +2,6 @@ package com.myphotosanywhere.mpa.selection
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -58,10 +57,24 @@ internal fun Modifier.dragRangeSelection(registry: TimelineSelectionHits,token: 
                 val gestureScope=this
                 awaitEachGesture {
                     val down=awaitFirstDown(requireUnconsumed=false,pass=PointerEventPass.Initial)
-                    val first=registry.hit(down.position+registry.origin,inset) ?: return@awaitEachGesture
+                    val downWindow=down.position+registry.origin
+                    val first=registry.hit(downWindow,inset) ?: return@awaitEachGesture
                     val baseline=latestSelection.toList()
-                    val press=awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
-                    if(press.id!=down.id || latestWindow.none { it.key==first.key }) return@awaitEachGesture
+                    // Child combinedClickable consumes its down/long-press events. Observe
+                    // Initial-pass motion and our own timeout, so that consumption cannot
+                    // cancel the parent range recognizer. Real scrolling/multitouch cancels.
+                    var latest=down;var aborted=false
+                    val early=withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        while(!aborted) {
+                            val event=awaitPointerEvent(PointerEventPass.Initial)
+                            val pointer=event.changes.firstOrNull { it.id==down.id }
+                            aborted=pointer==null || !pointer.pressed || event.changes.count { it.pressed }>1 ||
+                                (pointer.position+registry.origin-downWindow).getDistance()>viewConfiguration.touchSlop
+                            if(!aborted) latest=requireNotNull(pointer)
+                        }
+                    }
+                    if(early!=null || aborted || latestWindow.none { it.key==first.key }) return@awaitEachGesture
+                    val press=latest
                     val range=DragRangeSelection(baseline,latestWindow,first.key)
                     var finger=press.position+registry.origin
                     var active=true;var atLimit=false;var announced=false

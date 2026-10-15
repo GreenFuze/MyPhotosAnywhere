@@ -1,6 +1,7 @@
 package com.myphotosanywhere.mpa
 
 import android.graphics.Bitmap
+import androidx.activity.compose.setContent
 import androidx.room.withTransaction
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -117,7 +118,7 @@ class DragSelectionDeviceTest {
         val features=compose.runOnUiThread { ViewModelProvider(compose.activity)[LibraryFeaturesModel::class.java] }
         try {
             compose.runOnUiThread { model.changeLayout(GalleryLayout.MOSAIC) }
-            compose.setContent {
+            compose.runOnUiThread { compose.activity.setContent {
                 val density=LocalDensity.current.density;val targets by selected.targets.collectAsState()
                 CompositionLocalProvider(LocalDensity provides Density(density,2f),LocalLayoutDirection provides LayoutDirection.Rtl) {
                     MaterialTheme(colorScheme=darkColorScheme()) { Surface(Modifier.fillMaxSize()) {
@@ -125,7 +126,7 @@ class DragSelectionDeviceTest {
                             onRangeChange=selected::replaceDrag,onBeginSelection=selected::ensureSelected,onSelectionLimit=selected::dragLimit)
                     } }
                 }
-            }
+            } }
             val first=requireNotNull(app.timeline.find(TimelineQuery(),"photo:${fixture.photos[0].id}"))
             compose.runOnUiThread { model.rememberAnchor(first,0);model.restoreAnchor() };waitReady(first.key)
             val hero=compose.onNodeWithTag(first.key).fetchSemanticsNode()
