@@ -68,4 +68,21 @@ class DateScrubbingTest {
         coordinator.offer(recent);advanceTimeBy(80);coordinator.offer(recent);advanceTimeBy(20);runCurrent()
         assertEquals(listOf(recent),calls);coordinator.cancel()
     }
+    @Test fun soughtSmallTileAtViewportTopRemainsCanonicalBesideEarlierPortrait() {
+        val hero=TimelineAnchor(TimelineCursor(2,"photo:hero"),531)
+        val sought=TimelineAnchor(TimelineCursor(1,"photo:sought"),0)
+        assertEquals(sought,TimelineViewport.choose(listOf(hero,sought),sought))
+    }
+    @Test fun restoredPixelOffsetIsHeldUntilActualScrollingChangesIt() {
+        val hero=TimelineAnchor(TimelineCursor(2,"photo:hero"),543)
+        val sought=TimelineAnchor(TimelineCursor(1,"photo:sought"),12)
+        assertEquals(sought,TimelineViewport.choose(listOf(hero,sought),sought))
+        assertEquals(hero,TimelineViewport.choose(listOf(hero,sought.copy(offset=20)),sought))
+    }
+    @Test fun lowerViewportTileDoesNotDisplaceFirstVisibleDate() {
+        val first=TimelineAnchor(TimelineCursor(2,"photo:first"),40)
+        val lower=TimelineAnchor(TimelineCursor(null,"photo:unknown"),-100)
+        assertEquals(first,TimelineViewport.choose(listOf(first,lower),lower))
+        assertEquals(lower.copy(offset=0),TimelineViewport.choose(listOf(first,lower.copy(offset=0)),lower.copy(offset=0)))
+    }
 }

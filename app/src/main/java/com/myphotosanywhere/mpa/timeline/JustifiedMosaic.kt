@@ -67,6 +67,11 @@ internal object TimelineViewport {
 
     fun choose(visible: List<TimelineAnchor>,preferred: TimelineAnchor?): TimelineAnchor? {
         val first=visible.firstOrNull() ?: return null
-        return visible.firstOrNull { it.cursor.key==preferred?.cursor?.key && it.offset==first.offset } ?: first
+        if(preferred==null) return first
+        // A tall earlier tile can remain partially visible beside a sought small tile.
+        // Keep the requested identity while it remains at its exact saved pixel offset;
+        // actual scrolling changes that offset and restores ordinary first-visible tracking.
+        return visible.firstOrNull { it.cursor.key==preferred.cursor.key &&
+            (it.offset==first.offset || it.offset>=0 && it.offset==preferred.offset) } ?: first
     }
 }
