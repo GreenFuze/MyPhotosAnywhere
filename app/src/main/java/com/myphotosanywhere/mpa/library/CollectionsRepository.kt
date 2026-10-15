@@ -13,7 +13,7 @@ internal data class CollectionPreview(val count: Int,val entries: List<TimelineE
 /** Cards observe invalidation, then fetch at most four covers; never subscribe to the media library. */
 internal class CollectionsRepository(private val database: PhotoDatabase,private val timeline: TimelineRepository) {
     private fun changes() = callbackFlow {
-        val observer=object: InvalidationTracker.Observer("photos","cloud_photos","drive_sources","album_photos","faces","people") {
+        val observer=object: InvalidationTracker.Observer("photos","cloud_photos","drive_sources","album_photos","faces","people","drive_trash") {
             override fun onInvalidated(tables: Set<String>) { trySend(Unit) }
         }
         database.invalidationTracker.addObserver(observer);trySend(Unit)
@@ -31,14 +31,18 @@ internal class CollectionsRepository(private val database: PhotoDatabase,private
         } else timeline.page(query,null,TimelineDirection.AFTER,4)
         // Offline availability is a filesystem property: do not invent a SQL count from cached paths.
         val count=if(query.album==null) -1 else database.openHelper.readableDatabase.query(
-            "SELECT COUNT(*) FROM album_photos WHERE albumId=?",arrayOf(query.album)).use { rows -> check(rows.moveToFirst());rows.getInt(0) }
+            "SELECT COUNT(*) FROM album_photos a JOIN photos p ON p.id=a.photoId WHERE a.albumId=? AND p.archived=0 AND ${com.myphotosanywhere.mpa.trash.TrashVisibility.PHOTO_SQL}",arrayOf(query.album)).use { rows -> check(rows.moveToFirst());rows.getInt(0) }
         CollectionPreview(count,entries)
     } }
     /** Existing local annotations only; this never starts recognition or contacts a map service. */
     fun special(kind: String): Flow<CollectionPreview> = changes().map { withContext(Dispatchers.IO) {
-        require(kind=="People" || kind=="Places")
-        val sql=if(kind=="People") "SELECT f.cropPath FROM faces f JOIN people p ON p.id=f.personId WHERE f.cropPath<>'' ORDER BY p.name COLLATE NOCASE,f.id LIMIT 4"
-            else "SELECT thumbnailPath FROM photos WHERE archived=0 AND latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180 AND thumbnailPath<>'' ORDER BY COALESCE(capturedAt,importedAt) DESC,id LIMIT 4"
+        require(kind in setOf("People","Places","Trash"))
+        val visible=com.myphotosanywhere.mpa.trash.TrashVisibility.PHOTO_SQL
+        val sql=when(kind) {
+            "People" -> "SELECT f.cropPath FROM faces f JOIN people n ON n.id=f.personId JOIN photos p ON p.id=f.photoId WHERE f.cropPath<>'' AND $visible ORDER BY n.name COLLATE NOCASE,f.id LIMIT 4"
+            "Places" -> "SELECT p.thumbnailPath FROM photos p WHERE p.archived=0 AND p.latitude BETWEEN -90 AND 90 AND p.longitude BETWEEN -180 AND 180 AND p.thumbnailPath<>'' AND $visible ORDER BY COALESCE(p.capturedAt,p.importedAt) DESC,p.id LIMIT 4"
+            else -> "SELECT thumbnailPath FROM drive_trash WHERE confirmed=1 AND thumbnailPath<>'' ORDER BY updatedAt DESC,key LIMIT 4"
+        }
         val paths=database.openHelper.readableDatabase.query(sql).use { rows -> buildList { while(rows.moveToNext()) add(rows.getString(0)) } }
         CollectionPreview(-1,emptyList(),paths)
     } }

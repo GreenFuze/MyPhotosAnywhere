@@ -85,8 +85,11 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     val selectionNotice by selection.notice.collectAsStateWithLifecycle()
     val shareIntent by selection.share.collectAsStateWithLifecycle()
     var selectionAlbums by rememberSaveable { mutableStateOf(false) }
+    val trash: com.myphotosanywhere.mpa.trash.TrashViewModel=viewModel()
+    val trashBusy by trash.busy.collectAsStateWithLifecycle()
+    val trashConfirmation by trash.confirmation.collectAsStateWithLifecycle()
     val selecting=selectedTargets.isNotEmpty()
-    val selectionLocked=selectionBusy || selectionResult!=null
+    val selectionLocked=selectionBusy || selectionResult!=null || trashBusy || trashConfirmation!=null
     val photos by model.photos.collectAsStateWithLifecycle()
     val handoffs by model.handoffs.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
@@ -241,7 +244,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                     onActivity={ navigation.open(ShellDestination.AI_ACTIVITY) },
                     onPeople={ navigation.open(ShellDestination.PEOPLE) },onPlaces={ navigation.open(ShellDestination.PLACES) },
                     onOffline={ filter="Offline";albumId=null;personId=null;importedPersonKey=null;navigation.open(ShellDestination.PHOTOS) },
-                    onEdits={ filter="Edits";albumId=null;personId=null;importedPersonKey=null;navigation.open(ShellDestination.PHOTOS) },bottomClearance=navigationClearance)
+                    onEdits={ filter="Edits";albumId=null;personId=null;importedPersonKey=null;navigation.open(ShellDestination.PHOTOS) },bottomClearance=navigationClearance,onTrash={ navigation.open(ShellDestination.TRASH) })
                 6 -> {
                     LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                         if(handoffs.isEmpty()) item { Text("Open a photo and choose Edit with AI. Saved handoffs appear here.") }
@@ -257,13 +260,14 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                 }
                 2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; importedPersonKey=null; albumId=null; sourceKey=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto,onImported={ importedPersonKey=it;personId=null;albumId=null;sourceKey=null;filter="All";navigation.open(ShellDestination.PHOTOS) },onSettings={ navigation.open(ShellDestination.RECOGNITION) })
                 3 -> PlacesScreen(photos,settings.onlineMaps,{ features.updateSettings(settings.copy(onlineMaps=it)) },::selectPhoto)
+                16 -> com.myphotosanywhere.mpa.trash.TrashScreen(trash,navigationClearance,onSources={ navigation.open(ShellDestination.STORAGE) })
                 4,7,8,9,10,11,12,13,14,15 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
             }
         }
         if(selecting) SelectionBottomBar(selectionBusy,(if(tab==5) searchApplied.filter else filter)=="Archive",tab==0 && albumId!=null,onAction={ kind ->
             if(kind==BulkKind.ALBUM) selectionAlbums=true
             else selection.execute(BulkAction(kind,if(kind==BulkKind.REMOVE_ALBUM) albumId else null))
-        },modifier=Modifier.align(Alignment.BottomCenter).onSizeChanged { navigationHeight=it.height })
+        },onTrash={ trash.request(selectedTargets) },modifier=Modifier.align(Alignment.BottomCenter).onSizeChanged { navigationHeight=it.height })
         else ShellBottomBar(navigation.activePrimary,onSelect={ destination ->
             if(destination==ShellDestination.SEARCH && navigation.activePrimary!=ShellDestination.SEARCH)
                 searchOrigin=GalleryContext(filter,sourceKey,albumId,personId,importedPersonKey).save()
@@ -304,17 +308,17 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     searchViewer?.let { session -> TimelineViewer(session,searchTimeline,features,
         onEdit={ searchTimeline.closeViewer();selectedId=it;editorId=it },
         onDetails={ selectedId=it;viewerDetailsOpen=true },obscured=viewerDetailsOpen || editorId!=null || showShare,
-        onSource={ searchTimeline.closeViewer();navigation.open(ShellDestination.STORAGE) }) }
+        onSource={ searchTimeline.closeViewer();navigation.open(ShellDestination.STORAGE) },onTrash={ trash.request(listOf(SelectionTarget.from(it))) }) }
     timelineViewer?.let { session -> TimelineViewer(session,timeline,features,
         onEdit={ timeline.closeViewer();selectedId=it;editorId=it },
         onDetails={ selectedId=it;viewerDetailsOpen=true },obscured=viewerDetailsOpen || editorId!=null || showShare,
-        onSource={ timeline.closeViewer();navigation.open(ShellDestination.STORAGE) }) }
+        onSource={ timeline.closeViewer();navigation.open(ShellDestination.STORAGE) },onTrash={ trash.request(listOf(SelectionTarget.from(it))) }) }
     pendingViewKey?.let { key -> DriveOriginalDialog(cloud.find { it.key==key },features,onClose={ pendingViewKey=null;selectedId=null },onReady={
         pendingViewKey=null;selectedId=it;viewerId=it
     }) }
     viewerId?.let { id -> PhotoViewer(photos.filter { it.id==id || presence.showLocal(it,filter,albumId!=null || personId!=null || importedLabel!=null) },id,features,
         onClose={ viewerId=null;selectedId=null;viewerDetailsOpen=false },obscured=viewerDetailsOpen || editorId!=null || showShare,onCurrent={ selectedId=it },
-        onEdit={ viewerId=null; selectedId=it; editorId=it },onDetails={ selectedId=it;viewerDetailsOpen=true }) }
+        onEdit={ viewerId=null; selectedId=it; editorId=it },onDetails={ selectedId=it;viewerDetailsOpen=true },onTrash={ trash.request(listOf(SelectionTarget.from(it))) }) }
     if(selectedId!=null && selected==null && editorId==null && (viewerId==null || viewerDetailsOpen) && pendingViewKey==null) {
         AlertDialog(onDismissRequest={ selectedId=null;viewerDetailsOpen=false },title={ Text("Photo details") },
             text={ Text(selectedProblem ?: "Loading photo details…") },
@@ -329,6 +333,9 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         model.share(selected,provider,instructions) { intent -> context.startActivity(intent); showShare=false }
     }
     editorId?.let { id -> EditorScreen(id,onClose={ editorId=null },onSaved={ saved -> editorId=null; selectedId=saved }) }
+    com.myphotosanywhere.mpa.trash.TrashDialogs(trash,onQueued={
+        selection.clear();timeline.closeViewer();searchTimeline.closeViewer();viewerId=null;viewerDetailsOpen=false;selectedId=null
+    })
 }
 
 @Composable

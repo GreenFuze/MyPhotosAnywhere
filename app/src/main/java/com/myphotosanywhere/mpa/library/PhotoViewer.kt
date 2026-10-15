@@ -37,7 +37,7 @@ private sealed interface ViewerOriginal {
 
 @Composable
 fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesModel,onClose: ()->Unit,
-    onCurrent: (String)->Unit,onEdit: (String)->Unit,onDetails: (String)->Unit,obscured: Boolean=false) {
+    onCurrent: (String)->Unit,onEdit: (String)->Unit,onDetails: (String)->Unit,obscured: Boolean=false,onTrash: ((Photo)->Unit)?=null) {
     // Keep paging stable while an import inserts newer photos into the gallery.
     val available=remember(selectedId) { photos.filter { it.originalPath.isNotBlank() && File(it.originalPath).isFile }.sortedByDescending { it.capturedAt ?: it.importedAt } }
     if(available.isEmpty()) { LaunchedEffect(Unit) { onClose() }; return }
@@ -52,7 +52,7 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
                 !obscured && current.mimeType.startsWith("image/"),{ gestures.isZoomed(current.id) },{ chrome.show();onDetails(current.id) }),
                 topBar={ ViewerTopBar(current.capturedAt ?: current.importedAt,current.displayName,onClose,{ chrome.show();onDetails(current.id) },{ chrome.hide() }) },
                 bottomBar={
-                    ViewerActions(current,model,onEdit,showStatus=false)
+                    ViewerActions(current,model,onEdit,showStatus=false,onTrash=onTrash?.let { action -> { action(current) } })
                     Text("${pager.currentPage+1} / ${available.size}",style=MaterialTheme.typography.bodySmall,
                         modifier=Modifier.padding(16.dp).testTag("viewer-position"))
                 },status={ if(!obscured) ViewerStatus(model,Color.White) }) { captionInset ->

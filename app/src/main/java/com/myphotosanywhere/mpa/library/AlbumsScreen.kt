@@ -25,7 +25,7 @@ import com.myphotosanywhere.mpa.data.*
 @Composable
 fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGridState,
     onAlbum: (String)->Unit,onFavorites: ()->Unit,onArchive: ()->Unit,onActivity: ()->Unit,
-    onPeople: ()->Unit,onPlaces: ()->Unit,onOffline: ()->Unit,onEdits: ()->Unit,bottomClearance: Dp=0.dp) {
+    onPeople: ()->Unit,onPlaces: ()->Unit,onOffline: ()->Unit,onEdits: ()->Unit,bottomClearance: Dp=0.dp,onTrash: (()->Unit)?=null) {
     var create by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var manage by remember { mutableStateOf<Album?>(null) }
@@ -35,6 +35,7 @@ fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGrid
         contentPadding=PaddingValues(start=16.dp,top=12.dp,end=16.dp,bottom=16.dp+bottomClearance),
         verticalArrangement=Arrangement.spacedBy(16.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
         item { CollectionCard("Favorites",com.myphotosanywhere.mpa.R.drawable.ic_shell_favorite,repository,TimelineQuery("Favorites"),onFavorites) }
+        if(onTrash!=null) item { CollectionCard("Trash",com.myphotosanywhere.mpa.R.drawable.ic_action_trash,repository,null,onTrash) }
         item { CollectionCard("Archive",com.myphotosanywhere.mpa.R.drawable.ic_shell_archive,repository,TimelineQuery("Archive"),onArchive) }
         item { CollectionCard("People",com.myphotosanywhere.mpa.R.drawable.ic_shell_people,repository,null,onPeople) }
         item { CollectionCard("Places",com.myphotosanywhere.mpa.R.drawable.ic_shell_places,repository,null,onPlaces) }

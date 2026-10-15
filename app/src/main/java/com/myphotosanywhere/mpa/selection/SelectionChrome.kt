@@ -36,7 +36,7 @@ internal fun SelectionTopBar(count: Int,busy: Boolean,onClose: ()->Unit) {
 }
 
 @Composable
-internal fun SelectionBottomBar(busy: Boolean,archived: Boolean,inAlbum: Boolean,onAction: (BulkKind)->Unit,modifier: Modifier=Modifier) {
+internal fun SelectionBottomBar(busy: Boolean,archived: Boolean,inAlbum: Boolean,onAction: (BulkKind)->Unit,modifier: Modifier=Modifier,onTrash: (()->Unit)?=null) {
     Surface(modifier.fillMaxWidth(),color=MaterialTheme.colorScheme.surfaceContainer,shadowElevation=3.dp) {
         FlowRow(Modifier.padding(horizontal=8.dp,vertical=4.dp).navigationBarsPadding(),horizontalArrangement=Arrangement.SpaceEvenly) {
             listOf(
@@ -50,6 +50,7 @@ internal fun SelectionBottomBar(busy: Boolean,archived: Boolean,inAlbum: Boolean
                 IconLabelAction(icon,label,{ onAction(kind) },Modifier.testTag("selection:${kind.name}"),enabled=!busy,
                     description=when(kind) { BulkKind.ALBUM -> "Add to album";BulkKind.OFFLINE -> "Make available offline";else -> label })
             }
+            if(onTrash!=null) IconLabelAction(R.drawable.ic_action_trash,"Trash",onTrash,Modifier.testTag("selection:TRASH"),enabled=!busy,description="Move selected photos to Google Drive Trash")
             if(inAlbum) IconLabelAction(R.drawable.ic_action_remove_album,"Remove from album",{ onAction(BulkKind.REMOVE_ALBUM) },
                 Modifier.testTag("selection:REMOVE_ALBUM"),enabled=!busy)
         }

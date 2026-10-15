@@ -43,7 +43,7 @@ internal fun ViewerTopBar(millis: Long?,name: String,onClose: ()->Unit,onDetails
 }
 
 @Composable
-internal fun ViewerActions(photo: Photo?,model: LibraryFeaturesModel,onEdit: (String)->Unit,showStatus: Boolean=true) {
+internal fun ViewerActions(photo: Photo?,model: LibraryFeaturesModel,onEdit: (String)->Unit,showStatus: Boolean=true,onTrash: (()->Unit)?=null) {
     val context=LocalContext.current
     val busy by model.busy.collectAsStateWithLifecycle()
     val live by produceState(photo,photo?.id) {
@@ -62,6 +62,7 @@ internal fun ViewerActions(photo: Photo?,model: LibraryFeaturesModel,onEdit: (St
         if(item!=null) IconLabelAction(if(item.favorite) R.drawable.ic_shell_favorite else R.drawable.ic_action_favorite_outline,"Favorite",{ model.updatePhoto(item.id) { it.copy(favorite=!it.favorite) } },
             Modifier.testTag("viewer-favorite"),enabled=!busy,description=if(item.favorite) "Remove from favorites" else "Add to favorites",selected=item.favorite,
             color=if(item.favorite) Color(0xFF8BD5BE) else Color.White)
+        if(onTrash!=null) IconLabelAction(R.drawable.ic_action_trash,"Trash",onTrash,Modifier.testTag("viewer-trash"),enabled=!busy,color=Color.White,description="Move to Google Drive Trash")
         if(showStatus) ViewerStatus(model,Color.White)
     }
 }

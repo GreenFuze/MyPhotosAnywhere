@@ -101,7 +101,7 @@ class TimelineScaleTest {
                 val duringImportMillis=(System.nanoTime()-started)/1000000.0
                 assertEquals(60,updated.size)
                 assertEquals(selected,session.entry(session.initialPage))
-                assertEquals(9,database.openHelper.readableDatabase.version)
+                assertEquals(10,database.openHelper.readableDatabase.version)
                 val memoryAfter=Debug.getPss()
                 results.put(JSONObject().put("items",size).put("firstPageMs",firstMillis).put("seekMs",seekMillis)
                     .put("dateRangeMs",dateRangeMillis).put("mosaicPlanMs",mosaicMillis).put("aroundPageMs",aroundMillis).put("snapshotMs",snapshotMillis).put("duringImportMs",duringImportMillis).put("snapshotImportMs",snapshotImportMillis)

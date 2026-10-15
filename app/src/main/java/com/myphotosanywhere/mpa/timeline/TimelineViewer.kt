@@ -38,7 +38,7 @@ import java.io.File
 /** Presentation adapter only: originals, gestures, decoders, leases and video resources remain shared. */
 @Composable
 internal fun TimelineViewer(state: TimelineViewerState,model: TimelineViewModel,features: LibraryFeaturesModel,
-    onEdit: (String)->Unit,onDetails: (String)->Unit,onSource: ()->Unit,obscured: Boolean=false) {
+    onEdit: (String)->Unit,onDetails: (String)->Unit,onSource: ()->Unit,obscured: Boolean=false,onTrash: ((TimelineEntry)->Unit)?=null) {
     var current by remember(state.session?.id) { mutableStateOf(state.selected) }
     val currentMedia=rememberTimelineMedia(current,model.repository).media
     var remoteDetailsKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -61,7 +61,7 @@ internal fun TimelineViewer(state: TimelineViewerState,model: TimelineViewModel,
                             Text("${pager.currentPage+1} / ${session.count}",style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("viewer-position"))
                             IconButton(enabled=pager.currentPage<session.count-1,onClick={ pageScope.launchPage(pager,pager.currentPage+1) },modifier=Modifier.size(48.dp).testTag("viewer-next")) { ShellIcon(R.drawable.ic_action_next,"Next photo") }
                         }
-                        ViewerActions(currentMedia?.photo,features,onEdit,showStatus=false)
+                        ViewerActions(currentMedia?.photo,features,onEdit,showStatus=false,onTrash=onTrash?.let { action -> { action(current) } })
                     }
                 },status={
                     if(session==null) {
