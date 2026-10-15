@@ -12,6 +12,9 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
 import java.io.File
 
 /** All database and filesystem work stays off the UI thread and bounded by a page or cursor window. */
@@ -165,6 +168,12 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
 
     fun media(entry: TimelineEntry)=changes().map { resolve(entry) }
     fun photo(id: String)=changes().map { withContext(Dispatchers.IO) { database.photos().find(id) } }
+
+    fun dates(query: TimelineQuery)=flow {
+        // A continuous import must not starve the initial range or keep cancelling its read.
+        emit(dateRange(query))
+        emitAll(changes().map { kotlinx.coroutines.delay(250);dateRange(query) })
+    }.distinctUntilChanged()
 
     suspend fun originalAvailable(media: TimelineMedia)=withContext(Dispatchers.IO) {
         media.photo?.originalPath?.let(originalExists) ?: false

@@ -174,7 +174,8 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     val pinch by rememberUpdatedState<(Float)->Unit> { scale -> model.changeDensity(density.pinch(scale),viewport()) }
     if(dateNavigation) TimelineDateNavigator(query,model.repository,zone,viewport()?.cursor?.millis,
         onJump={ dateNavigation=false;model.jump(it,zone) },onClose={ dateNavigation=false })
-    Column(modifier) {
+    Box(modifier) {
+    Column(Modifier.fillMaxSize()) {
         val refresh=rows.loadState.refresh
         val failure=(refresh as? LoadState.Error) ?: (rows.loadState.append as? LoadState.Error) ?: (rows.loadState.prepend as? LoadState.Error)
         if(failure!=null) TextButton(onClick=rows::retry,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("timeline:retry")) {
@@ -300,8 +301,11 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         }
         }
         if(restoring || refresh is LoadState.Loading) LinearProgressIndicator(Modifier.align(Alignment.TopCenter).fillMaxWidth().testTag("timeline:refreshing"))
-        if(selection.isEmpty() && !selectionLocked && !restoring) TimelineDateRail(tiles,retained,query,zone,{ model.anchor(query) }) { dateNavigation=true }
         }
+    }
+    // Keep the date gesture alive while its seek replaces retained pages or restores the anchor.
+    TimelineDateRail(tiles,retained,query,zone,{ model.anchor(query) },model,bottomClearance,
+        selection.isEmpty() && !selectionLocked && (rows.itemCount>0 || model.anchor(query)!=null)) { dateNavigation=true }
     }
 }
 

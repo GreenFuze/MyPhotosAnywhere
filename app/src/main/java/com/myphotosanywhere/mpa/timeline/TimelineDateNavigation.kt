@@ -25,6 +25,26 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import com.myphotosanywhere.mpa.ui.MotionVisibility
+import com.myphotosanywhere.mpa.ui.MotionEdge
+import com.myphotosanywhere.mpa.ui.ShellIcon
+import com.myphotosanywhere.mpa.R
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 
 @Composable
 internal fun GalleryLayoutControls(selected: GalleryLayout,onSelect: (GalleryLayout)->Unit) {
@@ -53,7 +73,8 @@ internal fun GridDensityControls(selected: GridDensity,onSelect: (GridDensity)->
 }
 
 @Composable
-internal fun BoxScope.TimelineDateRail(state: TimelineGridViewport,items: List<TimelineRow>,query: TimelineQuery,zone: ZoneId,preferred: ()->TimelineAnchor?,onOpen: ()->Unit) {
+internal fun BoxScope.TimelineDateRail(state: TimelineGridViewport,items: List<TimelineRow>,query: TimelineQuery,zone: ZoneId,preferred: ()->TimelineAnchor?,
+    model: TimelineViewModel,bottomClearance: Dp,visible: Boolean,onOpen: ()->Unit) {
     val media=remember(items,query) { items.filter { it.query==query }.associateBy { it.entry.key } }
     val currentPreferred by rememberUpdatedState(preferred)
     val indicator by remember(state,media,zone) { derivedStateOf {
@@ -68,20 +89,97 @@ internal fun BoxScope.TimelineDateRail(state: TimelineGridViewport,items: List<T
         }
         TimelineViewport.choose(visible,currentPreferred())?.let { TimelineDateIndicator.from(it.cursor.millis,zone) }
     } }
-    TimelineFloatingDateChip(indicator,onOpen,Modifier.align(Alignment.TopCenter).padding(8.dp))
+    val scope=rememberCoroutineScope()
+    val lifecycle=LocalLifecycleOwner.current
+    val coordinator=remember(model,query,zone) { DateScrubCoordinator(scope,{ model.seekDate(query,it.atEndOfMonth(),zone) }) }
+    val scrub by coordinator.state.collectAsState()
+    var range by remember(model,query,zone) { mutableStateOf<MonthNavigation?>(null) }
+    LaunchedEffect(model,query,zone,lifecycle) {
+        lifecycle.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            try { model.repository.dates(query).collect { range=it?.months(zone) } }
+            catch(cancelled: CancellationException) { throw cancelled }
+            catch(_: android.database.sqlite.SQLiteException) { range=null } // Jump retains its explicit Retry dates surface.
+            finally { coordinator.cancel() }
+        }
+    }
+    DisposableEffect(coordinator) { onDispose { coordinator.cancel() } }
+    LaunchedEffect(visible) { if(!visible) coordinator.cancel() }
+    val preview=scrub.month?.takeIf { scrub.dragging || scrub.pending }
+    MotionVisibility(visible,MotionEdge.TOP,Modifier.align(Alignment.TopCenter).padding(8.dp)) {
+        TimelineFloatingDateChip(indicator,{ coordinator.cancel();onOpen() },preview=preview,seeking=scrub.pending)
+    }
+    MotionVisibility(visible && range!=null,MotionEdge.TOP,Modifier.align(Alignment.CenterEnd)
+        .padding(top=72.dp,end=8.dp,bottom=bottomClearance+8.dp).width(48.dp).fillMaxHeight()) {
+        range?.let { bounds -> DateScrubHandle(DateScrubScale(bounds),indicator?.date?.let(YearMonth::from),coordinator,visible) {
+            coordinator.cancel();onOpen()
+        } }
+    }
 }
 
 @Composable
-internal fun TimelineFloatingDateChip(indicator: TimelineDateIndicator?,onOpen: ()->Unit,modifier: Modifier=Modifier) {
+internal fun TimelineFloatingDateChip(indicator: TimelineDateIndicator?,onOpen: ()->Unit,modifier: Modifier=Modifier,
+    preview: YearMonth?=null,seeking: Boolean=false) {
     val locale=LocalConfiguration.current.locales[0]
+    val label=preview?.format(DateTimeFormatter.ofPattern("MMMM yyyy",locale)) ?: indicator?.label(locale) ?: "Jump to date"
     Surface(modifier,shape=androidx.compose.foundation.shape.RoundedCornerShape(50),
         color=MaterialTheme.colorScheme.surfaceContainerHigh,shadowElevation=2.dp) {
         TextButton(onClick=onOpen,modifier=Modifier.heightIn(min=48.dp).widthIn(min=48.dp,max=240.dp)
             .testTag("timeline:date-rail").semantics {
                 contentDescription="Jump to month or year"
-                stateDescription=indicator?.description(locale) ?: "No visible photo date"
+                stateDescription=if(preview!=null) "$label${if(seeking) ", seeking" else ", date preview"}" else indicator?.description(locale) ?: "No visible photo date"
             }) {
-            Text(indicator?.label(locale) ?: "Jump to date",style=MaterialTheme.typography.labelLarge)
+            Text(label,style=MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+/** Only the visible 48dp handle owns input; the rest of the edge still opens photos. */
+@Composable
+private fun DateScrubHandle(scale: DateScrubScale,current: YearMonth?,coordinator: DateScrubCoordinator,enabled: Boolean,onOpen: ()->Unit) {
+    val scrub by coordinator.state.collectAsState()
+    val latestScale by rememberUpdatedState(scale)
+    val locale=LocalConfiguration.current.locales[0]
+    val height=with(LocalDensity.current) { 72.dp.toPx() }
+    var track by remember { mutableStateOf(Rect.Zero) }
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    val preview=scrub.month?.takeIf { scrub.dragging || scrub.pending }
+    val month=preview ?: current ?: scale.months.first
+    val fraction=scale.fraction(month)
+    Box(Modifier.fillMaxSize().onGloballyPositioned { track=it.boundsInWindow() }.testTag("timeline:scrub-track")) {
+        IconButton(onClick=onOpen,enabled=enabled,modifier=Modifier.width(48.dp).height(72.dp)
+            .offset { IntOffset(0,((track.height-height).coerceAtLeast(0f)*fraction).roundToInt()) }
+            .onGloballyPositioned { origin=it.positionInWindow() }
+            .pointerInput(coordinator,enabled) {
+                if(!enabled) return@pointerInput
+                awaitEachGesture {
+                    val down=awaitFirstDown(requireUnconsumed=false,pass=PointerEventPass.Initial)
+                    val start=down.position+origin
+                    val held=latestScale
+                    var dragging=false;var released=false
+                    try {
+                        while(true) {
+                            val event=awaitPointerEvent(PointerEventPass.Initial)
+                            if(event.changes.count { it.pressed }>1) break
+                            val pointer=event.changes.firstOrNull { it.id==down.id } ?: break
+                            if(!pointer.pressed) {
+                                if(dragging) { pointer.consume();coordinator.finish();released=true }
+                                break
+                            }
+                            val position=pointer.position+origin
+                            if(!dragging && abs(position.y-start.y)>viewConfiguration.touchSlop) dragging=true
+                            if(dragging) {
+                                val top=track.top+height/2;val bottom=maxOf(top,track.bottom-height/2)
+                                coordinator.offer(held.month(held.fraction(position.y,top,bottom)))
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    } finally { if(dragging && !released) coordinator.cancel() }
+                }
+            }.testTag("timeline:date-scrubber").semantics {
+                contentDescription="Browse photo dates. Drag for months, or activate Jump to date."
+                stateDescription=if(current==null && preview==null) "Unknown date. Drag to dated photos." else month.format(DateTimeFormatter.ofPattern("MMMM yyyy",locale))
+            },colors=IconButtonDefaults.iconButtonColors(containerColor=MaterialTheme.colorScheme.surfaceContainerHigh)) {
+            ShellIcon(R.drawable.ic_date_scrub)
         }
     }
 }

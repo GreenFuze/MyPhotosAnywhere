@@ -69,6 +69,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
 
     fun configure(query: TimelineQuery) {
         if(configured && request.value.query==query) return
+        jumpJob?.cancel()
         configured=true
         val anchor=anchor(query)
         updateRequest(Request(query,anchor?.cursor,request.value.generation+1))
@@ -118,19 +119,25 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
 
     fun jump(date: LocalDate,zone: ZoneId) {
         jumpJob?.cancel()
-        jumpJob=viewModelScope.launch {
-            try {
-                val current=request.value
-                val cursor=repository.seek(current.query,date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
-                if(request.value!=current) return@launch
-                if(cursor==null) _message.value="No photos on or before this date."
-                else if(request.value==current) {
-                    saved[anchorName(current.query)]=Bundle().apply { putString("query",queryIdentity(current.query));putString("key",cursor.key);cursor.millis?.let { putLong("millis",it) };putInt("offset",0) }
-                    updateRequest(current.copy(cursor=cursor,generation=current.generation+1))
-                }
-            } catch(cancelled: CancellationException) { throw cancelled }
-            catch(error: android.database.sqlite.SQLiteException) { _message.value=error.message ?: "Cannot jump to this date. Retry." }
-        }
+        val query=request.value.query
+        jumpJob=viewModelScope.launch { seekDate(query,date,zone) }
+    }
+
+    /** Callers own cancellation. A superseded seek cannot replace another query or viewer. */
+    suspend fun seekDate(query: TimelineQuery,date: LocalDate,zone: ZoneId) {
+        val current=request.value
+        if(current.query!=query || _viewer.value!=null) return
+        try {
+            val cursor=repository.seek(query,date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
+            currentCoroutineContext().ensureActive()
+            if(request.value!=current || _viewer.value!=null) return
+            if(cursor==null) _message.value="No photos on or before this date."
+            else {
+                saved[anchorName(query)]=Bundle().apply { putString("query",queryIdentity(query));putString("key",cursor.key);cursor.millis?.let { putLong("millis",it) };putInt("offset",0) }
+                updateRequest(current.copy(cursor=cursor,generation=current.generation+1))
+            }
+        } catch(cancelled: CancellationException) { throw cancelled }
+        catch(error: android.database.sqlite.SQLiteException) { _message.value=error.message ?: "Cannot jump to this date. Retry." }
     }
 
     fun restoreAnchor() {
