@@ -266,7 +266,8 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                                 if(tile.index<rows.itemCount) rows[tile.index]
                                 val row=retained[tile.index]
                                 TimelineThumbnail(row.entry,model,features,selection,onToggle,onBeginSelection,selectionLocked || restoring || row.query!=query,zone,row.aspect,
-                                    Modifier.selectionHit(selectionHits,SelectionTarget.from(row.entry)).offset(tile.x.dp,tile.y.dp).width(tile.width.dp).height(tile.height.dp).semantics {
+                                    Modifier.offset(tile.x.dp,tile.y.dp).width(tile.width.dp).height(tile.height.dp)
+                                        .selectionHit(selectionHits,SelectionTarget.from(row.entry)).semantics {
                                         traversalIndex=tile.index.toFloat()
                                         collectionItemInfo=CollectionItemInfo(tile.row,tile.rowSpan,tile.column,1)
                                     }) {
