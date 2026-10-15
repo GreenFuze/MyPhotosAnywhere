@@ -8,9 +8,12 @@ import java.io.IOException
 
 class DriveTrashFailuresTest {
     @Test fun sdkNetworkProblemsRetryButConsentAndConfigurationNeedAnAction() {
-        for(code in listOf(CommonStatusCodes.NETWORK_ERROR,CommonStatusCodes.TIMEOUT,CommonStatusCodes.INTERNAL_ERROR))
+        for(code in listOf(CommonStatusCodes.NETWORK_ERROR,CommonStatusCodes.TIMEOUT,CommonStatusCodes.INTERNAL_ERROR,
+            CommonStatusCodes.CONNECTION_SUSPENDED_DURING_CALL,CommonStatusCodes.RECONNECTION_TIMED_OUT,
+            CommonStatusCodes.RECONNECTION_TIMED_OUT_DURING_UPDATE))
             assertTrue(DriveTrashFailures.retryable(DriveTrashFailures.google(code)))
         assertTrue(DriveTrashFailures.google(CommonStatusCodes.SIGN_IN_REQUIRED) is DriveAuthorizationNeeded)
+        assertFalse(DriveTrashFailures.retryable(DriveTrashFailures.google(CommonStatusCodes.API_NOT_CONNECTED)))
         assertFalse(DriveTrashFailures.retryable(DriveTrashFailures.google(CommonStatusCodes.DEVELOPER_ERROR)))
         assertTrue(DriveTrashFailures.google(CommonStatusCodes.DEVELOPER_ERROR).message.orEmpty().contains("code 10"))
     }
