@@ -86,9 +86,15 @@ class DateScrubDeviceTest {
         }
     }
     private fun waitAnchor(model: TimelineViewModel,query: TimelineQuery,key: String) {
-        compose.waitUntil(30000) {
+        try { compose.waitUntil(30000) {
             model.anchor(query)?.cursor?.key==key && compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() &&
                 compose.onAllNodes(hasTestTag(key) and isEnabled()).fetchSemanticsNodes().size==1
+        } } catch(error: ComposeTimeoutException) {
+            screenshot("date-scrub-failed")
+            val rail=compose.onAllNodesWithTag("timeline:date-rail").fetchSemanticsNodes().map { it.config.toString() }
+            val track=compose.onAllNodesWithTag("timeline:scrub-track").fetchSemanticsNodes().map { it.boundsInWindow }
+            val handle=compose.onAllNodesWithTag("timeline:date-scrubber").fetchSemanticsNodes().map { it.boundsInWindow to it.config.toString() }
+            throw AssertionError("Date seek expected=$key actual=${model.anchor(query)} generation=${model.restoration.value}/${model.refreshedGeneration.value} message=${model.message.value} rail=$rail track=$track handle=$handle",error)
         }
     }
     @Test fun directDragRapidSeeksImportAndViewerReturnPreserveCanonicalAnchor()=runBlocking<Unit> {
