@@ -1,0 +1,220 @@
+package com.myphotosanywhere.mpa.device
+
+import android.content.ContentValues
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.lifecycle.ViewModelProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.myphotosanywhere.mpa.MainActivity
+import com.myphotosanywhere.mpa.MpaApplication
+import com.myphotosanywhere.mpa.data.*
+import com.myphotosanywhere.mpa.drive.*
+import com.myphotosanywhere.mpa.timeline.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.io.File
+import java.io.IOException
+
+/** Run after the ordinary suite: full media grants must not contaminate other gallery fixtures. */
+@RunWith(AndroidJUnit4::class)
+class DeviceLibraryDeviceTest {
+    @get:Rule val compose=createAndroidComposeRule<MainActivity>()
+    private val instrumentation get()=InstrumentationRegistry.getInstrumentation()
+    private val app get()=instrumentation.targetContext.applicationContext as MpaApplication
+    private val uris=mutableListOf<Uri>()
+    private val ids=mutableSetOf<String>()
+    private fun grant() {
+        app.deviceMedia.permissions.request().filterNot { it==android.Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED }.forEach {
+            instrumentation.uiAutomation.grantRuntimePermission(app.packageName,it)
+        }
+        assertTrue(app.deviceMedia.permissions.current().full)
+    }
+    private fun camera(): Uri {
+        val values=ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME,"mpa-camera-${java.util.UUID.randomUUID()}.png")
+            put(MediaStore.MediaColumns.MIME_TYPE,"image/png")
+            put(MediaStore.MediaColumns.RELATIVE_PATH,"DCIM/Camera")
+            put(MediaStore.MediaColumns.IS_PENDING,1)
+            put(MediaStore.Images.ImageColumns.DATE_TAKEN,13_000_000_000_000L)
+        }
+        val uri=requireNotNull(app.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,values));uris+=uri
+        val image=Bitmap.createBitmap(1200,800,Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GREEN) }
+        try { requireNotNull(app.contentResolver.openOutputStream(uri)).use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) } }
+        finally { image.recycle() }
+        app.contentResolver.update(uri,ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING,0) },null,null)
+        return uri
+    }
+    private suspend fun indexed(uri: Uri): Photo {
+        app.deviceMedia.reconcile()
+        val mediaId=android.content.ContentUris.parseId(uri)
+        val record=app.database.openHelper.readableDatabase.query("SELECT photoId FROM device_media WHERE uri LIKE ? AND available=1",arrayOf("%/$mediaId")).use { cursor ->
+            check(cursor.moveToFirst());cursor.getString(0)
+        }
+        ids+=record
+        return requireNotNull(app.database.photos().find(record))
+    }
+    private fun cleanup()=runBlocking {
+        for(uri in uris) app.contentResolver.delete(uri,null,null)
+        app.deviceMedia.reconcile()
+        for(id in ids) {
+            val photo=app.database.photos().find(id)
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM manual_device_backups WHERE photoId=?",arrayOf(id))
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM drive_backups WHERE photoId=?",arrayOf(id))
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM photos WHERE id=?",arrayOf(id))
+            photo?.originalPath?.takeIf { it.isNotBlank() }?.let { File(it).delete() }
+        }
+    }
+    @Test fun cameraPhotosAppearWithoutCopyingAndOpenRealOriginalsWithDetailsAndBackup()=runBlocking<Unit> {
+        grant()
+        try {
+            val photo=indexed(camera())
+            assertEquals("",photo.originalPath);assertEquals("",photo.sha256);assertTrue(photo.thumbnailPath.startsWith("content://media/"))
+            assertTrue(app.deviceMedia.readable(photo.id));assertFalse(app.database.presence().inDrive(photo.id).first())
+            app.drive.enqueue(photo);assertTrue(app.database.drive().backupsForPhoto(photo.id).isEmpty())
+            val timeline=ViewModelProvider(compose.activity)[TimelineViewModel::class.java]
+            compose.runOnIdle { timeline.showNewest(TimelineQuery()) }
+            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${photo.id}").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("photo:${photo.id}").performClick()
+            compose.waitUntil(20000) { compose.onAllNodes(hasText("Original · 1200 × 800",substring=true)).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("viewer-backup").assertIsDisplayed()
+            compose.onNodeWithTag("viewer-details").performClick()
+            compose.waitUntil(10000) { compose.onAllNodesWithTag("details:availability").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("details:availability").performScrollTo().assertTextEquals("Original available on this device")
+            compose.onNodeWithTag("details:dimensions").performScrollTo().assertTextEquals("1200 × 800")
+            compose.onNodeWithTag("details:backup").performScrollTo().assertExists()
+            screenshot("device-camera-details")
+            assertEquals("",app.database.photos().find(photo.id)?.originalPath)
+        } finally { cleanup() }
+    }
+    @Test fun materializationKeepsIdentityCameraBytesAndProtectedPrivateOriginal()=runBlocking<Unit> {
+        grant()
+        try {
+            val uri=camera();val original=indexed(uri)
+            val before=requireNotNull(app.contentResolver.openInputStream(uri)).use { it.readBytes() }
+            val copy=app.deviceMedia.materialize(original.id)
+            assertEquals(original.id,copy.id);assertEquals(before.size.toLong(),copy.bytes)
+            assertArrayEquals(before,File(copy.originalPath).readBytes())
+            assertEquals(DriveBackupWorker.digest(File(copy.originalPath),"SHA-256"),copy.sha256)
+            assertArrayEquals(before,requireNotNull(app.contentResolver.openInputStream(uri)).use { it.readBytes() })
+            app.cache.enforce();assertTrue(File(copy.originalPath).isFile)
+            assertEquals(copy.id,indexed(uri).id);assertFalse(app.database.presence().inDrive(copy.id).first())
+        } finally { cleanup() }
+    }
+    @Test fun boundedRecognitionPreviewDoesNotCreatePrivateOriginalOrEnableConsent()=runBlocking<Unit> {
+        grant()
+        try {
+            val photo=indexed(camera());val consent=app.settings.state.value
+            app.deviceMedia.withPreview(photo.id) { current,image ->
+                assertEquals(photo.id,current.id);assertTrue(maxOf(image.width,image.height)<=1600)
+                assertTrue(image.allocationByteCount<=1600*1600*4)
+            }
+            assertEquals("",app.database.photos().find(photo.id)?.originalPath)
+            assertEquals(consent.faceIndexing,app.settings.state.value.faceIndexing)
+            assertEquals(consent.objectIndexing,app.settings.state.value.objectIndexing)
+        } finally { cleanup() }
+    }
+    @Test fun incompleteWorkingCopyAndOversizedBudgetKeepCameraOriginalAndCleanStages()=runBlocking<Unit> {
+        grant()
+        try {
+            val uri=camera();val photo=indexed(uri);val before=requireNotNull(app.contentResolver.openInputStream(uri)).use { it.readBytes() }
+            app.database.photos().update(photo.copy(bytes=photo.bytes+1))
+            try { app.deviceMedia.materialize(photo.id);fail("Incomplete copy must not commit") } catch(_: IOException) { }
+            assertEquals("",app.database.photos().find(photo.id)?.originalPath)
+            assertTrue(File(app.filesDir,"device-original-staging").listFiles().orEmpty().isEmpty())
+            app.database.photos().update(photo.copy(bytes=Long.MAX_VALUE))
+            try { app.deviceMedia.materialize(photo.id);fail("Overflowing storage budget must fail safely") } catch(_: IOException) { }
+            assertEquals("",app.database.photos().find(photo.id)?.originalPath)
+            assertArrayEquals(before,requireNotNull(app.contentResolver.openInputStream(uri)).use { it.readBytes() })
+        } finally { cleanup() }
+    }
+    @Test fun manualBackupCapturesDestinationWithoutEnablingAutomaticCameraUploads()=runBlocking<Unit> {
+        grant()
+        val source=DriveSource.from(DriveConnection(accountId="manual-device-fixture",email="manual@test",mode="APP_FILES",folderId="manual-device-folder",folderName="Manual fixture",unmeteredOnly=true))
+        val other=DriveSource.from(source.connection().copy(folderId="manual-device-other",folderName="Other"))
+        try {
+            val photo=indexed(camera());app.database.drive().saveSource(source);app.database.drive().saveSource(other)
+            assertFalse(source.backupEnabled)
+            app.drive.enqueueManual(photo.id,source.key)
+            val task=app.database.drive().backupsForPhoto(photo.id).single()
+            assertEquals(source.key,task.bindingKey);assertEquals(source.folderId,task.folderId)
+            val proof=requireNotNull(app.database.deviceMedia().authorization(task.id))
+            assertEquals(task.photoId,proof.photoId);assertEquals(source.key,proof.bindingKey)
+            assertFalse(app.database.presence().inDrive(photo.id).first())
+            app.database.drive().saveConnection(other.connection())
+            try { app.drive.enqueueManual(photo.id,other.key);fail("Captured work must never retarget") } catch(_: IOException) { }
+            assertEquals(task.id,app.database.drive().backupsForPhoto(photo.id).single().id)
+            assertFalse(requireNotNull(app.database.drive().source(source.key)).backupEnabled)
+        } finally {
+            androidx.work.WorkManager.getInstance(app).cancelAllWorkByTag("${DriveCoordinator.BACKUP_TAG}:${source.key}").result.get()
+            cleanup();app.database.drive().disconnectSource(source.key);app.database.drive().disconnectSource(other.key);app.database.drive().disconnect()
+        }
+    }
+    @Test fun cameraVideoGetsABoundedPosterAndPlaysItsUriWithoutCopyingTheOriginal()=runBlocking<Unit> {
+        grant()
+        try {
+            val values=ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME,"mpa-camera-video.mp4");put(MediaStore.MediaColumns.MIME_TYPE,"video/mp4")
+                put(MediaStore.MediaColumns.RELATIVE_PATH,"DCIM/Camera");put(MediaStore.MediaColumns.IS_PENDING,1)
+                put(MediaStore.Video.VideoColumns.DATE_TAKEN,13_000_000_001_000L)
+            }
+            val uri=requireNotNull(app.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,values));uris+=uri
+            val bytes=instrumentation.context.assets.open("device-camera.mp4").use { it.readBytes() }
+            requireNotNull(app.contentResolver.openOutputStream(uri)).use { it.write(bytes) }
+            app.contentResolver.update(uri,ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING,0) },null,null)
+            val photo=indexed(uri);val poster=requireNotNull(app.cache.thumbnail(photo))
+            assertTrue(poster.isFile);assertTrue(poster.length()<2*1024*1024)
+            val bounds=android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds=true }
+            android.graphics.BitmapFactory.decodeFile(poster.path,bounds)
+            assertTrue(bounds.outWidth>0 && bounds.outHeight>0);assertTrue(maxOf(bounds.outWidth,bounds.outHeight)<=480)
+            val timeline=ViewModelProvider(compose.activity)[TimelineViewModel::class.java]
+            compose.runOnIdle { timeline.showNewest(TimelineQuery()) }
+            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${photo.id}").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("photo:${photo.id}").performClick()
+            fun player(): android.widget.VideoView? {
+                if(Build.VERSION.SDK_INT<29) return null
+                fun find(view: android.view.View): android.widget.VideoView? {
+                    if(view is android.widget.VideoView) return view
+                    if(view is android.view.ViewGroup) for(index in 0 until view.childCount) find(view.getChildAt(index))?.let { return it }
+                    return null
+                }
+                return android.view.inspector.WindowInspector.getGlobalWindowViews().firstNotNullOfOrNull { find(it) }
+            }
+            compose.waitUntil(20000) { compose.runOnUiThread { player()?.duration?.let { it>0 }==true } }
+            val first=compose.runOnUiThread { requireNotNull(player()).also { it.start() } }
+            compose.waitUntil(5000) { compose.runOnUiThread { first.isPlaying } }
+            compose.activityRule.scenario.recreate()
+            compose.waitUntil(20000) { compose.runOnUiThread { player()?.duration?.let { it>0 }==true } }
+            assertFalse(compose.runOnUiThread { first.isPlaying })
+            compose.onNodeWithTag("viewer-backup").assertExists();screenshot("device-camera-video")
+            assertEquals("",app.database.photos().find(photo.id)?.originalPath)
+            assertEquals("",app.database.photos().find(photo.id)?.sha256)
+            assertArrayEquals(bytes,requireNotNull(app.contentResolver.openInputStream(uri)).use { it.readBytes() })
+            compose.onNodeWithTag("viewer-close").performClick()
+            compose.onNodeWithTag("photo:${photo.id}").assertExists()
+        } finally { cleanup() }
+    }
+    companion object {
+        @org.junit.AfterClass @JvmStatic fun retainReferencesForSeparateRevocationInvocation()=runBlocking<Unit> {
+            val app=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
+            DeviceAccessFixture.prepare(app)
+        }
+    }
+    private fun screenshot(name: String) {
+        val image=requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            val values=ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME,"$name.png");put(MediaStore.MediaColumns.MIME_TYPE,"image/png");put(MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA") }
+            val uri=requireNotNull(app.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values))
+            requireNotNull(app.contentResolver.openOutputStream(uri)).use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) }
+        } finally { image.recycle() }
+    }
+}

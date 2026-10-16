@@ -38,7 +38,7 @@ class ImportedPeopleScaleTest {
                 try { assertEquals(size/100,session.count);assertEquals(page[30].key,session.entry(session.initialPage).key)
                     measurements.put(JSONObject().put("items",size).put("groupsMs",groupsMs).put("firstPageMs",firstMs).put("snapshotMs",snapshotMs).put("pssBeforeKb",before).put("pssAfterKb",Debug.getPss()).put("pageBudget",TimelinePagingSource.CONFIG.maxSize).put("retainedMetadataDocuments",0).put("snapshotItems",session.count))
                 } finally { session.close() }
-                assertEquals(10,db.openHelper.readableDatabase.version)
+                assertEquals(11,db.openHelper.readableDatabase.version)
             } finally { db.close();context.deleteDatabase(name);directory.deleteRecursively() }
         }
         val values=android.content.ContentValues().apply { put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"takeout-people-benchmark.json");put(android.provider.MediaStore.MediaColumns.MIME_TYPE,"application/json");put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA") }
