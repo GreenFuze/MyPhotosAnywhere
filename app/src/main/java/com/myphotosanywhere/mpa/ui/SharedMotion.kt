@@ -29,7 +29,7 @@ internal fun MotionVisibility(visible: Boolean,edge: MotionEdge,modifier: Modifi
 
 /** Only toolbar presentation is swapped. Outgoing actions cannot own input or accessibility focus. */
 @Composable
-internal fun MotionSwap(selected: Boolean,content: @Composable (Boolean)->Unit) {
+internal fun <T> MotionSwap(selected: T,content: @Composable (T)->Unit) {
     AnimatedContent(selected,transitionSpec={
         (fadeIn(tween(160))+slideInVertically(tween(200)) { -it/4 }) togetherWith
             (fadeOut(tween(120))+slideOutVertically(tween(160)) { -it/4 })

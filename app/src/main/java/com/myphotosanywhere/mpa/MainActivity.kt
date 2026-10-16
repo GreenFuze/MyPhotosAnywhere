@@ -215,8 +215,9 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             ?: importedLabel?.name ?: if(filter=="All") "Photos" else filter
         else -> navigation.destination.title
     }
+    val showNavigation=tab in listOf(0,1,2,3,5,6,16)
     var navigationHeight by remember { mutableIntStateOf(0) }
-    val navigationClearance=with(LocalDensity.current) { navigationHeight.toDp() }
+    val navigationClearance=if(showNavigation || selecting) with(LocalDensity.current) { navigationHeight.toDp() } else 0.dp
     val scrollClearance=if(selecting) 0.dp else navigationClearance
     val primaryBrand=navigation.destination==navigation.primary && tab in listOf(0,1)
     val galleryBarState=rememberTopAppBarState()
@@ -255,13 +256,13 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         onStorage={ navigation.open(ShellDestination.STORAGE) },onActivity={ navigation.open(ShellDestination.ACTIVITY) },onImport={ navigation.open(ShellDestination.IMPORTS) },
         onFilters={ showFilters=true },showFilters=tab==0 || tab==5,
         filtersActive=filter!="All" || sourceKey!=null,needsAttention=sync.any { it.error!=null },
-        showTitle=!primaryBrand || filter!="All" || albumId!=null || personId!=null || importedLabel!=null,
+        showTitle=(!primaryBrand || filter!="All" || albumId!=null || personId!=null || importedLabel!=null) && tab !in listOf(10,17),
+        showActions=showNavigation,
         scrollBehavior=if(galleryScrolling) galleryScroll else null)
     } },snackbarHost={ SnackbarHost(snackbar,Modifier.padding(bottom=navigationClearance)) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
         // Browsing scrolls beneath floating navigation. Selection reserves the opaque toolbar viewport.
         Column(Modifier.fillMaxSize().then(if(selecting || tab !in listOf(0,1,5)) Modifier.padding(bottom=navigationClearance) else Modifier)) {
-            if(busy || featureBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
             when(tab) {
                 0 -> {
                     ShellImportActivity(onOpen={ navigation.open(ShellDestination.ACTIVITY) },sync=sync)
@@ -302,8 +303,11 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                 2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; importedPersonKey=null; albumId=null; sourceKey=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto,onImported={ importedPersonKey=it;personId=null;albumId=null;sourceKey=null;filter="All";navigation.open(ShellDestination.PHOTOS) },onSettings={ navigation.open(ShellDestination.RECOGNITION) })
                 3 -> PlacesScreen(photos,settings.onlineMaps,{ features.updateSettings(settings.copy(onlineMaps=it)) },::selectPhoto)
                 16 -> com.myphotosanywhere.mpa.trash.TrashScreen(trash,navigationClearance,onSources={ navigation.open(ShellDestination.STORAGE) })
-                4,7,8,9,10,11,12,13,14,15 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
+                4,7,8,9,10,11,12,13,14,15,17,18 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
             }
+        }
+        MotionVisibility(busy || featureBusy,MotionEdge.TOP,Modifier.align(Alignment.TopCenter)) {
+            LinearProgressIndicator(Modifier.fillMaxWidth().testTag("shell:progress"))
         }
         MotionVisibility(selecting,MotionEdge.BOTTOM,Modifier.align(Alignment.BottomCenter)) {
         SelectionBottomBar(selectionBusy,(if(tab==5) searchApplied.filter else filter)=="Archive",tab==0 && albumId!=null,onAction={ kind ->
@@ -311,7 +315,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             else selection.execute(BulkAction(kind,if(kind==BulkKind.REMOVE_ALBUM) albumId else null))
         },onTrash={ trash.request(selectedTargets) },modifier=Modifier.onSizeChanged { if(selecting) navigationHeight=it.height })
         }
-        MotionVisibility(!selecting,MotionEdge.BOTTOM,Modifier.align(Alignment.BottomCenter)) {
+        MotionVisibility(!selecting && showNavigation,MotionEdge.BOTTOM,Modifier.align(Alignment.BottomCenter)) {
         ShellBottomBar(navigation.activePrimary,onSelect={ destination ->
             if(destination==ShellDestination.SEARCH && navigation.activePrimary!=ShellDestination.SEARCH)
                 searchOrigin=GalleryContext(filter,sourceKey,albumId,personId,importedPersonKey).save()

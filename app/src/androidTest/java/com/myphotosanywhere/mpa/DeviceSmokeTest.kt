@@ -555,6 +555,7 @@ class DeviceSmokeTest {
             app.settings.update(original.copy(overnightIndexing=false))
             compose.onNodeWithTag("shell:storage").performClick()
             compose.onNodeWithTag("management:Settings").performClick()
+            compose.onNodeWithTag("management:Preferences").performClick()
             compose.onNodeWithTag("management:Recognition").performClick()
             compose.onNodeWithTag("index-night-switch").performScrollTo().performClick()
             compose.onNodeWithTag("index-start").performScrollTo().performTextReplacement("22:00")
@@ -564,6 +565,7 @@ class DeviceSmokeTest {
             assertEquals(22*60,app.settings.state.value.nightStart); assertEquals(6*60,app.settings.state.value.nightEnd)
             compose.onNodeWithText("Pause scans").performScrollTo().performClick()
             assertTrue(app.settings.state.value.indexingPaused)
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             compose.onNodeWithTag("management:Backup and metadata").performClick()
             compose.waitUntil(10000) {

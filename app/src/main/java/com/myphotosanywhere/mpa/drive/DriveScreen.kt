@@ -2,11 +2,11 @@ package com.myphotosanywhere.mpa.drive
 
 import android.accounts.AccountManager
 import android.app.Activity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,7 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,7 +45,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.common.AccountPicker
 import com.myphotosanywhere.mpa.data.Photo
-import com.myphotosanywhere.mpa.ui.IconLabelAction
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.semantics.heading
+import com.myphotosanywhere.mpa.management.GroupedMenu
+import com.myphotosanywhere.mpa.management.MenuEntry
+import com.myphotosanywhere.mpa.management.PreferenceCard
+import com.myphotosanywhere.mpa.management.PreferenceToggle
 import com.myphotosanywhere.mpa.R
 import com.myphotosanywhere.mpa.ui.ShellIcon
 import com.myphotosanywhere.mpa.ui.MotionVisibility
@@ -61,6 +66,8 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
     val busy by model.busy.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
     var disconnecting by rememberSaveable { mutableStateOf(false) }
+    var managing by rememberSaveable { mutableStateOf(false) }
+    BackHandler(managing && !disconnecting && browser==null) { managing=false }
     var modeName by rememberSaveable { mutableStateOf(DriveMode.APP_FILES.name) }
     var folderName by rememberSaveable { mutableStateOf("MyPhotosAnywhere") }
     var transferSettings by rememberSaveable { mutableStateOf<String?>(null) }
@@ -85,15 +92,14 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
     }
     val current = active
     val currentBackups = backups.filter { it.bindingKey == current?.binding()?.key }
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("MyPhotosAnywhere",style=MaterialTheme.typography.headlineSmall)
-        Text("Your gallery combines ${sources.size} connected sources. Managing a source does not filter Photos.",style=MaterialTheme.typography.bodySmall)
-        androidx.compose.foundation.layout.FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            IconLabelAction(R.drawable.ic_shell_activity,"Activity",onActivity,Modifier.testTag("management:Activity"))
-            IconLabelAction(R.drawable.ic_shell_add,"Import",onImports,Modifier.testTag("management:Import photos"),description="Import photos")
-            IconLabelAction(R.drawable.ic_action_settings,"Settings",onSettings,Modifier.testTag("management:Settings"))
-        }
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh).verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("MyPhotosAnywhere",style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(vertical=16.dp).semantics { heading() })
+        Text("All connected folders contribute to your photo library.",style=MaterialTheme.typography.bodyLarge)
+        GroupedMenu(listOf(
+            MenuEntry("Activity","Transfers, progress and recovery",R.drawable.ic_shell_activity,"management:Activity",open=onActivity),
+            MenuEntry("Import photos","Google Photos and Takeout",R.drawable.ic_shell_add,"management:Import photos",open=onImports),
+            MenuEntry("Settings","Preferences, storage and privacy",R.drawable.ic_action_settings,"management:Settings",open=onSettings)))
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let {
             Card(Modifier.fillMaxWidth()) {
@@ -107,26 +113,16 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
         if(sources.isNotEmpty()) {
             Text("Connected Drive sources",style=MaterialTheme.typography.titleMedium)
             sources.forEach { source ->
-                Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                            ShellIcon(R.drawable.ic_shell_account)
-                            Column(Modifier.weight(1f)) {
-                                Text(source.folderName,style=MaterialTheme.typography.titleMedium)
-                                Text(source.email,style=MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                        if(source.backupEnabled) Text("Default for new imports and backups",style=MaterialTheme.typography.labelMedium)
-                        else if(sources.size==1) Text("Default for new imports (only connected folder)",style=MaterialTheme.typography.labelMedium)
-                        TextButton(enabled=!busy,onClick={ model.selectSource(source) },modifier=Modifier.heightIn(min=48.dp)) {
-                            ShellIcon(R.drawable.ic_action_settings);Text("Manage source",Modifier.padding(start=8.dp))
-                        }
-                    }
-                }
+                PreferenceCard(source.folderName,source.email+"\n"+when {
+                    source.backupEnabled -> "Default for new imports and backups"
+                    sources.size==1 -> "Default for new imports (only connected folder)"
+                    else -> "Connected Drive folder"
+                },"source:manage:${source.key}") { if(!busy) { model.selectSource(source);managing=true } }
             }
-            Text("People and recognition are shared across every connected source. Transfers keep their own account and folder.",style=MaterialTheme.typography.bodySmall)
-            TextButton(enabled=!busy,onClick=model::addAccount) { Text("Add another Google account") }
+            GroupedMenu(listOf(MenuEntry("Connect another account","Add a Google Drive account or folder",R.drawable.ic_shell_add,"source:add",enabled=!busy) { managing=true;model.addAccount() }))
         }
+        MotionVisibility(managing || sources.isEmpty(),MotionEdge.TOP) {
+        Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
         if (current == null) {
             Text("Connect your Google Drive", style = MaterialTheme.typography.titleMedium)
             DriveMode.entries.forEach { mode ->
@@ -166,10 +162,7 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
                     }
                     MotionVisibility(expanded,MotionEdge.TOP) {
                         Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                            Row(Modifier.fillMaxWidth().heightIn(min=48.dp).toggleable(current.unmeteredOnly,enabled=!busy,role=Role.Switch,onValueChange=model::unmeteredOnly),verticalAlignment=Alignment.CenterVertically) {
-                                Switch(checked=current.unmeteredOnly,enabled=!busy,onCheckedChange=null)
-                                Text("Transfer on unmetered networks only",style=MaterialTheme.typography.bodySmall)
-                            }
+                            PreferenceToggle("Transfer on unmetered networks only","Applies to transfers for this source",current.unmeteredOnly,{ if(!busy) model.unmeteredOnly(it) })
                             Text("${currentBackups.count { it.state == "COMPLETE" }} backed up · ${currentBackups.count { it.state != "COMPLETE" }} pending")
                             if(current.backupEnabled) TextButton(enabled=!busy,onClick=model::retryBackup,modifier=Modifier.heightIn(min=48.dp)) { Text("Retry pending backups") }
                         }
@@ -190,6 +183,8 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
                 }) { Text("Reconnect") }
                 TextButton(enabled = !busy, onClick = { disconnecting=true },modifier=Modifier.testTag("source:remove")) { Text("Remove this source") }
             }
+        }
+        }
         }
         TextButton(onClick={ sourceHelp=!sourceHelp },modifier=Modifier.heightIn(min=48.dp).testTag("source:help")) {
             ShellIcon(R.drawable.ic_action_info);Text(stringResource(R.string.ux_source_help),Modifier.padding(start=8.dp))

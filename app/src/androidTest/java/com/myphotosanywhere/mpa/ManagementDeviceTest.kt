@@ -22,6 +22,7 @@ import com.myphotosanywhere.mpa.drive.*
 import com.myphotosanywhere.mpa.importing.*
 import com.myphotosanywhere.mpa.management.ManagementSettingsMenu
 import com.myphotosanywhere.mpa.people.*
+import androidx.room.withTransaction
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
@@ -37,16 +38,43 @@ class ManagementDeviceTest {
     private fun waitTag(tag: String) { compose.waitUntil(20000) { compose.onAllNodes(if(tag.startsWith("photo:") || tag.startsWith("cloud:")) hasTestTag(tag) and isEnabled() else hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() } }
     @Test fun sourcesSettingsAndFocusedPagesRestoreTheirOriginAcrossRotation() {
         compose.onNodeWithTag("nav:Collections").performClick();compose.onNodeWithTag("shell:storage").performClick()
-        compose.onNodeWithText("MyPhotosAnywhere").assertIsDisplayed();screenshotManagement("management-sources")
+        compose.onNodeWithText("MyPhotosAnywhere").assertIsDisplayed();compose.onNodeWithTag("shell:navigation").assertDoesNotExist();screenshotManagement("management-sources")
         compose.onNodeWithTag("management:Settings").performClick()
         waitTag("management:10");compose.onNodeWithTag("management:Storage and cache").assertIsDisplayed();compose.waitForIdle();screenshotManagement("management-menu");compose.onNodeWithTag("management:Storage and cache").performClick()
         compose.onNodeWithText("Offline storage").assertIsDisplayed();back()
-        compose.onNodeWithTag("management:Recognition").performClick();compose.onNodeWithTag("scan-now").assertIsDisplayed();back()
+        compose.onNodeWithTag("management:Preferences").performClick();compose.onNodeWithTag("management:Recognition").performClick();compose.onNodeWithTag("scan-now").assertIsDisplayed();back();back()
         compose.onNodeWithTag("management:Backup and metadata").performClick();compose.onNodeWithText("Portable annotations").assertIsDisplayed();back()
         compose.onNodeWithTag("management:Privacy and permissions").performClick();compose.onNodeWithText("Allow online maps").assertIsDisplayed();back()
         compose.onNodeWithTag("management:About MPA").performClick();compose.onNodeWithText("MPA 0.5.30 (41)",substring=true).assertExists()
         compose.activityRule.scenario.recreate();compose.onNodeWithText("MPA 0.5.30 (41)",substring=true).assertExists();back();back();back()
         compose.onNodeWithTag("nav:Collections").assertIsSelected()
+    }
+    @Test fun photoViewPreferencesRestoreTheGalleryIdentityWithoutChangingSourcesOrRecognition()=runBlocking<Unit> {
+        val originalLayout=app.galleryPresentation.layout.value;val originalDensity=app.galleryPresentation.density.value
+        val options=app.settings.state.value;val sources=app.database.drive().sources()
+        val prefix="menu-anchor-"+java.util.UUID.randomUUID();val ids=(0 until 90).map { "$prefix-$it" }
+        val file=File.createTempFile("menu-anchor-",".png",app.cacheDir);val image=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
+        try { image.eraseColor(Color.GREEN);file.outputStream().use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) } } finally { image.recycle() }
+        val hash=DriveBackupWorker.digest(file,"SHA-256");val time=java.time.Instant.parse("2201-01-01T00:00:00Z").toEpochMilli()
+        try {
+            app.galleryPresentation.updateLayout(com.myphotosanywhere.mpa.timeline.GalleryLayout.SQUARE)
+            app.galleryPresentation.update(com.myphotosanywhere.mpa.timeline.GridDensity.DEFAULT)
+            app.database.withTransaction { ids.forEachIndexed { i,id -> app.database.photos().insert(Photo(id,"$id.png",file.path,file.path,"image/png",file.length(),time-i,hash)) } }
+            waitTag("photo:${ids.first()}");compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:${ids[35]}"));waitTag("photo:${ids[35]}")
+            compose.onNodeWithTag("shell:storage").performClick();compose.onNodeWithTag("management:Settings").performClick()
+            compose.onNodeWithTag("management:Preferences").performClick();compose.onNodeWithTag("management:Photos view").performClick()
+            compose.onNodeWithTag("preference:layout:SQUARE").assertIsSelected();compose.onNodeWithTag("shell:navigation").assertDoesNotExist()
+            screenshotManagement("menu-photo-view");compose.onNodeWithTag("preference:layout:ROWS").performClick()
+            compose.waitUntil(10000) { app.galleryPresentation.layout.value==com.myphotosanywhere.mpa.timeline.GalleryLayout.ROWS }
+            compose.activityRule.scenario.recreate();compose.onNodeWithTag("preference:layout:ROWS").assertIsSelected()
+            repeat(4) { back();compose.waitForIdle() };waitTag("photo:${ids[35]}");compose.onNodeWithTag("photo:${ids[35]}").assertIsDisplayed()
+            screenshotManagement("menu-gallery-return");assertEquals(options,app.settings.state.value);assertEquals(sources,app.database.drive().sources())
+            assertEquals(hash,DriveBackupWorker.digest(file,"SHA-256"))
+            ids.forEach { assertEquals(hash,app.database.photos().find(it)?.sha256) }
+        } finally {
+            app.database.withTransaction { ids.forEach { app.database.openHelper.writableDatabase.execSQL("DELETE FROM photos WHERE id=?",arrayOf(it)) } }
+            file.delete();app.galleryPresentation.updateLayout(originalLayout);app.galleryPresentation.update(originalDensity)
+        }
     }
     @Test fun activityDetailsDoNotMutateCapturedJobsOrChangeNewImportDestination() {
         val source=DriveSource("management-destination","management-account","management@test","APP_FILES","management-folder","Management fixture",backupEnabled=true)
@@ -68,7 +96,7 @@ class ManagementDeviceTest {
         val source=DriveSource("management-disconnect","management-disconnect","disconnect@test","APP_FILES","disconnect-folder","Disconnect fixture")
         try {
             runBlocking { app.database.drive().saveSource(source);app.database.drive().saveConnection(source.connection()) }
-            compose.onNodeWithTag("shell:storage").performClick();compose.waitUntil(20000) { compose.onAllNodes(hasTestTag("source:remove") and isEnabled()).fetchSemanticsNodes().size==1 };compose.onNodeWithTag("source:remove").performScrollTo().assertTextEquals("Remove this source").assertIsEnabled().performClick()
+            compose.onNodeWithTag("shell:storage").performClick();waitTag("source:manage:${source.key}");compose.onNodeWithTag("source:manage:${source.key}").performScrollTo().performClick();compose.waitUntil(20000) { compose.onAllNodes(hasTestTag("source:remove") and isEnabled()).fetchSemanticsNodes().size==1 };compose.onNodeWithTag("source:remove").performScrollTo().assertTextEquals("Remove this source").assertIsEnabled().performClick()
             compose.onNodeWithText("Disconnect source").assertIsDisplayed();compose.onNodeWithText("Drive originals are not deleted.",substring=true).assertExists()
             compose.onNodeWithText("Keep source").performClick();runBlocking { assertEquals(source,app.database.drive().source(source.key)) }
         } finally { runBlocking { app.database.drive().disconnectSource(source.key);app.database.drive().disconnect() } }
@@ -145,8 +173,7 @@ class ManagementChromeDeviceTest {
                 }
             }
         }
-        for(group in listOf("Library","Backup and privacy","Application")) compose.onNodeWithText(group).assertExists()
-        for(title in listOf("Storage and cache","Recognition","Backup and metadata","Privacy and permissions","About MPA")) {
+        for(title in listOf("Preferences","Backup and metadata","Storage and cache","Privacy and permissions","About MPA")) {
             val node=compose.onNodeWithTag("management:$title").performScrollTo().assertIsDisplayed();val bounds=node.fetchSemanticsNode().boundsInRoot
             assertTrue(bounds.width>=48*pixels-1);assertTrue(bounds.height>=48*pixels-1);node.performClick();assertEquals(title,opened)
         }
