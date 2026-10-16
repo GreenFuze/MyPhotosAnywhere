@@ -86,7 +86,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         model.paging.map { data -> data.map { TimelineRow(it.entry,it.generation,it.query,it.aspect,it.contentEpoch) } }
     }
     val rows=rowsFlow.collectAsLazyPagingItems()
-    val rawRetained=rows.itemSnapshotList.items
+    val rawRetained=rows.itemSnapshotList.items.filter { it.query==query }
     val restoration by model.restoration.collectAsStateWithLifecycle()
     val refreshedGeneration by model.refreshedGeneration.collectAsStateWithLifecycle()
     val viewer by model.viewer.collectAsStateWithLifecycle()
@@ -121,7 +121,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
         lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
         restoring=true
         val anchor=model.anchor(query)
-        if(anchor!=null) {
+        run {
             val placement=object: TimelinePlacement {
                 private var requestedIndex=0
                 override suspend fun place(index: Int,offset: Int) {
@@ -162,20 +162,22 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             }
             val snapshots=snapshotFlow { Triple(rows.itemSnapshotList.items,rows.loadState.refresh,refreshedGeneration) }
                 .filter { (items,load,generation) ->
-                    load is LoadState.NotLoading && ((items.isEmpty() && generation==restoration) || items.any { it.generation==restoration }) || load is LoadState.Error
-                }.map { (items,_,_) -> items.filterNot { continuity.arrivals.hidden(it.entry.key) }.map { it.entry.key } }
-            val restored=TimelineAnchorRestorer(placement).restore(anchor,snapshots)
-            if(!restored) {
+                    load is LoadState.NotLoading && ((items.isEmpty() && generation==restoration) || items.any { it.generation==restoration && it.query==query }) || load is LoadState.Error
+                }.map { (items,_,_) -> items.filter { it.query==query && it.generation==restoration && !continuity.arrivals.hidden(it.entry.key) }.map { it.entry.key } }
+            // An explicit newest jump must wait for its own replacement page. Otherwise
+            // LazyGrid preserves the old visible key when the new provider arrives later.
+            val target=anchor ?: snapshots.first().firstOrNull()?.let { TimelineAnchor(TimelineCursor(null,it),0) }
+            val restored=target?.let { TimelineAnchorRestorer(placement).restore(it,snapshots) } ?: true
+            if(!restored && target!=null) {
                 // A real removal restores the nearest remaining identity, never a mutable old index.
-                val candidates=rows.itemSnapshotList.items.filterNot { continuity.arrivals.hidden(it.entry.key) }.mapIndexedNotNull { position,row ->
+                val candidates=rows.itemSnapshotList.items.filter { it.query==query && !continuity.arrivals.hidden(it.entry.key) }.mapIndexedNotNull { position,row ->
                     row.takeIf { it.generation==restoration }?.let { position to it.entry }
                 }
-                val nearest=candidates.firstOrNull { (_,entry) -> TimelineOrder.compare(entry.cursor,anchor.cursor)>=0 }
+                val nearest=candidates.firstOrNull { (_,entry) -> TimelineOrder.compare(entry.cursor,target.cursor)>=0 }
                     ?: candidates.lastOrNull()
-                if(nearest!=null) tiles.requestScrollToItem(nearest.first,anchor.offset)
+                if(nearest!=null) tiles.requestScrollToItem(nearest.first,target.offset)
             }
         }
-        if(anchor==null) tiles.requestScrollToItem(0)
         model.restored(restoration)
         restoring=false
         }
