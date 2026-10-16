@@ -43,5 +43,35 @@ class XmpCodecTest {
         val original=catalog().let { it.copy(assets=it.assets.map { a -> a.copy(instructions=recipe,recipe=recipe) }) }
         assertEquals(original,XmpCodec.decode(XmpCodec.encode(original)))
     }
+    @Test fun photoLevelNamesRenamesExclusionsAndIgnoredAliasesRoundTripWithoutFaceGeometry() {
+        val label=com.myphotosanywhere.mpa.people.ImportedPersonLabel("Sam","original-source")
+        val ignored=com.myphotosanywhere.mpa.people.ImportedPersonLabel("Removed","original-source")
+        val original=catalog().let { c -> c.copy(assets=c.assets.map { it.copy(faces=emptyList(),
+            photoPeople=PortablePhotoPeople("original-source",listOf(PortableMembership(label.key,"person",true)))) },
+            people=listOf(PortablePerson("person","Samuel")),aliases=listOf(
+                PortableAlias(label.key,label.name,label.binding,"person",false),
+                PortableAlias(ignored.key,ignored.name,ignored.binding,null,true))) }
+        assertEquals(original,XmpCodec.decode(XmpCodec.encode(original)))
+        assertTrue(XmpCodec.decode(XmpCodec.encode(original)).assets.single().faces.isEmpty())
+    }
+    @Test fun legacyCatalogDoesNotInventPhotoMembershipsOrAliases() {
+        val restored=XmpCodec.decode(XmpCodec.encode(catalog()))
+        assertNull(restored.assets.single().photoPeople);assertTrue(restored.aliases.isEmpty())
+    }
+    @Test fun aliasIdentityCollisionsDanglingDestinationsAndIgnoredMembersAreRejected() {
+        val label=com.myphotosanywhere.mpa.people.ImportedPersonLabel("Sam",null)
+        val valid=PortableAlias(label.key,label.name,null,"person",false)
+        assertThrows(IllegalArgumentException::class.java) { XmpCodec.encode(catalog().copy(aliases=listOf(valid,valid))) }
+        assertThrows(IllegalArgumentException::class.java) { XmpCodec.encode(catalog().copy(aliases=listOf(valid.copy(name="Another")))) }
+        assertThrows(IllegalArgumentException::class.java) { XmpCodec.encode(catalog().copy(aliases=listOf(valid.copy(personId="missing")))) }
+        val c=catalog().let { it.copy(assets=it.assets.map { a -> a.copy(photoPeople=PortablePhotoPeople(null,listOf(PortableMembership(label.key,"person",false)))) },
+            aliases=listOf(valid.copy(personId=null,ignored=true))) }
+        assertThrows(IllegalArgumentException::class.java) { XmpCodec.encode(c) }
+    }
+    @Test fun exportedNamesSupportTakeoutMaximumWithoutRelaxingDocumentBudget() {
+        val c=catalog().copy(people=listOf(PortablePerson("person","א".repeat(200))))
+        assertEquals(c,XmpCodec.decode(XmpCodec.encode(c)))
+        assertThrows(IllegalArgumentException::class.java) { XmpCodec.encode(c.copy(people=listOf(PortablePerson("person","a".repeat(201))))) }
+    }
 
 }

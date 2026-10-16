@@ -56,7 +56,7 @@ internal fun TrashScreen(model: TrashViewModel,bottomClearance: Dp,onSources: ()
                     Box(Modifier.fillMaxWidth().aspectRatio(1f).combinedClickable(
                         onClick={ if(selected.isEmpty()) preview=row else model.toggle(row) },
                         onLongClick={ model.beginSelection(row) }).testTag("trash:item:${row.key}").semantics { contentDescription="${row.name}, ${if(row.desired!=null) "waiting for Drive" else if(row.confirmed) "in Drive Trash" else "needs attention"}";this.selected=checked }) {
-                        AsyncImage(coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current).data(File(row.thumbnailPath)).size(480).build(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+                        AsyncImage(coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current).data(com.myphotosanywhere.mpa.library.previewSource(row.thumbnailPath)).size(480).build(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
                         if(checked) com.myphotosanywhere.mpa.selection.SelectionMark(true)
                     }
                     if(row.desired!=null) Text(if(row.error!=null) "Waiting to retry" else if(row.desired) "Trash pending" else "Restore pending",style=MaterialTheme.typography.labelSmall)
@@ -68,7 +68,7 @@ internal fun TrashScreen(model: TrashViewModel,bottomClearance: Dp,onSources: ()
     preview?.let { row -> ModalBottomSheet(onDismissRequest={ preview=null }) {
         Column(Modifier.fillMaxWidth().heightIn(max=with(androidx.compose.ui.platform.LocalDensity.current) { androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp()*.75f }).verticalScroll(rememberScrollState()).padding(20.dp).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Text(row.name,style=MaterialTheme.typography.titleLarge)
-            if(row.thumbnailPath.isNotBlank()) AsyncImage(coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current).data(File(row.thumbnailPath)).size(640).build(),
+            if(row.thumbnailPath.isNotBlank()) AsyncImage(coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current).data(com.myphotosanywhere.mpa.library.previewSource(row.thumbnailPath)).size(640).build(),
                 "Cached preview of ${row.name}",Modifier.fillMaxWidth().height(220.dp),contentScale=ContentScale.Fit)
             else Text("Preview unavailable. The Drive file identity is retained.")
             Text(sources.find { it.key==row.bindingKey }?.let { "Source: ${it.email} · ${it.folderName}" }

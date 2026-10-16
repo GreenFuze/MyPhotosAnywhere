@@ -34,7 +34,7 @@ internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,
     MotionSwap(destination) { target ->
     holder.SaveableStateProvider(target.id) {
         if(target==ShellDestination.STORAGE) DriveStorageScreen(photos,{ onOpen(ShellDestination.ACTIVITY) },{ onOpen(ShellDestination.IMPORTS) },{ onOpen(ShellDestination.SETTINGS) })
-        else Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh).verticalScroll(rememberScrollState()).padding(20.dp).testTag("management:${target.id}").semantics { paneTitle=target.title },verticalArrangement=Arrangement.spacedBy(14.dp)) {
+        else Column(Modifier.fillMaxSize().background(if(target in listOf(ShellDestination.SETTINGS,ShellDestination.PREFERENCES)) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(20.dp).testTag("management:${target.id}").semantics { paneTitle=target.title },verticalArrangement=Arrangement.spacedBy(14.dp)) {
             if(target in listOf(ShellDestination.SETTINGS,ShellDestination.PREFERENCES))
                 Text(target.title,style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(vertical=16.dp).semantics { heading() })
             when(target) {
@@ -59,7 +59,7 @@ internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,
                 ShellDestination.CACHE -> StorageControls(photos,features)
                 ShellDestination.RECOGNITION -> {
                     val settings by features.settings.collectAsStateWithLifecycle()
-                    Text("Recognition is optional and runs on this phone. Enabling it may download connected originals. Imported Takeout names remain photo labels; they are not assigned to faces automatically.")
+                    Text("People names are shared across your library. Face recognition is optional and runs on this phone. Possible matches need your review. Scanning connected originals follows your download preferences.")
                     PreferenceToggle(stringResource(R.string.menu_group_faces),stringResource(R.string.menu_group_faces_summary),settings.faceIndexing,
                         { features.updateSettings(settings.copy(faceIndexing=it)) },Modifier.testTag("preference:face-indexing"))
                     PreferenceToggle(stringResource(R.string.menu_object_labels),stringResource(R.string.menu_object_labels_summary),settings.objectIndexing,

@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -92,6 +93,11 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
     }
     val current = active
     val currentBackups = backups.filter { it.bindingKey == current?.binding()?.key }
+    val problemIds=currentBackups.filter { it.errorMessage!=null }.take(5).map { it.photoId }
+    val problemNames by produceState(emptyMap<String,String>(),problemIds) {
+        try { value=model.photoNames(problemIds) }
+        catch(error: android.database.sqlite.SQLiteException) { model.report(error.message ?: "Cannot read backup filenames. Transfer errors remain available.") }
+    }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh).verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("MyPhotosAnywhere",style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(vertical=16.dp).semantics { heading() })
@@ -100,6 +106,7 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
             MenuEntry("Activity","Transfers, progress and recovery",R.drawable.ic_shell_activity,"management:Activity",open=onActivity),
             MenuEntry("Import photos","Google Photos and Takeout",R.drawable.ic_shell_add,"management:Import photos",open=onImports),
             MenuEntry("Settings","Preferences, storage and privacy",R.drawable.ic_action_settings,"management:Settings",open=onSettings)))
+        com.myphotosanywhere.mpa.device.DevicePhotoAccessMenu()
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let {
             Card(Modifier.fillMaxWidth()) {
@@ -171,7 +178,7 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
             }
             val problems = currentBackups.filter { it.errorMessage != null }.take(5)
             problems.forEach { backup ->
-                Text("${photos.find { it.id == backup.photoId }?.displayName ?: "Photo"}: ${backup.errorMessage}",
+                Text("${problemNames[backup.photoId] ?: "Photo"}: ${backup.errorMessage}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

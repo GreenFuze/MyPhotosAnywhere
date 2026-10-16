@@ -43,22 +43,28 @@ internal class OriginalImageBudget(heapBytes: Long=Runtime.getRuntime().maxMemor
 
 /** Decode visible regions from original bytes, avoiding a full 50/200 MP bitmap in memory. */
 @Suppress("DEPRECATION")
-internal class OriginalImageSource(file: File): OriginalImageReader {
-    private val path=file.absolutePath
-    private val bounds=BitmapFactory.Options().apply { inJustDecodeBounds=true; BitmapFactory.decodeFile(path,this) }
-    override val width=bounds.outWidth
-    override val height=bounds.outHeight
-    override val orientation=runCatching { ExifInterface(path).getAttributeInt(ExifInterface.TAG_ORIENTATION,1) }.getOrDefault(1)
-    private val decoder=runCatching { BitmapRegionDecoder.newInstance(path,false) }.getOrNull()
+internal class OriginalImageSource(private val input: java.io.FileInputStream): OriginalImageReader {
+    constructor(file: File): this(file.inputStream())
+    private class Header(val width: Int,val height: Int,val orientation: Int,val decoder: BitmapRegionDecoder?)
+    private val header=try {
+        val bounds=BitmapFactory.Options().apply { inJustDecodeBounds=true; BitmapFactory.decodeFileDescriptor(input.fd,null,this) }
+        if(bounds.outWidth<=0 || bounds.outHeight<=0) throw java.io.IOException("This image format cannot be displayed on this phone.")
+        val orientation=try { ExifInterface(input.fd).getAttributeInt(ExifInterface.TAG_ORIENTATION,1) } catch(_: java.io.IOException) { 1 }
+        val decoder=try { BitmapRegionDecoder.newInstance(input.fd,false) } catch(_: java.io.IOException) { null }
+        Header(bounds.outWidth,bounds.outHeight,orientation,decoder)
+    } catch(failure: Throwable) { input.close();throw failure }
+    override val width=header.width
+    override val height=header.height
+    override val orientation=header.orientation
+    private val decoder=header.decoder
     override val supportsRegions get()=decoder!=null
-    init { require(width>0 && height>0) { "This image format cannot be displayed on this phone." } }
     override fun preview(): Bitmap {
         val sample=OriginalImageBudget().previewSample(width,height)
-        return requireNotNull(BitmapFactory.decodeFile(path,BitmapFactory.Options().apply { inSampleSize=sample; inPreferredConfig=Bitmap.Config.ARGB_8888 }))
+        return BitmapFactory.decodeFileDescriptor(input.fd,null,BitmapFactory.Options().apply { inSampleSize=sample; inPreferredConfig=Bitmap.Config.ARGB_8888 }) ?: throw java.io.IOException("This image could not be decoded.")
     }
     override fun region(rect: Rect,sample: Int): Bitmap? = decoder?.decodeRegion(rect,
         BitmapFactory.Options().apply { inSampleSize=sample; inPreferredConfig=Bitmap.Config.ARGB_8888 })
-    override fun close() { decoder?.recycle() }
+    override fun close() { try { decoder?.recycle() } finally { input.close() } }
 }
 
 internal object OriginalImageGeometry {
@@ -115,13 +121,14 @@ internal class OriginalPhotoView private constructor(context: Context,attrs: and
     private var tilesEnabled=true
     private var zoom=1f; private var offsetX=0f; private var offsetY=0f
     var onQuality: (String)->Unit = {}
-    fun load(file: File) {
+    fun load(file: File)=loadReader { openSource(file) }
+    internal fun loadReader(factory: ()->OriginalImageReader) {
         if(started) return; started=true
         worker.execute {
             var opened: OriginalImageReader?=null
             try {
                 if(closed) return@execute
-                opened=openSource(file);ownedSource=opened
+                opened=factory();ownedSource=opened
                 val image=opened.preview();val ready=opened
                 post {
                     if(closed) { image.recycle(); return@post }

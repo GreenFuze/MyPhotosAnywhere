@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.timeline
 
+import androidx.core.net.toUri
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -348,11 +349,14 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
     }
     val upgraded=upgradeArtifact?.takeIf { it.revision==revision }?.file
     val preferred=upgraded?.takeUnless { it.path==rejectedVariant }
-    val preview=preferred ?: thumbnail ?: entry.thumbnailPath.takeIf { it.isNotBlank() }?.let(::File)
+    val preview=preferred ?: thumbnail ?: entry.thumbnailPath.takeIf { it.isNotBlank() }?.let { if(it.startsWith("content://")) it.toUri() else File(it) }
     // A missing indexed file may fail before regeneration finishes at the same path.
     // Readiness changes once when verified preview work finishes, so Coil retries that
     // file without a progress-tick loop. Byte/source revision also invalidates old pixels.
     val previewState=when { preferred!=null -> "variant";thumbnail!=null -> "resolved";else -> "indexed" }
+    val inDrive by produceState(entry.photoId==null && entry.cloudKey!=null,entry.key) {
+        entry.photoId?.let { id -> features.app.database.presence().inDrive(id).collect { value=it } }
+    }
     val target=SelectionTarget.from(entry)
     val chosen=selection.any { it.matches(target) }
     val selecting=selection.isNotEmpty()
@@ -366,7 +370,7 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
             contentDescription="${if(entry.mimeType.startsWith("video/")) "Video" else "Photo"}, $date, ${entry.name}"
         }) {
         AsyncImage(coil.request.ImageRequest.Builder(context).data(preview)
-            .memoryCacheKey("$revision:$previewState:${preview?.path}:$widthBucket:$heightBucket")
+            .memoryCacheKey("$revision:$previewState:${preview}:$widthBucket:$heightBucket")
             .crossfade(if(android.animation.ValueAnimator.areAnimatorsEnabled()) 160 else 0).build(),null,
             modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop,
             onSuccess={ problem=null },
@@ -375,6 +379,9 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
         problem?.let { message -> Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
             com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_shell_warning,message)
         } }
+        if(inDrive) Box(Modifier.align(Alignment.BottomStart).padding(4.dp).testTag("drive-presence:${entry.key}")) {
+            com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_status_in_drive,"In Google Drive")
+        }
         if(entry.mimeType.startsWith("video/")) Box(Modifier.align(Alignment.BottomEnd).padding(4.dp)) {
             com.myphotosanywhere.mpa.ui.ShellIcon(com.myphotosanywhere.mpa.R.drawable.ic_shell_video,"Video")
         }

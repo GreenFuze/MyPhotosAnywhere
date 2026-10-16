@@ -16,6 +16,50 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[28],application=Application::class)
 class MetadataPersistenceTest {
+    @Test fun photoOnlyPeopleRecoveryPreservesCorrectionsAndTriggersPersistentOutbox()=runBlocking {
+        val context=RuntimeEnvironment.getApplication()
+        val db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).addCallback(METADATA_CALLBACK).build()
+        try {
+            val source=DriveSource.from(DriveConnection(accountId="a",email="a@test",mode="APP_FILES",folderId="folder",folderName="A"))
+            db.drive().saveSource(source)
+            val codec=com.myphotosanywhere.mpa.importing.TakeoutCodec()
+            val raw="""{"title":"photo.jpg","photoTakenTime":{"timestamp":"1"},"people":[{"name":"Sam"}],"privateUnknown":{"keep":true}}"""
+            val original=codec.apply(Photo("photo","photo.jpg","/original","/thumb","image/jpeg",10,1,"a".repeat(64),sourceBindingKey=source.key),codec.parse(raw))
+            db.photos().insert(original)
+            db.cloud().savePhoto(CloudPhoto("${source.key}:remote",source.key,"remote","folder","photo.jpg","image/jpeg",10,"md5","1",null,null,null,null,photoId=original.id))
+            val index=com.myphotosanywhere.mpa.people.CanonicalPeopleIndex(db)
+            index.index(original.id)
+            val alias=requireNotNull(db.personLabels().alias(com.myphotosanywhere.mpa.people.ImportedPersonLabel("Sam",source.key).key))
+            val person=requireNotNull(alias.personId)
+            val generation=requireNotNull(db.metadata().state(source.key)).generation
+            db.personLabels().exclude(original.id,person)
+            assertTrue(requireNotNull(db.metadata().state(source.key)).generation>generation)
+            db.library().savePerson(Person(person,"Samuel"))
+            val repository=MetadataRepository(context,db)
+            val backedUp=XmpCodec.decode(XmpCodec.encode(repository.snapshot(source)))
+            assertEquals("Samuel",backedUp.people.single().name);assertTrue(backedUp.assets.single().faces.isEmpty())
+            assertTrue(requireNotNull(backedUp.assets.single().photoPeople).members.single().excluded)
+            db.library().savePerson(Person(person,"Wrong"));db.personLabels().clearPhoto(original.id)
+            repository.applyCatalog(source,backedUp,1)
+            index.index(original.id)
+            assertEquals("Samuel",db.personLabels().person(person)?.name)
+            assertTrue(db.personLabels().members(original.id).single().excluded)
+            assertEquals(original.importedMetadata,db.photos().find(original.id)?.importedMetadata)
+            assertEquals(original.sha256,db.photos().find(original.id)?.sha256)
+            assertEquals(original.originalPath,db.photos().find(original.id)?.originalPath)
+            val merged=backedUp.copy(people=listOf(PortablePerson("survivor","Shared name")),
+                aliases=backedUp.aliases.map { it.copy(personId="survivor") },
+                assets=backedUp.assets.map { asset -> asset.copy(photoPeople=asset.photoPeople?.let { names ->
+                    names.copy(members=names.members.map { it.copy(personId="survivor") })
+                }) })
+            repository.applyCatalog(source,XmpCodec.decode(XmpCodec.encode(merged)),1)
+            index.index(original.id)
+            assertNull(db.personLabels().person(person));assertEquals(listOf(Person("survivor","Shared name")),db.library().allPeople())
+            assertEquals("survivor",db.personLabels().members(original.id).single().personId)
+            assertTrue(db.personLabels().members(original.id).single().excluded)
+            assertEquals(original.importedMetadata,db.photos().find(original.id)?.importedMetadata)
+        } finally { db.close() }
+    }
     @Test fun editsDuringAnUploadRemainInThePersistentOutbox() = runBlocking {
         val db=Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(),PhotoDatabase::class.java).build()
         try {

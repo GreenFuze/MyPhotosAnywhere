@@ -41,6 +41,7 @@ internal fun SelectionBottomBar(busy: Boolean,archived: Boolean,inAlbum: Boolean
         FlowRow(Modifier.padding(horizontal=8.dp,vertical=4.dp).navigationBarsPadding(),horizontalArrangement=Arrangement.SpaceEvenly) {
             listOf(
                 Triple(BulkKind.SHARE,"Share",R.drawable.ic_action_share),
+                Triple(BulkKind.BACKUP,"Back up",R.drawable.ic_action_backup),
                 Triple(BulkKind.ALBUM,"Album",R.drawable.ic_shell_collections),
                 Triple(BulkKind.FAVORITE,"Favorite",R.drawable.ic_shell_favorite),
                 if(archived) Triple(BulkKind.RESTORE,"Restore",R.drawable.ic_action_restore) else Triple(BulkKind.ARCHIVE,"Archive",R.drawable.ic_shell_archive),
@@ -75,7 +76,7 @@ internal fun SelectionDialogs(model: SelectionViewModel,albums: List<Album>,show
         confirmButton={ TextButton(onClick=model::cancel,modifier=Modifier.heightIn(min=48.dp)) { Text("Cancel operation") } })
     if(result!=null && !busy) AlertDialog(onDismissRequest=model::dismissResult,title={ Text(if(result.cancelled) "Operation cancelled" else "Selection result") },
         text={ LazyColumn(Modifier.heightIn(max=360.dp).testTag("selection:result")) {
-            item { Text("${result.completed} ${if(result.queued) "kept offline or queued for download" else "completed"}. ${result.failures.size} not completed. Originals are preserved.") }
+            item { Text("${result.completed} ${if(result.backedUp) "already in Drive or queued for backup" else if(result.queued) "kept offline or queued for download" else "completed"}. ${result.failures.size} not completed. Originals are preserved.") }
             items(result.failures,key={ it.target.key }) { failure -> Column(Modifier.padding(top=12.dp)) {
                 Text(failure.target.name,style=MaterialTheme.typography.titleSmall);Text(failure.reason)
             } }

@@ -12,10 +12,10 @@ internal class ThumbnailGeometry(private val capacity: Int=600,private val read:
     init { require(capacity in 300..1200) }
     private val shapes=LinkedHashMap<String,Float>(capacity,0.75f,true)
     val retainedCount get()=synchronized(shapes) { shapes.size }
-    suspend fun aspect(key: String,thumbnailPath: String): Float=withContext(Dispatchers.IO) {
+    suspend fun aspect(key: String,thumbnailPath: String,known: Float?=null): Float=withContext(Dispatchers.IO) {
         synchronized(shapes) { shapes[key] }?.let { return@withContext it }
         currentCoroutineContext().ensureActive()
-        val ratio=read(thumbnailPath)
+        val ratio=known ?: read(thumbnailPath)
         check(ratio.isFinite() && ratio>0) { "Invalid thumbnail geometry" }
         currentCoroutineContext().ensureActive()
         synchronized(shapes) {

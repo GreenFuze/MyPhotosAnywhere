@@ -46,6 +46,8 @@ Backfill existing retained labels in bounded resumable batches; preserve all exi
 
 New/imported/device photos update the shared label membership index and, when face-indexing consent is enabled, enter existing local detection/matching. Match against the same canonical identities regardless of how they were named. Imported names without face coordinates/embeddings are photo-level hints, not proven biometric templates: present candidate confirmation where association is uncertain; confirmed faces then supply matching data for subsequent photos. Do not enable recognition or download all Drive originals merely because imported names exist.
 
+Portable annotations must retain canonical renames, merges and photo-level memberships even when Takeout supplied no face coordinates. Extend the existing XMP namespace with optional, backward-readable membership/alias elements; preserve raw Takeout JSON, existing faces and the 2 MiB safety limit. Recovery previews expose conflicts and apply accepted changes atomically; legacy catalogs without the extension remain valid. Include round-trip, unknown-namespace, limits and restore tests.
+
 Acceptance: historical imported labels and named people share navigation/counts/actions; rename/merge persists across restart and new imports. Person queries include label memberships and confirmed faces exactly once, with source/archive/tombstone rules preserved. Duplicate names, multiple faces, zero embeddings, contradictory corrections and disabled recognition remain honest. Tests assert migration/backfill idempotence, aliases, safe merge, suggestions, unassign/corrections, metadata hashes and 10k/100k bounded indexing/query behavior.
 
 ## Integrated delivery gate

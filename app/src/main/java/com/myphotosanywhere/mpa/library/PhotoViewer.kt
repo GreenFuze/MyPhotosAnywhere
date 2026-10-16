@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.library
 
+import androidx.core.net.toUri
 import android.widget.VideoView
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -31,6 +32,7 @@ import java.io.File
 
 private sealed interface ViewerOriginal {
     data object Loading: ViewerOriginal
+    data class Device(val record: com.myphotosanywhere.mpa.data.DeviceMediaRecord): ViewerOriginal
     data class Ready(val read: MediaCache.OriginalRead): ViewerOriginal
     data class Unavailable(val message: String): ViewerOriginal
 }
@@ -39,7 +41,7 @@ private sealed interface ViewerOriginal {
 fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesModel,onClose: ()->Unit,
     onCurrent: (String)->Unit,onEdit: (String)->Unit,onDetails: (String)->Unit,obscured: Boolean=false,onTrash: ((Photo)->Unit)?=null) {
     // Keep paging stable while an import inserts newer photos into the gallery.
-    val available=remember(selectedId) { photos.filter { it.originalPath.isNotBlank() && File(it.originalPath).isFile }.sortedByDescending { it.capturedAt ?: it.importedAt } }
+    val available=remember(selectedId) { photos.filter { it.originalPath.isNotBlank() && File(it.originalPath).isFile || it.id.startsWith("device-") }.sortedByDescending { it.capturedAt ?: it.importedAt } }
     if(available.isEmpty()) { LaunchedEffect(Unit) { onClose() }; return }
     val pager=rememberPagerState(initialPage=available.indexOfFirst { it.id==selectedId }.coerceAtLeast(0),pageCount={ available.size })
     val current=available.getOrNull(pager.currentPage) ?: available.first()
@@ -70,18 +72,26 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
 @Composable
 internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active: Boolean,preview: File?=null,interactive: Boolean=true,onDetails: (()->Unit)?=null,onToggleControls: (()->Unit)?=null,captionInset: Dp=0.dp,onZoomChanged: ((Boolean)->Unit)?=null) {
     Box(Modifier.fillMaxSize()) {
-        if(preview!=null) coil.compose.AsyncImage(preview,"Preview",Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
-    val original by produceState<ViewerOriginal>(ViewerOriginal.Loading,photo.id,photo.originalPath,photo.cachedVersion) {
+        if(preview!=null || photo.thumbnailPath.startsWith("content://")) coil.compose.AsyncImage(preview ?: photo.thumbnailPath.toUri(),"Preview",Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
+    val referenceState by produceState<Pair<Boolean,com.myphotosanywhere.mpa.data.DeviceMediaRecord?>>(false to null,photo.id) {
+        model.app.deviceMedia.observe(photo.id).collect { value=true to it }
+    }
+    val reference=referenceState.second
+    val original by produceState<ViewerOriginal>(ViewerOriginal.Loading,photo.id,photo.originalPath,photo.cachedVersion,referenceState.first,reference?.available,reference?.revision) {
         var read: MediaCache.OriginalRead?=null
         try {
             read=model.app.cache.openOriginal(photo.id)
-            value=read?.let { ViewerOriginal.Ready(it) } ?: ViewerOriginal.Unavailable(
-                "This downloaded original is no longer on this phone. Close and download it again.")
+            val deviceOriginal=if(read==null) reference?.takeIf { model.app.deviceMedia.readable(photo.id) } else null
+            value=read?.let { ViewerOriginal.Ready(it) } ?: deviceOriginal?.let { ViewerOriginal.Device(it) } ?: if(!referenceState.first) ViewerOriginal.Loading else ViewerOriginal.Unavailable(
+                "This original is unavailable. Check device photo access or reconnect its Drive source and retry.")
         } catch(e: CancellationException) { throw e }
-        catch(_: Exception) { value=ViewerOriginal.Unavailable("Cannot open this original. Close and try downloading it again.") }
+        catch(_: java.io.IOException) { value=ViewerOriginal.Unavailable("Cannot open this original. Check photo access or download it again.") }
+        catch(_: SecurityException) { value=ViewerOriginal.Unavailable("Android photo access changed. Manage device photo access and retry.") }
+        catch(_: android.database.sqlite.SQLiteException) { value=ViewerOriginal.Unavailable("Cannot read original availability. Close and retry.") }
         awaitDispose { read?.close() }
     }
     val reader=(original as? ViewerOriginal.Ready)?.read
+    val device=(original as? ViewerOriginal.Device)?.record
     val toggleControls by rememberUpdatedState(onToggleControls)
     var quality by remember(photo.id) { mutableStateOf("Loading original…") }
     var zoom by remember(photo.id) { mutableFloatStateOf(1f) }
@@ -96,9 +106,9 @@ internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active:
     if(original is ViewerOriginal.Unavailable) Box(Modifier.fillMaxSize().then(previewTap)) {
         Text((original as ViewerOriginal.Unavailable).message,color=Color.White,
             modifier=Modifier.align(androidx.compose.ui.Alignment.Center).padding(20.dp))
-    } else if(reader==null) Box(Modifier.fillMaxSize().then(previewTap)) { CircularProgressIndicator() }
+    } else if(reader==null && device==null) Box(Modifier.fillMaxSize().then(previewTap)) { CircularProgressIndicator() }
     else if(photo.mimeType.startsWith("video/")) AndroidView(factory={ context -> VideoView(context).apply {
-        setVideoPath(reader.file.absolutePath)
+        if(device!=null) setVideoURI(device.uri.toUri()) else setVideoPath(requireNotNull(reader).file.absolutePath)
         val controls=android.widget.MediaController(context);controls.setAnchorView(this);setMediaController(controls)
         setOnPreparedListener { seekTo(1) }
     } },modifier=Modifier.fillMaxSize(),update={ if(!active || !interactive) it.pause() },onRelease={ it.stopPlayback() })
@@ -132,7 +142,9 @@ internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active:
         }
     }) {
         AndroidView(factory={ context -> OriginalPhotoView(context).apply {
-            onQuality={ quality=it };setActive(active);load(reader.file)
+            onQuality={ quality=it };setActive(active)
+            if(device!=null) loadReader { OriginalImageSource(android.os.ParcelFileDescriptor.AutoCloseInputStream(model.app.deviceMedia.openDescriptor(device))) }
+            else load(requireNotNull(reader).file)
         } },modifier=Modifier.fillMaxSize().testTag("original-image"),update={ it.setActive(active && interactive);it.transform(zoom,x,y) },onRelease={ it.close() })
         Text(quality,color=Color.White,style=MaterialTheme.typography.bodySmall,
             modifier=Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(bottom=captionInset).padding(8.dp))

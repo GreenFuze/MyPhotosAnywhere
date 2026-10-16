@@ -2,3 +2,6 @@
 
 # Room schema hashes must be reproducible on Windows and CI.
 app/schemas/** text eol=lf
+
+# Shell scripts must also run directly on Linux CI.
+*.sh text eol=lf

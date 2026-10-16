@@ -21,7 +21,7 @@ internal data class TimelineQuery(val filter: String="All",val source: String?=n
 
 internal enum class TimelineMediaType { ALL, PHOTOS, VIDEOS }
 
-internal enum class TimestampProvenance { CAPTURE, LINKED_CAPTURE, IMPORT, DRIVE_MODIFIED, UNKNOWN }
+internal enum class TimestampProvenance { CAPTURE, LINKED_CAPTURE, IMPORT, DRIVE_MODIFIED, DEVICE_ADDED, UNKNOWN }
 
 internal data class TimelineCursor(val millis: Long?,val key: String) {
     init { require(key.startsWith("photo:") || key.startsWith("cloud:")) }
@@ -40,7 +40,7 @@ internal data class TimelineEntry(val key: String,val photoId: String?,val cloud
     }
 }
 
-internal data class TimelineMedia(val entry: TimelineEntry,val photo: Photo?,val cloud: CloudPhoto?)
+internal data class TimelineMedia(val entry: TimelineEntry,val photo: Photo?,val cloud: CloudPhoto?,val device: com.myphotosanywhere.mpa.data.DeviceMediaRecord?=null)
 
 internal data class TimelineAnchor(val cursor: TimelineCursor,val offset: Int)
 

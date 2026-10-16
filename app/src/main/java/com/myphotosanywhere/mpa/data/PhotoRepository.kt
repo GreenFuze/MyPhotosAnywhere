@@ -118,7 +118,14 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
             val retriever=android.media.MediaMetadataRetriever()
             try {
                 retriever.setDataSource(file.absolutePath)
-                return if(Build.VERSION.SDK_INT >= 27) {
+                return videoPreview(retriever,maximum)
+            } finally { retriever.release() }
+        }
+
+        /** Shared bounded frame decoder for private files and readable device descriptors. */
+        internal fun videoPreview(retriever: android.media.MediaMetadataRetriever,maximum: Int): Bitmap {
+            require(maximum in 1..2048)
+            return if(Build.VERSION.SDK_INT >= 27) {
                     val width=retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: maximum
                     val height=retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: maximum
                     val scale=minOf(1.0,maximum.toDouble()/maxOf(width,height))
@@ -136,7 +143,6 @@ class PhotoRepository(private val context: Context, private val database: PhotoD
                     if(image!==small) image.recycle()
                     small
                 }
-            } finally { retriever.release() }
         }
 
         fun preview(file: File, requestedDimension: Int): Bitmap {

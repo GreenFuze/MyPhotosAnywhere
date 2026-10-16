@@ -63,6 +63,35 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
             finally { busy.value=false }
         }
     }
+    internal val deviceBackupRequest=MutableStateFlow<com.myphotosanywhere.mpa.device.DeviceBackupRequest?>(null)
+    internal fun requestDeviceBackup(photo: Photo) {
+        if(busy.value) return
+        viewModelScope.launch {
+            try {
+                val captured=withContext(Dispatchers.IO) { db.drive().backupsForPhoto(photo.id).filter { it.state!="COMPLETE" }.sortedBy { it.id }.firstOrNull() }
+                deviceBackupRequest.value=com.myphotosanywhere.mpa.device.DeviceBackupRequest(photo.id,photo.displayName,captured?.bindingKey,captured?.email)
+            } catch(error: android.database.sqlite.SQLiteException) { message.value=error.message ?: "Cannot read saved backup work. Retry." }
+        }
+    }
+    internal fun reviewDeviceBackup(id: String) {
+        if(busy.value) return
+        viewModelScope.launch {
+            try { withContext(Dispatchers.IO) { db.photos().find(id) }?.let { requestDeviceBackup(it) } }
+            catch(error: android.database.sqlite.SQLiteException) { message.value=error.message ?: "Cannot read this backup. Retry." }
+        }
+    }
+    internal fun dismissDeviceBackup() { if(!busy.value) deviceBackupRequest.value=null }
+    internal fun backupDevicePhoto(id: String,binding: String) {
+        if(busy.value) return
+        deviceBackupRequest.value=null;busy.value=true;message.value="Preparing this original for backup…"
+        viewModelScope.launch {
+            try { message.value=withContext(Dispatchers.IO) { app.drive.enqueueManual(id,binding) } }
+            catch(cancelled: CancellationException) { throw cancelled }
+            catch(error: java.io.IOException) { message.value=error.message ?: "Cannot queue this backup. The device original is preserved. Retry." }
+            catch(error: android.database.sqlite.SQLiteException) { message.value=error.message ?: "Cannot save this backup. The device original is preserved. Retry." }
+            finally { busy.value=false }
+        }
+    }
     fun clearMessage() { message.value=null }
     fun perform(action: suspend ()->Unit) {
         if(busy.value) return
@@ -70,11 +99,15 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
         viewModelScope.launch {
             try { action(); app.metadata.changed() }
             catch(e: CancellationException) { throw e }
-            catch(e: Exception) { message.value=e.message ?: "Operation failed. Your photos are preserved." }
+            catch(e: java.io.IOException) { message.value=e.message ?: "Operation needs retry. Your photos are preserved." }
+            catch(e: android.database.sqlite.SQLiteException) { message.value=e.message ?: "Cannot save this change. Your photos are preserved." }
+            catch(e: SecurityException) { message.value=e.message ?: "Android access changed. Review permissions and retry." }
+            catch(e: IllegalArgumentException) { message.value=e.message ?: "Review these values and try again." }
             finally { busy.value=false }
         }
     }
     fun pinPhoto(id: String,pin: Boolean) = perform {
+        if(pin && db.deviceMedia().find(id)!=null) app.deviceMedia.materialize(id)
         app.cache.lock.withLock { db.photos().find(id)?.let { db.photos().update(it.copy(pinned=pin)) } }
         val photo=db.photos().find(id)
         if(pin && photo!=null && photo.originalPath.isBlank() && photo.sourceRemoteId!=null)
@@ -158,13 +191,24 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
         message.value="Source annotations exported as XMP. Original media is unchanged."
     }
     fun assign(faceIds: List<String>,name: String,personId: String? = null) = perform {
-        require(name.isNotBlank() && name.length<=100)
-        app.people.assign(faceIds,Person(personId ?: UUID.randomUUID().toString(),name.trim()))
+        require(name.isNotBlank() && name.length<=200)
+        app.people.assign(faceIds,Person(personId ?: UUID.randomUUID().toString(),name.trim()),allowCreate=personId==null)
     }
-    fun acceptFace(id: String,person: Person) = perform { app.people.assign(listOf(id),person) }
+    fun acceptFace(id: String,person: Person) = perform { app.people.assign(listOf(id),person,allowCreate=false) }
     fun unassignFace(id: String) = perform { app.people.unassign(id) }
+    internal fun excludePersonFromPhoto(photo: String,person: String) = perform {
+        db.withTransaction {
+            db.personLabels().exclude(photo,person)
+            db.library().photoFaces(photo).filter { it.personId==person || it.suggestedPersonId==person }.forEach { app.people.unassign(it.id) }
+        }
+        app.people.refreshSuggestions()
+    }
     fun renamePerson(person: Person,name: String) = perform {
-        require(name.isNotBlank() && name.length<=100); db.library().savePerson(person.copy(name=name.trim()))
+        require(name.isNotBlank() && name.length<=200)
+        db.withTransaction {
+            val latest=db.personLabels().person(person.id) ?: throw java.io.IOException("This person is no longer available. Choose a person again.")
+            db.library().savePerson(latest.copy(name=name.trim()))
+        }
     }
     fun mergePeople(source: String,target: String) = perform { app.people.merge(source,target); app.people.refreshSuggestions() }
     fun deletePerson(id: String) = perform { app.people.deletePerson(id) }

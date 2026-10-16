@@ -60,15 +60,35 @@ class MetadataRepository(private val context: Context,private val database: Phot
         }
         val faces=db.library().allFaces(); val people=db.library().allPeople()
         val albums=db.library().allAlbums(); val memberships=db.library().allMemberships()
+        val aliases=linkedMapOf<String,PersonAlias>()
+        val named=links.values.associate { photo ->
+            val origin=db.personLabels().origin(photo.id)
+            val members=db.personLabels().members(photo.id)
+            members.forEach { member ->
+                val alias=checkNotNull(db.personLabels().alias(member.aliasKey)) { "Photo association has no provider alias." }
+                aliases[alias.key]=alias
+            }
+            if(origin!=null) db.personLabels().ignored(origin.binding).forEach { aliases[it.key]=it }
+            photo.id to if(origin==null && members.isEmpty()) null else PortablePhotoPeople(origin?.binding,
+                members.map { PortableMembership(it.aliasKey,it.personId,it.excluded) })
+        }
         val assets=links.map { (remote,photo) -> PortableAsset(photo.metadataAssetId ?: photo.id,remote,photo.sha256,photo.bytes,
             photo.favorite,photo.archived,photo.placeLabel,photo.latitude,photo.longitude,photo.capturedAt,
             photo.parentId?.let { photos[it]?.metadataAssetId ?: it },photo.editProvider,photo.editInstructions,photo.labels,
             db.library().draft(photo.id)?.recipe,memberships.filter { it.photoId==photo.id }.map { it.albumId },
-            faces.filter { it.photoId==photo.id }.map { PortableFace(it.id,it.personId,it.corrected,FaceRegion.of(it),it.imageWidth,it.imageHeight,it.modelVersion) },photo.importedMetadata) }
-        val personIds=assets.flatMap { it.faces }.mapNotNull { it.personId }.toSet()
+            faces.filter { it.photoId==photo.id }.map { PortableFace(it.id,it.personId,it.corrected,FaceRegion.of(it),it.imageWidth,it.imageHeight,it.modelVersion) },photo.importedMetadata,named[photo.id]) }
+        val personIds=referencedPeople(assets)+aliases.values.mapNotNull { it.personId }
         val albumIds=assets.flatMap { it.albums }.toSet()
         XmpCatalog(source.accountId,source.folderId,assets,people.filter { it.id in personIds }.map { PortablePerson(it.id,it.name) },
-            albums.filter { it.id in albumIds }.map { PortableAlbum(it.id,it.name) })
+            albums.filter { it.id in albumIds }.map { PortableAlbum(it.id,it.name) },
+            aliases.values.sortedBy { it.key }.map { PortableAlias(it.key,it.name,it.binding,it.personId,it.ignored) })
+    }
+    private fun referencedPeople(assets: List<PortableAsset>)=(assets.flatMap { it.faces }.mapNotNull { it.personId }+
+        assets.flatMap { it.photoPeople?.members.orEmpty() }.map { it.personId }).toSet()
+    private fun relevantAliases(catalog: XmpCatalog,assets: List<PortableAsset>): List<PortableAlias> {
+        val keys=assets.flatMap { it.photoPeople?.members.orEmpty() }.map { it.aliasKey }.toSet()
+        val origins=assets.mapNotNull { it.photoPeople }.map { it.origin }.toSet()
+        return catalog.aliases.filter { it.key in keys || it.ignored && it.binding in origins }
     }
     private fun checkCatalog(catalog: XmpCatalog,source: DriveSource) {
         require(catalog.accountId==source.accountId && catalog.folderId==source.folderId) { "This XMP catalog belongs to another Drive source." }
@@ -111,9 +131,15 @@ class MetadataRepository(private val context: Context,private val database: Phot
             val previous=XmpCodec.decode(requireNotNull(oldXml)); checkCatalog(previous,source)
             val untouched=previous.assets.filter { old -> catalog.assets.none { it.remoteId==old.remoteId } }
             val assets=catalog.assets+untouched
-            val personIds=assets.flatMap { it.faces }.mapNotNull { it.personId }.toSet(); val albumIds=assets.flatMap { it.albums }.toSet()
-            catalog=catalog.copy(assets=assets,people=(catalog.people+previous.people).distinctBy { it.id }.filter { it.id in personIds },
-                albums=(catalog.albums+previous.albums).distinctBy { it.id }.filter { it.id in albumIds })
+            val aliases=(catalog.aliases+relevantAliases(previous,untouched)).distinctBy { it.key }
+            // A local rename/merge updates aliases even in assets not yet downloaded here.
+            val byAlias=aliases.associateBy { it.key }
+            val combined=assets.map { asset -> asset.copy(photoPeople=asset.photoPeople?.let { names -> names.copy(members=names.members.mapNotNull { member ->
+                byAlias[member.aliasKey]?.let { alias -> if(alias.ignored) null else member.copy(personId=checkNotNull(alias.personId)) }
+            }) }) }
+            val personIds=referencedPeople(combined)+aliases.mapNotNull { it.personId }; val albumIds=assets.flatMap { it.albums }.toSet()
+            catalog=catalog.copy(assets=combined,people=(catalog.people+previous.people).distinctBy { it.id }.filter { it.id in personIds },
+                albums=(catalog.albums+previous.albums).distinctBy { it.id }.filter { it.id in albumIds },aliases=aliases)
         }
         val xml=XmpCodec.encode(catalog,oldXml)
         currentCoroutineContext().ensureActive()
@@ -143,13 +169,19 @@ class MetadataRepository(private val context: Context,private val database: Phot
         val api=app.sync.api(source.connection()); val file=api.metadataFiles(source.folderId).singleOrNull() ?: error("No MPA XMP catalog found in this folder.")
         remote(api,source,file.id); val read=api.readMetadata(file.id); val catalog=XmpCodec.decode(read.first); checkCatalog(catalog,source)
         val matches=matching(source,catalog)
-        val referenced=catalog.assets.filter { it.id in matches }.flatMap { it.faces }.mapNotNull { it.personId }.toSet()
+        val assets=catalog.assets.filter { it.id in matches }
+        val referenced=referencedPeople(assets)
         val names=db.library().allPeople().associateBy { it.id }
+        val redirects=relevantAliases(catalog,assets).mapNotNull { alias ->
+            val local=db.personLabels().alias(alias.key)
+            if(local==null || local.personId==alias.personId && local.ignored==alias.ignored) null
+            else "${names[local.personId]?.name ?: alias.name} → ${catalog.people.find { it.id==alias.personId }?.name ?: "removed association"} (shared imported name)"
+        }
         MetadataPreview(key,file.id,read.second,read.first,matches.size,catalog.assets.size-matches.size,
             referenced.size,catalog.assets.filter { it.id in matches }.flatMap { it.albums }.distinct().size,
-            catalog.people.count { it.id in referenced && names[it.id]!=null && names[it.id]?.name!=it.name },
+            catalog.people.count { it.id in referenced && names[it.id]!=null && names[it.id]?.name!=it.name }+redirects.size,
             fingerprint(snapshot(source)),catalog.people.filter { it.id in referenced && names[it.id]!=null && names[it.id]?.name!=it.name }
-                .map { "${names[it.id]?.name} → ${it.name}" })
+                .map { "${names[it.id]?.name} → ${it.name}" }+redirects)
     } }
     suspend fun recover(preview: MetadataPreview) = lock.withLock { withContext(Dispatchers.IO) {
         val source=db.drive().source(preview.key) ?: error("Reconnect this Drive source.")
@@ -170,8 +202,15 @@ class MetadataRepository(private val context: Context,private val database: Phot
             val matches=matching(source,catalog)
             require(matches.size==expectedMatching) { "The local library changed. Preview recovery again." }
             val assets=catalog.assets.filter { it.id in matches }
-            val personIds=assets.flatMap { it.faces }.mapNotNull { it.personId }.toSet(); val albumIds=assets.flatMap { it.albums }.toSet()
+            val aliases=relevantAliases(catalog,assets)
+            val retired=aliases.mapNotNull { incoming -> db.personLabels().alias(incoming.key)?.personId?.takeIf { it!=incoming.personId } }.toSet()
+            val personIds=referencedPeople(assets)+aliases.mapNotNull { it.personId }; val albumIds=assets.flatMap { it.albums }.toSet()
             catalog.people.filter { it.id in personIds }.forEach { db.library().savePerson(Person(it.id,it.name)) }
+            for(alias in aliases) {
+                db.personLabels().saveAlias(PersonAlias(alias.key,alias.name,alias.binding,alias.personId,alias.ignored))
+                if(alias.ignored) db.personLabels().clearAlias(alias.key)
+                else db.personLabels().redirectAlias(alias.key,checkNotNull(alias.personId))
+            }
             val existingAlbums=db.library().allAlbums().associateBy { it.id }
             catalog.albums.filter { it.id in albumIds }.forEach { a ->
                 db.library().saveAlbum(existingAlbums[a.id]?.copy(name=a.name) ?: Album(a.id,a.name,System.currentTimeMillis()))
@@ -184,6 +223,12 @@ class MetadataRepository(private val context: Context,private val database: Phot
                 db.photos().update(photo.copy(metadataAssetId=asset.id,favorite=asset.favorite,archived=asset.archived,
                     placeLabel=asset.place,latitude=asset.latitude,longitude=asset.longitude,capturedAt=asset.capturedAt,
                     parentId=asset.parentId?.let { parent -> matches[parent]?.id ?: db.photos().all().find { (it.metadataAssetId ?: it.id)==parent }?.id },editProvider=asset.provider,editInstructions=asset.instructions,labels=asset.labels,importedMetadata=asset.importedMetadata))
+                // Absence means a legacy catalog: do not erase newer local label corrections.
+                asset.photoPeople?.let { names ->
+                    db.personLabels().restoreOrigin(PhotoPeopleOrigin(photo.id,names.origin))
+                    db.personLabels().clearPhoto(photo.id)
+                    names.members.forEach { db.personLabels().saveMember(PhotoPersonLabel(photo.id,it.aliasKey,it.personId,it.excluded)) }
+                }
                 allMemberships.filter { it.photoId==photo.id }.forEach { db.library().removeFromAlbum(it.albumId,photo.id) }
                 asset.albums.forEach { db.library().addToAlbum(AlbumPhoto(it,photo.id)) }
                 if(asset.recipe==null) db.library().deleteDraft(photo.id)
@@ -202,6 +247,9 @@ class MetadataRepository(private val context: Context,private val database: Phot
                 // Regenerate crops and embeddings using geometric matches on a later phone scan.
                 db.library().saveScan(FaceScan(photo.id,photo.sha256,modelVersion="restored"))
             }
+            // Remove only identities left wholly unreferenced by an explicitly
+            // accepted alias change. Unmatched photos and faces stay untouched.
+            for(id in retired) if(id !in personIds && !db.personLabels().references(id)) db.library().deletePerson(id)
             db.metadata().insert(MetadataState(source.key)); db.metadata().dirty(source.key)
             requireNotNull(db.metadata().state(source.key)).generation
     }

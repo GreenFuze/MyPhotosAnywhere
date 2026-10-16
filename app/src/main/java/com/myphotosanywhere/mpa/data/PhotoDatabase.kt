@@ -82,6 +82,8 @@ interface PhotoDao {
 
     @Query("SELECT * FROM photos ORDER BY importedAt")
     suspend fun all(): List<Photo>
+    @Query("SELECT p.* FROM photos p WHERE p.mimeType LIKE 'image/%' AND p.id>:after AND "+com.myphotosanywhere.mpa.trash.TrashVisibility.PHOTO_SQL+" ORDER BY p.id LIMIT :limit")
+    suspend fun recognitionCandidates(after: String,limit: Int): List<Photo>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(photo: Photo)
@@ -109,8 +111,11 @@ interface PhotoDao {
     com.myphotosanywhere.mpa.importing.ImportJob::class, com.myphotosanywhere.mpa.importing.ImportItem::class,
     com.myphotosanywhere.mpa.importing.TakeoutSidecar::class,
     com.myphotosanywhere.mpa.importing.TakeoutDownload::class,
-    com.myphotosanywhere.mpa.trash.DriveTrashRecord::class], version = 10, exportSchema = true)
+    com.myphotosanywhere.mpa.trash.DriveTrashRecord::class,DeviceMediaRecord::class,DeviceScanSeen::class,ManualDeviceBackup::class,PersonAlias::class,PhotoPersonLabel::class,PhotoPeopleOrigin::class,PeopleIndexItem::class], version = 11, exportSchema = true)
 abstract class PhotoDatabase : RoomDatabase() {
+    internal abstract fun presence(): LibraryPresenceDao
+    internal abstract fun deviceMedia(): DeviceMediaDao
+    internal abstract fun personLabels(): PersonLabelsDao
     internal abstract fun trash(): com.myphotosanywhere.mpa.trash.DriveTrashDao
     abstract fun photos(): PhotoDao
     abstract fun drive(): DriveDao

@@ -37,7 +37,7 @@ fun MetadataControls(model: LibraryFeaturesModel) {
         }
     }
     preview?.let { result -> AlertDialog(onDismissRequest={ model.metadataPreview.value=null },title={ Text("Recover annotations?") },
-        text={ Column { Text("${result.matching} downloaded photos match the catalogue’s file IDs, sizes and SHA-256 checksums. Their favorites, locations, albums, edit drafts and reviewed face assignments will be replaced. ${result.people} people and ${result.albums} albums are included. ${result.globalNameChanges} existing global names will change across sources. ${result.unavailable} unavailable or changed photos will be skipped; download them and preview again later. Face crops and embeddings are rebuilt on your phone. Photos are preserved.")
+        text={ Column { Text("${result.matching} downloaded photos match the catalogue’s file IDs, sizes and SHA-256 checksums. Their favorites, locations, albums, edit drafts, reviewed faces and photo-person associations will be replaced when included. ${result.people} people and ${result.albums} albums are included. ${result.globalNameChanges} shared names or alias mappings will change across sources. ${result.unavailable} unavailable or changed photos will be skipped; download them and preview again later. Face crops and embeddings are rebuilt on your phone. Photos are preserved.")
             result.nameChanges.take(20).forEach { Text(it,style=MaterialTheme.typography.bodySmall) }
         } },
         confirmButton={ Button(enabled=!busy && result.matching>0,onClick={ model.recoverMetadata() }) { Text("Recover matching photos") } },

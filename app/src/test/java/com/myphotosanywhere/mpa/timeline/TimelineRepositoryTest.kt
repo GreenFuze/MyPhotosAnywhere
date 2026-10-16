@@ -25,7 +25,7 @@ class TimelineRepositoryTest {
     private lateinit var temporaryRoot: File
     @Before fun setup()=runBlocking {
         db=Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(),PhotoDatabase::class.java).build()
-        repository=TimelineRepository(db) { it.startsWith("/present/") }
+        repository=TimelineRepository(db,originalExists={ it.startsWith("/present/") })
         // Robolectric embeds long test names in its app-data path, exceeding
         // Windows native SQLite's path limit. Keep the disposable fixture short.
         temporaryRoot=java.nio.file.Files.createTempDirectory("mpa-timeline-").toFile()
@@ -285,7 +285,7 @@ class TimelineRepositoryTest {
         assertEquals(before,db.photos().all())
         assertEquals(remote,db.cloud().photo(remote.key))
         assertEquals(face,db.library().face(face.id))
-        assertEquals(10,db.openHelper.readableDatabase.version)
+        assertEquals(11,db.openHelper.readableDatabase.version)
     }
 
     @Test fun lowStoragePreparationPreservesOriginalRecordsAndCleansIndex()=runBlocking {

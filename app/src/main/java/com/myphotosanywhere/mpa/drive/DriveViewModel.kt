@@ -81,7 +81,7 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         for(source in dao.sources().filter { it.accountId==user.id }) {
             val refreshed=source.copy(email=user.email)
             dao.saveSource(refreshed)
-            app.sync.schedule(refreshed.connection(),true); app.downloads.retry(source.key)
+            app.sync.schedule(refreshed.connection(),true); app.downloads.retry(source.key);app.drive.resumeManual(source.key,retryFailures=true)
         }
         path.clear()
         _browser.value = readBrowser(api, "root", "My Drive")
@@ -153,6 +153,10 @@ class DriveViewModel(application: Application, private val saved: SavedStateHand
         _browser.value = readBrowser(authorizedApi(active), folder, active.folderName ?: "Photo folder")
     }
 
+    internal suspend fun photoNames(ids: List<String>): Map<String,String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        require(ids.size<=5)
+        ids.mapNotNull { id -> app.database.photos().find(id)?.let { id to it.displayName } }.toMap()
+    }
     fun selectSource(source: DriveSource) = perform {
         val stored=dao.source(source.key) ?: error("Reconnect this source first.")
         dao.saveConnection(stored.connection()); path.clear(); _browser.value=null

@@ -80,7 +80,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
     val newPhotos=request.map { it.query }.distinctUntilChanged().flatMapLatest { query ->
         if(query.needsMetadata) flowOf(false)
         else merge(kotlinx.coroutines.flow.callbackFlow<Unit> {
-            val observation=repository.observe { trySend(Unit) }
+            val observation=repository.observe(query) { trySend(Unit) }
             trySend(Unit)
             awaitClose { observation.close() }
         },frontierAcknowledgements).conflate().debounce(250).mapLatest {
@@ -103,7 +103,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
             }
         }.flow.map { data ->
             val epoch=contentEpoch.incrementAndGet()
-            data.map { TimelineItem(it,current.generation,current.query,geometry.aspect(it.key,it.thumbnailPath),epoch) }
+            data.map { TimelineItem(it,current.generation,current.query,geometry.aspect(it.key,it.thumbnailPath,repository.deviceAspect(it)),epoch) }
         }
             .onCompletion { synchronized(sources) { sources.toList().forEach { it.invalidate() };sources.clear() } }
     }.cachedIn(viewModelScope)

@@ -11,8 +11,15 @@ fun installMetadataTriggers(db: SupportSQLiteDatabase) {
         "photos" to "favorite,archived,placeLabel,latitude,longitude,capturedAt,parentId,editProvider,editInstructions,labels,metadataAssetId,importedMetadata",
         "faces" to "personId,corrected,left,top,right,bottom,imageWidth,imageHeight,modelVersion",
         "people" to "name", "albums" to "name", "album_photos" to "albumId,photoId", "edit_drafts" to "recipe",
-        "drive_backups" to "state,remoteId,remoteMd5,remoteVersion")
-    for((table,columns) in tables) for(event in listOf("INSERT","DELETE","UPDATE OF $columns")) {
+        "drive_backups" to "state,remoteId,remoteMd5,remoteVersion",
+        "person_aliases" to "name,binding,personId,ignored", "photo_people" to "aliasKey,personId,excluded",
+        "photo_people_origins" to "binding")
+    // Earlier migrations also install this outbox. New tables are installed only
+    // after the additive migration has created them; never reference future tables.
+    val available=db.query("SELECT name FROM sqlite_master WHERE type='table'").use { cursor ->
+        buildSet { while(cursor.moveToNext()) add(cursor.getString(0)) }
+    }
+    for((table,columns) in tables.filterKeys { it in available }) for(event in listOf("INSERT","DELETE","UPDATE OF $columns")) {
         val suffix=event.substringBefore(' ').lowercase()
         val changed=if(suffix=="update") "WHEN "+columns.split(',').joinToString(" OR ") { "OLD.`$it` IS NOT NEW.`$it`" } else ""
         db.execSQL("""CREATE TRIGGER IF NOT EXISTS mpa_xmp_${table}_$suffix AFTER $event ON `$table` $changed BEGIN
