@@ -113,12 +113,14 @@ class UxAcceptanceDeviceTest {
         val photos=(0 until 320).map { index -> Photo("ux-frame-$index","Frame $index.png",file.path,file.path,"image/png",file.length(),5_000_000_000_000L-index*86400000L,hash,capturedAt=5_000_000_000_000L-index*86400000L) }
         val layout=app.galleryPresentation.layout.value
         val thread=HandlerThread("mpa-test-frame-observer").apply { start() }
-        val handler=Handler(thread.looper);val durations=mutableListOf<Long>();val heap=mutableListOf<Long>();var dropped=0
+        val handler=Handler(thread.looper);val durations=mutableListOf<Long>();val heap=mutableListOf<Long>();var dropped=0;var collecting=true
         val listener=Window.OnFrameMetricsAvailableListener { _,metrics,lost ->
             val total=metrics.getMetric(FrameMetrics.TOTAL_DURATION)
             synchronized(durations) {
-                dropped+=lost
-                if(total>=0 && durations.size<1024) { durations+=total;val runtime=Runtime.getRuntime();heap+=runtime.totalMemory()-runtime.freeMemory() }
+                if(collecting) {
+                    dropped+=lost
+                    if(total>=0 && durations.size<1024) { durations+=total;val runtime=Runtime.getRuntime();heap+=runtime.totalMemory()-runtime.freeMemory() }
+                }
             }
         }
         var observedWindow: Window?=null
@@ -139,12 +141,13 @@ class UxAcceptanceDeviceTest {
             }
             compose.runOnUiThread { requireNotNull(observedWindow).removeOnFrameMetricsAvailableListener(listener) };observedWindow=null
             val drained=CountDownLatch(1);check(handler.post { drained.countDown() });assertTrue(drained.await(5,TimeUnit.SECONDS))
-            val values=synchronized(durations) { durations.sorted() };assertTrue("Actual hardware-window frame evidence is required",values.size>=10)
+            val samples=synchronized(durations) { collecting=false;Triple(durations.sorted(),heap.toList(),dropped) }
+            val values=samples.first;assertTrue("Actual hardware-window frame evidence is required",values.size>=10)
             val report=JSONObject().put("api",android.os.Build.VERSION.SDK_INT).put("fixtureItems",320).put("insertedItems",12)
-                .put("sampleLimit",1024).put("frames",values.size).put("droppedReports",dropped).put("frameMetric","FrameMetrics.TOTAL_DURATION nanoseconds")
+                .put("sampleLimit",1024).put("frames",values.size).put("droppedReports",samples.third).put("frameMetric","FrameMetrics.TOTAL_DURATION nanoseconds")
                 .put("medianMs",values[values.size/2]/1_000_000.0).put("p95Ms",values[((values.size-1)*.95).toInt()]/1_000_000.0)
                 .put("maxMs",values.last()/1_000_000.0).put("framesOver16_67ms",values.count { it>16_670_000 })
-                .put("heapMinBytes",heap.minOrNull()).put("heapMaxBytes",heap.maxOrNull()).put("pageBudget",300)
+                .put("heapMinBytes",samples.second.minOrNull()).put("heapMaxBytes",samples.second.maxOrNull()).put("pageBudget",300)
                 .put("scope","Synthetic emulator scrolling during index inserts; diagnostic measurements, not S23 Ultra frame-rate acceptance. Query/snapshot 10k/100k and bounded-page assertions are separate native benchmarks.")
             export("ux-scroll-benchmark.json","application/json",report.toString(2).toByteArray())
             screenshot("ux-scroll-measured")
