@@ -61,7 +61,9 @@ class ManagementDeviceTest {
             app.galleryPresentation.update(com.myphotosanywhere.mpa.timeline.GridDensity.DEFAULT)
             app.database.withTransaction { ids.forEachIndexed { i,id -> app.database.photos().insert(Photo(id,"$id.png",file.path,file.path,"image/png",file.length(),time-i,hash)) } }
             waitTag("photo:${ids.first()}");compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:${ids[35]}"));waitTag("photo:${ids[35]}")
-            compose.onNodeWithTag("shell:storage").performClick();compose.onNodeWithTag("management:Settings").performClick()
+            repeat(2) { InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_TAB) }
+            compose.waitForIdle();compose.onNodeWithTag("shell:storage").assertIsDisplayed().performClick();waitTag("management:Settings")
+            compose.onNodeWithTag("management:Settings").performClick()
             compose.onNodeWithTag("management:Preferences").performClick();compose.onNodeWithTag("management:Photos view").performClick()
             compose.onNodeWithTag("preference:layout:SQUARE").assertIsSelected();compose.onNodeWithTag("shell:navigation").assertDoesNotExist()
             screenshotManagement("menu-photo-view");compose.onNodeWithTag("preference:layout:ROWS").performClick()

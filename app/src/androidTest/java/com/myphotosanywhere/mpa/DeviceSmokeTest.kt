@@ -221,7 +221,7 @@ class DeviceSmokeTest {
             }
             assertTrue(source.isFile); assertTrue(stage.isFile)
             compose.activityRule.scenario.recreate()
-            compose.onNodeWithTag("shell:activity").performClick()
+            compose.onNodeWithTag("management:7").assertExists()
             compose.onNodeWithTag("dismiss-import-errors:$id").assertDoesNotExist()
             runBlocking { dao.saveJob(job.copy(error="Fresh import error")) }
             compose.waitUntil(5000) { compose.onAllNodesWithTag("dismiss-import-errors:$id").fetchSemanticsNodes().isNotEmpty() }
