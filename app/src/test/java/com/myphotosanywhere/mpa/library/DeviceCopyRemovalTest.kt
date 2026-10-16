@@ -17,6 +17,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
 import org.robolectric.shadows.ShadowStatFs
+import org.robolectric.shadows.ShadowBitmapFactory
 import java.io.File
 import java.io.IOException
 
@@ -147,6 +148,8 @@ class DeviceCopyRemovalTest {
     fun undecodableMediaWithoutPreviewKeepsVerifiedOriginalAndAllMetadata()=runBlocking<Unit> {
         val fixture=Fixture();fixture.create();var verified=0
         try {
+            // The legacy shadow otherwise fabricates a bitmap for invalid image bytes.
+            ShadowBitmapFactory.setAllowInvalidImageData(false)
             ShadowStatFs.registerStats(requireNotNull(fixture.preview.parentFile).absolutePath,4096,262144,131072)
             fixture.original.writeText("Unsupported original image bytes")
             val photo=fixture.photo.copy(bytes=fixture.original.length(),sha256=DriveBackupWorker.digest(fixture.original,"SHA-256"))
@@ -158,7 +161,7 @@ class DeviceCopyRemovalTest {
             assertEquals(1,verified);assertTrue(fixture.original.isFile)
             assertEquals(photo.sha256,DriveBackupWorker.digest(fixture.original,"SHA-256"))
             assertEquals(photo,fixture.database.photos().find(photo.id));assertEquals(row,fixture.database.cloud().photo(row.key))
-        } finally { fixture.close() }
+        } finally { ShadowBitmapFactory.setAllowInvalidImageData(true);fixture.close() }
     }
     @Test fun unrelatedMetadataUpdatedDuringVerificationIsPreservedAndAliasedOriginalsStayProtected()=runBlocking<Unit> {
         val fixture=Fixture();fixture.create()
