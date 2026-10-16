@@ -29,7 +29,7 @@ class ImportDuplicateFinder(private val cloud: CloudDao, private val api: DriveG
             val id=pending.removeFirst()
             if(id==root) return true
             if(!seen.add(id)) continue
-            require(seen.size<=64) { "Drive ancestry is too deep. Review the destination before resuming." }
+            if(seen.size>64) throw ImportDestinationUnavailable("Drive ancestry is too deep. Review the destination before resuming.")
             keepGoing()
             val folder=api.file(id)
             if(!folder.trashed && folder.mimeType==DriveGateway.FOLDER_MIME) pending.addAll(folder.parents)

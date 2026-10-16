@@ -17,14 +17,19 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.util.concurrent.TimeUnit
 
+class PhotosPickerAuthorizationNeeded: java.io.IOException("Reconnect Google Photos to resume this import.")
+class PhotosPickerRequestException(val status: Int,val selection: Boolean,message: String): IllegalArgumentException(message) {
+    val blocksJob: Boolean get()=status in setOf(401,403,429) || status in 500..599 || selection && status in setOf(404,410)
+}
+
 class PhotosAuthorization(private val context: Context) {
     suspend fun request(email: String) = Identity.getAuthorizationClient(context).authorize(
         AuthorizationRequest.builder().setAccount(Account(email, "com.google"))
             .setRequestedScopes(listOf(Scope(SCOPE))).setOptOutIncludingGrantedScopes(true).build()).await()
     suspend fun token(email: String): String {
         val result = request(email)
-        require(!result.hasResolution() && SCOPE in result.grantedScopes) { "Reconnect Google Photos to resume this import." }
-        return result.accessToken ?: error("Reconnect Google Photos.")
+        if(result.hasResolution() || SCOPE !in result.grantedScopes) throw PhotosPickerAuthorizationNeeded()
+        return result.accessToken ?: throw PhotosPickerAuthorizationNeeded()
     }
     companion object { const val SCOPE = "https://www.googleapis.com/auth/photospicker.mediaitems.readonly" }
 }
@@ -84,18 +89,19 @@ class PhotosPickerGateway(private val token: String,
     private fun url(path: String) = api.newBuilder().apply { path.split('/').forEach { addPathSegment(it) } }.build()
     private suspend fun json(request: Request.Builder): JsonObject = withContext(Dispatchers.IO) {
         client.newCall(request.header("Authorization","Bearer $token").build()).execute().use { response ->
-            checkResponse(response)
+            checkResponse(response,selection=true)
             JsonParser.parseString(response.body.string()).asJsonObject
         }
     }
-    private fun checkResponse(response: Response) {
-        require(response.isSuccessful) { when(response.code) {
+    private fun checkResponse(response: Response,selection: Boolean=false) {
+        if(!response.isSuccessful) throw PhotosPickerRequestException(response.code,selection,when(response.code) {
             401 -> "Reconnect Google Photos."
             403 -> "Google Photos denied access. Check Picker API, consent scope, test users and the installed signing certificate."
-            404,410 -> "Google Photos selection expired. Select these items again; verified imports are preserved."
+            404,410 -> if(selection) "Google Photos selection expired. Select these items again; verified imports are preserved."
+                else "This Google Photos media file is unavailable. Other selected files can continue; retry this file later."
             429 -> "Google Photos is limiting requests. Retry later."
             else -> "Google Photos request failed (HTTP ${response.code}). Retry from Imports."
-        } }
+        })
     }
     private fun parseSession(j: JsonObject): PickerSession {
         val config = j.getAsJsonObject("pollingConfig")

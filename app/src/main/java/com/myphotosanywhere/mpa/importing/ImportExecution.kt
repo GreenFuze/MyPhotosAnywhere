@@ -1,6 +1,7 @@
 package com.myphotosanywhere.mpa.importing
 
 import com.myphotosanywhere.mpa.drive.DriveConnectionException
+import com.myphotosanywhere.mpa.drive.DriveHttpException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -29,7 +30,8 @@ class ImportExecution(private val dao: ImportDao,
                 try {
                     if(!runOne()) break
                     attempts=0
-                } catch(e: DriveConnectionException) {
+                } catch(e: java.io.IOException) {
+                    if(e !is DriveConnectionException && !(e is DriveHttpException && e.retryable)) throw e
                     val retry=ImportConnectionRecovery(dao).record(id,attempts,e)
                     publish(snapshot(id))
                     if(!retry) break
@@ -40,9 +42,9 @@ class ImportExecution(private val dao: ImportDao,
             }
             dao.job(id)?.state!="FAILED"
         } catch(e: CancellationException) { throw e }
-        catch(_: Exception) {
-            dao.connectionState(id,"FAILED","Background import stopped. Open MPA and resume; transfer checkpoints are preserved.")
-            false
+        catch(error: Exception) {
+            dao.connectionState(id,"FAILED","An unexpected internal import error stopped this job. Verified photos and transfer checkpoints are preserved.")
+            throw error
         } finally { updates.cancelAndJoin() }
     }
 }

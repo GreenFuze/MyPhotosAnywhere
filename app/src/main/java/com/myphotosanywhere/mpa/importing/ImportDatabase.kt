@@ -55,6 +55,13 @@ interface ImportDao {
     @Query("SELECT * FROM import_items ORDER BY job,path") fun observeItems(): Flow<List<ImportItem>>
     @Query("SELECT * FROM import_items WHERE job=:id ORDER BY path,id") suspend fun items(id: String): List<ImportItem>
     @Query("SELECT * FROM import_items WHERE id=:id") suspend fun item(id: String): ImportItem?
+    @Query("""SELECT * FROM import_items WHERE job=:id AND selected=1
+        AND state IN ('PENDING','STAGING','UPLOADING','VERIFIED') ORDER BY path,id LIMIT 1""")
+    suspend fun nextRunnable(id: String): ImportItem?
+    @Query("SELECT COUNT(*) FROM import_items WHERE job=:id AND selected=1 AND state='FAILED'")
+    suspend fun selectedFailureCount(id: String): Int
+    @Query("UPDATE import_items SET state='PENDING',error=NULL WHERE job=:id AND selected=1 AND state='FAILED'")
+    suspend fun retrySelectedFailures(id: String): Int
     @Query("""SELECT * FROM import_items WHERE job=:job AND id>:after AND state='COMPLETE'
         AND metadata IS NOT NULL AND photoId IS NOT NULL ORDER BY id LIMIT :limit""")
     suspend fun metadataRepairPage(job: String,after: String,limit: Int): List<ImportItem>

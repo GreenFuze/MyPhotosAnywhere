@@ -9,19 +9,24 @@ import com.google.gson.JsonObject
 import com.myphotosanywhere.mpa.MpaApplication
 import com.myphotosanywhere.mpa.data.*
 import com.myphotosanywhere.mpa.drive.*
-import com.myphotosanywhere.mpa.metadata.XmpCodec
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.util.UUID
 
-class ImportRepository(private val context: Context) {
+class ImportRepository internal constructor(private val context: Context,private val runtime: ImportRuntime?) {
+    constructor(context: Context): this(context,null)
     private val app get()=context.applicationContext as MpaApplication
     private val db get()=app.database
     private val dao get()=db.imports()
     private val lock=Mutex() // One staged media file across jobs, including retries.
-    private val documents=TakeoutDocuments(context)
+    private val documents=TakeoutDocuments(context,runtime?.storage)
+    private val input=ImportItemInput()
+    private val storage get()=runtime?.storage ?: app.storage
+    private suspend fun gateway(source: DriveSource,client: okhttp3.OkHttpClient?)=try {
+        runtime?.gateway(source,client) ?: app.sync.api(source.connection(),client)
+    } catch(error: SecurityException) { throw ImportDestinationUnavailable("Android blocked access to this import's Google account.",error) }
     private val codec=TakeoutCodec()
     private val archives=TakeoutArchiveStore(context)
     private val links=TakeoutLinkVault()
@@ -200,9 +205,9 @@ class ImportRepository(private val context: Context) {
         val uri=item.uri.toUri()
         if(uri.scheme!=DriveTakeoutArchive.SCHEME) return documents.stage(item,stage,keepGoing)
         val binding=requireNotNull(uri.authority)
-        val source=db.drive().source(binding) ?: error("Reconnect this import's original Drive ZIP source.")
-        val archive=DriveTakeoutArchive(app.sync.api(source.connection(),client),binding,source.folderId)
-        return TakeoutDocuments(context) { archive.open(it,512L*1024*1024) }.stage(item,stage,keepGoing)
+        val source=db.drive().source(binding) ?: throw ImportDestinationUnavailable("Reconnect this import's original Drive ZIP source.")
+        val archive=DriveTakeoutArchive(gateway(source,client),binding,source.folderId)
+        return TakeoutDocuments(context,runtime?.storage) { archive.open(it,512L*1024*1024) }.stage(item,stage,keepGoing)
     }
 
     suspend fun createPicker(email: String): ImportJob = withContext(Dispatchers.IO) {
@@ -265,10 +270,7 @@ class ImportRepository(private val context: Context) {
         if(download?.state=="CLEANED") require(dao.items(id).none {
             it.selected && it.state!="COMPLETE" && it.uri==Uri.fromFile(archives.file(id)).toString()
         }) { "Downloaded ZIP was removed. Start a new import for its unfinished files." }
-        db.withTransaction {
-            dao.items(id).filter { it.state=="FAILED" }.forEach { dao.updateItem(it.copy(state="PENDING",error=null)) }
-            dao.saveJob(job.copy(state="RUNNING",error=null))
-        }
+        ImportRetryPreparation(db).prepare(id)
         schedule(id,ExistingWorkPolicy.REPLACE,visible=true)
     }
     suspend fun dismissErrors(id: String) {
@@ -325,44 +327,49 @@ class ImportRepository(private val context: Context) {
         suspend fun keepGoing() {
             currentCoroutineContext().ensureActive()
             if(dao.job(id)?.state!="RUNNING") throw CancellationException("Import stopped.")
-            require(db.drive().source(job.binding)!=null) { "Import Drive source disconnected." }
+            if(db.drive().source(job.binding)==null) throw ImportDestinationUnavailable("Import Drive source disconnected. Reconnect its original source.")
         }
-        var item=dao.items(id).firstOrNull { it.selected && it.state in listOf("PENDING","STAGING","UPLOADING","VERIFIED") }
+        val item=dao.nextRunnable(id)
         if(item==null) {
-            val failed=dao.items(id).any { it.selected && it.state=="FAILED" }
-            val changed=dao.connectionState(job.id,if(failed) "FAILED" else "COMPLETE",job.error)==1
-            if(changed && !failed) cleanCompletedDownload(id)
+            if(ImportItemRecovery(db).finish(id)) cleanCompletedDownload(id)
             return@withLock false
         }
         val initial=requireNotNull(item)
-        try {
-            val source=db.drive().source(job.binding) ?: error("Reconnect the original Drive source.")
-            val api=app.sync.api(source.connection(),client)
-            val folder=api.file(source.folderId)
-            require(!folder.trashed && folder.canAddChildren) { "Original import destination is no longer writable." }
-            // Fail before another upload when the portable catalogue cannot represent this batch.
-            XmpCodec.encode(app.metadata.snapshot(source))
+        ImportItemRecovery(db).attempt(id,initial.id) {
+            val source=db.drive().source(job.binding) ?: throw ImportDestinationUnavailable("Reconnect the original Drive source.")
+            val api=gateway(source,client)
+            val folder=try { api.file(source.folderId) }
+            catch(error: DriveHttpException) {
+                if(error.retryable) throw error
+                throw ImportDestinationUnavailable("The original import destination is unavailable. "+error.message,error)
+            }
+            if(folder.trashed || !folder.canAddChildren) throw ImportDestinationUnavailable("Original import destination is no longer writable.")
+            // Optional source-wide annotation backup is a separate durable outbox. Its bounded
+            // portable catalogue must not prevent importing and retaining another photo's data.
             var current=initial
             val stage=File(context.filesDir,"migration-stage/${current.id}")
             if(current.staged==null || !File(requireNotNull(current.staged)).isFile) {
                 require(current.remoteId==null || current.sha256!=null) { "Upload checkpoint has no byte identity." }
                 val stageDir=requireNotNull(stage.parentFile).apply { mkdirs() }
-                app.storage.requireBytes(stageDir,maxOf(current.size,16L*1024*1024)+16L*1024*1024,
-                    "Not enough free space to stage this item. Free storage and resume.")
+                input.read("Cannot stage this file") { storage.requireBytes(stageDir,maxOf(current.size,16L*1024*1024)+16L*1024*1024,
+                    "Not enough free space to stage this item. Free storage and resume.") }
                 current=current.copy(state="STAGING",error=null); dao.updateItem(current)
-                val hashes=if(job.kind=="PICKER") {
-                    val token=PhotosAuthorization(context).token(job.email)
+                val pickerSession=if(job.kind=="PICKER") requireNotNull(job.session) { "Picker job has no saved session." } else null
+                val token=if(pickerSession!=null) try { PhotosAuthorization(context).token(job.email) }
+                    catch(error: SecurityException) { throw ImportDestinationUnavailable("Android blocked access to this import's Google Photos account.",error) } else null
+                val hashes=input.read("Cannot read this source image") { if(token!=null) {
                     val picker=if(client==null) PhotosPickerGateway(token) else PhotosPickerGateway(token,client)
-                    picker.download(picker.find(requireNotNull(job.session),current.path),stage,app.storage,::keepGoing)
-                } else stageTakeout(current,stage,client,::keepGoing)
+                    picker.download(picker.find(requireNotNull(pickerSession),current.path),stage,storage,::keepGoing)
+                } else stageTakeout(current,stage,client,::keepGoing) }
                 val sha=hashes.sha256; val md5=hashes.md5
-                require(current.sha256==null || current.sha256==sha) { "Source bytes changed since interrupted transfer. Original checkpoint preserved." }
+                if(current.sha256!=null && current.sha256!=sha) throw ImportItemDataException("Source bytes changed since interrupted transfer. Original checkpoint preserved.")
                 current=current.copy(size=stage.length(),staged=stage.absolutePath,sha256=sha,md5=md5,state="UPLOADING")
                 dao.updateItem(current)
             }
             keepGoing()
             val importThumb=File(context.filesDir,"thumbnails/${current.id}.jpg")
-            val bitmap=PhotoRepository.mediaPreview(File(requireNotNull(current.staged)),current.mime,480)
+            val stagedFile=File(requireNotNull(current.staged))
+            val bitmap=input.read("Cannot preview this media") { PhotoRepository.mediaPreview(stagedFile,current.mime,480) }
             try {
                 importThumb.parentFile?.mkdirs()
                 importThumb.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,it)) }
@@ -372,13 +379,12 @@ class ImportRepository(private val context: Context) {
             val remote: DriveFile
             if(duplicateRemote!=null) {
                 val hashes=MediaFingerprint.read(File(requireNotNull(current.staged)),::keepGoing)
-                require(hashes.bytes==current.size && hashes.sha256==current.sha256 && hashes.md5==current.md5) {
-                    "Staged bytes changed. Source and checkpoints are preserved."
-                }
+                if(hashes.bytes!=current.size || hashes.sha256!=current.sha256 || hashes.md5!=current.md5)
+                    throw ImportItemDataException("Staged bytes changed. Source and checkpoints are preserved.")
                 remote=duplicateRemote; current=current.copy(remoteId=remote.id,state="VERIFIED",offset=current.size)
                 dao.updateItem(current)
             } else {
-                require(db.cloud().liveCount(source.key) < 10000) { "MPA's 10,000 asset catalogue limit reached. Split into a new Drive source." }
+                if(db.cloud().liveCount(source.key)>=10000) throw ImportDestinationUnavailable("MPA's 10,000 asset catalogue limit reached. Split into a new Drive source.")
                 val result=ImportTransfer(api).upload(current,source.folderId,{ dao.updateItem(it) },::keepGoing)
                 current=result.first; remote=result.second
             }
@@ -396,12 +402,14 @@ class ImportRepository(private val context: Context) {
                 val photo=existingPhoto?.copy(cachedVersion=remote.version,displayName=remote.name) ?: Photo(current.id,current.name,"",importThumb.absolutePath,current.mime,current.size,System.currentTimeMillis(),requireNotNull(current.sha256),latitude=gps?.get(0),longitude=gps?.get(1),
                     capturedAt=PhotoRepository.captureTime(media),sourceBindingKey=source.key,sourceRemoteId=remote.id,
                     cachedVersion=remote.version,metadataAssetId=previous?.assetId ?: remote.assetId ?: current.id)
-                val incoming=if(job.kind=="TAKEOUT" && current.metadata!=null) codec.parse(requireNotNull(current.metadata)) else null
+                val incoming=if(job.kind=="TAKEOUT" && current.metadata!=null)
+                    input.read("Invalid Takeout metadata") { codec.parse(requireNotNull(current.metadata)) } else null
                 val base=if(existingPhoto==null && incoming!=null) photo.copy(capturedAt=incoming.captured ?: photo.capturedAt,
                     latitude=incoming.latitude ?: photo.latitude,longitude=incoming.longitude ?: photo.longitude) else photo
-                var annotated=if(incoming!=null) codec.apply(base,incoming) else base
+                var annotated=if(incoming!=null) input.read("Conflicting Takeout metadata") { codec.apply(base,incoming) } else base
                 if(job.kind=="PICKER" && annotated.importedMetadata.isBlank()) {
-                    val provenance=com.google.gson.JsonParser.parseString(requireNotNull(current.metadata)).asJsonObject
+                    val raw=requireNotNull(current.metadata) { "Picker item has no saved provenance." }
+                    val provenance=input.read("Invalid Picker metadata") { com.google.gson.JsonParser.parseString(raw).asJsonObject }
                     annotated=annotated.copy(importedMetadata=JsonObject().apply { add("googlePhotosPicker",provenance) }.toString(),
                         capturedAt=annotated.capturedAt ?: provenance.get("capturedAt")?.asLong)
                 }
@@ -417,18 +425,12 @@ class ImportRepository(private val context: Context) {
                     thumbnailPath=annotated.thumbnailPath.ifBlank { importThumb.absolutePath },thumbnailVersion=remote.version,
                     photoId=annotated.id,assetId=annotated.metadataAssetId,sourceAssetId=previous?.sourceAssetId ?: remote.sourceAssetId,thumbnailUpdatedAt=System.currentTimeMillis(),sha256=current.sha256))
                 dao.updateItem(current.copy(state="COMPLETE",photoId=annotated.id,staged=null,error=null))
-                // Project the candidate before committing: never silently discard annotations at XMP limits.
-                XmpCodec.encode(app.metadata.snapshot(source))
+                // Room annotation triggers retain the dirty backup generation atomically with
+                // these complete annotations. No XML guard or metadata field is discarded.
             } }
             stage.delete() // Only after verified remote bytes and the atomic metadata/link commit.
-            app.metadata.schedule(); app.people.schedule(); app.sync.schedule(source.connection(),true)
-            true
-        } catch(e: CancellationException) { throw e }
-        catch(e: DriveConnectionException) { throw e }
-        catch(e: Exception) {
-            dao.item(initial.id)?.let { dao.updateItem(it.copy(state="FAILED",error=e.message ?: "Import failed. Source preserved.")) }
-            dao.connectionState(id,"FAILED",e.message)
-            false
+            if(runtime!=null) runtime.committed(source)
+            else { app.metadata.schedule();app.people.schedule();app.sync.schedule(source.connection(),true) }
         }
     } }
 

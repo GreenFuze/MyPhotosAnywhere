@@ -55,7 +55,12 @@ class ImportExecutionTest {
             for(transport in listOf(true,false)) {
                 dao.saveJob(ImportJob("job","destination","TAKEOUT",state="RUNNING"))
                 var calls=0; var waits=0
-                assertFalse(ImportExecution(dao,{ calls++; if(transport) throw failure else error("invalid bytes") },{}, { waits++ }).run("job"))
+                val execution=ImportExecution(dao,{ calls++; if(transport) throw failure else error("invalid bytes") },{}, { waits++ })
+                if(transport) assertFalse(execution.run("job"))
+                else {
+                    try { execution.run("job");fail("Unexpected internal failures must propagate") }
+                    catch(error: IllegalStateException) { assertEquals("invalid bytes",error.message) }
+                }
                 assertEquals(if(transport) 4 else 1,calls); assertEquals(if(transport) 3 else 0,waits)
                 assertEquals("FAILED",dao.job("job")?.state)
                 assertFalse(dao.job("job")?.error.orEmpty().contains("secret"))

@@ -1,0 +1,8 @@
+<resources>
+    <plurals name="import_retry_remaining">
+        <item quantity="one">%d file needs retry. Other selected files continue importing.</item>
+        <item quantity="other">%d files need retry. Other selected files continue importing.</item>
+    </plurals>
+    <string name="import_retry_information">If an image fails, its error is kept and other images continue. Resume retries only failed or unfinished selected files. Verified imports are kept.</string>
+    <string name="import_annotation_information">XMP annotation backup is separate from importing originals. If its catalogue exceeds 2 MiB, annotations remain on this phone and that backup needs attention; image imports continue.</string>
+</resources>

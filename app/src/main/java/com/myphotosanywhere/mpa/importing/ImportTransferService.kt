@@ -36,12 +36,13 @@ class ImportTransferService: JobService() {
                 app.database.imports().job(id)?.let { notices.finish(id,execution.snapshot(id)) }
                 jobFinished(params,false)
             } catch(e: CancellationException) { throw e }
-            catch(_: Exception) {
+            catch(error: Exception) {
                 app.database.imports().connectionState(id,"FAILED","Background import stopped. Open MPA to resume; checkpoints are preserved.")
                 app.database.imports().job(id)?.let {
                     notices.finish(id,ImportProgress.from(it,app.database.imports().items(id)))
                 }
                 jobFinished(params,false)
+                if(error !is SecurityException) throw error
             } finally { if(running[params.jobId]===currentCoroutineContext().job) running.remove(params.jobId) }
         }
         running[params.jobId]=transfer

@@ -10,9 +10,9 @@ class ImportTransfer(private val api: DriveGateway) {
         keepGoing: suspend () -> Unit): Pair<ImportItem, DriveFile> {
         var item = initial
         val file = File(requireNotNull(item.staged))
-        require(file.isFile && file.length() == item.size) { "Staged file missing or size changed. Source and checkpoints are preserved." }
+        requireData(file.isFile && file.length() == item.size,"Staged file missing or size changed. Source and checkpoints are preserved.")
         val hashes=MediaFingerprint.read(file,keepGoing)
-        require(hashes.bytes==item.size && hashes.sha256==item.sha256 && hashes.md5==item.md5) { "Staged bytes changed. Source and checkpoints are preserved." }
+        requireData(hashes.bytes==item.size && hashes.sha256==item.sha256 && hashes.md5==item.md5,"Staged bytes changed. Source and checkpoints are preserved.")
         keepGoing()
         if(item.remoteId==null) {
             item = item.copy(remoteId = api.generateId(), state = "UPLOADING")
@@ -36,7 +36,7 @@ class ImportTransfer(private val api: DriveGateway) {
                     val bytes=ByteArray(minOf(1024L*1024,item.size-start).toInt())
                     input.seek(start); input.readFully(bytes)
                     progress=api.chunk(requireNotNull(session),item.size,start,bytes)
-                    require(progress.complete || progress.offset>start) { "Drive did not acknowledge import progress." }
+                    requireData(progress.complete || progress.offset>start,"Drive did not acknowledge import progress.")
                     item=item.copy(offset=progress.offset); save(item)
                 }
             }
@@ -49,10 +49,10 @@ class ImportTransfer(private val api: DriveGateway) {
     }
 
     companion object {
+        private fun requireData(valid: Boolean,message: String) { if(!valid) throw ImportItemDataException(message) }
         fun verify(remote: DriveFile, item: ImportItem, parent: String) {
-            require(!remote.trashed && remote.version!=null && (remote.sha256==null || remote.sha256==item.sha256) && remote.md5==item.md5 && remote.bytes==item.size && parent in remote.parents) {
-                "Remote checksum, size or destination changed. Import paused without overwriting or removing source bytes."
-            }
+            requireData(!remote.trashed && remote.version!=null && (remote.sha256==null || remote.sha256==item.sha256) && remote.md5==item.md5 && remote.bytes==item.size && parent in remote.parents,
+                "Remote checksum, size or destination changed. This file needs review; source bytes and checkpoints are preserved.")
         }
     }
 }

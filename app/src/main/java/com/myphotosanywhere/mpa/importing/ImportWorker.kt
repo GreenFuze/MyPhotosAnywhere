@@ -52,11 +52,11 @@ class ImportWorker(context: Context, params: WorkerParameters): CoroutineWorker(
             notices.finish(job,snapshot(job))
             if(success) Result.success() else Result.failure()
         } catch(e: CancellationException) { throw e }
-        catch(_: Exception) {
+        catch(error: Exception) {
             app.database.imports().connectionState(job,"FAILED",
                 "Background import stopped. Open MPA and resume; transfer checkpoints are preserved.")
             notices.finish(job,snapshot(job))
-            Result.failure()
+            if(error is SecurityException) Result.failure() else throw error
         }
     }
 }

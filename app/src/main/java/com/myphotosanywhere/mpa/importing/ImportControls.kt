@@ -152,6 +152,11 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
         OutlinedCard(Modifier.fillMaxWidth(),shape=androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         ImportJobProgress(job.id,progress)
+        val failedItems=entries.count { it.selected && it.state=="FAILED" }
+        if(failedItems>0 && job.state=="RUNNING") Text(
+            androidx.compose.ui.res.pluralStringResource(R.plurals.import_retry_remaining,failedItems,failedItems),
+            color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall,
+            modifier=Modifier.testTag("import-failed-count:${job.id}"))
         job.error?.let(ImportStatusText::inApp)?.takeIf { it!=progress.detail }?.let { Text(it,color=MaterialTheme.colorScheme.error) }
         Text("Destination: ${sources.find { it.key==job.binding }?.let { "${it.folderName} (${it.email})" } ?: "Disconnected original source"}",style=MaterialTheme.typography.bodySmall)
         FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -233,7 +238,9 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
             TextButton(onClick={ context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                 .putExtra(Settings.EXTRA_APP_PACKAGE,context.packageName)) }) { Text("Open notification settings") }
         }
-        Text("Imports go to the default Drive destination. Your only connected folder is chosen automatically. User-selected source files remain untouched. Media limit: 250 MiB per file; catalogue: 10,000 assets / 2 MiB.")
+        Text(stringResource(R.string.import_retry_information),style=MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.import_annotation_information),style=MaterialTheme.typography.bodySmall)
+        Text("Imports go to the default Drive destination. Your only connected folder is chosen automatically. User-selected source files remain untouched. Media limit: 250 MiB per file; source: 10,000 assets.")
         Text("For ZIPs, use local/USB storage. Cloud document providers may download the archive internally. Picker omits location metadata and may transcode videos.",style=MaterialTheme.typography.bodySmall)
         } }
         }
