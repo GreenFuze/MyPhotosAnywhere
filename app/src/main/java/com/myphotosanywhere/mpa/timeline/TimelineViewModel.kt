@@ -10,6 +10,7 @@ import androidx.paging.cachedIn
 import androidx.paging.map
 import com.myphotosanywhere.mpa.MpaApplication
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import java.time.LocalDate
 import java.time.ZoneId
@@ -81,7 +82,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
         else merge(kotlinx.coroutines.flow.callbackFlow<Unit> {
             val observation=repository.observe { trySend(Unit) }
             trySend(Unit)
-            kotlinx.coroutines.channels.awaitClose { observation.close() }
+            awaitClose { observation.close() }
         },frontierAcknowledgements).conflate().debounce(250).mapLatest {
             val frontier=continuity(query).frontier
             try { frontier.observe(repository.page(query,null,TimelineDirection.AFTER,1).firstOrNull()?.cursor) }
