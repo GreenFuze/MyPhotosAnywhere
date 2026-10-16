@@ -1,3 +1,7 @@
+## MPA 0.5.30: independent image failure recovery
+
+Application `a9c567182679c07f229b7c8c1c92193da539c1a9` passed 428 unit/integration and 139 native tests per API29/35/37 (417 total), zero test failures/errors/skips and zero lint findings. Schema10 and upgrade signer unchanged. [Evidence and explicit limits](releases/v0.5.30.md).
+
 ## MPA 0.5.29: UX acceptance and protected library actions
 
 Application `80612beaebee2362d84e3b6234512a781300c468` passed 417 unit/integration and 137 native tests per API29/35/37 (411 total), zero failures/errors/skips and zero lint findings. Schema10 and upgrade signer unchanged. [Evidence and explicit physical/performance limits](releases/v0.5.29.md).

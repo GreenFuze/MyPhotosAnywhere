@@ -6,6 +6,8 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
+The [0.5.30 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.30) continues other selected images after an item failure, retries only failed/unfinished items on Resume, and separates optional oversized XMP backup from original importing. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.30/MPA-0.5.30-debug.apk) · [Validation and remaining limits](docs/releases/v0.5.30.md).
+
 The [0.5.29 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.29) refines Sources/import history and Details, adds protected device-download removal and identity-proven repair of saved Takeout metadata, and fixes regenerated preview refresh. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.29/MPA-0.5.29-debug.apk) · [Automated evidence and pending physical acceptance](docs/releases/v0.5.29.md).
 
 The [0.5.28 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.28) adds direct date scrubbing and stable Mosaic date anchors. All 402 unit/integration and 387 native tests passed with zero lint findings; schema 10 and the upgrade signer remain unchanged. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.28/MPA-0.5.28-debug.apk) · [Evidence and limits](docs/releases/v0.5.28.md).

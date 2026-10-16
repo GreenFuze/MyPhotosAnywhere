@@ -87,3 +87,7 @@ Owner screenshots are the visual reference. Supported Android app-bar behavior: 
 ## Final automated UX delivery and remaining acceptance
 
 Stages 0.5.23–0.5.29 are delivered. Automated checks cover the planned Drive Trash, motion, Collections/Details, thumbnails/mosaic, continuous selection, direct date navigation and management refinements. Human TalkBack, translated Hebrew, live Google recovery and S23 Ultra behavior/frame performance remain pending; emulator FrameMetrics are diagnostic and do not satisfy a physical 60Hz target. The JPEG crash remains unreproduced. The next authorized backend increment handles oversized XMP and item-specific import continuation/retry; no claim of that fix is made by 0.5.29. The 250MiB video limit remains separate scope.
+
+## Import recovery delivered — 0.5.30 / 41
+
+[Published evidence](releases/v0.5.30.md), tested `a9c567182679c07f229b7c8c1c92193da539c1a9`. Individual image failures continue other selected files; Resume retries only selected failed/unfinished files and preserves verified successes/checkpoints/captured destinations. Optional source-wide XMP backup capacity no longer blocks original import; complete metadata stays in Room and the dirty outbox. Its 2MiB portable backup limit remains explicit, without claiming expanded backup capacity. All planned UX stages are delivered; the physical/live-service/human accessibility acceptance listed above remains pending.
