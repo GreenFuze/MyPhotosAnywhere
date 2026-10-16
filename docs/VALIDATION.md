@@ -1,3 +1,7 @@
+## MPA 0.5.28: Direct date scrubbing
+
+Application `7d71cfcc087d1c9cfbe9bf6243b937a79d8a7b3e` passed 402 unit/integration and 129 native tests per API 29/35/37 (387 total), zero failures/errors/skips and zero lint findings. Schema10 and established signer unchanged. [Evidence and pending physical acceptance](releases/v0.5.28.md).
+
 ## MPA 0.5.27: Continuous drag selection
 
 Application `6be8d783c8014e2aa58bb115b5be4a8b75b55ff7` passed 392 unit/integration and 125 native tests per API29/35/37 (375 total), zero failures/errors/skips and zero lint findings. Schema 10 and established signer unchanged. [Evidence and pending physical acceptance](releases/v0.5.27.md).
