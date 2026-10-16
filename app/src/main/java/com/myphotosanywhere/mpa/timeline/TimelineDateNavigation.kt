@@ -125,6 +125,7 @@ internal fun TimelineFloatingDateChip(indicator: TimelineDateIndicator?,onOpen: 
         color=MaterialTheme.colorScheme.surfaceContainerHigh,shadowElevation=2.dp) {
         TextButton(onClick=onOpen,modifier=Modifier.heightIn(min=48.dp).widthIn(min=48.dp,max=240.dp)
             .testTag("timeline:date-rail").semantics {
+                heading()
                 contentDescription="Jump to month or year"
                 stateDescription=if(preview!=null) "$label${if(seeking) ", seeking" else ", date preview"}" else indicator?.description(locale) ?: "No visible photo date"
             }) {

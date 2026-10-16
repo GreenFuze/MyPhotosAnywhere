@@ -1,0 +1,34 @@
+<resources>
+    <string name="ux_transfer_settings">Transfer settings</string>
+    <string name="ux_source_help">Source and account help</string>
+    <string name="ux_expanded">Expanded</string>
+    <string name="ux_collapsed">Collapsed</string>
+    <string name="ux_remove_download">Remove device download</string>
+    <string name="ux_remove_download_question">Remove device download?</string>
+    <string name="ux_remove_download_explanation">MPA verifies the Drive original before removing this downloaded file. Its cached preview, albums and photo information stay here. Offline pins, edits and active transfers prevent removal.</string>
+    <string name="ux_cancel">Cancel</string>
+    <string name="ux_close">Close</string>
+    <string name="ux_repair_metadata">Repair saved metadata</string>
+    <string name="ux_repair_metadata_summary">Updated: %1$d · Already applied: %2$d · Need review: %3$d</string>
+    <string name="ux_repair_metadata_help">This uses saved Takeout sidecars for verified imported photos. It keeps your existing annotations and does not upload originals again. If no sidecar was saved, add the matching ZIP part first. Only names actually exported by Google can be recovered; these remain imported labels, separate from reviewed face groups.</string>
+    <plurals name="ux_repair_more_failures">
+        <item quantity="one">%d additional item needs review. Repair can be repeated safely after resolving the saved metadata.</item>
+        <item quantity="other">%d additional items need review. Repair can be repeated safely after resolving the saved metadata.</item>
+    </plurals>
+    <plurals name="ux_photo_count">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
+    </plurals>
+    <plurals name="ux_restore_photo_count">
+        <item quantity="one">Restore %d photo</item>
+        <item quantity="other">Restore %d photos</item>
+    </plurals>
+    <plurals name="ux_restore_photo_message">
+        <item quantity="one">Restore %d photo to its existing Drive location.</item>
+        <item quantity="other">Restore %d photos to their existing Drive locations.</item>
+    </plurals>
+    <plurals name="ux_trash_photo_message">
+        <item quantity="one">Move %d photo to Drive Trash. Google normally deletes it after 30 days. Other Drive copies and local original bytes are preserved.</item>
+        <item quantity="other">Move %d photos to Drive Trash. Google normally deletes them after 30 days. Other Drive copies and local original bytes are preserved.</item>
+    </plurals>
+</resources>

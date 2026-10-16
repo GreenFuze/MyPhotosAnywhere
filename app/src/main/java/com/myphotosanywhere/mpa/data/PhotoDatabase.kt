@@ -70,6 +70,15 @@ interface PhotoDao {
 
     @Query("SELECT * FROM photos WHERE id = :id")
     suspend fun find(id: String): Photo?
+    @Query("SELECT EXISTS(SELECT 1 FROM photos WHERE originalPath IN (:paths) AND id<>:id)")
+    suspend fun sharesOriginal(id: String,paths: List<String>): Boolean
+    @Query("""SELECT EXISTS(SELECT 1 FROM import_items i JOIN import_jobs j ON j.id=i.job
+        WHERE i.photoId=:id AND i.state<>'COMPLETE' AND j.state<>'CANCELLED')""")
+    suspend fun unfinishedImport(id: String): Boolean
+    @Query("UPDATE photos SET originalPath='',thumbnailPath=:preview WHERE id=:id AND originalPath=:path")
+    suspend fun clearOriginal(id: String,path: String,preview: String): Int
+    @Query("UPDATE photos SET originalPath=:path WHERE id=:id AND originalPath='' AND sha256=:sha AND bytes=:bytes")
+    suspend fun restoreOriginalPath(id: String,path: String,sha: String,bytes: Long): Int
 
     @Query("SELECT * FROM photos ORDER BY importedAt")
     suspend fun all(): List<Photo>

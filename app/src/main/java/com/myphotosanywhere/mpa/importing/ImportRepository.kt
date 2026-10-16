@@ -26,6 +26,12 @@ class ImportRepository(private val context: Context) {
     private val archives=TakeoutArchiveStore(context)
     private val links=TakeoutLinkVault()
 
+    suspend fun repairMetadata(id: String): MetadataRepairResult=withContext(Dispatchers.IO) { lock.withLock {
+        val result=TakeoutMetadataRepair(db).repair(id)
+        if(result.applied>0) app.metadata.schedule()
+        result
+    } }
+
     suspend fun addTakeoutUrl(link: String, autoStart: Boolean=true): String = withContext(Dispatchers.IO) { lock.withLock {
         val url=link.trim(); TakeoutZipDownloader.validateLink(url)
         val job=ImportJob(UUID.randomUUID().toString(),destination().key,"TAKEOUT",state="DOWNLOADING")
@@ -144,10 +150,8 @@ class ImportRepository(private val context: Context) {
             dao.saveJob(job.copy(state="PREVIEW",error=null))
             manifest.forEach { dao.insertItem(it) }
             documents.match(dao.items(job.id)).forEach { dao.updateItem(it) }
-            // Late metadata can attach to a previously completed media item without uploading again.
-            for(item in dao.items(job.id).filter { it.state=="COMPLETE" && it.metadata!=null && it.photoId!=null })
-                db.photos().find(requireNotNull(item.photoId))?.let { db.photos().update(codec.apply(it,codec.parse(requireNotNull(item.metadata)))) }
         }
+        applyLateMetadata(job.id)
         job.id
     } }
 
@@ -181,11 +185,16 @@ class ImportRepository(private val context: Context) {
             dao.saveJob(job.copy(state="PREVIEW",error=null))
             manifest.forEach { dao.insertItem(it) }
             documents.match(dao.items(job.id)).forEach { dao.updateItem(it) }
-            for(item in dao.items(job.id).filter { it.state=="COMPLETE" && it.metadata!=null && it.photoId!=null })
-                db.photos().find(requireNotNull(item.photoId))?.let { db.photos().update(codec.apply(it,codec.parse(requireNotNull(item.metadata)))) }
         }
+        applyLateMetadata(job.id)
         job.id
     } }
+
+    private suspend fun applyLateMetadata(id: String) {
+        val result=TakeoutMetadataRepair(db).repair(id)
+        if(result.applied>0) app.metadata.schedule()
+        if(result.failed>0) dao.job(id)?.let { dao.saveJob(it.copy(error="Some saved metadata could not be applied. Open Repair saved metadata to review and retry. Verified photos and checkpoints are preserved.")) }
+    }
 
     private suspend fun stageTakeout(item: ImportItem, stage: File, client: okhttp3.OkHttpClient?, keepGoing: suspend ()->Unit): MediaFingerprint {
         val uri=item.uri.toUri()

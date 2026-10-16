@@ -5,7 +5,9 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Modifier
@@ -35,6 +37,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -42,6 +48,9 @@ import com.google.android.gms.common.AccountPicker
 import com.myphotosanywhere.mpa.data.Photo
 import com.myphotosanywhere.mpa.ui.IconLabelAction
 import com.myphotosanywhere.mpa.R
+import com.myphotosanywhere.mpa.ui.ShellIcon
+import com.myphotosanywhere.mpa.ui.MotionVisibility
+import com.myphotosanywhere.mpa.ui.MotionEdge
 
 @Composable
 fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->Unit,onSettings: ()->Unit,model: DriveViewModel = viewModel()) {
@@ -54,6 +63,8 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
     var disconnecting by rememberSaveable { mutableStateOf(false) }
     var modeName by rememberSaveable { mutableStateOf(DriveMode.APP_FILES.name) }
     var folderName by rememberSaveable { mutableStateOf("MyPhotosAnywhere") }
+    var transferSettings by rememberSaveable { mutableStateOf<String?>(null) }
+    var sourceHelp by rememberSaveable { mutableStateOf(false) }
     val resolution = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
         model.authorizationResult(it.resultCode,it.data)
     }
@@ -69,7 +80,8 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
         try {
             accountPicker.launch(AccountPicker.newChooseAccountIntent(AccountPicker.AccountChooserOptions.Builder()
                 .setAllowableAccountsTypes(listOf("com.google")).build()))
-        } catch (_: Exception) { model.report("Google account selection is unavailable. Install or update Google Play services.") }
+        } catch (_: android.content.ActivityNotFoundException) { model.report("Google account selection is unavailable. Install or update Google Play services.") }
+        catch (_: SecurityException) { model.report("Android blocked Google account selection. Check this device’s account restrictions.") }
     }
     val current = active
     val currentBackups = backups.filter { it.bindingKey == current?.binding()?.key }
@@ -95,13 +107,20 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
         if(sources.isNotEmpty()) {
             Text("Connected Drive sources",style=MaterialTheme.typography.titleMedium)
             sources.forEach { source ->
-                Card(Modifier.fillMaxWidth()) {
+                Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp)) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(source.folderName)
-                        Text(source.email,style=MaterialTheme.typography.bodySmall)
+                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                            ShellIcon(R.drawable.ic_shell_account)
+                            Column(Modifier.weight(1f)) {
+                                Text(source.folderName,style=MaterialTheme.typography.titleMedium)
+                                Text(source.email,style=MaterialTheme.typography.bodySmall)
+                            }
+                        }
                         if(source.backupEnabled) Text("Default for new imports and backups",style=MaterialTheme.typography.labelMedium)
                         else if(sources.size==1) Text("Default for new imports (only connected folder)",style=MaterialTheme.typography.labelMedium)
-                        TextButton(enabled=!busy,onClick={ model.selectSource(source) }) { Text("Manage source") }
+                        TextButton(enabled=!busy,onClick={ model.selectSource(source) },modifier=Modifier.heightIn(min=48.dp)) {
+                            ShellIcon(R.drawable.ic_action_settings);Text("Manage source",Modifier.padding(start=8.dp))
+                        }
                     }
                 }
             }
@@ -111,9 +130,9 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
         if (current == null) {
             Text("Connect your Google Drive", style = MaterialTheme.typography.titleMedium)
             DriveMode.entries.forEach { mode ->
-                Row(Modifier.fillMaxWidth().clickable(enabled = !busy) { modeName = mode.name },
+                Row(Modifier.fillMaxWidth().heightIn(min=48.dp).selectable(selected=modeName==mode.name,enabled=!busy,role=Role.RadioButton,onClick={ modeName=mode.name }),
                     verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = modeName == mode.name, onClick = { modeName = mode.name }, enabled = !busy)
+                    RadioButton(selected = modeName == mode.name, onClick = null, enabled = !busy)
                     Text(mode.title)
                 }
             }
@@ -122,24 +141,39 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
             Text("Sign in with the Google account that stores your photos.",
                 style = MaterialTheme.typography.bodySmall)
         } else {
-            Card(Modifier.fillMaxWidth()) {
+            Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(current.email, style = MaterialTheme.typography.titleMedium)
                     Text(current.folderName ?: "No photo folder selected")
                     Text(DriveMode.valueOf(current.mode).title, style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(enabled = !busy, onClick = { model.browse() }) { Text("Add Drive folder") }
+                    OutlinedButton(enabled = !busy, onClick = { model.browse() },modifier=Modifier.heightIn(min=48.dp)) {
+                        ShellIcon(R.drawable.ic_shell_add);Text("Add Drive folder",Modifier.padding(start=8.dp))
+                    }
                     if (current.folderId != null) {
-                        OutlinedButton(enabled = !busy, onClick = model::browseSelected) { Text("Browse Drive photos") }
+                        OutlinedButton(enabled = !busy, onClick = model::browseSelected,modifier=Modifier.heightIn(min=48.dp)) {
+                            ShellIcon(R.drawable.ic_shell_photos);Text("Browse Drive photos",Modifier.padding(start=8.dp))
+                        }
                         Button(enabled = !busy, onClick = if (current.backupEnabled) model::pauseBackup else model::enableBackup) {
                             Text(if (current.backupEnabled) "Pause backup" else "Use as default import and backup destination")
                         }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Switch(checked = current.unmeteredOnly, enabled = !busy, onCheckedChange = model::unmeteredOnly)
-                        Text("Transfer on unmetered networks only", style = MaterialTheme.typography.bodySmall)
+                    val settingsKey=current.binding()?.key ?: current.accountId
+                    val expanded=transferSettings==settingsKey
+                    val expandedState=stringResource(if(expanded) R.string.ux_expanded else R.string.ux_collapsed)
+                    OutlinedButton(enabled=!busy,onClick={ transferSettings=if(expanded) null else settingsKey },
+                        modifier=Modifier.heightIn(min=48.dp).testTag("source:transfer-settings").semantics { stateDescription=expandedState }) {
+                        ShellIcon(R.drawable.ic_action_settings);Text(stringResource(R.string.ux_transfer_settings),Modifier.padding(start=8.dp))
                     }
-                    Text("${currentBackups.count { it.state == "COMPLETE" }} backed up · ${currentBackups.count { it.state != "COMPLETE" }} pending")
-                    if (current.backupEnabled) TextButton(enabled = !busy, onClick = model::retryBackup) { Text("Retry pending backups") }
+                    MotionVisibility(expanded,MotionEdge.TOP) {
+                        Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.fillMaxWidth().heightIn(min=48.dp).toggleable(current.unmeteredOnly,enabled=!busy,role=Role.Switch,onValueChange=model::unmeteredOnly),verticalAlignment=Alignment.CenterVertically) {
+                                Switch(checked=current.unmeteredOnly,enabled=!busy,onCheckedChange=null)
+                                Text("Transfer on unmetered networks only",style=MaterialTheme.typography.bodySmall)
+                            }
+                            Text("${currentBackups.count { it.state == "COMPLETE" }} backed up · ${currentBackups.count { it.state != "COMPLETE" }} pending")
+                            if(current.backupEnabled) TextButton(enabled=!busy,onClick=model::retryBackup,modifier=Modifier.heightIn(min=48.dp)) { Text("Retry pending backups") }
+                        }
+                    }
                 }
             }
             val problems = currentBackups.filter { it.errorMessage != null }.take(5)
@@ -157,9 +191,16 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
                 TextButton(enabled = !busy, onClick = { disconnecting=true },modifier=Modifier.testTag("source:remove")) { Text("Remove this source") }
             }
         }
-        Text("Removing a source stops its transfers. Other sources continue syncing; local photos and people are preserved. Google permissions can be revoked in your account settings.", style = MaterialTheme.typography.bodySmall)
-        Text("Keep your source copies. Uninstalling MPA removes this device's private library.", style = MaterialTheme.typography.bodySmall)
-        GoogleSetupDetails()
+        TextButton(onClick={ sourceHelp=!sourceHelp },modifier=Modifier.heightIn(min=48.dp).testTag("source:help")) {
+            ShellIcon(R.drawable.ic_action_info);Text(stringResource(R.string.ux_source_help),Modifier.padding(start=8.dp))
+        }
+        MotionVisibility(sourceHelp,MotionEdge.TOP) {
+            Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text("Removing a source stops its transfers. Other sources continue syncing; local photos and people are preserved. Google permissions can be revoked in your account settings.",style=MaterialTheme.typography.bodySmall)
+                Text("Keep your source copies. Uninstalling MPA removes this device's private library.",style=MaterialTheme.typography.bodySmall)
+                GoogleSetupDetails()
+            }
+        }
     }
     if(disconnecting && current!=null) AlertDialog(onDismissRequest={ disconnecting=false },title={ Text("Disconnect ${current.folderName ?: current.email}?") },text={
         Text("This stops access and transfers for ${current.email} / ${current.folderName ?: "this source"}. Its remote-only entries leave the connected gallery; existing local photos, annotations and saved import jobs are preserved. Jobs keep this destination and may require reconnection. Drive originals are not deleted. Other sources continue working.")

@@ -55,6 +55,9 @@ interface ImportDao {
     @Query("SELECT * FROM import_items ORDER BY job,path") fun observeItems(): Flow<List<ImportItem>>
     @Query("SELECT * FROM import_items WHERE job=:id ORDER BY path,id") suspend fun items(id: String): List<ImportItem>
     @Query("SELECT * FROM import_items WHERE id=:id") suspend fun item(id: String): ImportItem?
+    @Query("""SELECT * FROM import_items WHERE job=:job AND id>:after AND state='COMPLETE'
+        AND metadata IS NOT NULL AND photoId IS NOT NULL ORDER BY id LIMIT :limit""")
+    suspend fun metadataRepairPage(job: String,after: String,limit: Int): List<ImportItem>
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertItem(item: ImportItem)
     @Update suspend fun updateItem(item: ImportItem)
     @Query("SELECT * FROM takeout_sidecars ORDER BY binding,name") fun observeSidecars(): Flow<List<TakeoutSidecar>>

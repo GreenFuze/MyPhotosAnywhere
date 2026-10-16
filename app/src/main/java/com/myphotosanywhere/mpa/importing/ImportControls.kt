@@ -15,12 +15,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -29,6 +31,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.AccountPicker
 import com.myphotosanywhere.mpa.MpaApplication
+import com.myphotosanywhere.mpa.R
+import com.myphotosanywhere.mpa.ui.MotionVisibility
+import com.myphotosanywhere.mpa.ui.MotionEdge
+import com.myphotosanywhere.mpa.ui.ShellIcon
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -43,6 +49,19 @@ class ImportModel(application: Application): AndroidViewModel(application) {
     val dismissed=history.observeDismissed().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptySet())
     val busy=MutableStateFlow(false)
     val message=MutableStateFlow<String?>(null)
+    val metadataRepair=MutableStateFlow<MetadataRepairResult?>(null)
+    fun repairMetadata(id: String) {
+        if(busy.value) return
+        viewModelScope.launch {
+            busy.value=true
+            try { metadataRepair.value=app.imports.repairMetadata(id) }
+            catch(error: CancellationException) { throw error }
+            catch(error: java.io.IOException) { message.value=error.message }
+            catch(error: android.database.sqlite.SQLiteException) { message.value="Metadata storage is unavailable. Saved photos and sidecars are preserved; retry repair." }
+            catch(error: SecurityException) { message.value="Metadata storage access is unavailable. Saved photos and sidecars are preserved." }
+            finally { busy.value=false }
+        }
+    }
     private var photosEmail: String?=null
     fun run(action: suspend () -> Unit) {
         if(busy.value) return
@@ -87,6 +106,7 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
     val downloads by model.downloads.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
+    val metadataRepair by model.metadataRepair.collectAsStateWithLifecycle()
     val settings by model.app.settings.state.collectAsStateWithLifecycle()
     val notices=remember(context) { ImportNotifications(context) }
     var notificationsEnabled by remember { mutableStateOf(notices.enabled()) }
@@ -113,7 +133,8 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
     var discardZip by rememberSaveable { mutableStateOf<String?>(null) }
     fun open(uri: String) {
         try { context.startActivity(Intent(Intent.ACTION_VIEW,uri.toUri())) }
-        catch(_: Exception) { model.message.value="Install a browser to open Google Photos, then use Open picker below." }
+        catch(_: android.content.ActivityNotFoundException) { model.message.value="Install a browser to open Google Photos, then use Open picker below." }
+        catch(_: SecurityException) { model.message.value="Android blocked the picker browser. Open it through a permitted browser and retry." }
     }
     val resolution=rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
         model.authorized(it.data,::open)
@@ -128,20 +149,26 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
         val entries=items.filter { it.job==job.id }
         val download=downloads.find { it.job==job.id }
         val progress=ImportProgress.from(job,entries)
+        OutlinedCard(Modifier.fillMaxWidth(),shape=androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
+        Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         ImportJobProgress(job.id,progress)
         job.error?.let(ImportStatusText::inApp)?.takeIf { it!=progress.detail }?.let { Text(it,color=MaterialTheme.colorScheme.error) }
         Text("Destination: ${sources.find { it.key==job.binding }?.let { "${it.folderName} (${it.email})" } ?: "Disconnected original source"}",style=MaterialTheme.typography.bodySmall)
-        TextButton(onClick={ expandedJob=if(expandedJob==job.id) null else job.id },modifier=Modifier.heightIn(min=48.dp).testTag("import:details:${job.id}")) { Text(if(expandedJob==job.id) "Hide details" else "View details") }
+        FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick={ expandedJob=if(expandedJob==job.id) null else job.id },modifier=Modifier.heightIn(min=48.dp).testTag("import:details:${job.id}")) {
+            ShellIcon(R.drawable.ic_action_info);Text(if(expandedJob==job.id) "Hide details" else "View details",Modifier.padding(start=8.dp))
+        }
         if(ImportErrorDismissal.canDismiss(job) && ImportErrorDismissal.hasErrors(job,entries,download))
             TextButton(enabled=!busy,onClick={ model.run { model.app.imports.dismissErrors(job.id) } },
-                modifier=Modifier.testTag("dismiss-import-errors:${job.id}")) { Text("Dismiss errors") }
+                modifier=Modifier.heightIn(min=48.dp).testTag("dismiss-import-errors:${job.id}")) { Text("Dismiss errors") }
         if(ImportHistory.canDismiss(job.state)) {
             if(job.id in dismissed) TextButton(enabled=!busy,onClick={ model.run { model.history.restore(job.id) } },
-                modifier=Modifier.testTag("restore-import:${job.id}")) { Text("Restore import") }
+                modifier=Modifier.heightIn(min=48.dp).testTag("restore-import:${job.id}")) { Text("Restore import") }
             else TextButton(enabled=!busy,onClick={ model.run { model.history.dismiss(model.app.database,job.id) } },
-                modifier=Modifier.testTag("dismiss-import:${job.id}")) { Text("Dismiss import") }
+                modifier=Modifier.heightIn(min=48.dp).testTag("dismiss-import:${job.id}")) { Text("Dismiss import") }
         }
-        if(expandedJob==job.id) {
+        }
+        MotionVisibility(expandedJob==job.id,MotionEdge.TOP) { Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
         download?.let {
             Text(when(it.state) {
                 "CLEANED" -> "Downloaded ZIP removed from this phone."
@@ -159,6 +186,8 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
             }
         }
         if(job.kind=="TAKEOUT" && job.state !in listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP","CANCELLED")) {
+            if(entries.any { it.state=="COMPLETE" }) TextButton(enabled=!busy,onClick={ model.repairMetadata(job.id) },
+                modifier=Modifier.heightIn(min=48.dp).testTag("repair-metadata:${job.id}")) { Text(stringResource(R.string.ux_repair_metadata)) }
             TextButton(enabled=!busy,onClick={ targetJob=job.id; zip.launch(Unit) }) { Text("Add ZIP parts to this import") }
             TextButton(enabled=!busy && sources.isNotEmpty(),onClick={ targetJob=job.id; driveZip=true }) { Text("Add Drive ZIP part") }
         }
@@ -173,6 +202,8 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
         if(job.state !in listOf("COMPLETE","CANCELLED")) TextButton(enabled=!busy,onClick={ model.run { model.app.imports.pause(job.id,true) } }) { Text("Cancel remaining import") }
     }
     }
+    } }
+    }
     val activeStates=listOf("RUNNING","DOWNLOADING","WAITING_FOR_APP")
     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text(when(surface) { ImportSurface.NEW -> "Import Google Photos";ImportSurface.ACTIVITY -> "Imports";ImportSurface.HISTORY -> "Import history" },style=MaterialTheme.typography.titleMedium)
@@ -182,16 +213,17 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
             ?: "Connect a Drive folder, or choose a default when several folders are connected.",style=MaterialTheme.typography.bodySmall)
         Button(enabled=!busy,onClick={
             try { account.launch(AccountPicker.newChooseAccountIntent(AccountPicker.AccountChooserOptions.Builder().setAllowableAccountsTypes(listOf("com.google")).build())) }
-            catch(_: Exception) { model.message.value="Google account selection requires Google Play services." }
-        },modifier=Modifier.testTag("import-photos-picker")) { Text("Choose from Google Photos") }
-        OutlinedButton(enabled=!busy,onClick={ targetJob=null; zip.launch(Unit) },modifier=Modifier.testTag("import-takeout")) { Text("Import Takeout ZIP parts") }
+            catch(_: android.content.ActivityNotFoundException) { model.message.value="Google account selection requires Google Play services." }
+            catch(_: SecurityException) { model.message.value="Android blocked Google account selection. Check account access and retry." }
+        },modifier=Modifier.heightIn(min=48.dp).testTag("import-photos-picker")) { ShellIcon(R.drawable.ic_shell_photos);Text("Choose from Google Photos",Modifier.padding(start=8.dp)) }
+        OutlinedButton(enabled=!busy,onClick={ targetJob=null; zip.launch(Unit) },modifier=Modifier.heightIn(min=48.dp).testTag("import-takeout")) { ShellIcon(R.drawable.ic_shell_add);Text("Import Takeout ZIP parts",Modifier.padding(start=8.dp)) }
         TextButton(enabled=!busy && sources.isNotEmpty(),onClick={ targetJob=null; driveZip=true }) { Text("Import Takeout ZIP from Drive") }
         TextButton(enabled=!busy,onClick={ targetJob=null; folder.launch(Unit) }) { Text("Import extracted Takeout folder") }
         Text(if(settings.sidecarBackup) "Imported metadata uses XMP annotation backup; check Settings > Backup and metadata."
             else "Imported metadata is local only until you enable Settings > Backup and metadata.",style=MaterialTheme.typography.bodySmall)
         var explain by rememberSaveable { mutableStateOf(false) }
         TextButton(onClick={ explain=!explain },modifier=Modifier.heightIn(min=48.dp)) { Text(if(explain) "Hide import information" else "How imports work") }
-        if(explain) {
+        MotionVisibility(explain,MotionEdge.TOP) { Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text("Takeout ZIPs are read locally. Importing uploads the selected files to your Drive destination and requires an internet connection.",style=MaterialTheme.typography.bodySmall)
         Text("Imports continue in the background with live progress here and in notifications. Android may pause work for network or system limits; checkpoints are preserved.",style=MaterialTheme.typography.bodySmall)
         if(!notificationsEnabled) {
@@ -203,7 +235,7 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
         }
         Text("Imports go to the default Drive destination. Your only connected folder is chosen automatically. User-selected source files remain untouched. Media limit: 250 MiB per file; catalogue: 10,000 assets / 2 MiB.")
         Text("For ZIPs, use local/USB storage. Cloud document providers may download the archive internally. Picker omits location metadata and may transcode videos.",style=MaterialTheme.typography.bodySmall)
-        }
+        } }
         }
         if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let { Text(it,color=MaterialTheme.colorScheme.error); TextButton(onClick={ model.message.value=null }) { Text("Dismiss") } }
@@ -239,6 +271,18 @@ fun ImportControls(surface: ImportSurface=ImportSurface.NEW,model: ImportModel=v
         }
     } }
     if(driveZip) DriveTakeoutBrowser(model,targetJob) { driveZip=false }
+    metadataRepair?.let { result -> AlertDialog(onDismissRequest={ model.metadataRepair.value=null },
+        title={ Text(stringResource(R.string.ux_repair_metadata)) },text={
+            Column(Modifier.heightIn(max=400.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.ux_repair_metadata_summary,result.applied,result.unchanged,result.failed))
+                Text(stringResource(R.string.ux_repair_metadata_help))
+                result.failures.forEach { Text("${it.name}: ${it.reason}",style=MaterialTheme.typography.bodySmall) }
+                if(result.failed>result.failures.size) {
+                    val remaining=result.failed-result.failures.size
+                    Text(androidx.compose.ui.res.pluralStringResource(R.plurals.ux_repair_more_failures,remaining,remaining))
+                }
+            }
+        },confirmButton={ TextButton(onClick={ model.metadataRepair.value=null },modifier=Modifier.heightIn(min=48.dp)) { Text(stringResource(R.string.ux_close)) } }) }
     discardZip?.let { id -> AlertDialog(onDismissRequest={ discardZip=null },title={ Text("Delete downloaded ZIP?") },text={
         Text("This removes MPA's downloaded ZIP and unfinished transfer copies from this phone. Verified imports remain in Drive. Skipped or unfinished files will need the source ZIP again; an expired link may require a new export.")
     },confirmButton={ TextButton(onClick={ discardZip=null; model.run { model.app.imports.discardDownloadedZip(id) } }) { Text("Delete phone ZIP") } },

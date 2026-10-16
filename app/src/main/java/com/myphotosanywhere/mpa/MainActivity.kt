@@ -373,13 +373,17 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     if(selected!=null && !showShare && editorId==null && (viewerId==null || viewerDetailsOpen) && pendingViewKey==null && (timelineViewer==null && searchViewer==null || viewerDetailsOpen)) PhotoDetails(selected,features,albums,memberships,people,faces,
         onClose={ viewerDetailsOpen=false;if(viewerId==null) selectedId=null },onEdit={ editorId=selected.id },onAI={ showShare=true },onExport={
             exportId=selected.id; export.launch(selected.displayName)
-        },onResult=handoffs.firstOrNull { it.photoId==selected.id }?.let { h -> { pickResult(h) } },onView=if(viewerId==null && timelineViewer==null && searchViewer==null) ({ viewerId=selected.id }) else null,showPreview=viewerId==null && timelineViewer==null && searchViewer==null)
+        },onResult=handoffs.firstOrNull { it.photoId==selected.id }?.let { h -> { pickResult(h) } },onView=if(viewerId==null && timelineViewer==null && searchViewer==null) ({ viewerId=selected.id }) else null,showPreview=viewerId==null && timelineViewer==null && searchViewer==null,
+        onRemoveCopy={ features.requestRemoveDownload(selected) })
     if(selected!=null && showShare) ShareDialog(busy,onDismiss={ showShare=false }) { provider,instructions ->
         model.share(selected,provider,instructions) { intent -> context.startActivity(intent); showShare=false }
     }
     editorId?.let { id -> EditorScreen(id,onClose={ editorId=null },onSaved={ saved -> editorId=null; selectedId=saved }) }
     com.myphotosanywhere.mpa.trash.TrashDialogs(trash,onQueued={
         selection.clear();timeline.closeViewer();searchTimeline.closeViewer();viewerId=null;viewerDetailsOpen=false;selectedId=null
+    })
+    DeviceCopyDialogs(features,onClosing={
+        timeline.closeViewer();searchTimeline.closeViewer();viewerId=null;viewerDetailsOpen=false;selectedId=null
     })
 }
 

@@ -13,6 +13,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import com.myphotosanywhere.mpa.R
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.semantics.heading
@@ -70,8 +72,8 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
             Card(onClick={ onImported(group.label.key) },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("imported-person:${group.label.key}")) {
                 Row(Modifier.padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     if(group.thumbnail.isNotBlank()) AsyncImage(File(group.thumbnail),null,Modifier.size(72.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),contentScale=ContentScale.Crop)
-                    Column { Text(group.label.name,style=MaterialTheme.typography.titleMedium)
-                        Text("${group.photos} ${if(group.photos==1) "photo" else "photos"} · imported label",style=MaterialTheme.typography.bodySmall)
+                    Column(Modifier.weight(1f)) { Text(group.label.name,style=MaterialTheme.typography.titleMedium)
+                        Text(pluralStringResource(R.plurals.ux_photo_count,group.photos,group.photos)+" · imported label",style=MaterialTheme.typography.bodySmall)
                         Text(sources.find { it.key==group.label.binding }?.let { "${it.folderName} · ${it.email}" } ?: if(group.label.binding==null) "Imported source not recorded" else "Original import source disconnected",style=MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -103,7 +105,8 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                     if(cover!=null) AsyncImage(File(cover.cropPath),null,Modifier.size(72.dp).clip(CircleShape),contentScale=ContentScale.Crop)
                     Column(Modifier.weight(1f).heightIn(min=48.dp).clickable(role=androidx.compose.ui.semantics.Role.Button) { onPerson(person.id) }) {
                         Text(person.name,style=MaterialTheme.typography.titleMedium)
-                        Text("${faces.filter { it.personId==person.id }.map { it.photoId }.distinct().size} photos")
+                        val count=faces.filter { it.personId==person.id }.map { it.photoId }.distinct().size
+                        Text(pluralStringResource(R.plurals.ux_photo_count,count,count))
                         val candidates=pending.filter { it.suggestedPersonId==person.id }
                         if(candidates.isNotEmpty()) TextButton(onClick={ startNaming(candidates.map { it.id },person) }) {
                             Text("Review ${candidates.size} possible matches")

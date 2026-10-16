@@ -29,6 +29,8 @@ interface LibraryDao {
     @Query("SELECT * FROM album_photos") fun memberships(): Flow<List<AlbumPhoto>>
     @Query("SELECT * FROM album_photos WHERE albumId = :id") suspend fun members(id: String): List<AlbumPhoto>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun saveAlbum(album: Album)
+    @Query("UPDATE albums SET name = :name WHERE id = :id") suspend fun renameAlbum(id: String,name: String): Int
+    @Query("UPDATE albums SET pinned = :pinned WHERE id = :id") suspend fun pinAlbum(id: String,pinned: Boolean): Int
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun addToAlbum(member: AlbumPhoto)
     @Query("DELETE FROM album_photos WHERE albumId = :album AND photoId = :photo") suspend fun removeFromAlbum(album: String, photo: String)
     @Query("DELETE FROM album_photos WHERE albumId = :id") suspend fun clearAlbum(id: String)

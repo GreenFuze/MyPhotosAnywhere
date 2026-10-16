@@ -8,7 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import androidx.room.withTransaction
+import kotlinx.coroutines.NonCancellable
 import java.io.File
+import java.io.IOException
 
 /** All readers of disposable originals and all eviction share this lock. */
 class MediaCache(private val context: Context, private val database: PhotoDatabase, private val settings: LibrarySettings,
@@ -52,6 +55,124 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
             database.photos().update(photo.copy(lastAccess=System.currentTimeMillis()))
             action(photo,file)
         }
+    }
+
+    /** User-directed removal is separate from Drive Trash and requires fresh exact-copy proof. */
+    internal suspend fun removeDownloadedCopy(identity: DeviceCopyIdentity): String=withContext(Dispatchers.IO) {
+        val id=identity.id
+        val unused=kotlinx.coroutines.withTimeoutOrNull(1500) {
+            while(synchronized(readers) { readers[id] ?: 0 }>0) kotlinx.coroutines.delay(16)
+            true
+        }
+        if(unused!=true) throw IOException("This original is still in use. Close its viewer or editor and retry.")
+        var protection: AutoCloseable?=null
+        try {
+            val snapshot=lock.withLock {
+                val photo=database.photos().find(id) ?: throw IOException("This photo is no longer available.")
+                if(!identity.matches(photo)) throw IOException("This photo or its source changed. Open its details again.")
+                requireDisposable(photo,0)
+                val source=requireNotNull(database.drive().source(requireNotNull(photo.sourceBindingKey)))
+                val file=File(photo.originalPath)
+                protection=reader(id)
+                RemovalSnapshot(photo,source,file,file.lastModified())
+            }
+            val photo=snapshot.photo;val file=snapshot.file
+            if(file.length()!=photo.bytes || com.myphotosanywhere.mpa.drive.DriveBackupWorker.digest(file,"SHA-256")!=photo.sha256)
+                throw IOException("The device file no longer matches its verified identity. It was kept.")
+            val verified=if(remoteVerifier!=null) remoteVerifier.invoke(photo,file) else {
+                val app=context.applicationContext as com.myphotosanywhere.mpa.MpaApplication
+                val api=app.sync.api(snapshot.source.connection())
+                val remote=api.file(requireNotNull(photo.sourceRemoteId))
+                remote.id==photo.sourceRemoteId && !remote.trashed && remote.version==photo.cachedVersion && remote.bytes==photo.bytes &&
+                    remote.md5!=null && remote.md5==com.myphotosanywhere.mpa.drive.DriveBackupWorker.digest(file,"MD5") &&
+                    app.sync.inside(api,remote,snapshot.source.folderId)
+            }
+            if(!verified) throw IOException("The Drive original could not be verified. The device copy was kept. Reconnect or refresh its source and retry.")
+            lock.withLock {
+                val latest=database.photos().find(id) ?: throw IOException("This photo is no longer available.")
+                if(!snapshot.sameOriginal(latest) || !file.isFile || file.length()!=latest.bytes || file.lastModified()!=snapshot.modified)
+                    throw IOException("This photo changed while Drive was checked. The device copy was kept.")
+                requireDisposable(latest,1)
+                val source=database.drive().source(requireNotNull(latest.sourceBindingKey))
+                if(source==null || source.accountId!=snapshot.source.accountId || source.folderId!=snapshot.source.folderId || source.mode!=snapshot.source.mode)
+                    throw IOException("The connected source changed. The device copy was kept.")
+                val preview=removalPreview(latest,file)
+                // Commit availability first. Process death can leave extra owned bytes, never
+                // delete the only original or roll unrelated metadata back to an old snapshot.
+                withContext(NonCancellable) {
+                    database.withTransaction {
+                        val current=database.photos().find(id) ?: throw IOException("This photo is no longer available.")
+                        if(!snapshot.sameOriginal(current)) throw IOException("This photo changed. The device copy was kept.")
+                        requireDisposable(current,1)
+                        check(database.photos().clearOriginal(id,current.originalPath,preview.path)==1)
+                    }
+                    if(!file.delete()) {
+                        check(database.photos().restoreOriginalPath(id,photo.originalPath,photo.sha256,photo.bytes)==1) { "Cannot restore the retained original path." }
+                        throw IOException("Android could not remove this download. The original file was kept.")
+                    }
+                }
+            }
+            "Device download removed. The Drive original and photo information are preserved."
+        } finally { protection?.close() }
+    }
+
+    private data class RemovalSnapshot(val photo: Photo,val source: com.myphotosanywhere.mpa.drive.DriveSource,val file: File,val modified: Long) {
+        fun sameOriginal(other: Photo)=other.id==photo.id && other.sha256==photo.sha256 && other.bytes==photo.bytes &&
+            other.originalPath==photo.originalPath && other.cachedVersion==photo.cachedVersion &&
+            other.sourceBindingKey==photo.sourceBindingKey && other.sourceRemoteId==photo.sourceRemoteId
+    }
+    private suspend fun requireDisposable(photo: Photo,ownedReaders: Int) {
+        val source=photo.sourceBindingKey?.let { database.drive().source(it) }
+        val remote=photo.sourceRemoteId
+        if(source==null || remote.isNullOrBlank() || photo.cachedVersion==null)
+            throw IOException("This original has no connected, verified Drive copy. It cannot be removed from this device.")
+        val row=database.cloud().photo("${source.key}:$remote")
+        if(row==null || row.removed || row.photoId!=photo.id || row.bytes!=photo.bytes || row.version!=photo.cachedVersion ||
+            row.sha256?.let { it!=photo.sha256 }==true)
+            throw IOException("Refresh this source before removing its device download. The original was kept.")
+        val file=File(photo.originalPath);val originals=File(context.filesDir,"originals").canonicalFile
+        if(photo.originalPath.isBlank() || !file.isFile || !file.canonicalPath.startsWith(originals.path+File.separator) ||
+            database.photos().sharesOriginal(photo.id,listOf(file.absolutePath,file.canonicalPath)))
+            throw IOException("This file is missing, shared, or outside MPA’s disposable downloads. It was kept.")
+        if(photo.pinned || database.library().pinnedAlbumCount(photo.id)>0)
+            throw IOException("This photo is kept offline. Remove its photo or album offline pin first.")
+        val options=settings.state.value;val scan=database.library().scan(photo.id)
+        val awaitingIndex=photo.mimeType.startsWith("image/") && !options.indexingPaused && scan?.error==null &&
+            (options.faceIndexing && (scan==null || scan.sha256!=photo.sha256 || scan.modelVersion!=com.myphotosanywhere.mpa.people.PeopleRepository.SCAN_VERSION) ||
+                options.objectIndexing && photo.labels.isBlank())
+        if(database.library().draft(photo.id)!=null || database.photos().findHandoffsForPhoto(photo.id).isNotEmpty() || awaitingIndex)
+            throw IOException("An edit, AI handoff, or enabled recognition scan still needs this original. It was kept.")
+        if(database.photos().unfinishedImport(photo.id) || database.trash().unfinishedTransfer(source.accountId,remote) ||
+            database.drive().backupsForPhoto(photo.id).any { it.state!="COMPLETE" } ||
+            database.cloud().download(row.key)?.let { it.state!="COMPLETE" }==true ||
+            database.trash().records(source.accountId,remote).any { it.confirmed || it.desired!=null })
+            throw IOException("A transfer or Drive Trash operation still needs this original. It was kept.")
+        if(synchronized(readers) { readers[photo.id] ?: 0 }>ownedReaders)
+            throw IOException("This original is still in use. Close its viewer or editor and retry.")
+    }
+    private fun removalPreview(photo: Photo,original: File): File {
+        val directory=File(context.filesDir,"thumbnails")
+        val cached=File(photo.thumbnailPath)
+        if(photo.thumbnailPath.isNotBlank() && cached.isFile && cached.length()<=2L*1024*1024 &&
+            cached.canonicalPath.startsWith(directory.canonicalPath+File.separator)) {
+            val header=android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds=true }
+            android.graphics.BitmapFactory.decodeFile(cached.path,header)
+            if(header.outWidth>0 && header.outHeight>0) return cached
+        }
+        if(!directory.isDirectory && !directory.mkdirs()) throw IOException("Cannot keep a preview. The original was kept.")
+        val budget=StorageBudget(context)
+        if(budget.available(directory)<32L*1024*1024) throw IOException("More free space is needed to keep a preview. The original was kept.")
+        val key=java.security.MessageDigest.getInstance("SHA-256").digest("${photo.id}:${photo.sha256}".toByteArray()).joinToString("") { "%02x".format(it) }
+        val target=File(directory,"removed-$key.jpg")
+        val temporary=File.createTempFile("removed-preview-",".part",directory)
+        try {
+            val bitmap=try { PhotoRepository.mediaPreview(original,photo.mimeType,480) }
+            catch(error: IllegalStateException) { throw IOException("Cannot keep a usable preview. The original was kept.",error) }
+            try { temporary.outputStream().use { if(!bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,90,it)) throw IOException("Cannot save the preview. The original was kept.") } }
+            finally { bitmap.recycle() }
+            if(!temporary.renameTo(target)) throw IOException("Cannot retain the preview. The original was kept.")
+            return target
+        } finally { if(temporary.exists()) check(temporary.delete()) { "Cannot remove an owned preview staging file." } }
     }
     suspend fun enforce(clear: Boolean = false): String = withContext(Dispatchers.IO) {
         lock.withLock {

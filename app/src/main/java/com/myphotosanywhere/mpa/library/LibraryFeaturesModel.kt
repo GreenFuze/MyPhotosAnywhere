@@ -17,6 +17,8 @@ import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.util.UUID
 
+internal data class DeviceCopyRequest(val name: String,val identity: DeviceCopyIdentity)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryFeaturesModel(application: Application): AndroidViewModel(application) {
     val app=application as MpaApplication
@@ -38,6 +40,29 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
     val metadataPreview=MutableStateFlow<com.myphotosanywhere.mpa.metadata.MetadataPreview?>(null)
     val message=MutableStateFlow<String?>(null)
     val busy=MutableStateFlow(false)
+    internal val deviceCopyRequest=MutableStateFlow<DeviceCopyRequest?>(null)
+    internal fun requestRemoveDownload(photo: Photo) {
+        if(busy.value) return
+        val identity=DeviceCopyIdentity.from(photo)
+        if(identity==null) message.value="This original has no verified Drive copy. It is protected on this device."
+        else deviceCopyRequest.value=DeviceCopyRequest(photo.displayName,identity)
+    }
+    internal fun dismissRemoveDownload() { if(!busy.value) deviceCopyRequest.value=null }
+    internal fun confirmRemoveDownload(onClosing: ()->Unit) {
+        if(busy.value) return
+        val request=deviceCopyRequest.value ?: return
+        deviceCopyRequest.value=null;busy.value=true
+        message.value="Verifying the Drive original before removing this download…"
+        onClosing()
+        viewModelScope.launch {
+            try { message.value=app.cache.removeDownloadedCopy(request.identity) }
+            catch(cancelled: CancellationException) { throw cancelled }
+            catch(error: java.io.IOException) { message.value=error.message ?: "The device copy was kept. Retry." }
+            catch(error: android.database.sqlite.SQLiteException) { message.value=error.message ?: "Cannot update download availability. Retry." }
+            catch(_: SecurityException) { message.value="Android blocked access to this download. It was kept." }
+            finally { busy.value=false }
+        }
+    }
     fun clearMessage() { message.value=null }
     fun perform(action: suspend ()->Unit) {
         if(busy.value) return
@@ -63,7 +88,8 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
         db.library().saveAlbum(Album(UUID.randomUUID().toString(),name.trim(),System.currentTimeMillis()))
     }
     fun renameAlbum(album: Album,name: String) = perform {
-        require(name.isNotBlank() && name.length<=100); db.library().saveAlbum(album.copy(name=name.trim()))
+        require(name.isNotBlank() && name.length<=100)
+        if(db.library().renameAlbum(album.id,name.trim())!=1) throw java.io.IOException("This album is no longer available.")
     }
     fun addToAlbum(albumId: String,photoId: String) = perform { db.library().addToAlbum(AlbumPhoto(albumId,photoId)) }
     fun removeFromAlbum(albumId: String,photoId: String) = perform { db.library().removeFromAlbum(albumId,photoId) }
@@ -72,7 +98,9 @@ class LibraryFeaturesModel(application: Application): AndroidViewModel(applicati
         message.value="Album removed. Photos are preserved."
     }
     fun pinAlbum(album: Album,pin: Boolean) = perform {
-        app.cache.lock.withLock { db.library().saveAlbum(album.copy(pinned=pin)) }
+        app.cache.lock.withLock {
+            if(db.library().pinAlbum(album.id,pin)!=1) throw java.io.IOException("This album is no longer available.")
+        }
         if(pin) db.library().members(album.id).forEach { member ->
             val photo=db.photos().find(member.photoId)
             if(photo!=null && photo.originalPath.isBlank() && photo.sourceRemoteId!=null)

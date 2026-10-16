@@ -27,21 +27,25 @@ import java.io.File
 import java.text.DateFormat
 import java.util.Date
 
+private data class DetailsFactsKey(val id: String,val sha: String,val bytes: Long,val capturedAt: Long?,val archived: Boolean,
+    val path: String,val version: String?,val linkedCapture: Long?)
+private data class DetailsFactsState(val facts: PhotoFacts?=null,val failed: Boolean=false)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,memberships: List<AlbumPhoto>,
     people: List<Person>,faces: List<FaceRecord>,onClose: ()->Unit,onEdit: ()->Unit,onAI: ()->Unit,
-    onExport: ()->Unit,onResult: (()->Unit)? = null,onView: (()->Unit)? = null,showPreview: Boolean=true) {
+    onExport: ()->Unit,onResult: (()->Unit)? = null,onView: (()->Unit)? = null,showPreview: Boolean=true,onRemoveCopy: (()->Unit)?=null) {
     val context=LocalContext.current
-    val reader by produceState<AutoCloseable?>(null,photo.id) {
-        value=model.app.cache.acquireReader(photo.id)
-        awaitDispose { value?.close() }
-    }
+    val reader by key(photo.id) { produceState<AutoCloseable?>(null) {
+        val lease=model.app.cache.acquireReader(photo.id)
+        value=lease
+        awaitDispose { lease.close() }
+    } }
     val busy by model.busy.collectAsStateWithLifecycle()
     val cloud by model.cloud.collectAsStateWithLifecycle()
     val sources by model.sources.collectAsStateWithLifecycle()
     val factsRepository=remember(model) { PhotoFactsRepository(model.app.timeline,model.app.cache) }
-    var factsFailure by remember(photo.id) { mutableStateOf(false) }
     var factsRetry by remember(photo.id) { mutableIntStateOf(0) }
     val linkedCapture=remember(cloud,photo.id,photo.sourceBindingKey,photo.sourceRemoteId) {
         cloud.asSequence().filter { it.photoId==photo.id && it.capturedAt!=null }
@@ -49,15 +53,18 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
                 if(it.bindingKey==photo.sourceBindingKey && it.remoteId==photo.sourceRemoteId) 0 else 1
             }.thenBy { it.key })?.capturedAt
     }
-    val facts by produceState<PhotoFacts?>(null,photo.id,photo.capturedAt,photo.archived,photo.originalPath,photo.cachedVersion,linkedCapture,factsRetry) {
-        factsFailure=false
-        try { value=factsRepository.read(photo) }
-        catch(_: android.database.sqlite.SQLiteException) { factsFailure=true }
-    }
-    val shownMillis=facts?.millis ?: photo.capturedAt ?: photo.importedAt
-    val available by produceState(false,photo.id,photo.originalPath,photo.cachedVersion,busy) {
+    val factsKey=DetailsFactsKey(photo.id,photo.sha256,photo.bytes,photo.capturedAt,photo.archived,photo.originalPath,photo.cachedVersion,linkedCapture)
+    val factsState by key(factsKey) { produceState(DetailsFactsState(),factsRetry) {
+        value=DetailsFactsState()
+        try { value=DetailsFactsState(factsRepository.read(photo)) }
+        catch(_: android.database.sqlite.SQLiteException) { value=DetailsFactsState(failed=true) }
+    } }
+    val facts=factsState.facts
+    // A linked capture date may still be loading. Never briefly label import time as capture time.
+    val shownMillis=facts?.millis ?: photo.capturedAt
+    val available by key(photo.id,photo.sha256,photo.bytes,photo.originalPath,photo.cachedVersion) { produceState(false,busy) {
         value=withContext(Dispatchers.IO) { photo.originalPath.isNotBlank() && File(photo.originalPath).isFile }
-    }
+    } }
     var collections by remember { mutableStateOf(false) }
     var location by remember { mutableStateOf(false) }
     var place by remember(photo.id) { mutableStateOf(photo.placeLabel) }
@@ -79,8 +86,10 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
             ViewerStatus(model)
             Column(Modifier.weight(1f,fill=false).verticalScroll(rememberScrollState()).padding(horizontal=20.dp).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             DetailSection("Date and file",R.drawable.ic_action_info) {
-                Text(DateFormat.getDateInstance(DateFormat.FULL).format(Date(shownMillis)),style=MaterialTheme.typography.titleLarge)
-                Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(shownMillis)),style=MaterialTheme.typography.bodyMedium)
+                if(shownMillis!=null) {
+                    Text(DateFormat.getDateInstance(DateFormat.FULL).format(Date(shownMillis)),style=MaterialTheme.typography.titleLarge)
+                    Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(shownMillis)),style=MaterialTheme.typography.bodyMedium)
+                } else Text(if(factsState.failed) "Photo date unavailable. Retry details." else "Reading photo date…",style=MaterialTheme.typography.bodyMedium)
                 when(facts?.provenance) {
                     com.myphotosanywhere.mpa.timeline.TimestampProvenance.IMPORT -> Text("Import date · capture date unavailable",style=MaterialTheme.typography.bodySmall)
                     com.myphotosanywhere.mpa.timeline.TimestampProvenance.LINKED_CAPTURE -> Text("Capture date from linked source",style=MaterialTheme.typography.bodySmall)
@@ -88,7 +97,7 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
                 }
                 facts?.dimensions?.let { (width,height) -> Text("$width × $height",style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("details:dimensions")) }
                 Text(photo.displayName,style=MaterialTheme.typography.bodyMedium)
-                if(factsFailure) TextButton(onClick={ factsRetry++ }) { Text("Retry file details") }
+                if(factsState.failed) TextButton(onClick={ factsRetry++ }) { Text("Retry file details") }
                 Text("${photo.mimeType} · %.1f MiB".format(photo.bytes/(1024.0*1024)),style=MaterialTheme.typography.bodySmall)
             }
             if(showPreview) AsyncImage(coil.request.ImageRequest.Builder(context)
@@ -97,7 +106,7 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
             if(available && onView!=null) TextButton(onClick=onView) { Text("View full screen") }
             DetailSection("Original and source",R.drawable.ic_shell_account) {
 
-            Text(if(photo.parentId==null) "Original preserved" else "Edited copy · original preserved")
+            Text(if(photo.parentId==null) "Original file" else "Edited copy · linked to original")
 
             Text(if(available) "Original available on this device" else "Original unavailable on this device",
                 modifier=Modifier.testTag("details:availability"))
@@ -106,13 +115,18 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
                 ?: if(photo.sourceBindingKey==null) "Source: Imported on this device" else "Source disconnected · ${photo.sourceBindingKey}",
                 modifier=Modifier.testTag("details:source"))
             if(GalleryVisibility.removedFromDrive(photo,cloud,sources.map { it.key }.toSet()))
-                Text("Removed from Drive · local copy preserved",color=MaterialTheme.colorScheme.error)
+                Text(if(available) "Removed from Drive · local copy preserved" else "Removed from Drive · indexed metadata preserved",color=MaterialTheme.colorScheme.error)
             if(!available) {
                 Text(if(photo.sourceRemoteId!=null) "Download the Drive original to edit, share, or export." else "The original file is unavailable. Your indexed metadata is preserved.")
                 cloud.find { it.key=="${photo.sourceBindingKey}:${photo.sourceRemoteId}" }?.let { row ->
                     Button(enabled=!busy && !row.removed,onClick={ model.download(row,photo.pinned) }) { Text("Download original") }
                 }
             }
+            if(available && onRemoveCopy!=null && DeviceCopyIdentity.from(photo)!=null)
+                TextButton(enabled=!busy,onClick=onRemoveCopy,modifier=Modifier.heightIn(min=48.dp).testTag("details:remove-copy")) {
+                    com.myphotosanywhere.mpa.ui.ShellIcon(R.drawable.ic_shell_offline)
+                    Text(androidx.compose.ui.res.stringResource(R.string.ux_remove_download),Modifier.padding(start=8.dp))
+                }
             }
             DetailSection("Organize",R.drawable.ic_shell_collections) {
             FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {

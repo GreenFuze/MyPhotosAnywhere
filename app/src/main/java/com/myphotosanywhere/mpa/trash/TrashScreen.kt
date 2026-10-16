@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -33,11 +34,11 @@ internal fun TrashScreen(model: TrashViewModel,bottomClearance: Dp,onSources: ()
     Column(Modifier.fillMaxSize().testTag("trash:screen")) {
         Text("Google Drive Trash",Modifier.padding(horizontal=16.dp).semantics { heading() },style=MaterialTheme.typography.titleLarge)
         Text("Photos tracked by MPA use Google Drive Trash and are normally deleted by Google after 30 days. Local-only originals are preserved.",Modifier.padding(16.dp),style=MaterialTheme.typography.bodyMedium)
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly) {
+        FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             TextButton(onClick={ model.refresh();rows.refresh() },enabled=!busy,modifier=Modifier.heightIn(min=48.dp).testTag("trash:refresh")) { ShellIcon(R.drawable.ic_shell_activity);Text("Refresh") }
             TextButton(onClick=onSources,modifier=Modifier.heightIn(min=48.dp)) { Text("Sources") }
             if(selected.isNotEmpty()) {
-                TextButton(onClick={ model.restore(selected) },enabled=!busy,modifier=Modifier.heightIn(min=48.dp).testTag("trash:restore-selected")) { Text("Restore ${selected.size}") }
+                TextButton(onClick={ model.restore(selected) },enabled=!busy,modifier=Modifier.heightIn(min=48.dp).testTag("trash:restore-selected")) { Text(pluralStringResource(R.plurals.ux_restore_photo_count,selected.size,selected.size)) }
                 TextButton(onClick=model::clearSelection,modifier=Modifier.heightIn(min=48.dp)) { Text("Clear") }
             }
         }
@@ -91,7 +92,9 @@ internal fun TrashDialogs(model: TrashViewModel,onQueued: ()->Unit) {
         title={ Text(if(state.candidates.isEmpty()) "Photos preserved" else if(state.restore) "Restore from Drive Trash?" else "Move to Google Drive Trash?") },
         text={ androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max=400.dp).testTag("trash:confirmation")) {
             if(message!=null) item { Text(requireNotNull(message),color=MaterialTheme.colorScheme.error,modifier=Modifier.semantics { liveRegion=LiveRegionMode.Polite }) }
-            item { Text(if(state.candidates.isEmpty()) "No photos will be changed." else if(state.restore) "Restore ${state.candidates.size} photos to their existing Drive locations." else "Move ${state.candidates.size} photos to Drive Trash. Google normally deletes them after 30 days. Other Drive copies and local original bytes are preserved.") }
+            item { Text(if(state.candidates.isEmpty()) "No photos will be changed." else if(state.restore)
+                pluralStringResource(R.plurals.ux_restore_photo_message,state.candidates.size,state.candidates.size)
+                else pluralStringResource(R.plurals.ux_trash_photo_message,state.candidates.size,state.candidates.size)) }
             state.candidates.forEach { candidate -> item(key=candidate.record.key) { Column(Modifier.padding(top=12.dp)) {
                 Text(candidate.record.name,style=MaterialTheme.typography.titleSmall);Text("${candidate.account} · ${candidate.folder}",style=MaterialTheme.typography.bodySmall)
             } } }
