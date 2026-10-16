@@ -17,7 +17,7 @@ internal class TimelineGridViewport(val state: LazyGridState) {
         val plan=blocks
         return state.layoutInfo.visibleItemsInfo.flatMap { item ->
             if(plan==null) listOf(VisibleTimelineTile(item.key.toString(),item.index,item.offset,item.size))
-            else plan.blocks.getOrNull(item.index)?.takeIf { it.key==item.key }?.tiles.orEmpty().map {
+            else (plan.blocks.getOrNull(item.index)?.takeIf { it.key==item.key } ?: plan.blocks.firstOrNull { it.key==item.key })?.tiles.orEmpty().map {
                 VisibleTimelineTile(it.key,it.index,IntOffset(item.offset.x+(it.x*scale).roundToInt(),item.offset.y+(it.y*scale).roundToInt()),
                     IntSize((it.width*scale).roundToInt(),(it.height*scale).roundToInt()))
             }
@@ -32,7 +32,7 @@ internal class TimelineGridViewport(val state: LazyGridState) {
         val old=held?.let { previous.locations[it.cursor.key] }
         val fresh=held?.let { next.locations[it.cursor.key] }
         val changed=old!=null && fresh!=null &&
-            (old.first!=fresh.first || old.second.y!=fresh.second.y || old.second.height!=fresh.second.height || old.second.width!=fresh.second.width)
+            (previous.blocks[old.first].key!=next.blocks[fresh.first].key || old.second.x!=fresh.second.x || old.second.y!=fresh.second.y || old.second.height!=fresh.second.height || old.second.width!=fresh.second.width)
         blocks=next;scale=pixelsPerDp
         return held.takeIf { changed }
     }

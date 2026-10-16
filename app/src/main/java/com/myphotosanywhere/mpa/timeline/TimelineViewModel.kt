@@ -15,15 +15,33 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 internal data class TimelineViewerState(val selected: TimelineEntry,val session: ViewerSession?=null,val problem: String?=null)
-internal data class TimelineItem(val entry: TimelineEntry,val generation: Long,val query: TimelineQuery,val aspect: Float)
+internal data class TimelineItem(val entry: TimelineEntry,val generation: Long,val query: TimelineQuery,val aspect: Float,val contentEpoch: Long=0)
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class,FlowPreview::class)
 internal class TimelineViewModel(application: Application,private val saved: SavedStateHandle): AndroidViewModel(application) {
     private val app=application as MpaApplication
     val repository=app.timeline
     val density=app.galleryPresentation.density
     val layout=app.galleryPresentation.layout
     private val geometry=ThumbnailGeometry()
+    private val contentEpoch=java.util.concurrent.atomic.AtomicLong()
+    internal class Continuity {
+        val mosaic=MosaicContinuity()
+        val arrivals=TimelineWindowContinuity()
+        val frontier=TimelineFrontier()
+    }
+    private val continuities=LinkedHashMap<TimelineQuery,Continuity>()
+    fun continuity(query: TimelineQuery): Continuity {
+        val value=continuities.remove(query) ?: Continuity()
+        continuities[query]=value
+        while(continuities.size>8) continuities.remove(continuities.keys.first())
+        return value
+    }
+    fun showNewest(query: TimelineQuery) {
+        if(request.value.query!=query || _viewer.value!=null) return
+        jumpJob?.cancel();saved.remove<Bundle>(anchorName(query));continuities.remove(query);frontierAcknowledgements.tryEmit(Unit)
+        updateRequest(request.value.copy(cursor=null,generation=request.value.generation+1))
+    }
     fun changeLayout(value: GalleryLayout) {
         if(value==layout.value) return
         anchor()?.let { saved[anchorName(request.value.query)]=anchorBundle(it.cursor,it.offset) }
@@ -57,13 +75,35 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
     val refreshedGeneration=_refreshedGeneration.asStateFlow()
     private val _message=MutableStateFlow<String?>(null)
     val message=_message.asStateFlow()
+    private val frontierAcknowledgements=MutableSharedFlow<Unit>(extraBufferCapacity=1)
+    val newPhotos=request.map { it.query }.distinctUntilChanged().flatMapLatest { query ->
+        if(query.needsMetadata) flowOf(false)
+        else merge(kotlinx.coroutines.flow.callbackFlow<Unit> {
+            val observation=repository.observe { trySend(Unit) }
+            trySend(Unit)
+            kotlinx.coroutines.channels.awaitClose { observation.close() }
+        },frontierAcknowledgements).conflate().debounce(250).mapLatest {
+            val frontier=continuity(query).frontier
+            try { frontier.observe(repository.page(query,null,TimelineDirection.AFTER,1).firstOrNull()?.cursor) }
+            catch(cancelled: CancellationException) { throw cancelled }
+            catch(error: android.database.sqlite.SQLiteException) { _message.value=error.message ?: "Cannot check for new photos. Available photos are kept." }
+            catch(error: java.io.IOException) { _message.value=error.message ?: "Cannot check for new photos. Available photos are kept." }
+            frontier.hasNewer
+        }
+    }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),false)
+    fun acknowledgeNewest(query: TimelineQuery,cursor: TimelineCursor?) {
+        if(request.value.query==query && continuity(query).frontier.acknowledge(cursor)) frontierAcknowledgements.tryEmit(Unit)
+    }
     val paging=request.flatMapLatest { current ->
         val sources=java.util.Collections.synchronizedSet(mutableSetOf<TimelinePagingSource>())
         Pager(TimelinePagingSource.CONFIG,initialKey=current.cursor) {
-            TimelinePagingSource(repository,current.query) { _refreshedGeneration.value=current.generation }.also { source ->
+            TimelinePagingSource(repository,current.query,refreshAnchor={ anchor(current.query)?.cursor }) { _refreshedGeneration.value=current.generation }.also { source ->
                 sources.add(source);source.registerInvalidatedCallback { sources.remove(source) }
             }
-        }.flow.map { data -> data.map { TimelineItem(it,current.generation,current.query,geometry.aspect(it.key,it.thumbnailPath)) } }
+        }.flow.map { data ->
+            val epoch=contentEpoch.incrementAndGet()
+            data.map { TimelineItem(it,current.generation,current.query,geometry.aspect(it.key,it.thumbnailPath),epoch) }
+        }
             .onCompletion { synchronized(sources) { sources.toList().forEach { it.invalidate() };sources.clear() } }
     }.cachedIn(viewModelScope)
 
@@ -134,6 +174,7 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
             if(cursor==null) _message.value="No photos on or before this date."
             else {
                 saved[anchorName(query)]=Bundle().apply { putString("query",queryIdentity(query));putString("key",cursor.key);cursor.millis?.let { putLong("millis",it) };putInt("offset",0) }
+                continuities.remove(query);frontierAcknowledgements.tryEmit(Unit)
                 updateRequest(current.copy(cursor=cursor,generation=current.generation+1))
             }
         } catch(cancelled: CancellationException) { throw cancelled }
