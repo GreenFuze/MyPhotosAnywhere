@@ -168,7 +168,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             // LazyGrid preserves the old visible key when the new provider arrives later.
             val target=anchor ?: snapshots.first().firstOrNull()?.let { TimelineAnchor(TimelineCursor(null,it),0) }
             val restored=target?.let { TimelineAnchorRestorer(placement).restore(it,snapshots) } ?: true
-            if(!restored && target!=null) {
+            if(!restored) {
                 // A real removal restores the nearest remaining identity, never a mutable old index.
                 val candidates=rows.itemSnapshotList.items.filter { it.query==query && !continuity.arrivals.hidden(it.entry.key) }.mapIndexedNotNull { position,row ->
                     row.takeIf { it.generation==restoration }?.let { position to it.entry }
