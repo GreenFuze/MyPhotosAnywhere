@@ -71,6 +71,9 @@ class UxAcceptanceDeviceTest {
                 compose.onNodeWithTag("source:help").performScrollTo().performClick()
                 compose.onNodeWithText("Removing a source stops its transfers.",substring=true).performScrollTo().assertIsDisplayed()
                 assertEquals(source,app.database.drive().source(source.key));assertEquals(job,app.database.imports().job(job.id))
+                compose.onNodeWithTag("source:help").performScrollTo().performClick()
+                compose.onNodeWithTag("source:transfer-settings").performScrollTo().performClick()
+                compose.onNodeWithTag("source:transfer-settings").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,"Collapsed"))
             }
         } finally {
             app.database.drive().disconnectSource(source.key);app.database.drive().disconnect()
@@ -87,6 +90,8 @@ class UxAcceptanceDeviceTest {
                 largeContent(dark) { PhotoDetails(photo,model,emptyList(),emptyList(),emptyList(),emptyList(),{},{},{},{},onRemoveCopy={ error("Local-only originals must never offer removal") }) }
                 waitTag("photo-details-close")
                 compose.waitUntil(10000) { compose.onAllNodesWithText("Import date · capture date unavailable").fetchSemanticsNodes().isNotEmpty() }
+                val date=java.text.DateFormat.getDateInstance(java.text.DateFormat.FULL).format(java.util.Date(photo.importedAt))
+                compose.onNodeWithText(date).performScrollTo().assertIsDisplayed()
                 compose.onNodeWithTag("photo-details-close").assertIsDisplayed()
                 val bounds=compose.onNodeWithTag("photo-details-close").fetchSemanticsNode().boundsInWindow
                 val px=compose.activity.resources.displayMetrics.density

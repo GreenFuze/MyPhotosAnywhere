@@ -461,6 +461,7 @@ class DeviceSmokeTest {
 
     @Test fun googleSetupDetailsDescribeTheInstalledVersionAndSigningCertificate() {
         compose.onNodeWithTag("shell:storage").performClick()
+        compose.onNodeWithTag("source:help").performScrollTo().performClick()
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()

@@ -129,6 +129,19 @@ class DeviceCopyRemovalTest {
             } finally { reader?.close();fixture.close() }
         }
     }
+    @Test fun undecodableMediaWithoutPreviewKeepsVerifiedOriginalAndAllMetadata()=runBlocking<Unit> {
+        val fixture=Fixture();fixture.create();var verified=0
+        try {
+            fixture.original.writeText("Unsupported original image bytes")
+            val photo=fixture.photo.copy(bytes=fixture.original.length(),sha256=DriveBackupWorker.digest(fixture.original,"SHA-256"))
+            val row=fixture.row.copy(bytes=photo.bytes,sha256=photo.sha256,md5=DriveBackupWorker.digest(fixture.original,"MD5"))
+            fixture.database.photos().update(photo);fixture.database.cloud().savePhoto(row);check(fixture.preview.delete())
+            rejected { fixture.cache { _,_ -> verified++;true }.removeDownloadedCopy(requireNotNull(DeviceCopyIdentity.from(photo))) }
+            assertEquals(1,verified);assertTrue(fixture.original.isFile)
+            assertEquals(photo.sha256,DriveBackupWorker.digest(fixture.original,"SHA-256"))
+            assertEquals(photo,fixture.database.photos().find(photo.id));assertEquals(row,fixture.database.cloud().photo(row.key))
+        } finally { fixture.close() }
+    }
     @Test fun unrelatedMetadataUpdatedDuringVerificationIsPreservedAndAliasedOriginalsStayProtected()=runBlocking<Unit> {
         val fixture=Fixture();fixture.create()
         try {

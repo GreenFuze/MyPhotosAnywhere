@@ -71,7 +71,8 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
                 val photo=database.photos().find(id) ?: throw IOException("This photo is no longer available.")
                 if(!identity.matches(photo)) throw IOException("This photo or its source changed. Open its details again.")
                 requireDisposable(photo,0)
-                val source=requireNotNull(database.drive().source(requireNotNull(photo.sourceBindingKey)))
+                val source=database.drive().source(requireNotNull(photo.sourceBindingKey))
+                    ?: throw IOException("The connected source changed. The device copy was kept.")
                 val file=File(photo.originalPath)
                 protection=reader(id)
                 RemovalSnapshot(photo,source,file,file.lastModified())
@@ -168,6 +169,7 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
         try {
             val bitmap=try { PhotoRepository.mediaPreview(original,photo.mimeType,480) }
             catch(error: IllegalStateException) { throw IOException("Cannot keep a usable preview. The original was kept.",error) }
+            catch(error: IllegalArgumentException) { throw IOException("This media cannot provide a usable preview. The original was kept.",error) }
             try { temporary.outputStream().use { if(!bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,90,it)) throw IOException("Cannot save the preview. The original was kept.") } }
             finally { bitmap.recycle() }
             if(!temporary.renameTo(target)) throw IOException("Cannot retain the preview. The original was kept.")

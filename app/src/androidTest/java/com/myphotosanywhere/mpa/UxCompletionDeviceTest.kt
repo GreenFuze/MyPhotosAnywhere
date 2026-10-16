@@ -136,7 +136,7 @@ class UxCompletionDeviceTest {
                 fixture.insert();fixture.open();compose.onNodeWithTag("viewer-details").performClick();waitTag("photo-details")
                 compose.runOnUiThread { compose.activity.requestedOrientation=ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
                 compose.waitUntil(15000) { compose.activity.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE }
-                waitTag("photo-details");compose.onNodeWithText(fixture.photo.displayName).assertExists()
+                waitTag("photo-details");compose.onNode(hasText(fixture.photo.displayName) and hasAnyAncestor(hasTestTag("photo-details"))).assertExists()
                 compose.onNodeWithTag("photo-details-close").assertIsDisplayed();screenshot("details-landscape")
                 compose.onNodeWithTag("photo-details-close").performClick();waitTag("viewer-screen")
                 compose.onNodeWithText(fixture.photo.displayName).assertExists()
