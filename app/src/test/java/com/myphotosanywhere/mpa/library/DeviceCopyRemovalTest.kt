@@ -14,12 +14,26 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import org.robolectric.shadows.ShadowStatFs
 import java.io.File
 import java.io.IOException
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[28],application=Application::class)
 class DeviceCopyRemovalTest {
+    @Implements(android.os.storage.StorageManager::class)
+    class AvailableStorage {
+        @Implementation fun getUuidForPath(path: File): java.util.UUID {
+            check(path.isDirectory)
+            return android.os.storage.StorageManager.UUID_DEFAULT
+        }
+        @Implementation fun getAllocatableBytes(uuid: java.util.UUID): Long {
+            check(uuid==android.os.storage.StorageManager.UUID_DEFAULT)
+            return 512L*1024*1024
+        }
+    }
     private class Fixture: AutoCloseable {
         val context=RuntimeEnvironment.getApplication()
         val database=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).build()
@@ -129,14 +143,18 @@ class DeviceCopyRemovalTest {
             } finally { reader?.close();fixture.close() }
         }
     }
-    @Test fun undecodableMediaWithoutPreviewKeepsVerifiedOriginalAndAllMetadata()=runBlocking<Unit> {
+    @Test @Config(shadows=[AvailableStorage::class])
+    fun undecodableMediaWithoutPreviewKeepsVerifiedOriginalAndAllMetadata()=runBlocking<Unit> {
         val fixture=Fixture();fixture.create();var verified=0
         try {
+            ShadowStatFs.registerStats(requireNotNull(fixture.preview.parentFile).absolutePath,4096,262144,131072)
             fixture.original.writeText("Unsupported original image bytes")
             val photo=fixture.photo.copy(bytes=fixture.original.length(),sha256=DriveBackupWorker.digest(fixture.original,"SHA-256"))
             val row=fixture.row.copy(bytes=photo.bytes,sha256=photo.sha256,md5=DriveBackupWorker.digest(fixture.original,"MD5"))
             fixture.database.photos().update(photo);fixture.database.cloud().savePhoto(row);check(fixture.preview.delete())
-            rejected { fixture.cache { _,_ -> verified++;true }.removeDownloadedCopy(requireNotNull(DeviceCopyIdentity.from(photo))) }
+            val error=rejected { fixture.cache { _,_ -> verified++;true }.removeDownloadedCopy(requireNotNull(DeviceCopyIdentity.from(photo))) }
+            assertTrue(error.message.orEmpty().contains("preview"))
+            assertFalse(error.message.orEmpty().contains("free space"))
             assertEquals(1,verified);assertTrue(fixture.original.isFile)
             assertEquals(photo.sha256,DriveBackupWorker.digest(fixture.original,"SHA-256"))
             assertEquals(photo,fixture.database.photos().find(photo.id));assertEquals(row,fixture.database.cloud().photo(row.key))
