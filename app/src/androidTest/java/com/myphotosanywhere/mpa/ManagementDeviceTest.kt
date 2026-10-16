@@ -147,7 +147,13 @@ class ManagementDeviceTest {
             val canonical=runBlocking { app.personLabels.drain();requireNotNull(app.database.personLabels().alias(label.key)?.personId) }
             val second=runBlocking { requireNotNull(app.database.personLabels().alias(ImportedPersonLabel("Sam Exported",null).key)?.personId) }
             compose.onNodeWithTag("nav:Collections").performClick();compose.onNodeWithTag("collections:People").performClick()
-            waitTag("person:$canonical");compose.onNodeWithTag("person:$canonical").performScrollTo().assertIsDisplayed()
+            compose.waitUntil(20000) {
+                try {
+                    compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("person:$canonical"))
+                    compose.onAllNodesWithTag("person:$canonical").fetchSemanticsNodes().isNotEmpty()
+                } catch(_: AssertionError) { false }
+            }
+            compose.onNodeWithTag("person:$canonical").assertIsDisplayed()
             screenshotManagement("takeout-imported-people");compose.onNodeWithTag("person:$canonical").performClick();waitTag("photo:$id")
             compose.onNodeWithTag("photo:$id").performClick();waitTag("viewer-details");compose.onNodeWithTag("viewer-details").performClick()
             waitTag("details:person:$canonical");compose.onNodeWithTag("details:person:$canonical").performScrollTo().assertTextContains("כינרת Exported")

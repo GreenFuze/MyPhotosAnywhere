@@ -537,6 +537,8 @@ class DeviceSmokeTest {
             com.myphotosanywhere.mpa.library.OriginalImageSource(file).use { source ->
                 assertEquals(4096,source.width)
                 assertTrue(source.supportsRegions)
+                val preview=source.preview()
+                try { assertTrue(preview.width>0);assertTrue(preview.height>0) } finally { preview.recycle() }
                 val rect=android.graphics.Rect(2990,0,3020,128)
                 val detail=requireNotNull(source.region(rect,1))
                 try {

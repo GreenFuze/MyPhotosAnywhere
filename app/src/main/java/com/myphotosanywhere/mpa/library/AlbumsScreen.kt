@@ -98,8 +98,8 @@ internal fun CollectionCard(title: String,icon: Int,repository: CollectionsRepos
                 Box(Modifier.fillMaxWidth().aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceContainerHigh),contentAlignment=Alignment.Center) {
                     com.myphotosanywhere.mpa.ui.ShellIcon(icon)
                     if(covers.isNotEmpty()) Column(Modifier.fillMaxSize()) {
-                        covers.chunked(2).forEach { pair -> Row(Modifier.weight(1f)) { pair.forEach { path ->
-                            AsyncImage(path.takeIf { it.isNotBlank() },null,Modifier.weight(1f).fillMaxHeight(),contentScale=ContentScale.Crop)
+                        covers.withIndex().chunked(2).forEach { pair -> Row(Modifier.weight(1f)) { pair.forEach { (index,path) ->
+                            AsyncImage(rememberPreview(path,preview?.coverIds?.getOrNull(index)),null,Modifier.weight(1f).fillMaxHeight(),contentScale=ContentScale.Crop)
                         } } }
                     }
                 }

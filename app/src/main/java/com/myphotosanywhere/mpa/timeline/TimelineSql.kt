@@ -77,15 +77,22 @@ internal class TimelineSql(private val query: TimelineQuery) {
         )
     """.trimIndent()
 
-    fun peopleOverview(coversOnly: Boolean=false)=statement("""SELECT n.id,n.name,COUNT(DISTINCT e.photoId),
-        COALESCE((SELECT f.cropPath FROM faces f JOIN filtered v ON v.photoId=f.photoId
+    fun peopleOverview(coversOnly: Boolean=false)=statement(""", person_members AS (
+        SELECT personId,photoId FROM faces WHERE personId IS NOT NULL
+        UNION SELECT personId,photoId FROM photo_people WHERE excluded=0
+        ), member_media AS (
+          SELECT m.personId,e.photoId,e.thumbnailPath,e.effectiveMillis,e.canonicalKey
+          FROM person_members m JOIN filtered e ON e.photoId=m.photoId
+        )
+        SELECT n.id,n.name,COUNT(m.photoId),
+        COALESCE((SELECT f.cropPath FROM faces f JOIN member_media v ON v.photoId=f.photoId AND v.personId=f.personId
             WHERE f.personId=n.id AND f.cropPath<>'' ORDER BY f.id LIMIT 1),
-          (SELECT v.thumbnailPath FROM filtered v WHERE v.photoId IN
-            (SELECT photoId FROM faces WHERE personId=n.id UNION SELECT photoId FROM photo_people WHERE personId=n.id AND excluded=0)
-            ORDER BY v.effectiveMillis DESC,v.canonicalKey COLLATE BINARY ASC LIMIT 1),'')
-        FROM people n LEFT JOIN (SELECT personId,photoId FROM faces WHERE personId IS NOT NULL
-          UNION SELECT personId,photoId FROM photo_people WHERE excluded=0) m ON m.personId=n.id
-        LEFT JOIN filtered e ON e.photoId=m.photoId GROUP BY n.id ${if(coversOnly) "HAVING COUNT(DISTINCT e.photoId)>0" else ""} ORDER BY n.name COLLATE NOCASE,n.id ${if(coversOnly) "LIMIT 4" else ""}""")
+          (SELECT v.thumbnailPath FROM member_media v WHERE v.personId=n.id
+            ORDER BY v.effectiveMillis DESC,v.canonicalKey COLLATE BINARY ASC LIMIT 1),''),
+        (SELECT v.photoId FROM member_media v WHERE v.personId=n.id
+            ORDER BY v.effectiveMillis DESC,v.canonicalKey COLLATE BINARY ASC LIMIT 1)
+        FROM people n LEFT JOIN member_media m ON m.personId=n.id
+        GROUP BY n.id ${if(coversOnly) "HAVING COUNT(m.photoId)>0" else ""} ORDER BY n.name COLLATE NOCASE,n.id ${if(coversOnly) "LIMIT 4" else ""}""")
 
     fun dateRange()=statement("SELECT MIN(effectiveMillis),MAX(effectiveMillis) FROM filtered")
     fun ordered()=statement("SELECT * FROM filtered ORDER BY effectiveMillis DESC,canonicalKey COLLATE BINARY ASC")

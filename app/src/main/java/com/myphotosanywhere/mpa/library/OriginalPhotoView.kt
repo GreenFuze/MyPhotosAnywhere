@@ -49,7 +49,9 @@ internal class OriginalImageSource(private val input: java.io.FileInputStream): 
     private val header=try {
         val bounds=BitmapFactory.Options().apply { inJustDecodeBounds=true; BitmapFactory.decodeFileDescriptor(input.fd,null,this) }
         if(bounds.outWidth<=0 || bounds.outHeight<=0) throw java.io.IOException("This image format cannot be displayed on this phone.")
+        input.channel.position(0)
         val orientation=try { ExifInterface(input.fd).getAttributeInt(ExifInterface.TAG_ORIENTATION,1) } catch(_: java.io.IOException) { 1 }
+        input.channel.position(0)
         val decoder=try { BitmapRegionDecoder.newInstance(input.fd,false) } catch(_: java.io.IOException) { null }
         Header(bounds.outWidth,bounds.outHeight,orientation,decoder)
     } catch(failure: Throwable) { input.close();throw failure }
@@ -60,6 +62,7 @@ internal class OriginalImageSource(private val input: java.io.FileInputStream): 
     override val supportsRegions get()=decoder!=null
     override fun preview(): Bitmap {
         val sample=OriginalImageBudget().previewSample(width,height)
+        input.channel.position(0)
         return BitmapFactory.decodeFileDescriptor(input.fd,null,BitmapFactory.Options().apply { inSampleSize=sample; inPreferredConfig=Bitmap.Config.ARGB_8888 }) ?: throw java.io.IOException("This image could not be decoded.")
     }
     override fun region(rect: Rect,sample: Int): Bitmap? = decoder?.decodeRegion(rect,

@@ -133,12 +133,11 @@ private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: Timel
         }
     }
     val preview=entry.thumbnailPath.takeIf { it.isNotBlank() && !it.startsWith("content://") }?.let(::File)
-    val previewData=preview ?: entry.thumbnailPath.takeIf { it.startsWith("content://") }?.let(android.net.Uri::parse)
     val toggleControls by rememberUpdatedState(onToggleControls)
     Box(Modifier.fillMaxSize().then(if(media?.photo==null && entry.mimeType.startsWith("image/")) Modifier.pointerInput(entry.key,active,interactive) {
             detectTapGestures(onTap={ if(active && interactive) toggleControls() })
         } else Modifier)) {
-        if(previewData!=null) AsyncImage(previewData,"Preview",Modifier.fillMaxSize(),contentScale=ContentScale.Fit)
+        if(preview!=null) AsyncImage(preview,"Preview",Modifier.fillMaxSize(),contentScale=ContentScale.Fit)
         val photo=media?.photo
         if(photo!=null) ViewerMediaContent(photo,features,active,preview,interactive,onToggleControls=onToggleControls,captionInset=captionInset,onZoomChanged={ gestures.update(photo.id,it) })
         if(!available) Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom=captionInset).padding(12.dp),horizontalAlignment=Alignment.CenterHorizontally) {

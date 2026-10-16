@@ -49,6 +49,7 @@ class CanonicalPeopleScaleTest {
                 val timeline=TimelineRepository(db)
                 start=System.nanoTime();val groups=CanonicalPeopleRepository(timeline).groups();val groupsMs=(System.nanoTime()-start)/1e6
                 assertEquals(100,groups.size);assertEquals(size/20,groups.sumOf { it.photos })
+                assertTrue("People overview must not repeatedly scan the entire library per person: $groupsMs ms",groupsMs<15000)
                 start=System.nanoTime();val first=timeline.page(TimelineQuery(),null,TimelineDirection.AFTER,60);val firstMs=(System.nanoTime()-start)/1e6
                 assertEquals(60,first.size);assertTrue(first.all { it.searchDocument==null && it.sha256.isNullOrBlank() })
                 val older=timeline.page(TimelineQuery(),first.last().cursor,TimelineDirection.AFTER,60)

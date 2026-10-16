@@ -1,6 +1,5 @@
 package com.myphotosanywhere.mpa.timeline
 
-import androidx.core.net.toUri
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -349,7 +348,7 @@ private fun TimelineThumbnail(entry: TimelineEntry,model: TimelineViewModel,feat
     }
     val upgraded=upgradeArtifact?.takeIf { it.revision==revision }?.file
     val preferred=upgraded?.takeUnless { it.path==rejectedVariant }
-    val preview=preferred ?: thumbnail ?: entry.thumbnailPath.takeIf { it.isNotBlank() }?.let { if(it.startsWith("content://")) it.toUri() else File(it) }
+    val preview=preferred ?: thumbnail ?: entry.thumbnailPath.takeIf { it.isNotBlank() && !it.startsWith("content://") }?.let(::File)
     // A missing indexed file may fail before regeneration finishes at the same path.
     // Readiness changes once when verified preview work finishes, so Coil retries that
     // file without a progress-tick loop. Byte/source revision also invalidates old pixels.

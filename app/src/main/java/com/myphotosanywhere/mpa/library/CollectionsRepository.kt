@@ -8,7 +8,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
 
-internal data class CollectionPreview(val count: Int,val entries: List<TimelineEntry>,val paths: List<String> = entries.map { it.thumbnailPath })
+internal data class CollectionPreview(val count: Int,val entries: List<TimelineEntry>,val paths: List<String> = entries.map { it.thumbnailPath },val coverIds: List<String?> = entries.map { it.photoId })
 
 /** Cards observe invalidation, then fetch at most four covers; never subscribe to the media library. */
 internal class CollectionsRepository(private val database: PhotoDatabase,private val timeline: TimelineRepository) {
@@ -39,16 +39,16 @@ internal class CollectionsRepository(private val database: PhotoDatabase,private
         require(kind in setOf("People","Places","Trash"))
         if(kind=="People") {
             val covers=database.openHelper.readableDatabase.query(TimelineSql(TimelineQuery()).peopleOverview(coversOnly=true)).use { rows ->
-                buildList { while(rows.moveToNext()) rows.getString(3)?.takeIf { it.isNotBlank() }?.let { add(it) } }
+                buildList { while(rows.moveToNext()) rows.getString(3)?.takeIf { it.isNotBlank() }?.let { add(it to rows.getString(4)) } }
             }
-            return@withContext CollectionPreview(-1,emptyList(),covers)
+            return@withContext CollectionPreview(-1,emptyList(),covers.map { it.first },covers.map { it.second })
         }
         val visible=com.myphotosanywhere.mpa.trash.TrashVisibility.PHOTO_SQL
         val sql=when(kind) {
-            "Places" -> "SELECT p.thumbnailPath FROM photos p WHERE p.archived=0 AND p.latitude BETWEEN -90 AND 90 AND p.longitude BETWEEN -180 AND 180 AND p.thumbnailPath<>'' AND $visible ORDER BY COALESCE(p.capturedAt,p.importedAt) DESC,p.id LIMIT 4"
-            else -> "SELECT thumbnailPath FROM drive_trash WHERE confirmed=1 AND thumbnailPath<>'' ORDER BY updatedAt DESC,key LIMIT 4"
+            "Places" -> "SELECT p.thumbnailPath,p.id FROM photos p WHERE p.archived=0 AND p.latitude BETWEEN -90 AND 90 AND p.longitude BETWEEN -180 AND 180 AND p.thumbnailPath<>'' AND $visible ORDER BY COALESCE(p.capturedAt,p.importedAt) DESC,p.id LIMIT 4"
+            else -> "SELECT thumbnailPath,NULL FROM drive_trash WHERE confirmed=1 AND thumbnailPath<>'' ORDER BY updatedAt DESC,key LIMIT 4"
         }
-        val paths=database.openHelper.readableDatabase.query(sql).use { rows -> buildList { while(rows.moveToNext()) add(rows.getString(0)) } }
-        CollectionPreview(-1,emptyList(),paths)
+        val paths=database.openHelper.readableDatabase.query(sql).use { rows -> buildList { while(rows.moveToNext()) add(rows.getString(0) to rows.getString(1)) } }
+        CollectionPreview(-1,emptyList(),paths.map { it.first },paths.map { it.second })
     } }
 }

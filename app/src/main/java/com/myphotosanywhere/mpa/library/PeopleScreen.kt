@@ -79,7 +79,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
             val person=group.person
             Card(onClick={ onPerson(person.id) },modifier=Modifier.fillMaxWidth().testTag("person:${person.id}")) {
                 Row(Modifier.padding(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-                    if(group.thumbnail.isNotBlank()) AsyncImage(previewSource(group.thumbnail),null,Modifier.size(72.dp).clip(CircleShape),contentScale=ContentScale.Crop)
+                    if(group.thumbnail.isNotBlank()) AsyncImage(rememberPreview(group.thumbnail,group.coverPhotoId),null,Modifier.size(72.dp).clip(CircleShape),contentScale=ContentScale.Crop)
                     else Box(Modifier.size(72.dp),contentAlignment=androidx.compose.ui.Alignment.Center) { com.myphotosanywhere.mpa.ui.ShellIcon(R.drawable.ic_shell_people) }
                     Column(Modifier.weight(1f).heightIn(min=48.dp)) {
                         Text(person.name,style=MaterialTheme.typography.titleMedium)
@@ -95,7 +95,11 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                 }
             }
         }
-        item { Text("Unassigned faces · ${faces.count { it.personId==null }}",style=MaterialTheme.typography.titleMedium) }
+        item {
+            Text("Unassigned faces · ${faces.count { it.personId==null }}",style=MaterialTheme.typography.titleMedium)
+            val unavailable=review.diagnostics.values.count { it.status in listOf(FaceReview.Status.NO_EMBEDDING,FaceReview.Status.INVALID_EMBEDDING,FaceReview.Status.DIFFERENT_MODEL) }
+            if(unavailable>0) Text("$unavailable unassigned faces lack usable matching data. Open Why separate? to check them.")
+        }
         items(groups,key={ it.first() }) { ids ->
             val group=ids.mapNotNull { byId[it] }
             Card(Modifier.fillMaxWidth()) {

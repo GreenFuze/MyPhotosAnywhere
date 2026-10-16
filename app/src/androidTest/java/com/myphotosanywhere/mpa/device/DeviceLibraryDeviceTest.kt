@@ -27,6 +27,7 @@ import java.io.IOException
 
 /** Run after the ordinary suite: full media grants must not contaminate other gallery fixtures. */
 @RunWith(AndroidJUnit4::class)
+@DeviceLibraryStage
 class DeviceLibraryDeviceTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val instrumentation get()=InstrumentationRegistry.getInstrumentation()
@@ -87,6 +88,7 @@ class DeviceLibraryDeviceTest {
             compose.onNodeWithTag("photo:${photo.id}").performClick()
             compose.waitUntil(20000) { compose.onAllNodes(hasText("Original · 1200 × 800",substring=true)).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("viewer-backup").assertIsDisplayed()
+            compose.onNodeWithTag("viewer-trash").assertDoesNotExist()
             compose.onNodeWithTag("viewer-details").performClick()
             compose.waitUntil(10000) { compose.onAllNodesWithTag("details:availability").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("details:availability").performScrollTo().assertTextEquals("Original available on this device")
@@ -118,6 +120,18 @@ class DeviceLibraryDeviceTest {
                 assertEquals(photo.id,current.id);assertTrue(maxOf(image.width,image.height)<=1600)
                 assertTrue(image.allocationByteCount<=1600*1600*4)
             }
+            val reference=requireNotNull(app.database.deviceMedia().find(photo.id))
+            try {
+                app.deviceMedia.openDescriptor(reference.copy(providerVersion=reference.providerVersion+"-stale")).close()
+                fail("A reused provider URI must not bypass its saved source identity")
+            } catch(_: IOException) { }
+            assertNull(com.myphotosanywhere.mpa.library.previewSource(photo.thumbnailPath))
+            val preview=requireNotNull(app.cache.thumbnail(photo))
+            assertTrue(preview.isFile)
+            assertTrue(preview.canonicalPath.startsWith(File(app.filesDir,"thumbnails").canonicalPath+File.separator))
+            assertTrue(android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds=true
+                android.graphics.BitmapFactory.decodeFile(preview.path,this)
+            }.let { it.outWidth in 1..1600 && it.outHeight in 1..1600 })
             assertEquals("",app.database.photos().find(photo.id)?.originalPath)
             assertEquals(consent.faceIndexing,app.settings.state.value.faceIndexing)
             assertEquals(consent.objectIndexing,app.settings.state.value.objectIndexing)

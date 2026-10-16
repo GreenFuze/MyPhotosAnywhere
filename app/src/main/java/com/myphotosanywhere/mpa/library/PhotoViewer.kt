@@ -72,7 +72,13 @@ fun PhotoViewer(photos: List<Photo>,selectedId: String,model: LibraryFeaturesMod
 @Composable
 internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active: Boolean,preview: File?=null,interactive: Boolean=true,onDetails: (()->Unit)?=null,onToggleControls: (()->Unit)?=null,captionInset: Dp=0.dp,onZoomChanged: ((Boolean)->Unit)?=null) {
     Box(Modifier.fillMaxSize()) {
-        if(preview!=null || photo.thumbnailPath.startsWith("content://")) coil.compose.AsyncImage(preview ?: photo.thumbnailPath.toUri(),"Preview",Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
+        val safePreview by produceState(preview,photo.id,photo.thumbnailPath,photo.sha256) {
+            try { value=preview ?: model.app.cache.thumbnail(photo) }
+            catch(error: CancellationException) { throw error }
+            catch(_: java.io.IOException) { value=preview }
+            catch(_: android.database.sqlite.SQLiteException) { value=preview }
+        }
+        if(safePreview!=null) coil.compose.AsyncImage(safePreview,"Preview",Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
     val referenceState by produceState<Pair<Boolean,com.myphotosanywhere.mpa.data.DeviceMediaRecord?>>(false to null,photo.id) {
         model.app.deviceMedia.observe(photo.id).collect { value=true to it }
     }

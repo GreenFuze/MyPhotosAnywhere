@@ -20,6 +20,10 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /** Prepared at the end of the full-access invocation, then checked after external revocation. */
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class DeviceLibraryStage
+
 internal object DeviceAccessFixture {
     suspend fun prepare(app: MpaApplication)=withContext(Dispatchers.IO) {
         check(app.deviceMedia.permissions.current().full)
@@ -52,6 +56,7 @@ internal object DeviceAccessFixture {
 
 /** CI revokes permissions between instrumentation invocations, since revocation kills the app. */
 @RunWith(AndroidJUnit4::class)
+@DeviceLibraryStage
 class DeviceLibraryAccessDeviceTest {
     @Test fun externalRevocationKeepsMetadataAndOwnedOriginalsThenSelectedGrantIsRechecked()=runBlocking<Unit> {
         val instrumentation=InstrumentationRegistry.getInstrumentation()

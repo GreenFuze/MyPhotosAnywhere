@@ -76,6 +76,10 @@ class NativeStages:
                     shutil.move(str(saved), str(destination))
 
     def revoke(self):
+        fixture=subprocess.run(["adb","shell","run-as",self.PACKAGE,"test","-f",
+                                "shared_prefs/device-revocation-fixture.xml"],capture_output=True)
+        if fixture.returncode:
+            raise ValueError("Camera-access fixture was not retained between native invocations.")
         sdk = int(subprocess.check_output(["adb", "shell", "getprop", "ro.build.version.sdk"], text=True).strip())
         permissions = ["READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO"] if sdk >= 33 else ["READ_EXTERNAL_STORAGE"]
         if sdk >= 34:
@@ -89,7 +93,7 @@ class NativeStages:
             raise ValueError("Synthetic native suites and permission revocation require an emulator.")
         apk = self.owned("app/build/outputs/apk/debug/app-debug.apk")
         checksum = hashlib.sha256(apk.read_bytes()).hexdigest()
-        stages = [("main", "notClass", self.DEVICE + "," + self.ACCESS),
+        stages = [("main", "notAnnotation", "com.myphotosanywhere.mpa.device.DeviceLibraryStage"),
                   ("device-library", "class", self.DEVICE), ("revoked-access", "class", self.ACCESS)]
         status = 1
         try:
@@ -97,7 +101,8 @@ class NativeStages:
                 if stage == "revoked-access":
                     self.revoke()
                 command = [sys.executable, "scripts/gradle_checks.py", "--log", "build/diagnostics/device-" + stage + ".log",
-                           "--", "connectedDebugAndroidTest", "-Pandroid.testInstrumentationRunnerArguments." + selector + "=" + classes]
+                           "--", "connectedDebugAndroidTest", "-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true",
+                           "-Pandroid.testInstrumentationRunnerArguments." + selector + "=" + classes]
                 status = subprocess.run(command, cwd=self.root).returncode
                 self.archive(stage, status)
                 if hashlib.sha256(apk.read_bytes()).hexdigest() != checksum:

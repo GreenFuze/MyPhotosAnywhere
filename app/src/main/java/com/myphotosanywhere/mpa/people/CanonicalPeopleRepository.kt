@@ -12,7 +12,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
-internal data class CanonicalPersonGroup(val person: Person,val photos: Int,val thumbnail: String)
+internal data class CanonicalPersonGroup(val person: Person,val photos: Int,val thumbnail: String,val coverPhotoId: String?=null)
 internal data class CanonicalPeopleState(val groups: List<CanonicalPersonGroup> = emptyList(),val loading: Boolean=true,val error: String?=null)
 
 /** Count the same visible photo identities as the person grid, once per person. */
@@ -26,7 +26,7 @@ internal class CanonicalPeopleRepository(private val timeline: TimelineRepositor
             buildList {
                 while(rows.moveToNext()) {
                     currentCoroutineContext().ensureActive()
-                    add(CanonicalPersonGroup(Person(rows.getString(0),rows.getString(1)),rows.getInt(2),rows.getString(3).orEmpty()))
+                    add(CanonicalPersonGroup(Person(rows.getString(0),rows.getString(1)),rows.getInt(2),rows.getString(3).orEmpty(),rows.getString(4)))
                 }
             }
         }

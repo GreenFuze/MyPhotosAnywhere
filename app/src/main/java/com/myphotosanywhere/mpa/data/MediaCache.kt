@@ -52,9 +52,9 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
         if(current!=null && (current.originalPath.isBlank() || !File(current.originalPath).isFile) && database.deviceMedia().find(id)!=null)
             (context.applicationContext as com.myphotosanywhere.mpa.MpaApplication).deviceMedia.materialize(id)
         lock.withLock {
-            val photo=database.photos().find(id) ?: error("This photo is no longer in the library.")
+            val photo=database.photos().find(id) ?: throw IOException("This photo is no longer in the library.")
             val file=File(photo.originalPath)
-            check(photo.originalPath.isNotBlank() && file.isFile) { "Download this photo before opening or editing it." }
+            if(photo.originalPath.isBlank() || !file.isFile) throw IOException("Download this photo before opening or editing it.")
             database.photos().update(photo.copy(lastAccess=System.currentTimeMillis()))
             action(photo,file)
         }
@@ -254,7 +254,7 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
             if(latest.sha256!=photo.sha256 || latest.bytes!=photo.bytes || latest.thumbnailPath!=photo.thumbnailPath) return@withLock null
             val file=File(latest.originalPath)
             if(latest.originalPath.isBlank() || !file.isFile || latest.thumbnailPath.isBlank()) {
-                if(provider && latest.mimeType.startsWith("video/") && database.deviceMedia().find(photo.id)!=null) {
+                if(provider && (latest.mimeType.startsWith("video/") || latest.mimeType.startsWith("image/")) && database.deviceMedia().find(photo.id)!=null) {
                     val app=context.applicationContext as com.myphotosanywhere.mpa.MpaApplication
                     val directory=checkNotNull(target.parentFile)
                     if(!directory.isDirectory && !directory.mkdirs()) throw IOException("Cannot save a device-video preview.")
@@ -262,9 +262,16 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
                     val stage=File.createTempFile("device-preview-",".part",directory)
                     var failure: Throwable?=null
                     try {
-                        val bitmap=app.deviceMedia.videoPreview(photo.id)
-                        try { stage.outputStream().use { output -> if(!bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,output)) throw IOException("Cannot save this video preview.");output.fd.sync() } }
-                        finally { bitmap.recycle() }
+                        fun write(bitmap: android.graphics.Bitmap) {
+                            stage.outputStream().use { output ->
+                                if(!bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,output)) throw IOException("Cannot save this device preview.")
+                                output.fd.sync()
+                            }
+                        }
+                        if(latest.mimeType.startsWith("video/")) {
+                            val bitmap=app.deviceMedia.videoPreview(photo.id)
+                            try { write(bitmap) } finally { bitmap.recycle() }
+                        } else app.deviceMedia.withPreview(photo.id) { _,bitmap -> write(bitmap) }
                         if(!stage.renameTo(target)) throw IOException("Cannot retain the video preview. The original is unchanged.")
                         database.withTransaction {
                             database.photos().find(latest.id)?.takeIf { it.sha256==latest.sha256 && it.bytes==latest.bytes && it.thumbnailPath==latest.thumbnailPath }

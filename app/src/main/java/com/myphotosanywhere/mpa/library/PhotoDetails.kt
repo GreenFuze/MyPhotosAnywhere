@@ -112,7 +112,7 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
                 Text("${photo.mimeType} · %.1f MiB".format(photo.bytes/(1024.0*1024)),style=MaterialTheme.typography.bodySmall)
             }
             if(showPreview) AsyncImage(coil.request.ImageRequest.Builder(context)
-                .data(com.myphotosanywhere.mpa.library.previewSource(if(photo.thumbnailPath.isNotBlank()) photo.thumbnailPath else if(available && reader!=null) photo.originalPath else ""))
+                .data(rememberPreview(if(photo.thumbnailPath.isNotBlank()) photo.thumbnailPath else if(available && reader!=null) photo.originalPath else "",photo.id))
                 .size(480).build(),photo.displayName,modifier=Modifier.fillMaxWidth().height(160.dp),contentScale=ContentScale.Fit)
             if(available && onView!=null) TextButton(onClick=onView) { Text("View full screen") }
             DetailSection("Original and source",R.drawable.ic_shell_account) {
