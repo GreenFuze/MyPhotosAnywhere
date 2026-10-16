@@ -1,3 +1,7 @@
+## MPA 0.5.29: UX acceptance and protected library actions
+
+Application `80612beaebee2362d84e3b6234512a781300c468` passed 417 unit/integration and 137 native tests per API29/35/37 (411 total), zero failures/errors/skips and zero lint findings. Schema10 and upgrade signer unchanged. [Evidence and explicit physical/performance limits](releases/v0.5.29.md).
+
 ## MPA 0.5.28: Direct date scrubbing
 
 Application `7d71cfcc087d1c9cfbe9bf6243b937a79d8a7b3e` passed 402 unit/integration and 129 native tests per API 29/35/37 (387 total), zero failures/errors/skips and zero lint findings. Schema10 and established signer unchanged. [Evidence and pending physical acceptance](releases/v0.5.28.md).

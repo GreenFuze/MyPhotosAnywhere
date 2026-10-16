@@ -12,7 +12,7 @@ Baseline: published MPA 0.5.22/code 33, Room schema 9. Updated October 15, 2026.
 | 0.5.26 / 37 | Sharper adaptive thumbnails and richer mosaic | [Published](releases/v0.5.26.md), tested `54e83a55d52659927168d64f9b727161d43a5422` |
 | 0.5.27 / 38 | Continuous drag selection | [Published](releases/v0.5.27.md), tested `6be8d783c8014e2aa58bb115b5be4a8b75b55ff7` |
 | 0.5.28 / 39 | Direct date scrubbing | [Published](releases/v0.5.28.md), tested `7d71cfcc087d1c9cfbe9bf6243b937a79d8a7b3e` |
-| 0.5.29 / 40 | Management refinement and complete UX audit | In implementation |
+| 0.5.29 / 40 | Management refinement and complete UX audit | [Published](releases/v0.5.29.md), tested `80612beaebee2362d84e3b6234512a781300c468`; physical/performance acceptance pending |
 
 Version allocations express delivery order, not a reason to skip a blocking fix. Update this ledger with tested commits, release links and pending physical-device evidence after each stage. Prefer focused changes and preserve each published upgrade path.
 
@@ -83,3 +83,7 @@ Complete the photo-first UX and the newly requested Drive Trash capability. Do n
 ## References
 
 Owner screenshots are the visual reference. Supported Android app-bar behavior: https://developer.android.com/develop/ui/compose/components/app-bars. Drive Trash/Restore/capabilities/retention: https://developers.google.com/workspace/drive/api/guides/delete. Provider thumbnail and capabilities contract: https://developers.google.com/workspace/drive/api/reference/rest/v3/files. No claim is made about Google's private layout or thumbnail algorithms.
+
+## Final automated UX delivery and remaining acceptance
+
+Stages 0.5.23–0.5.29 are delivered. Automated checks cover the planned Drive Trash, motion, Collections/Details, thumbnails/mosaic, continuous selection, direct date navigation and management refinements. Human TalkBack, translated Hebrew, live Google recovery and S23 Ultra behavior/frame performance remain pending; emulator FrameMetrics are diagnostic and do not satisfy a physical 60Hz target. The JPEG crash remains unreproduced. The next authorized backend increment handles oversized XMP and item-specific import continuation/retry; no claim of that fix is made by 0.5.29. The 250MiB video limit remains separate scope.

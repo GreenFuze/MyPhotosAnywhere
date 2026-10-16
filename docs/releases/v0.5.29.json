@@ -1,0 +1,10 @@
+{
+  "tag": "v0.5.29",
+  "source_sha": "80612beaebee2362d84e3b6234512a781300c468",
+  "build_run_id": 38867723485,
+  "device_run_id": 38867723466,
+  "apk_sha256": "078e1019ab597dd39eebe208dfad66d227560b603e459b9a065e556a38d22955",
+  "certificate_sha256": "1262430ed1e257b54a4c09697cbc63bc148af11755485bcf7b2c66492f0379b4",
+  "version_code": 40,
+  "room_schema": 10
+}
