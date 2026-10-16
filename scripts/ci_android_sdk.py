@@ -8,8 +8,8 @@ import urllib.request
 
 
 class AndroidSdkSetup:
-    CLI_SHA256 = "54b6e2d382444b91511fcc7ab34ddec6561f257d6d1cdce16bb91af6789b6de2"
-    CLI_VERSION = "1.0.16500706"
+    CLI_SHA256 = "c8f88b14aa00e44a542dd3597cbdcb015e55511e33c2dd69920f41f5b086e228"
+    CLI_VERSION = "1.0.16625370"
 
     def __init__(self):
         self.sdk = Path(os.environ["ANDROID_HOME"])
