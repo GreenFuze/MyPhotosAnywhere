@@ -143,7 +143,7 @@ class DeviceCopyRemovalTest {
             } finally { reader?.close();fixture.close() }
         }
     }
-    @Test @Config(shadows=[AvailableStorage::class])
+    @Test @Config(sdk=[27],shadows=[AvailableStorage::class])
     fun undecodableMediaWithoutPreviewKeepsVerifiedOriginalAndAllMetadata()=runBlocking<Unit> {
         val fixture=Fixture();fixture.create();var verified=0
         try {
