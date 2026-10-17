@@ -70,12 +70,16 @@ class PeopleMenusDeviceTest {
         compose.onNodeWithText("Back").performClick();compose.onNodeWithTag("person:merge").assertIsDisplayed()
     }
     private fun screenshot(name: String,actionTag: String,actionColor: Int) {
-        val frame=DialogFrame(compose.onNodeWithTag(actionTag).fetchSemanticsNode().boundsInWindow,actionColor)
         var accepted: Bitmap?=null
         try {
             // Semantics can be ready before the new dialog surface reaches the compositor.
             // Save the exact verified frame, never an unchecked second screenshot or a blank PNG.
             compose.waitUntil(10000) {
+                val node=compose.onNodeWithTag(actionTag).fetchSemanticsNode()
+                // Dialog bounds are relative to a separate window, not the screenshot's screen.
+                // Re-read geometry while IME/inset placement settles rather than sampling old bounds.
+                val bounds=node.boundsInWindow.translate(node.positionOnScreen-node.positionInWindow)
+                val frame=DialogFrame(bounds,actionColor)
                 val candidate=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
                 if(frame.isDrawn(candidate)) { accepted=candidate;true }
                 else { candidate.recycle();false }
