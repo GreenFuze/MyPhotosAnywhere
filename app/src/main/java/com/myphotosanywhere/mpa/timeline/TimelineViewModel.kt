@@ -74,6 +74,8 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
     val restoration=request.map { it.generation }.stateIn(viewModelScope,SharingStarted.Eagerly,0L)
     private val _refreshedGeneration=MutableStateFlow(-1L)
     val refreshedGeneration=_refreshedGeneration.asStateFlow()
+    private val _completedRefresh=MutableStateFlow<TimelineRefreshReceipt?>(null)
+    val completedRefresh=_completedRefresh.asStateFlow()
     private val _message=MutableStateFlow<String?>(null)
     val message=_message.asStateFlow()
     private val frontierAcknowledgements=MutableSharedFlow<Unit>(extraBufferCapacity=1)
@@ -98,7 +100,12 @@ internal class TimelineViewModel(application: Application,private val saved: Sav
     val paging=request.flatMapLatest { current ->
         val sources=java.util.Collections.synchronizedSet(mutableSetOf<TimelinePagingSource>())
         Pager(TimelinePagingSource.CONFIG,initialKey=current.cursor) {
-            TimelinePagingSource(repository,current.query,refreshAnchor={ anchor(current.query)?.cursor }) { _refreshedGeneration.value=current.generation }.also { source ->
+            TimelinePagingSource(repository,current.query,refreshAnchor={ anchor(current.query)?.cursor }) { empty ->
+                if(request.value==current) {
+                    _completedRefresh.value=TimelineRefreshReceipt(current.query,current.generation,empty)
+                    _refreshedGeneration.value=current.generation
+                }
+            }.also { source ->
                 sources.add(source);source.registerInvalidatedCallback { sources.remove(source) }
             }
         }.flow.map { data ->

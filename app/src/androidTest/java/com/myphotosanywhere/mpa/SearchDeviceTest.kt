@@ -194,6 +194,38 @@ class SearchDeviceTest {
             waitTag("photo:${fixture.photos[0].id}");compose.onNodeWithText("No matching photos").assertDoesNotExist();fixture.verify()
         }
     }
+    @Test fun emptySearchRemainsStableThroughInvalidationsRotationAndFilterClearing() {
+        Fixture("empty-refresh").use { fixture ->
+            search("missing-search-next-empty-refresh");waitText("No matching photos")
+            fun assertEmptySearch() {
+                compose.onNodeWithText("No matching photos").assertExists()
+                compose.onNodeWithText("Your photos belong here").assertDoesNotExist()
+                compose.onNodeWithText("No photos indexed yet").assertDoesNotExist()
+                compose.onNodeWithTag("timeline:loading").assertDoesNotExist()
+            }
+            assertEmptySearch()
+            compose.mainClock.autoAdvance=false
+            try {
+                repeat(3) { change ->
+                    runBlocking {
+                        val photo=requireNotNull(app.database.photos().find(fixture.photos[0].id))
+                        app.database.photos().update(photo.copy(displayName="Still unmatched $change.png"))
+                    }
+                    repeat(16) { compose.mainClock.advanceTimeByFrame();compose.waitForIdle();assertEmptySearch() }
+                }
+            } finally { compose.mainClock.autoAdvance=true }
+            screenshot("search-empty-stable")
+            compose.activityRule.scenario.recreate();waitText("No matching photos");assertEmptySearch()
+            val search=model()
+            compose.runOnIdle { search.update(search.draft.value.copy(filter="Favorites"));search.submit() }
+            waitText("No matching photos");waitTag("timeline:empty-action")
+            compose.onNodeWithTag("timeline:empty-action").assertTextContains("Clear filters").performClick()
+            compose.waitUntil(10000) { compose.onAllNodes(hasTestTag("timeline:empty-action") and hasText("Clear search")).fetchSemanticsNodes().isNotEmpty() }
+            assertEmptySearch();assertEquals("missing-search-next-empty-refresh",search.applied.value.text)
+            compose.onNodeWithTag("timeline:empty-action").performClick();waitTag("search:suggestions")
+            compose.onNodeWithText("No matching photos").assertDoesNotExist();fixture.verify()
+        }
+    }
     @Test fun cancellingFilterSheetDoesNotApplyItsDraft() {
         compose.onNodeWithTag("nav:Search").performClick();compose.onNodeWithTag("search:query").performImeAction()
         compose.onNodeWithTag("shell:filters").performClick();compose.onNodeWithTag("search:type:VIDEOS").performClick()

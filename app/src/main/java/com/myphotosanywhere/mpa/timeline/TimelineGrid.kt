@@ -68,7 +68,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     bottomClearance: Dp,modifier: Modifier=Modifier,
     selection: List<SelectionTarget>,onToggle: (SelectionTarget)->Unit,selectionLocked: Boolean,
     hasSources: Boolean,onConnect: ()->Unit,onClearFilters: ()->Unit,onRefresh: ()->Unit,emptyActionLabel: String="Clear filters",
-    onRangeChange: ((List<SelectionTarget>)->Unit)?=null,onBeginSelection: (SelectionTarget)->Unit=onToggle,onSelectionLimit: ()->Unit={}) {
+    onRangeChange: ((List<SelectionTarget>)->Unit)?=null,onBeginSelection: (SelectionTarget)->Unit=onToggle,onSelectionLimit: ()->Unit={},searchResults: Boolean=false) {
     val zone=deviceTimelineZone(model)
     val lifecycleOwner=LocalLifecycleOwner.current
     // Content/span callbacks must capture one immutable geometry snapshot. A delegated
@@ -89,6 +89,8 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     val rawRetained=rows.itemSnapshotList.items.filter { it.query==query }
     val restoration by model.restoration.collectAsStateWithLifecycle()
     val refreshedGeneration by model.refreshedGeneration.collectAsStateWithLifecycle()
+    val completedRefresh by model.completedRefresh.collectAsStateWithLifecycle()
+    val presentation=remember { TimelinePresentation() }
     val viewer by model.viewer.collectAsStateWithLifecycle()
     var restoring by remember(query,restoration,zone,density,layout) { mutableStateOf(true) }
     val continuity=remember(model,query,restoration) { model.continuity(query) }
@@ -197,17 +199,21 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
     Column(Modifier.fillMaxSize()) {
         val refresh=rows.loadState.refresh
         val failure=(refresh as? LoadState.Error) ?: (rows.loadState.append as? LoadState.Error) ?: (rows.loadState.prepend as? LoadState.Error)
+        val content=presentation.content(query,restoration,completedRefresh,retained.size,failure!=null)
         if(failure!=null) TextButton(onClick=rows::retry,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("timeline:retry")) {
-            Text("Library could not update. Available photos are shown. Retry")
+            Text(if(retained.isNotEmpty()) "Library could not update. Available photos are shown. Retry" else "Photos could not update. Retry")
         }
-        if(rows.itemCount==0 && (refresh is LoadState.Loading || refresh is LoadState.NotLoading && refreshedGeneration!=restoration)) {
+        if(content==TimelineContent.LOADING) {
             LazyVerticalGrid(GridCells.Fixed(density.columns),modifier=Modifier.weight(1f).testTag("timeline:loading"),
                 horizontalArrangement=Arrangement.spacedBy(2.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
                 items(18) { Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant)) }
             }
-        } else if(rows.itemCount==0 && refresh is LoadState.NotLoading) Box(Modifier.weight(1f).fillMaxWidth().padding(32.dp),contentAlignment=Alignment.Center) {
+        } else if(content==TimelineContent.ERROR) Box(Modifier.weight(1f).fillMaxWidth().padding(32.dp),contentAlignment=Alignment.Center) {
+            Text("Photos are unavailable. Use Retry to try again.",modifier=Modifier.testTag("timeline:load-error"))
+        } else if(content==TimelineContent.EMPTY) Box(Modifier.weight(1f).fillMaxWidth().padding(32.dp),contentAlignment=Alignment.Center) {
+            if(refresh is LoadState.Loading) LinearProgressIndicator(Modifier.align(Alignment.TopCenter).fillMaxWidth().testTag("timeline:empty-updating"))
             Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                val filtered=query!=TimelineQuery()
+                val filtered=searchResults || query!=TimelineQuery()
                 Text(if(filtered) "No matching photos" else if(hasSources) "No photos indexed yet" else "Your photos belong here",style=MaterialTheme.typography.titleMedium)
                 if(filtered) TextButton(onClick=onClearFilters,modifier=Modifier.heightIn(min=48.dp).testTag("timeline:empty-action")) { Text(emptyActionLabel) }
                 else if(!hasSources) Button(onClick=onConnect) { Text("Connect Google Drive") }
@@ -285,7 +291,7 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
                                     Modifier.offset(tile.x.dp,tile.y.dp).width(tile.width.dp).height(tile.height.dp)
                                         .selectionHit(selectionHits,SelectionTarget.from(row.entry)).semantics {
                                         traversalIndex=tile.index.toFloat()
-                                        collectionItemInfo=CollectionItemInfo(tile.row,tile.rowSpan,tile.column,1)
+                                        collectionItemInfo=CollectionItemInfo(tile.row,tile.rowSpan,tile.column,tile.columnSpan)
                                     }) {
                                     val offset=tiles.visible().firstOrNull { it.key==row.entry.key }?.offset?.y
                                     model.open(row.entry,offset?.let { -it },TimelineViewport.opening(viewport(),offset?.let { TimelineAnchor(row.entry.cursor,-it) }))
@@ -309,9 +315,8 @@ internal fun TimelineGrid(query: TimelineQuery,model: TimelineViewModel,features
             Text(androidx.compose.ui.res.stringResource(com.myphotosanywhere.mpa.R.string.gallery_new_photos))
         }
     }
-    // Keep the date gesture alive while its seek replaces retained pages or restores the anchor.
-    TimelineDateRail(tiles,retained,query,zone,{ model.anchor(query) },model,bottomClearance,
-        selection.isEmpty() && !selectionLocked && (rows.itemCount>0 || model.anchor(query)!=null)) { dateNavigation=true }
+    TimelineFloatingDate(tiles,retained,query,zone,{ model.anchor(query) },
+        selection.isEmpty() && !selectionLocked && (retained.isNotEmpty() || model.anchor(query)!=null)) { dateNavigation=true }
     }
 }
 

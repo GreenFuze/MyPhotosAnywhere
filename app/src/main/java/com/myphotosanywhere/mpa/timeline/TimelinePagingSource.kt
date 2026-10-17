@@ -6,7 +6,7 @@ import androidx.paging.PagingState
 import kotlinx.coroutines.CancellationException
 
 internal class TimelinePagingSource(private val repository: TimelineRepository,private val query: TimelineQuery,
-    private val refreshAnchor: ()->TimelineCursor?={ null },private val onRefresh: ()->Unit={}): PagingSource<TimelineCursor,TimelineEntry>() {
+    private val refreshAnchor: ()->TimelineCursor?={ null },private val onRefresh: (Boolean)->Unit={}): PagingSource<TimelineCursor,TimelineEntry>() {
     private val observation=repository.observe(query,::invalidate)
     init { registerInvalidatedCallback { observation.close() } }
     override fun getRefreshKey(state: PagingState<TimelineCursor,TimelineEntry>): TimelineCursor?=
@@ -25,7 +25,7 @@ internal class TimelinePagingSource(private val repository: TimelineRepository,p
             val previous=first?.takeIf { repository.page(query,it,TimelineDirection.BEFORE,1).isNotEmpty() }
             val next=last?.takeIf { repository.page(query,it,TimelineDirection.AFTER,1).isNotEmpty() }
             if(invalid) return LoadResult.Invalid()
-            if(params is LoadParams.Refresh) onRefresh()
+            if(params is LoadParams.Refresh) onRefresh(entries.isEmpty())
             return LoadResult.Page(entries,previous,next)
         } catch(cancelled: CancellationException) { throw cancelled }
         catch(error: java.io.IOException) { return LoadResult.Error(error) }

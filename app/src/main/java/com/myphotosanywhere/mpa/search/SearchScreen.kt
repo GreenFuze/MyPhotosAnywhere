@@ -73,7 +73,7 @@ internal fun SearchScreen(draft: SearchCriteria,applied: SearchCriteria,recents:
             TimelineGrid(query,timeline,features,bottomClearance,Modifier.weight(1f).fillMaxWidth(),selection,onToggle,selectionLocked,
                 sources.isNotEmpty(),onConnect,onClearFilters={
                     if(applied.filtered) model.clearFilters() else { model.text("");model.submit() }
-                },onRefresh=features::refreshCloud,emptyActionLabel=if(applied.filtered) "Clear filters" else "Clear search",onRangeChange=onRangeChange,onBeginSelection=onBeginSelection,onSelectionLimit=onSelectionLimit)
+                },onRefresh=features::refreshCloud,emptyActionLabel=if(applied.filtered) "Clear filters" else "Clear search",onRangeChange=onRangeChange,onBeginSelection=onBeginSelection,onSelectionLimit=onSelectionLimit,searchResults=true)
         } else {
             val repository=remember(features) { CollectionsRepository(features.app.database,features.app.timeline) }
             LazyVerticalGrid(GridCells.Adaptive(148.dp),state=suggestions,modifier=Modifier.fillMaxSize().testTag("search:suggestions"),
