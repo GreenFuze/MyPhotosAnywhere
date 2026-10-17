@@ -31,18 +31,18 @@ mpa_diagnostic_log_pid=$!
 trap 'kill "$mpa_diagnostic_log_pid" 2>/dev/null || true' EXIT
 adb install -r -t app/build/outputs/apk/debug/app-debug.apk
 adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-adb shell am instrument -w -r -e class com.myphotosanywhere.mpa.device.DeviceLibraryDeviceTest com.myphotosanywhere.mpa.test/androidx.test.runner.AndroidJUnitRunner | tee build/diagnostics/focused-camera-instrumentation.txt
+adb shell am instrument -w -r -e class com.myphotosanywhere.mpa.timeline.MosaicDeviceTest,com.myphotosanywhere.mpa.timeline.GalleryArrivalDeviceTest,com.myphotosanywhere.mpa.ResourceDiagnosticTest com.myphotosanywhere.mpa.test/com.myphotosanywhere.mpa.ResourceDiagnosticRunner | tee build/diagnostics/focused-camera-instrumentation.txt
 mkdir -p app/build/reports/androidTests/screenshots
 adb pull /sdcard/Download/MPA app/build/reports/androidTests/screenshots/raw
 python3 - <<'VERIFY_FOCUSED'
 from pathlib import Path
 import re,json,subprocess
 text=Path('build/diagnostics/focused-camera-instrumentation.txt').read_text(encoding='utf-8')
-assert re.search(r'OK \(6 tests\)',text),text
-assert len(re.findall(r'^INSTRUMENTATION_STATUS_CODE: 0\s*$',text,re.M))==6,text
+assert re.search(r'OK \(7 tests\)',text),text
+assert len(re.findall(r'^INSTRUMENTATION_STATUS_CODE: 0\s*$',text,re.M))==7,text
 assert 'FAILURES!!!' not in text and 'INSTRUMENTATION_FAILED' not in text
-assert Path('app/build/reports/androidTests/screenshots/raw/device-camera-video.png').is_file()
+assert 'allocationTracingRecordsTheDeliberateTestOnlySentinel' in text
 tree=subprocess.check_output(['git','rev-parse','HEAD:app/src/main'],text=True).strip()
 assert tree=='cfb8e76becaa683605966797d88629e00395f0d9',tree
-Path('build/diagnostics/focused-source-proof.json').write_text(json.dumps({'applicationSource':'b65db27632aaac855be084fe9715a5393e90ca0e','appMainTree':tree,'cameraTests':6,'releaseAcceptance':False},indent=2)+'\n')
+Path('build/diagnostics/focused-source-proof.json').write_text(json.dumps({'applicationSource':'b65db27632aaac855be084fe9715a5393e90ca0e','appMainTree':tree,'allocationTests':7,'releaseAcceptance':False},indent=2)+'\n')
 VERIFY_FOCUSED
