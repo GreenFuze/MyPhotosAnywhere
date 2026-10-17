@@ -46,7 +46,7 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
     val busy by model.busy.collectAsStateWithLifecycle()
     val cloud by model.cloud.collectAsStateWithLifecycle()
     val sources by model.sources.collectAsStateWithLifecycle()
-    val factsRepository=remember(model) { PhotoFactsRepository(model.app.timeline,model.app.cache) }
+    val factsRepository=remember(model) { PhotoFactsRepository(model.app.timeline,model.app.cache,model.app.deviceMedia) }
     var factsRetry by remember(photo.id) { mutableIntStateOf(0) }
     val device by produceState<DeviceMediaRecord?>(null,photo.id) { model.app.deviceMedia.observe(photo.id).collect { value=it } }
     val linkedCapture=remember(cloud,photo.id,photo.sourceBindingKey,photo.sourceRemoteId) {

@@ -92,6 +92,7 @@ class DeviceLibraryDeviceTest {
             compose.onNodeWithTag("viewer-details").performClick()
             compose.waitUntil(10000) { compose.onAllNodesWithTag("details:availability").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("details:availability").performScrollTo().assertTextEquals("Original available on this device")
+            compose.waitUntil(10000) { compose.onAllNodesWithTag("details:dimensions").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("details:dimensions").performScrollTo().assertTextEquals("1200 × 800")
             compose.onNodeWithTag("details:backup").performScrollTo().assertExists()
             screenshot("device-camera-details")
@@ -132,6 +133,12 @@ class DeviceLibraryDeviceTest {
             assertTrue(android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds=true
                 android.graphics.BitmapFactory.decodeFile(preview.path,this)
             }.let { it.outWidth in 1..1600 && it.outHeight in 1..1600 })
+            // Android can publish a readable URI before its scanner fills width/height.
+            val incompleteDimensions=requireNotNull(app.database.deviceMedia().find(photo.id))
+            app.database.deviceMedia().save(incompleteDimensions.copy(width=0,height=0))
+            val facts=com.myphotosanywhere.mpa.library.PhotoFactsRepository(app.timeline,app.cache,app.deviceMedia).read(photo)
+            assertEquals(1200 to 800,facts.dimensions)
+            assertEquals(1200 to 800,app.deviceMedia.imageDimensions(photo.id))
             assertEquals("",app.database.photos().find(photo.id)?.originalPath)
             assertEquals(consent.faceIndexing,app.settings.state.value.faceIndexing)
             assertEquals(consent.objectIndexing,app.settings.state.value.objectIndexing)

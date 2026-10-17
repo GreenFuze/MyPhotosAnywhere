@@ -48,7 +48,7 @@ internal object DeviceAccessFixture {
             }
             val photo=if(index==1) app.deviceMedia.materialize(id) else requireNotNull(app.database.photos().find(id))
             saved.put(JSONObject().put("id",id).put("uri",uri.toString()).put("path",photo.originalPath)
-                .put("sha",photo.sha256).put("bytes",photo.bytes).put("captured",photo.capturedAt))
+                .put("sha",photo.sha256).put("bytes",photo.bytes).put("captured",photo.capturedAt ?: JSONObject.NULL))
         }
         app.getSharedPreferences("device-revocation-fixture",0).edit(commit=true) { putString("rows",saved.toString()) }
     }
@@ -72,7 +72,9 @@ class DeviceLibraryAccessDeviceTest {
                 val photo=requireNotNull(app.database.photos().find(id));val reference=requireNotNull(app.database.deviceMedia().find(id))
                 assertFalse(reference.available);assertFalse(app.deviceMedia.readable(id))
                 assertEquals(saved.getString("sha"),photo.sha256);assertEquals(saved.getLong("bytes"),photo.bytes)
-                assertEquals(saved.getString("path"),photo.originalPath);assertEquals(saved.getLong("captured"),requireNotNull(photo.capturedAt))
+                assertEquals(saved.getString("path"),photo.originalPath)
+                if(saved.isNull("captured")) assertNull(photo.capturedAt)
+                else assertEquals(saved.getLong("captured"),requireNotNull(photo.capturedAt))
                 if(index==0) { assertEquals("",photo.originalPath);assertFalse("photo:$id" in keys) }
                 else {
                     assertTrue("photo:$id" in keys);assertTrue(File(photo.originalPath).isFile)

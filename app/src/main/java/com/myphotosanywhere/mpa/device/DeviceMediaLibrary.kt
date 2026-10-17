@@ -220,6 +220,24 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
         try { openDescriptor(record).use { true } }
         catch(_: IOException) { false }
     }
+    /** MediaStore may not have image dimensions yet. Read only original bounds, never pixels. */
+    internal suspend fun imageDimensions(id: String): Pair<Int,Int>?=withContext(Dispatchers.IO) {
+        val reference=database.deviceMedia().find(id) ?: return@withContext null
+        val photo=database.photos().find(id) ?: return@withContext null
+        if(!photo.mimeType.startsWith("image/")) return@withContext null
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(openDescriptor(reference)).use { input ->
+            val bounds=android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds=true }
+            android.graphics.BitmapFactory.decodeFileDescriptor(input.fd,null,bounds)
+            if(bounds.outWidth<=0 || bounds.outHeight<=0) return@use null
+            input.channel.position(0)
+            val orientation=try {
+                androidx.exifinterface.media.ExifInterface(input.fd).getAttributeInt(androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,1)
+            } catch(_: IOException) { 1 }
+            currentCoroutineContext().ensureActive();current(reference)
+            if(database.deviceMedia().find(id)!=reference) throw IOException("Device photo access changed. Refresh and retry details.")
+            if(orientation in 5..8) bounds.outHeight to bounds.outWidth else bounds.outWidth to bounds.outHeight
+        }
+    }
     /** Recognition owns one bounded bitmap, without materializing every camera original. */
     internal suspend fun withPreview(id: String,block: suspend (Photo,android.graphics.Bitmap)->Unit)=withContext(Dispatchers.IO) {
         val reference=database.deviceMedia().find(id) ?: throw IOException("This device original is no longer indexed.")

@@ -37,7 +37,7 @@ class VisualDetailsDeviceTest {
         try {
             app.database.drive().saveSource(source);app.database.photos().insert(photo);app.database.cloud().savePhoto(exact)
             app.database.cloud().savePhoto(exact.copy(key="a-alias:facts-alias",bindingKey="a-alias",remoteId="facts-alias",capturedAt=1_700_000_000_000L))
-            val repository=PhotoFactsRepository(app.timeline,app.cache)
+            val repository=PhotoFactsRepository(app.timeline,app.cache,app.deviceMedia)
             val facts=repository.read(photo)
             assertEquals(exact.capturedAt,facts.millis);assertEquals(TimestampProvenance.LINKED_CAPTURE,facts.provenance)
             assertEquals(360 to 240,facts.dimensions)
