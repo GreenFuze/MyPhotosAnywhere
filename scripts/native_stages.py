@@ -118,6 +118,7 @@ class NativeStages:
                     self.revoke()
                 command = [sys.executable, "scripts/gradle_checks.py", "--log", "build/diagnostics/device-" + stage + ".log",
                            "--", "connectedDebugAndroidTest", "-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true",
+                           "-Pandroid.testInstrumentationRunnerArguments.package=" + self.PACKAGE,
                            "-Pandroid.testInstrumentationRunnerArguments." + selector + "=" + classes]
                 status = subprocess.run(command, cwd=self.root).returncode
                 self.archive(stage, status)
