@@ -64,6 +64,17 @@ class DeviceLibraryDeviceTest {
         ids+=record
         return requireNotNull(app.database.photos().find(record))
     }
+    private fun open(photo: Photo,timeline: TimelineViewModel) {
+        compose.runOnIdle { timeline.showNewest(TimelineQuery()) }
+        compose.waitUntil(30000) {
+            compose.onAllNodes(hasTestTag("photo:${photo.id}") and isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
+                timeline.refreshedGeneration.value==timeline.restoration.value &&
+                compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty()
+        }
+        compose.onNodeWithTag("photo:${photo.id}").performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithTag("viewer-screen").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(photo.id,compose.runOnUiThread { requireNotNull(timeline.viewer.value).selected.photoId })
+    }
     private fun cleanup()=runBlocking {
         for(uri in uris) app.contentResolver.delete(uri,null,null)
         app.deviceMedia.reconcile()
@@ -83,9 +94,7 @@ class DeviceLibraryDeviceTest {
             assertTrue(app.deviceMedia.readable(photo.id));assertFalse(app.database.presence().inDrive(photo.id).first())
             app.drive.enqueue(photo);assertTrue(app.database.drive().backupsForPhoto(photo.id).isEmpty())
             val timeline=ViewModelProvider(compose.activity)[TimelineViewModel::class.java]
-            compose.runOnIdle { timeline.showNewest(TimelineQuery()) }
-            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${photo.id}").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithTag("photo:${photo.id}").performClick()
+            open(photo,timeline)
             compose.waitUntil(20000) { compose.onAllNodes(hasText("Original · 1200 × 800",substring=true)).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("viewer-backup").assertIsDisplayed()
             compose.onNodeWithTag("viewer-trash").assertDoesNotExist()
@@ -198,9 +207,7 @@ class DeviceLibraryDeviceTest {
             android.graphics.BitmapFactory.decodeFile(poster.path,bounds)
             assertTrue(bounds.outWidth>0 && bounds.outHeight>0);assertTrue(maxOf(bounds.outWidth,bounds.outHeight)<=480)
             val timeline=ViewModelProvider(compose.activity)[TimelineViewModel::class.java]
-            compose.runOnIdle { timeline.showNewest(TimelineQuery()) }
-            compose.waitUntil(30000) { compose.onAllNodesWithTag("photo:${photo.id}").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithTag("photo:${photo.id}").performClick()
+            open(photo,timeline)
             fun player(): android.widget.VideoView? {
                 if(Build.VERSION.SDK_INT<29) return null
                 fun find(view: android.view.View): android.widget.VideoView? {
