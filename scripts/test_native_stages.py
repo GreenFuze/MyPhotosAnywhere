@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import hashlib
+import json
 import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from subprocess import CompletedProcess
 
 module_path = Path(__file__).with_name("native_stages.py")
 if not module_path.exists():
@@ -31,6 +33,28 @@ class NativeStagesTest(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('<testsuite tests="1"><testcase classname="' + classname + '" name="example">' + outcome + '</testcase></testsuite>', encoding="utf-8")
         return path.read_bytes()
+
+    def testPortableFixtureReadPrecedesRealApi29PermissionRevocation(self):
+        raw=json.dumps([{"id":"one","captured":None},{"id":"two","captured":1000}])
+        xml=("<map><string name='rows'>"+raw+"</string></map>").encode()
+        with patch.object(native.subprocess,"run",return_value=CompletedProcess([],0,xml,b"")) as run, \
+                patch.object(native.subprocess,"check_output",return_value="29\n"):
+            self.owner.revoke()
+        self.assertEqual(run.call_args_list[0].args[0],["adb","exec-out","run-as",self.owner.PACKAGE,"cat","shared_prefs/device-revocation-fixture.xml"])
+        self.assertEqual(run.call_args_list[1].args[0],["adb","shell","pm","revoke",self.owner.PACKAGE,"android.permission.READ_EXTERNAL_STORAGE"])
+        self.assertEqual(2,run.call_count)
+
+    def testMissingFixtureCannotRevokePermissionsAndPreservesReadFailureReason(self):
+        with patch.object(native.subprocess,"run",return_value=CompletedProcess([],1,b"",b"package data missing")) as run:
+            with self.assertRaisesRegex(ValueError,"package data missing"):
+                self.owner.revoke()
+        self.assertEqual(1,run.call_count)
+
+    def testCorruptOrIncompleteFixtureCannotRevokePermissions(self):
+        for xml in (b"not XML",b"<map/>",b"<map><string name='rows'>[{\"id\":\"one\",\"captured\":null}]</string></map>"):
+            with self.subTest(xml=xml),patch.object(native.subprocess,"run",return_value=CompletedProcess([],0,xml,b"")) as run:
+                with self.assertRaises(ValueError):self.owner.revoke()
+                self.assertEqual(1,run.call_count)
 
     def testEveryArchivedReportIsRestoredAtItsRecordedPathWithTheSameHash(self):
         original = self.report()

@@ -35,6 +35,7 @@ internal class CanonicalPeopleIndex(private val database: PhotoDatabase,private 
         }
     }
     fun retry() { owner.launch { database.personLabels().retry();start() } }
+    internal suspend fun close() { owner.coroutineContext.job.cancelAndJoin() }
     private fun changes()=callbackFlow {
         val observer=object: InvalidationTracker.Observer("photos","people_index_queue") {
             override fun onInvalidated(tables: Set<String>) { trySend(Unit) }
