@@ -64,6 +64,9 @@ class VisualDetailsDeviceTest {
         compose.onNodeWithTag("nav:Collections").performClick()
         compose.onNodeWithTag("collections:People").performScrollTo().performClick()
         compose.onNodeWithTag("people-list").assertExists()
+        compose.waitUntil(10000) {
+            compose.onAllNodes(hasTestTag("people-list") and SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"People ready")).fetchSemanticsNodes().size==1
+        }
         compose.onAllNodesWithText("Imported people").assertCountEquals(0)
         compose.onAllNodesWithText("Named faces").assertCountEquals(0)
         compose.onNodeWithTag("people-list").performScrollToNode(hasText("Unassigned faces",substring=true))
