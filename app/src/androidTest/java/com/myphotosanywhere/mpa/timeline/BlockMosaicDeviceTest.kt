@@ -3,9 +3,19 @@ package com.myphotosanywhere.mpa.timeline
 import androidx.room.withTransaction
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -46,13 +56,14 @@ class BlockMosaicDeviceTest {
             app.galleryPresentation.update(GridDensity.DEFAULT);app.galleryPresentation.updateLayout(GalleryLayout.MOSAIC);photos=fixture(files)
             waitPhoto("photo:blocks-002");compose.waitForIdle()
             val cells=(0..2).map { compose.onNodeWithTag("photo:blocks-00$it").fetchSemanticsNode() }
-            assertTrue(cells[0].boundsInWindow.width>cells[1].boundsInWindow.width*1.9f)
+            assertEquals(cells[0].boundsInWindow.width,cells[1].boundsInWindow.width,2f)
             assertEquals(cells[1].boundsInWindow.width,cells[2].boundsInWindow.width,2f)
             assertEquals(cells[0].boundsInWindow.top,cells[2].boundsInWindow.top,2f)
             assertTrue(cells[0].boundsInWindow.height>cells[2].boundsInWindow.height*1.9f)
             assertTrue(cells[0].config[SemanticsProperties.CollectionItemInfo].rowSpan>=2)
             assertEquals(3,compose.onNodeWithTag("photos:grid").fetchSemanticsNode().config[SemanticsProperties.CollectionInfo].columnCount)
-            assertEquals(2,cells[2].config[SemanticsProperties.CollectionItemInfo].columnIndex)
+            assertEquals(1,cells[0].config[SemanticsProperties.CollectionItemInfo].columnSpan)
+            assertTrue(cells.map { it.config[SemanticsProperties.CollectionItemInfo].columnIndex }.toSet()==setOf(0,1,2))
             screenshot("blocks-gallery")
             android.util.Log.i("MosaicTransitions","Enter selection")
             compose.onNodeWithTag("photo:blocks-000").performTouchInput { longClick() };compose.onNodeWithTag("photo:blocks-000").assertIsSelected()
@@ -124,6 +135,44 @@ class BlockMosaicDeviceTest {
             compose.waitForIdle();assertEquals(before,compose.onNodeWithTag(anchor.cursor.key).fetchSemanticsNode().boundsInWindow.top,4f)
             assertEquals(photos.size+2,photos.count { app.database.photos().find(it.id)!=null }+additions.count { app.database.photos().find(it.id)!=null })
         } finally { (photos+additions).forEach { app.database.photos().find(it.id)?.let { row -> app.database.photos().update(row.copy(archived=true)) } };files.forEach { it.delete() };app.galleryPresentation.updateLayout(previous);app.galleryPresentation.update(density) }
+    }
+    @Test fun compactMosaicUsesBalancedSpansAndMirrorsCorrectlyAtLargeRtlFontScale()=runBlocking<Unit> {
+        val previous=app.galleryPresentation.layout.value;val density=app.galleryPresentation.density.value
+        val files=listOf(picture(160,240,Color.BLUE),picture(160,240,Color.GREEN),picture(360,240,Color.RED),picture(240,240,Color.MAGENTA))
+        var photos=emptyList<Photo>()
+        try {
+            app.galleryPresentation.update(GridDensity.COMPACT);app.galleryPresentation.updateLayout(GalleryLayout.MOSAIC)
+            photos=fixture(files,"blocks-balanced");val model=timeline()
+            val features=compose.runOnUiThread { ViewModelProvider(compose.activity)[com.myphotosanywhere.mpa.library.LibraryFeaturesModel::class.java] }
+            compose.runOnUiThread { compose.activity.setContent {
+                val pixels=LocalDensity.current.density
+                CompositionLocalProvider(LocalDensity provides Density(pixels,2f),LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    MaterialTheme(colorScheme=darkColorScheme()) { Surface(Modifier.fillMaxSize()) {
+                        TimelineGrid(TimelineQuery(),model,features,80.dp,Modifier.fillMaxSize().safeDrawingPadding(),emptyList(),{},false,true,{}, {}, {})
+                    } }
+                }
+            } }
+            waitPhoto("photo:blocks-balanced-002");compose.waitForIdle()
+            val cells=(0..2).map { compose.onNodeWithTag("photo:blocks-balanced-00$it").fetchSemanticsNode() }
+            val grid=compose.onNodeWithTag("photos:grid").fetchSemanticsNode()
+            val hero=cells[0];val small=cells[1];val info=hero.config[SemanticsProperties.CollectionItemInfo]
+            assertEquals(4,grid.config[SemanticsProperties.CollectionInfo].columnCount)
+            assertEquals(2,info.columnSpan);assertTrue(info.rowSpan in 2..4)
+            assertEquals(small.boundsInWindow.width,cells[2].boundsInWindow.width,2f)
+            assertEquals(2*small.boundsInWindow.width+2*compose.density.density,hero.boundsInWindow.width,2f)
+            val expectedLeft=grid.boundsInWindow.right-2*compose.density.density-hero.boundsInWindow.width-info.columnIndex*(small.boundsInWindow.width+2*compose.density.density)
+            assertEquals(expectedLeft,hero.boundsInWindow.left,3f)
+            cells.forEachIndexed { index,node ->
+                assertTrue(node.boundsInWindow.width>=48*compose.density.density-1)
+                assertEquals(index.toFloat(),node.config[SemanticsProperties.TraversalIndex],0f)
+            }
+            compose.onNodeWithTag("timeline:date-scrubber").assertDoesNotExist()
+            screenshot("blocks-balanced-rtl-large")
+            photos.forEach { assertEquals(it,app.database.photos().find(it.id)?.copy(lastAccess=it.lastAccess)) }
+        } finally {
+            photos.forEach { app.database.photos().find(it.id)?.let { row -> app.database.photos().update(row.copy(archived=true)) } }
+            files.forEach { it.delete() };app.galleryPresentation.updateLayout(previous);app.galleryPresentation.update(density)
+        }
     }
     private fun screenshot(name: String) {
         val instrumentation=InstrumentationRegistry.getInstrumentation();val image=requireNotNull(instrumentation.uiAutomation.takeScreenshot())

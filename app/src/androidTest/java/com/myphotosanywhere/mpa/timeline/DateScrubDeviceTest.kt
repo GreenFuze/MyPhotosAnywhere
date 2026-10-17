@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -72,18 +71,16 @@ class DateScrubDeviceTest {
         compose.onNodeWithTag("shell:filters").performClick()
         compose.onNodeWithText("${fixture.source.folderName} · ${fixture.source.email}").performScrollTo().performClick()
         compose.onNodeWithText("Done").performScrollTo().performClick()
-        waitTag("photo:${fixture.photos.first().id}");waitTag("timeline:date-scrubber")
+        waitTag("photo:${fixture.photos.first().id}");waitTag("timeline:date-rail")
+        compose.onNodeWithTag("timeline:date-scrubber").assertDoesNotExist()
+        compose.onNodeWithTag("timeline:scrub-track").assertDoesNotExist()
     }
-    private fun dragTo(month: YearMonth,scale: DateScrubScale,begin: Boolean=false,finish: Boolean=false) {
-        val track=compose.onNodeWithTag("timeline:scrub-track").fetchSemanticsNode().boundsInWindow
-        val handle=compose.onNodeWithTag("timeline:date-scrubber").fetchSemanticsNode().boundsInWindow
-        val height=handle.height
-        val target=Offset(track.width/2,height/2+(track.height-height).coerceAtLeast(0f)*scale.fraction(month))
-        compose.onNodeWithTag("timeline:scrub-track").performTouchInput {
-            if(begin) down(handle.center-track.topLeft)
-            moveTo(target);advanceEventTime(150)
-            if(finish) up()
-        }
+    private fun jumpTo(month: YearMonth) {
+        compose.onNodeWithTag("timeline:date-rail").performClick();waitTag("timeline:year")
+        compose.onNodeWithTag("timeline:year").performTextReplacement(month.year.toString())
+        compose.onNodeWithTag("timeline:year").performImeAction()
+        compose.onNodeWithTag("timeline:month:${month.monthValue}").performScrollTo().performClick()
+        compose.onNodeWithTag("timeline:month-jump").performClick()
     }
     private fun waitAnchor(model: TimelineViewModel,query: TimelineQuery,key: String) {
         try { compose.waitUntil(30000) {
@@ -97,21 +94,23 @@ class DateScrubDeviceTest {
             throw AssertionError("Date seek expected=$key actual=${model.anchor(query)} generation=${model.restoration.value}/${model.refreshedGeneration.value} message=${model.message.value} rail=$rail track=$track handle=$handle",error)
         }
     }
-    @Test fun directDragRapidSeeksImportAndViewerReturnPreserveCanonicalAnchor()=runBlocking<Unit> {
+    @Test fun dateJumpsRapidSeeksImportAndViewerReturnPreserveCanonicalAnchorWithoutScrollBar()=runBlocking<Unit> {
         val fixture=Fixture(app,"scrub-main");fixture.create()
         try {
             filter(fixture);val model=model();val zone=ZoneId.systemDefault()
             val scale=DateScrubScale(requireNotNull(app.timeline.dateRange(fixture.query)).months(zone))
             val month=scale.months.last.minusMonths(120)
             val expected=requireNotNull(app.timeline.seek(fixture.query,month.atEndOfMonth().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()))
-            dragTo(month,scale,begin=true)
+            jumpTo(month)
             waitAnchor(model,fixture.query,expected.key)
-            // The original gesture remains active after its own seek/restoration.
+            // New navigation requests supersede earlier seeks without losing identity.
             val added=fixture.photos.first().copy(id="scrub-main-import",capturedAt=requireNotNull(fixture.photos.first().capturedAt)+86400000L)
             fixture.photos.add(added);app.database.photos().insert(added)
             val final=scale.months.last.minusMonths(180)
-            for(offset in listOf(30L,150L,60L)) dragTo(scale.months.last.minusMonths(offset),scale)
-            dragTo(final,scale,finish=true)
+            compose.runOnUiThread {
+                for(offset in listOf(30L,150L,60L)) model.jump(scale.months.last.minusMonths(offset).atEndOfMonth(),zone)
+                model.jump(final.atEndOfMonth(),zone)
+            }
             val finalCursor=requireNotNull(app.timeline.seek(fixture.query,final.atEndOfMonth().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()))
             waitAnchor(model,fixture.query,finalCursor.key)
             screenshot("date-scrub-gallery")
@@ -124,7 +123,7 @@ class DateScrubDeviceTest {
             assertTrue(fixture.file.isFile)
         } finally { fixture.close() }
     }
-    @Test fun rtlLargeTextHasAccessibleHandleClearOfNavigationAndJumpAlternative()=runBlocking<Unit> {
+    @Test fun rtlLargeTextHasAccessibleFloatingDateAndJumpClearOfNavigationWithoutScrollBar()=runBlocking<Unit> {
         val fixture=Fixture(app,"scrub-rtl");fixture.create();val model=model()
         val features=compose.runOnUiThread { ViewModelProvider(compose.activity)[LibraryFeaturesModel::class.java] }
         try {
@@ -136,16 +135,19 @@ class DateScrubDeviceTest {
                     } }
                 }
             } }
-            waitTag("timeline:date-scrubber")
-            val track=compose.onNodeWithTag("timeline:scrub-track").fetchSemanticsNode().boundsInWindow
-            val handle=compose.onNodeWithTag("timeline:date-scrubber").fetchSemanticsNode()
-            assertTrue(track.left<100f);assertTrue(handle.boundsInWindow.width>=48*compose.density.density-1)
-            assertTrue(handle.config[SemanticsProperties.ContentDescription].any { it.contains("Jump to date") })
+            waitTag("timeline:date-rail")
+            compose.onNodeWithTag("timeline:date-scrubber").assertDoesNotExist()
+            compose.onNodeWithTag("timeline:scrub-track").assertDoesNotExist()
+            val capsule=compose.onNodeWithTag("timeline:date-rail").fetchSemanticsNode()
+            assertTrue(capsule.boundsInWindow.width>=48*compose.density.density-1)
+            assertTrue(capsule.boundsInWindow.height>=48*compose.density.density-1)
+            assertTrue(capsule.config[SemanticsProperties.ContentDescription].any { it.contains("Jump to month or year") })
+            assertTrue(capsule.boundsInWindow.bottom<compose.onRoot().fetchSemanticsNode().boundsInWindow.bottom-80*compose.density.density)
             val scale=DateScrubScale(requireNotNull(app.timeline.dateRange(fixture.query)).months(ZoneId.systemDefault()))
-            dragTo(scale.months.first,scale,begin=true,finish=true)
+            jumpTo(scale.months.first)
             waitAnchor(model,fixture.query,"photo:${fixture.photos.last().id}")
             screenshot("date-scrub-rtl-large")
-            compose.onNodeWithTag("timeline:date-scrubber").performClick();waitTag("timeline:date-navigation")
+            compose.onNodeWithTag("timeline:date-rail").performClick();waitTag("timeline:date-navigation")
             screenshot("date-scrub-jump")
             compose.onNodeWithText("Cancel").performClick()
             assertEquals("photo:${fixture.photos.last().id}",compose.runOnUiThread { model.anchor(fixture.query)?.cursor?.key })

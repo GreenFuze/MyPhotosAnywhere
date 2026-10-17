@@ -4,7 +4,7 @@ import kotlin.math.floor
 import kotlin.math.roundToInt
 
 internal data class BlockTile(val key: String,val index: Int,val x: Float,val y: Float,val width: Float,val height: Float,
-    val row: Int,val column: Int,val rowSpan: Int=1)
+    val row: Int,val column: Int,val rowSpan: Int=1,val columnSpan: Int=1)
 internal data class PhotoBlock(val key: String,val tiles: List<BlockTile>,val height: Float,val rows: Int)
 internal data class BlockMosaicPlan(val blocks: List<PhotoBlock>,val columns: Int) {
     val tiles=blocks.flatMap { it.tiles }
@@ -21,18 +21,24 @@ internal class BlockMosaic {
         val columns=minOf(requestedColumns,floor((width+GAP)/(48+GAP)).toInt().coerceAtLeast(1))
         val blocks=ArrayList<PhotoBlock>();var index=0;var logicalRow=0
         while(index<items.size) {
-            val heroWidth=(width-GAP)/2
-            val sideColumns=columns-1
-            val small=if(sideColumns>0) (width-heroWidth-GAP-(sideColumns-1)*GAP)/sideColumns else width
-            val heroRows=if(sideColumns>0) (heroWidth/items[index].aspect/(small+GAP)).roundToInt().coerceIn(2,6) else 1
+            val small=(width-(columns-1)*GAP)/columns
+            // Four-column layouts use a two-column portrait; other densities keep
+            // one-column portraits. Adjacent tiles retain the selected column width.
+            val heroSpan=if(columns>=4) 2 else 1
+            val heroWidth=small*heroSpan+(heroSpan-1)*GAP
+            val sideColumns=columns-heroSpan
+            val heroRows=if(sideColumns>0) (heroWidth/items[index].aspect/(small+GAP)).roundToInt().coerceIn(2,4) else 1
             val count=1+heroRows*sideColumns
             if(columns>1 && small>=48 && items[index].aspect<0.85f && (!endReached || items.size-index>=count)) {
                 val end=minOf(items.size,index+count);val height=heroRows*(small+GAP)-GAP
+                // Canonical identity fixes alignment through recomposition and paging.
+                val heroColumn=items[index].key.hashCode().mod(sideColumns+1)
                 val tiles=ArrayList<BlockTile>()
-                tiles.add(BlockTile(items[index].key,index,0f,0f,heroWidth,height,logicalRow,0,heroRows))
+                tiles.add(BlockTile(items[index].key,index,heroColumn*(small+GAP),0f,heroWidth,height,logicalRow,heroColumn,heroRows,heroSpan))
                 for(position in index+1 until end) {
-                    val n=position-index-1;val row=n/sideColumns;val column=n%sideColumns
-                    tiles.add(BlockTile(items[position].key,position,heroWidth+GAP+column*(small+GAP),row*(small+GAP),small,small,logicalRow+row,column+1))
+                    val n=position-index-1;val row=n/sideColumns;val side=n%sideColumns
+                    val column=if(side<heroColumn) side else side+heroSpan
+                    tiles.add(BlockTile(items[position].key,position,column*(small+GAP),row*(small+GAP),small,small,logicalRow+row,column))
                 }
                 blocks.add(PhotoBlock("block:${items[index].key}",tiles,height,heroRows));index=end;logicalRow+=heroRows
             } else {

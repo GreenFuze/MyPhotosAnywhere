@@ -7,7 +7,7 @@ class MosaicContinuityTest {
     private fun items(first: Int,count: Int)=List(count) { n -> val id=first+n;MosaicInput("photo:$id",if(id%4==0) 0.6f else if(id%4==1) 2.2f else 1f) }
     private fun geometry(plan: BlockMosaicPlan,key: String): List<Any> {
         val (block,tile)=plan.locations.getValue(key)
-        return listOf(plan.blocks[block].key,tile.x,tile.y,tile.width,tile.height,tile.rowSpan)
+        return listOf(plan.blocks[block].key,tile.x,tile.y,tile.width,tile.height,tile.rowSpan,tile.column,tile.columnSpan)
     }
     @Test fun appendingAndLateDimensionsKeepEveryExistingTileInPlace() {
         for(layout in GalleryLayout.entries) {
