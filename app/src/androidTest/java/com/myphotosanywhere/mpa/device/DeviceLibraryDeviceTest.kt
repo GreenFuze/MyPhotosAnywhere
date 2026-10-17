@@ -223,7 +223,11 @@ class DeviceLibraryDeviceTest {
             compose.activityRule.scenario.recreate()
             compose.waitUntil(20000) { compose.runOnUiThread { player()?.duration?.let { it>0 }==true } }
             assertFalse(compose.runOnUiThread { first.isPlaying })
-            compose.onNodeWithTag("viewer-backup").assertExists();screenshot("device-camera-video")
+            compose.onNodeWithTag("viewer-backup").assertIsDisplayed()
+            val navigation=listOf("viewer-previous","viewer-position","viewer-next").map { compose.onNodeWithTag(it).fetchSemanticsNode().boundsInWindow }
+            val actions=listOf("viewer-share","viewer-favorite","viewer-backup").map { compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInWindow }
+            assertTrue("Viewer navigation and actions must occupy separate rows",navigation.all { control -> actions.all { action -> control.bottom<=action.top } })
+            screenshot("device-camera-video")
             assertEquals("",app.database.photos().find(photo.id)?.originalPath)
             assertEquals("",app.database.photos().find(photo.id)?.sha256)
             assertArrayEquals(bytes,requireNotNull(app.contentResolver.openInputStream(uri)).use { it.readBytes() })
