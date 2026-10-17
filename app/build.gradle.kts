@@ -14,7 +14,7 @@ android {
         targetSdk = 37
         versionCode = 42
         versionName = "0.5.31"
-        testInstrumentationRunner = "com.myphotosanywhere.mpa.ResourceDiagnosticRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     // CI keeps the upgrade key outside every cache and artifact path.
     System.getenv("MPA_UPGRADE_KEYSTORE_PATH")?.let { keyPath ->

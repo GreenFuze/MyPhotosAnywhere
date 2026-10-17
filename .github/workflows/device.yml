@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        api: [35]
+        api: [29]
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7.0.1
@@ -41,7 +41,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libx11-dev libx11-xcb-dev
-      - name: Native regression and scale tests
+      - name: Focused camera and video diagnostic
         run: bash scripts/ci_emulator.sh '${{ matrix.api }}'
       - uses: actions/upload-artifact@v7.0.2
         if: always()

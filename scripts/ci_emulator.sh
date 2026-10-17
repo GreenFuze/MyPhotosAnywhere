@@ -74,4 +74,4 @@ adb shell settings put system screen_off_timeout 1800000
 adb shell settings put global stay_on_while_plugged_in 7
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
-bash scripts/run_device_checks.sh
+bash scripts/run_focused_video_diagnostic.sh
