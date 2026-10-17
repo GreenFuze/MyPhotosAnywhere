@@ -30,7 +30,8 @@ import java.io.File
 
 @Composable
 internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<FaceRecord>,enabled: Boolean,
-    onPerson: (String)->Unit,onPhoto: (String)->Unit,onSettings: ()->Unit) {
+    onPerson: (String)->Unit,onPhoto: (String)->Unit,onSettings: ()->Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState=androidx.compose.foundation.lazy.rememberLazyListState()) {
     val repository=remember(model) { com.myphotosanywhere.mpa.people.CanonicalPeopleRepository(model.app.timeline) }
     var retryPeople by remember { mutableIntStateOf(0) }
     val labelError by model.app.personLabels.error.collectAsStateWithLifecycle()
@@ -62,7 +63,10 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
     fun startNaming(ids: List<String>,person: Person?=null) {
         naming=ids; selected=ids.toSet(); namingPersonId=person?.id; name=person?.name ?: ""
     }
-    LazyColumn(Modifier.fillMaxSize().testTag("people-list"),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    // A temporary header-only loading list must not clamp the saved person-card anchor.
+    val loadingList=androidx.compose.foundation.lazy.rememberLazyListState()
+    LazyColumn(Modifier.fillMaxSize().testTag("people-list"),state=if(state.loading && state.groups.isEmpty()) loadingList else listState,
+        contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item { Text("People",style=MaterialTheme.typography.headlineSmall) }
         item {
             ScanActions(model)

@@ -160,6 +160,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     var jumpToDate by rememberSaveable { mutableStateOf(false) }
     val searchSuggestions=rememberLazyGridState()
     val collectionsHubGrid=rememberLazyGridState()
+    val peopleList=androidx.compose.foundation.lazy.rememberLazyListState()
     var exportId by rememberSaveable { mutableStateOf<String?>(null) }
     val snackbar=remember { SnackbarHostState() }
     val context=LocalContext.current
@@ -319,7 +320,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                         } }
                     }
                 }
-                2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; importedPersonKey=null; albumId=null; sourceKey=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto,onSettings={ navigation.open(ShellDestination.RECOGNITION) })
+                2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; importedPersonKey=null; albumId=null; sourceKey=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto,onSettings={ navigation.open(ShellDestination.RECOGNITION) },listState=peopleList)
                 3 -> PlacesScreen(photos,settings.onlineMaps,{ features.updateSettings(settings.copy(onlineMaps=it)) },::selectPhoto)
                 16 -> com.myphotosanywhere.mpa.trash.TrashScreen(trash,navigationClearance,onSources={ navigation.open(ShellDestination.STORAGE) })
                 4,7,8,9,10,11,12,13,14,15,17,18 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
