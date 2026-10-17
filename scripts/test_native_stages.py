@@ -77,6 +77,33 @@ class NativeStagesTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.owner.archive("incomplete",0)
 
+    def testAggregatedSuitesPreserveCompleteReportsAndIdentities(self):
+        self.report()
+        path=self.root/"app/build/outputs/androidTest-results/connected/debug/TEST-device.xml"
+        raw='<testsuites tests="1">'+path.read_text(encoding="utf-8")+'</testsuites>'
+        path.write_text(raw,encoding="utf-8")
+        self.owner.archive("main",0)
+        self.owner.restore_archives()
+        record=self.owner.records[0]
+        self.assertEqual(1,record["tests"])
+        self.assertEqual(raw,(self.root/record["reports"][0]["path"]).read_text(encoding="utf-8"))
+
+    def testAggregateCannotHideAnIncompleteNestedSuite(self):
+        self.report()
+        path=self.root/"app/build/outputs/androidTest-results/connected/debug/TEST-device.xml"
+        nested=path.read_text(encoding="utf-8").replace('tests="1"','tests="2"')
+        path.write_text('<testsuites tests="1">'+nested+'</testsuites>',encoding="utf-8")
+        with self.assertRaises(ValueError):
+            self.owner.archive("incomplete-aggregate",0)
+
+    def testAggregateCannotHideNestedErrors(self):
+        self.report()
+        path=self.root/"app/build/outputs/androidTest-results/connected/debug/TEST-device.xml"
+        nested=path.read_text(encoding="utf-8").replace('tests="1"','tests="1" errors="1"')
+        path.write_text('<testsuites tests="1">'+nested+'</testsuites>',encoding="utf-8")
+        with self.assertRaises(ValueError):
+            self.owner.archive("invalid-aggregate",0)
+
     def testRootErrorsCannotBeHiddenByPassingChildCases(self):
         self.report()
         path=self.root/"app/build/outputs/androidTest-results/connected/debug/TEST-device.xml"

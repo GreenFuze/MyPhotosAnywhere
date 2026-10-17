@@ -40,9 +40,14 @@ class NativeStages:
                           "sha256": hashlib.sha256(report.read_bytes()).hexdigest()})
             root=ET.parse(report).getroot()
             cases=list(root.iter("testcase"))
-            if status==0 and (root.tag!="testsuite" or int(root.get("tests",-1))!=len(cases)
-                              or any(int(root.get(name,0)) for name in ("failures","errors","skipped"))):
-                raise ValueError("Native XML declares missing, failing or skipped test evidence.")
+            if status==0:
+                if root.tag not in ("testsuite","testsuites"):
+                    raise ValueError("Native XML has an unsupported report root.")
+                suites=[root,*[item for item in root.iter("testsuite") if item is not root]]
+                for suite in suites:
+                    if (int(suite.get("tests",-1))!=len(list(suite.iter("testcase")))
+                            or any(int(suite.get(name,0)) for name in ("failures","errors","skipped"))):
+                        raise ValueError("Native XML declares missing, failing or skipped test evidence.")
             tests.extend(cases)
         for test in tests:
             identity = (test.get("classname"), test.get("name"))
