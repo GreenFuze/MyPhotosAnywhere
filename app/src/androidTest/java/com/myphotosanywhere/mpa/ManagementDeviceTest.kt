@@ -45,8 +45,8 @@ class ManagementDeviceTest {
         compose.onNodeWithTag("management:Preferences").performClick();compose.onNodeWithTag("management:Recognition").performClick();compose.onNodeWithTag("scan-now").assertIsDisplayed();back();back()
         compose.onNodeWithTag("management:Backup and metadata").performClick();compose.onNodeWithText("Portable annotations").assertIsDisplayed();back()
         compose.onNodeWithTag("management:Privacy and permissions").performClick();compose.onNodeWithText("Allow online maps").assertIsDisplayed();back()
-        compose.onNodeWithTag("management:About MPA").performClick();compose.onNodeWithText("MPA 0.5.31 (42)",substring=true).assertExists()
-        compose.activityRule.scenario.recreate();compose.onNodeWithText("MPA 0.5.31 (42)",substring=true).assertExists();back();back();back()
+        compose.onNodeWithTag("management:About MPA").performClick();compose.onNodeWithText("MPA 0.5.32 (43)",substring=true).assertExists()
+        compose.activityRule.scenario.recreate();compose.onNodeWithText("MPA 0.5.32 (43)",substring=true).assertExists();back();back();back()
         compose.onNodeWithTag("nav:Collections").assertIsSelected()
     }
     @Test fun photoViewPreferencesRestoreTheGalleryIdentityWithoutChangingSourcesOrRecognition()=runBlocking<Unit> {
