@@ -227,6 +227,14 @@ class DeviceLibraryDeviceTest {
             val navigation=listOf("viewer-previous","viewer-position","viewer-next").map { compose.onNodeWithTag(it).fetchSemanticsNode().boundsInWindow }
             val actions=listOf("viewer-share","viewer-favorite","viewer-backup").map { compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInWindow }
             assertTrue("Viewer navigation and actions must occupy separate rows",navigation.all { control -> actions.all { action -> control.bottom<=action.top } })
+            val viewerBounds=compose.onNodeWithTag("viewer-screen").fetchSemanticsNode().boundsInWindow
+            var restoredFrameReady=false
+            try {
+                compose.waitUntil("Restored video must show its frame over opaque black letterboxing",10000) { opaqueVideoFrame(viewerBounds) }
+                restoredFrameReady=true
+            } finally {
+                if(!restoredFrameReady) screenshot("device-camera-video")
+            }
             screenshot("device-camera-video")
             assertEquals("",app.database.photos().find(photo.id)?.originalPath)
             assertEquals("",app.database.photos().find(photo.id)?.sha256)
@@ -240,6 +248,22 @@ class DeviceLibraryDeviceTest {
             val app=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
             DeviceAccessFixture.prepare(app)
         }
+    }
+    /** Check the actual compositor, not just MediaPlayer preparation or Compose semantics. */
+    private fun opaqueVideoFrame(bounds: androidx.compose.ui.geometry.Rect): Boolean {
+        val image=instrumentation.uiAutomation.takeScreenshot() ?: return false
+        try {
+            fun pixel(x: Float,y: Float)=image.getPixel(
+                (bounds.left+bounds.width*x).toInt().coerceIn(0,image.width-1),
+                (bounds.top+bounds.height*y).toInt().coerceIn(0,image.height-1))
+            val center=pixel(.5f,.5f)
+            val frame=Color.green(center)>Color.red(center)+20 && Color.green(center)>Color.blue(center)+10
+            val opaque=listOf(.2f,.8f).all { y -> listOf(.25f,.5f,.75f).all { x ->
+                val color=pixel(x,y)
+                Color.red(color)<=8 && Color.green(color)<=8 && Color.blue(color)<=8
+            } }
+            return frame && opaque
+        } finally { image.recycle() }
     }
     private fun screenshot(name: String) {
         val image=requireNotNull(instrumentation.uiAutomation.takeScreenshot())
