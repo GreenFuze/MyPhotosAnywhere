@@ -66,7 +66,7 @@ internal fun ViewerSurface(chrome: ViewerChromeController,modifier: Modifier=Mod
         }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha=.72f))
             .onSizeChanged { footerPixels=it.height }) {
-            MotionVisibility(chrome.visible,MotionEdge.BOTTOM) { bottomBar() }
+            MotionVisibility(chrome.visible,MotionEdge.BOTTOM) { Column { bottomBar() } }
             status()
         }
     }
