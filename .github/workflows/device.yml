@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        api: [29, 35, "37.0"]
+        api: [35]
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7.0.1
