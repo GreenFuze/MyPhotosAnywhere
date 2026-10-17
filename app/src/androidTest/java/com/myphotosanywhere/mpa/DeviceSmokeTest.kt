@@ -568,6 +568,23 @@ class DeviceSmokeTest {
             compose.waitUntil(10000) {
                 compose.runOnUiThread { androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true }
             }
+            // Isolated diagnostic only: exercise real IME/window control turnover repeatedly.
+            repeat(24) { iteration ->
+                android.util.Log.i("MPAResourceTrace","Schedule IME diagnostic cycle $iteration")
+                compose.onNodeWithTag("index-start").performScrollTo().performClick()
+                compose.onNodeWithTag("index-start").performTextReplacement(if(iteration%2==0) "23:00" else "22:00")
+                compose.onNodeWithText("Save window").performScrollTo().performClick()
+                compose.waitUntil(10000) {
+                    compose.runOnUiThread { androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true }
+                }
+                compose.waitForIdle()
+                System.gc();System.runFinalization();Thread.sleep(100)
+            }
+            compose.onNodeWithTag("index-start").performTextReplacement("22:00")
+            compose.onNodeWithText("Save window").performScrollTo().performClick()
+            compose.waitUntil(10000) {
+                compose.runOnUiThread { androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true }
+            }
             compose.waitForIdle()
             compose.onNodeWithText("Pause scans").performScrollTo().performClick()
             assertTrue(app.settings.state.value.indexingPaused)
