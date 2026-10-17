@@ -554,7 +554,7 @@ class DeviceSmokeTest {
     @Test fun storageExposesXmpPrivacyAndSavesMidnightScheduleWithPause() = runBlocking<Unit> {
         val original=app.settings.state.value
         try {
-            app.settings.update(original.copy(overnightIndexing=false))
+            app.settings.update(original.copy(overnightIndexing=false,indexingPaused=false))
             compose.onNodeWithTag("shell:storage").performClick()
             compose.onNodeWithTag("management:Settings").performClick()
             compose.onNodeWithTag("management:Preferences").performClick()
@@ -565,6 +565,10 @@ class DeviceSmokeTest {
             compose.onNodeWithText("Save window").performScrollTo().performClick()
             assertTrue(app.settings.state.value.overnightIndexing)
             assertEquals(22*60,app.settings.state.value.nightStart); assertEquals(6*60,app.settings.state.value.nightEnd)
+            compose.waitUntil(10000) {
+                compose.runOnUiThread { androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true }
+            }
+            compose.waitForIdle()
             compose.onNodeWithText("Pause scans").performScrollTo().performClick()
             assertTrue(app.settings.state.value.indexingPaused)
             compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
