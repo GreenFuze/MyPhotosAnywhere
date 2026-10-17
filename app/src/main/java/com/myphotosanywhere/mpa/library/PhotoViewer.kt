@@ -2,6 +2,7 @@ package com.myphotosanywhere.mpa.library
 
 import androidx.core.net.toUri
 import android.widget.VideoView
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
@@ -15,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
@@ -113,11 +115,22 @@ internal fun ViewerMediaContent(photo: Photo,model: LibraryFeaturesModel,active:
         Text((original as ViewerOriginal.Unavailable).message,color=Color.White,
             modifier=Modifier.align(androidx.compose.ui.Alignment.Center).padding(20.dp))
     } else if(reader==null && device==null) Box(Modifier.fillMaxSize().then(previewTap)) { CircularProgressIndicator() }
-    else if(photo.mimeType.startsWith("video/")) AndroidView(factory={ context -> VideoView(context).apply {
+    else if(photo.mimeType.startsWith("video/")) BoxWithConstraints(Modifier.fillMaxSize()) {
+        val frame=remember(photo.id) { VideoFrameState(device?.width ?: 0,device?.height ?: 0) }
+        val fitted=if(maxWidth/maxHeight>frame.aspect) Modifier.fillMaxHeight().aspectRatio(frame.aspect,matchHeightConstraintsFirst=true)
+            else Modifier.fillMaxWidth().aspectRatio(frame.aspect)
+        AndroidView(factory={ context -> VideoView(context).apply {
+        outlineProvider=android.view.ViewOutlineProvider.BOUNDS;clipToOutline=true
         if(device!=null) setVideoURI(device.uri.toUri()) else setVideoPath(requireNotNull(reader).file.absolutePath)
         val controls=android.widget.MediaController(context);controls.setAnchorView(this);setMediaController(controls)
-        setOnPreparedListener { seekTo(1) }
-    } },modifier=Modifier.fillMaxSize(),update={ if(!active || !interactive) it.pause() },onRelease={ it.stopPlayback() })
+        setOnPreparedListener { player -> frame.onPrepared(player.videoWidth,player.videoHeight);seekTo(1) }
+        } },modifier=Modifier.align(Alignment.Center).then(fitted).clipToBounds(),update={ if(!active || !interactive) it.pause() },onRelease={ it.stopPlayback() })
+        // A SurfaceView can clear its parent window before its first measured video frame.
+        // Retain the available poster over that preparation interval, including on API 29.
+        if(!frame.prepared) Box(Modifier.fillMaxSize().background(Color.Black)) {
+            if(safePreview!=null) coil.compose.AsyncImage(safePreview,"Preview",Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
+        }
+    }
     else Box(Modifier.fillMaxSize().clipToBounds().viewerDetailsSwipe(photo.id,active && interactive,{ zoom>1f },onDetails).pointerInput(photo.id,active,interactive) {
         detectTapGestures(onTap={ if(active && interactive) toggleControls?.invoke() },
             onDoubleTap={ if(active && interactive) { zoom=if(zoom>1f) 1f else 2.5f;x=0f;y=0f } })
