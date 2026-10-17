@@ -221,7 +221,7 @@ class DeviceSmokeTest {
             }
             assertTrue(source.isFile); assertTrue(stage.isFile)
             compose.activityRule.scenario.recreate()
-            compose.onNodeWithTag("shell:activity").performClick()
+            compose.onNodeWithTag("management:7").assertExists()
             compose.onNodeWithTag("dismiss-import-errors:$id").assertDoesNotExist()
             runBlocking { dao.saveJob(job.copy(error="Fresh import error")) }
             compose.waitUntil(5000) { compose.onAllNodesWithTag("dismiss-import-errors:$id").fetchSemanticsNodes().isNotEmpty() }
@@ -465,7 +465,7 @@ class DeviceSmokeTest {
         compose.onNodeWithText("Google setup details").performScrollTo().performClick()
         compose.onNodeWithText("Google setup for this installed app").assertIsDisplayed()
         compose.onNodeWithText("Package: com.myphotosanywhere.mpa",substring=true).assertExists()
-        compose.onNodeWithText("MPA 0.5.30 (41)",substring=true).assertExists()
+        compose.onNodeWithText("MPA 0.5.31 (42)",substring=true).assertExists()
         val info=com.myphotosanywhere.mpa.drive.GoogleSetupInfo.installed(app)
         assertEquals("com.myphotosanywhere.mpa",info.packageName)
         assertTrue(info.sha1.isNotEmpty())
@@ -537,6 +537,8 @@ class DeviceSmokeTest {
             com.myphotosanywhere.mpa.library.OriginalImageSource(file).use { source ->
                 assertEquals(4096,source.width)
                 assertTrue(source.supportsRegions)
+                val preview=source.preview()
+                try { assertTrue(preview.width>0);assertTrue(preview.height>0) } finally { preview.recycle() }
                 val rect=android.graphics.Rect(2990,0,3020,128)
                 val detail=requireNotNull(source.region(rect,1))
                 try {
@@ -552,9 +554,10 @@ class DeviceSmokeTest {
     @Test fun storageExposesXmpPrivacyAndSavesMidnightScheduleWithPause() = runBlocking<Unit> {
         val original=app.settings.state.value
         try {
-            app.settings.update(original.copy(overnightIndexing=false))
+            app.settings.update(original.copy(overnightIndexing=false,indexingPaused=false))
             compose.onNodeWithTag("shell:storage").performClick()
             compose.onNodeWithTag("management:Settings").performClick()
+            compose.onNodeWithTag("management:Preferences").performClick()
             compose.onNodeWithTag("management:Recognition").performClick()
             compose.onNodeWithTag("index-night-switch").performScrollTo().performClick()
             compose.onNodeWithTag("index-start").performScrollTo().performTextReplacement("22:00")
@@ -562,8 +565,13 @@ class DeviceSmokeTest {
             compose.onNodeWithText("Save window").performScrollTo().performClick()
             assertTrue(app.settings.state.value.overnightIndexing)
             assertEquals(22*60,app.settings.state.value.nightStart); assertEquals(6*60,app.settings.state.value.nightEnd)
+            compose.waitUntil(10000) {
+                compose.runOnUiThread { androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true }
+            }
+            compose.waitForIdle()
             compose.onNodeWithText("Pause scans").performScrollTo().performClick()
             assertTrue(app.settings.state.value.indexingPaused)
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             compose.onNodeWithTag("management:Backup and metadata").performClick()
             compose.waitUntil(10000) {

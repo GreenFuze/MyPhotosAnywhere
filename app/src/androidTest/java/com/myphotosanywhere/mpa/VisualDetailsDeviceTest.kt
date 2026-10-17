@@ -37,7 +37,7 @@ class VisualDetailsDeviceTest {
         try {
             app.database.drive().saveSource(source);app.database.photos().insert(photo);app.database.cloud().savePhoto(exact)
             app.database.cloud().savePhoto(exact.copy(key="a-alias:facts-alias",bindingKey="a-alias",remoteId="facts-alias",capturedAt=1_700_000_000_000L))
-            val repository=PhotoFactsRepository(app.timeline,app.cache)
+            val repository=PhotoFactsRepository(app.timeline,app.cache,app.deviceMedia)
             val facts=repository.read(photo)
             assertEquals(exact.capturedAt,facts.millis);assertEquals(TimestampProvenance.LINKED_CAPTURE,facts.provenance)
             assertEquals(360 to 240,facts.dimensions)
@@ -63,9 +63,14 @@ class VisualDetailsDeviceTest {
         compose.onNodeWithTag("collections:Archive").performClick()
         compose.onNodeWithTag("nav:Collections").performClick()
         compose.onNodeWithTag("collections:People").performScrollTo().performClick()
-        compose.onNodeWithText("Imported people").assertExists()
-        compose.onNodeWithTag("people-list").performScrollToNode(hasText("Named faces"))
-        compose.onNodeWithText("Named faces").assertIsDisplayed()
+        compose.onNodeWithTag("people-list").assertExists()
+        compose.waitUntil(10000) {
+            compose.onAllNodes(hasTestTag("people-list") and SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"People ready")).fetchSemanticsNodes().size==1
+        }
+        compose.onAllNodesWithText("Imported people").assertCountEquals(0)
+        compose.onAllNodesWithText("Named faces").assertCountEquals(0)
+        compose.onNodeWithTag("people-list").performScrollToNode(hasText("Unassigned faces",substring=true))
+        compose.onNodeWithText("Unassigned faces",substring=true).assertIsDisplayed()
         screenshot("people-visual")
     }
 
@@ -93,7 +98,12 @@ class VisualDetailsDeviceTest {
             compose.waitUntil(10000) { !model.busy.value && model.albums.value.any { it.id==album.id && it.name=="Renamed visual album" && it.pinned } }
             assertEquals(album.copy(name="Renamed visual album",pinned=true),saved())
             assertEquals(listOf(com.myphotosanywhere.mpa.data.AlbumPhoto(album.id,photo.id)),app.database.library().members(album.id))
-            compose.onNodeWithTag("album:manage:${album.id}").performClick()
+            compose.waitUntil(10000) {
+                compose.runOnUiThread { androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true }
+            }
+            compose.onNodeWithTag("collections:grid").performScrollToNode(hasTestTag("album:manage:${album.id}"))
+            compose.onNodeWithTag("album:manage:${album.id}").assertIsDisplayed().performClick()
+            compose.waitUntil(10000) { compose.onAllNodesWithText("Unpin offline album").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("Unpin offline album").performClick()
             compose.waitUntil(10000) { saved()?.pinned==false && !model.busy.value && compose.onAllNodesWithText("Keep offline").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("Remove album").performClick()

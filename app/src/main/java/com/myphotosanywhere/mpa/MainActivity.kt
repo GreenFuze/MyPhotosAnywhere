@@ -81,6 +81,7 @@ class MainActivity: ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = viewModel(),features: LibraryFeaturesModel = viewModel(),timeline: TimelineViewModel = viewModel(),selection: SelectionViewModel = viewModel(),search: SearchViewModel = viewModel(),searchTimeline: TimelineViewModel = viewModel(key="search-timeline")) {
+    com.myphotosanywhere.mpa.device.DeviceLibraryLifecycle()
     val searchDraft by search.draft.collectAsStateWithLifecycle()
     val searchApplied by search.applied.collectAsStateWithLifecycle()
     val searchRecents by search.recents.collectAsStateWithLifecycle()
@@ -130,17 +131,36 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     var personId by rememberSaveable { mutableStateOf<String?>(null) }
     var importedPersonKey by rememberSaveable { mutableStateOf<String?>(null) }
     val importedLabel=remember(importedPersonKey) { importedPersonKey?.let { requireNotNull(com.myphotosanywhere.mpa.people.ImportedPersonLabel.fromKey(it)) } }
+    LaunchedEffect(importedPersonKey) {
+        val oldKey=importedPersonKey ?: return@LaunchedEffect
+        try {
+            val alias=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                features.app.personLabels.drain()
+                features.app.database.personLabels().alias(oldKey)
+            }
+            if(importedPersonKey==oldKey) {
+                importedPersonKey=null;personId=alias?.personId?.takeUnless { alias.ignored }
+                if(personId==null) {
+                    features.message.value="This person is no longer available. Choose a person from People."
+                    navigation.open(ShellDestination.PEOPLE)
+                }
+            }
+        } catch(cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch(error: android.database.sqlite.SQLiteException) { features.message.value=error.message ?: "Cannot restore this person. Retry People." }
+    }
     var searchOrigin by rememberSaveable { mutableStateOf<Bundle?>(null) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
+    var selectionBackup by rememberSaveable { mutableStateOf(false) }
     val timelineViewer by timeline.viewer.collectAsStateWithLifecycle()
     val timelineMessage by timeline.message.collectAsStateWithLifecycle()
     LaunchedEffect(tab,selectedId,viewerId,pendingViewKey,editorId) {
         val legacy=tab !in listOf(0,1,5) || selectedId!=null || viewerId!=null || pendingViewKey!=null || editorId!=null
-        model.legacyLoading(tab !in listOf(0,1,5) || viewerId!=null || pendingViewKey!=null);features.legacyLoading(legacy)
+        model.legacyLoading(tab in listOf(3,11) || viewerId!=null || pendingViewKey!=null);features.legacyLoading(legacy)
     }
     var jumpToDate by rememberSaveable { mutableStateOf(false) }
     val searchSuggestions=rememberLazyGridState()
     val collectionsHubGrid=rememberLazyGridState()
+    val peopleList=androidx.compose.foundation.lazy.rememberLazyListState()
     var exportId by rememberSaveable { mutableStateOf<String?>(null) }
     val snackbar=remember { SnackbarHostState() }
     val context=LocalContext.current
@@ -215,8 +235,9 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
             ?: importedLabel?.name ?: if(filter=="All") "Photos" else filter
         else -> navigation.destination.title
     }
+    val showNavigation=tab in listOf(0,1,2,3,5,6,16)
     var navigationHeight by remember { mutableIntStateOf(0) }
-    val navigationClearance=with(LocalDensity.current) { navigationHeight.toDp() }
+    val navigationClearance=if(showNavigation || selecting) with(LocalDensity.current) { navigationHeight.toDp() } else 0.dp
     val scrollClearance=if(selecting) 0.dp else navigationClearance
     val primaryBrand=navigation.destination==navigation.primary && tab in listOf(0,1)
     val galleryBarState=rememberTopAppBarState()
@@ -255,13 +276,13 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         onStorage={ navigation.open(ShellDestination.STORAGE) },onActivity={ navigation.open(ShellDestination.ACTIVITY) },onImport={ navigation.open(ShellDestination.IMPORTS) },
         onFilters={ showFilters=true },showFilters=tab==0 || tab==5,
         filtersActive=filter!="All" || sourceKey!=null,needsAttention=sync.any { it.error!=null },
-        showTitle=!primaryBrand || filter!="All" || albumId!=null || personId!=null || importedLabel!=null,
+        showTitle=(!primaryBrand || filter!="All" || albumId!=null || personId!=null || importedLabel!=null) && tab !in listOf(10,17),
+        showActions=showNavigation,
         scrollBehavior=if(galleryScrolling) galleryScroll else null)
     } },snackbarHost={ SnackbarHost(snackbar,Modifier.padding(bottom=navigationClearance)) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
         // Browsing scrolls beneath floating navigation. Selection reserves the opaque toolbar viewport.
         Column(Modifier.fillMaxSize().then(if(selecting || tab !in listOf(0,1,5)) Modifier.padding(bottom=navigationClearance) else Modifier)) {
-            if(busy || featureBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
             when(tab) {
                 0 -> {
                     ShellImportActivity(onOpen={ navigation.open(ShellDestination.ACTIVITY) },sync=sync)
@@ -299,19 +320,23 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                         } }
                     }
                 }
-                2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; importedPersonKey=null; albumId=null; sourceKey=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto,onImported={ importedPersonKey=it;personId=null;albumId=null;sourceKey=null;filter="All";navigation.open(ShellDestination.PHOTOS) },onSettings={ navigation.open(ShellDestination.RECOGNITION) })
+                2 -> PeopleScreen(features,people,faces,settings.faceIndexing,onPerson={ personId=it; importedPersonKey=null; albumId=null; sourceKey=null; filter="All"; navigation.open(ShellDestination.PHOTOS) },onPhoto=::selectPhoto,onSettings={ navigation.open(ShellDestination.RECOGNITION) },listState=peopleList)
                 3 -> PlacesScreen(photos,settings.onlineMaps,{ features.updateSettings(settings.copy(onlineMaps=it)) },::selectPhoto)
                 16 -> com.myphotosanywhere.mpa.trash.TrashScreen(trash,navigationClearance,onSources={ navigation.open(ShellDestination.STORAGE) })
-                4,7,8,9,10,11,12,13,14,15 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
+                4,7,8,9,10,11,12,13,14,15,17,18 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
             }
+        }
+        MotionVisibility(busy || featureBusy,MotionEdge.TOP,Modifier.align(Alignment.TopCenter)) {
+            LinearProgressIndicator(Modifier.fillMaxWidth().testTag("shell:progress"))
         }
         MotionVisibility(selecting,MotionEdge.BOTTOM,Modifier.align(Alignment.BottomCenter)) {
         SelectionBottomBar(selectionBusy,(if(tab==5) searchApplied.filter else filter)=="Archive",tab==0 && albumId!=null,onAction={ kind ->
             if(kind==BulkKind.ALBUM) selectionAlbums=true
+            else if(kind==BulkKind.BACKUP) selectionBackup=true
             else selection.execute(BulkAction(kind,if(kind==BulkKind.REMOVE_ALBUM) albumId else null))
         },onTrash={ trash.request(selectedTargets) },modifier=Modifier.onSizeChanged { if(selecting) navigationHeight=it.height })
         }
-        MotionVisibility(!selecting,MotionEdge.BOTTOM,Modifier.align(Alignment.BottomCenter)) {
+        MotionVisibility(!selecting && showNavigation,MotionEdge.BOTTOM,Modifier.align(Alignment.BottomCenter)) {
         ShellBottomBar(navigation.activePrimary,onSelect={ destination ->
             if(destination==ShellDestination.SEARCH && navigation.activePrimary!=ShellDestination.SEARCH)
                 searchOrigin=GalleryContext(filter,sourceKey,albumId,personId,importedPersonKey).save()
@@ -322,6 +347,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         }
     }
     SelectionDialogs(selection,albums,selectionAlbums,{ selectionAlbums=false },selectionResult,selectionBusy,selectionProgress,selectionTotal)
+    if(selectionBackup) com.myphotosanywhere.mpa.device.SelectionBackupDialog(selection,features,{ selectionBackup=false }) { navigation.open(ShellDestination.STORAGE) }
     if(showFilters && tab==5) SearchFilters(searchDraft,sources,onApply={ search.update(it);submitSearch();showFilters=false },onClose={ showFilters=false })
     if(showFilters && tab!=5) ModalBottomSheet(onDismissRequest={ showFilters=false }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -374,7 +400,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
         onClose={ viewerDetailsOpen=false;if(viewerId==null) selectedId=null },onEdit={ editorId=selected.id },onAI={ showShare=true },onExport={
             exportId=selected.id; export.launch(selected.displayName)
         },onResult=handoffs.firstOrNull { it.photoId==selected.id }?.let { h -> { pickResult(h) } },onView=if(viewerId==null && timelineViewer==null && searchViewer==null) ({ viewerId=selected.id }) else null,showPreview=viewerId==null && timelineViewer==null && searchViewer==null,
-        onRemoveCopy={ features.requestRemoveDownload(selected) })
+        onRemoveCopy={ features.requestRemoveDownload(selected) },onDeviceAccess={ timeline.closeViewer();searchTimeline.closeViewer();viewerId=null;viewerDetailsOpen=false;selectedId=null;navigation.open(ShellDestination.STORAGE) })
     if(selected!=null && showShare) ShareDialog(busy,onDismiss={ showShare=false }) { provider,instructions ->
         model.share(selected,provider,instructions) { intent -> context.startActivity(intent); showShare=false }
     }
@@ -382,6 +408,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
     com.myphotosanywhere.mpa.trash.TrashDialogs(trash,onQueued={
         selection.clear();timeline.closeViewer();searchTimeline.closeViewer();viewerId=null;viewerDetailsOpen=false;selectedId=null
     })
+    com.myphotosanywhere.mpa.device.DeviceBackupDialog(features) { timeline.closeViewer();searchTimeline.closeViewer();viewerId=null;viewerDetailsOpen=false;selectedId=null;navigation.open(ShellDestination.STORAGE) }
     DeviceCopyDialogs(features,onClosing={
         timeline.closeViewer();searchTimeline.closeViewer();viewerId=null;viewerDetailsOpen=false;selectedId=null
     })

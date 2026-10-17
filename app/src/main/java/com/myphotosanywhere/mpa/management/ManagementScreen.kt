@@ -3,9 +3,9 @@ package com.myphotosanywhere.mpa.management
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.background
+import androidx.compose.ui.res.stringResource
+import com.myphotosanywhere.mpa.ui.MotionSwap
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -14,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -25,17 +26,18 @@ import com.myphotosanywhere.mpa.library.*
 import com.myphotosanywhere.mpa.ui.ShellDestination
 import com.myphotosanywhere.mpa.ui.ShellIcon
 import com.myphotosanywhere.mpa.R
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.Alignment
 
 /** Focused destinations share existing state holders. Their workers, persistence and captured destinations are unchanged. */
 @Composable
 internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,features: LibraryFeaturesModel,onOpen: (ShellDestination)->Unit) {
     val holder=rememberSaveableStateHolder()
-    holder.SaveableStateProvider(destination.id) {
-        if(destination==ShellDestination.STORAGE) DriveStorageScreen(photos,{ onOpen(ShellDestination.ACTIVITY) },{ onOpen(ShellDestination.IMPORTS) },{ onOpen(ShellDestination.SETTINGS) })
-        else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp).testTag("management:${destination.id}"),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-            when(destination) {
+    MotionSwap(destination) { target ->
+    holder.SaveableStateProvider(target.id) {
+        if(target==ShellDestination.STORAGE) DriveStorageScreen(photos,{ onOpen(ShellDestination.ACTIVITY) },{ onOpen(ShellDestination.IMPORTS) },{ onOpen(ShellDestination.SETTINGS) })
+        else Column(Modifier.fillMaxSize().background(if(target in listOf(ShellDestination.SETTINGS,ShellDestination.PREFERENCES)) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(20.dp).testTag("management:${target.id}").semantics { paneTitle=target.title },verticalArrangement=Arrangement.spacedBy(14.dp)) {
+            if(target in listOf(ShellDestination.SETTINGS,ShellDestination.PREFERENCES))
+                Text(target.title,style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(vertical=16.dp).semantics { heading() })
+            when(target) {
                 ShellDestination.ACTIVITY -> {
                     ManagementLink(ShellDestination.IMPORTS,onOpen);ManagementLink(ShellDestination.IMPORT_HISTORY,onOpen)
                     ScanActions(features)
@@ -49,16 +51,26 @@ internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,
                 ShellDestination.SETTINGS -> {
                     ManagementSettingsMenu(onOpen)
                 }
+                ShellDestination.PREFERENCES -> {
+                    PreferenceCard(stringResource(R.string.menu_photos_view),stringResource(R.string.menu_photos_view_summary),"management:Photos view") { onOpen(ShellDestination.PHOTO_VIEW) }
+                    PreferenceCard(stringResource(R.string.menu_recognition),stringResource(R.string.menu_recognition_summary),"management:Recognition") { onOpen(ShellDestination.RECOGNITION) }
+                }
+                ShellDestination.PHOTO_VIEW -> PhotosViewPreferences()
                 ShellDestination.CACHE -> StorageControls(photos,features)
                 ShellDestination.RECOGNITION -> {
                     val settings by features.settings.collectAsStateWithLifecycle()
+                    Text("People names are shared across your library. Face recognition is optional and runs on this phone. Possible matches need your review. Scanning connected originals follows your download preferences.")
+                    PreferenceToggle(stringResource(R.string.menu_group_faces),stringResource(R.string.menu_group_faces_summary),settings.faceIndexing,
+                        { features.updateSettings(settings.copy(faceIndexing=it)) },Modifier.testTag("preference:face-indexing"))
+                    PreferenceToggle(stringResource(R.string.menu_object_labels),stringResource(R.string.menu_object_labels_summary),settings.objectIndexing,
+                        { features.updateSettings(settings.copy(objectIndexing=it)) },Modifier.testTag("preference:object-indexing"))
                     ScanActions(features)
-                    Text("Recognition is optional and runs on this phone. Enabling it may download connected originals. Imported Takeout names remain photo labels; they are not assigned to faces automatically.")
-                    SettingsToggle("On-device face indexing",settings.faceIndexing) { features.updateSettings(settings.copy(faceIndexing=it)) }
-                    SettingsToggle("On-device object and scene labels",settings.objectIndexing) { features.updateSettings(settings.copy(objectIndexing=it)) }
                     IndexingControls(features)
                 }
-                ShellDestination.ANNOTATIONS -> MetadataControls(features)
+                ShellDestination.ANNOTATIONS -> {
+                    GroupedMenu(listOf(MenuEntry(stringResource(R.string.menu_backup_destination),stringResource(R.string.menu_backup_destination_summary),R.drawable.ic_shell_account,"management:Backup destination") { onOpen(ShellDestination.STORAGE) }))
+                    MetadataControls(features)
+                }
                 ShellDestination.PRIVACY -> {
                     val settings by features.settings.collectAsStateWithLifecycle()
                     val context=LocalContext.current
@@ -74,20 +86,26 @@ internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,
                     Text("A familiar photo experience. Your Google Drive storage. Your control.")
                     Text(info.text())
                 }
-                else -> error("Not a management destination: $destination")
+                else -> error("Not a management destination: $target")
             }
         }
+    }
     }
 }
 
 /** Menu ownership stays in presentation; opening a section cannot mutate settings. */
 private object SettingsMenu {
-    val groups=listOf(
-        "Library" to listOf(ShellDestination.CACHE,ShellDestination.RECOGNITION),
-        "Backup and privacy" to listOf(ShellDestination.ANNOTATIONS,ShellDestination.PRIVACY),
-        "Application" to listOf(ShellDestination.ABOUT)
-    )
+    val destinations=listOf(ShellDestination.PREFERENCES,ShellDestination.ANNOTATIONS,ShellDestination.CACHE,ShellDestination.PRIVACY,ShellDestination.ABOUT)
+    fun summary(destination: ShellDestination)=when(destination) {
+        ShellDestination.PREFERENCES -> R.string.menu_preferences_summary
+        ShellDestination.CACHE -> R.string.menu_storage_summary
+        ShellDestination.ANNOTATIONS -> R.string.menu_annotations_summary
+        ShellDestination.PRIVACY -> R.string.menu_privacy_summary
+        ShellDestination.ABOUT -> R.string.menu_about_summary
+        else -> error("No settings summary for $destination")
+    }
     fun icon(destination: ShellDestination)=when(destination) {
+        ShellDestination.PREFERENCES -> R.drawable.ic_action_settings
         ShellDestination.CACHE -> R.drawable.ic_shell_offline
         ShellDestination.RECOGNITION -> R.drawable.ic_shell_people
         ShellDestination.ANNOTATIONS -> R.drawable.ic_action_backup
@@ -101,39 +119,17 @@ private object SettingsMenu {
 
 @Composable
 internal fun ManagementSettingsMenu(onOpen: (ShellDestination)->Unit) {
-    Column(verticalArrangement=Arrangement.spacedBy(20.dp)) {
-        SettingsMenu.groups.forEach { (heading,destinations) ->
-            Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Text(heading,style=MaterialTheme.typography.titleSmall,modifier=Modifier.semantics { heading() })
-                Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surfaceContainer) {
-                    Column {
-                        destinations.forEachIndexed { index,destination ->
-                            ManagementLink(destination,onOpen)
-                            if(index<destinations.lastIndex) HorizontalDivider(Modifier.padding(start=56.dp,end=16.dp))
-                        }
-                    }
-                }
-            }
-        }
-    }
+    GroupedMenu(SettingsMenu.destinations.map { destination ->
+        MenuEntry(destination.title,stringResource(SettingsMenu.summary(destination)),SettingsMenu.icon(destination),"management:${destination.title}") { onOpen(destination) }
+    })
 }
 
 @Composable
 private fun ManagementLink(destination: ShellDestination,onOpen: (ShellDestination)->Unit) {
-    Surface(onClick={ onOpen(destination) },modifier=Modifier.fillMaxWidth().heightIn(min=64.dp)
-        .testTag("management:${destination.title}").semantics { role=Role.Button },color=MaterialTheme.colorScheme.surfaceContainer) {
-        Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
-            ShellIcon(SettingsMenu.icon(destination))
-            Text(destination.title,Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)
-            ShellIcon(R.drawable.ic_action_chevron)
-        }
-    }
+    GroupedMenu(listOf(MenuEntry(destination.title,"",SettingsMenu.icon(destination),"management:${destination.title}") { onOpen(destination) }))
 }
 
 @Composable
 private fun SettingsToggle(label: String,checked: Boolean,onChange: (Boolean)->Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min=48.dp).toggleable(checked,role=Role.Switch,onValueChange=onChange).padding(vertical=8.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-        Switch(checked=checked,onCheckedChange=null)
-        Text(label,Modifier.weight(1f))
-    }
+    PreferenceToggle(label,"",checked,onChange)
 }

@@ -36,14 +36,14 @@ fun ShellIcon(@DrawableRes resource: Int, description: String?=null) {
 @Composable
 fun ShellTopBar(title: String,canGoBack: Boolean,onBack: ()->Unit,canAddPhotos: Boolean,onAddPhotos: ()->Unit,
     onStorage: ()->Unit,onActivity: ()->Unit,onImport: ()->Unit,onFilters: ()->Unit,showFilters: Boolean,
-    filtersActive: Boolean,needsAttention: Boolean,showTitle: Boolean=true,scrollBehavior: TopAppBarScrollBehavior?=null) {
+    filtersActive: Boolean,needsAttention: Boolean,showTitle: Boolean=true,scrollBehavior: TopAppBarScrollBehavior?=null,showActions: Boolean=true) {
     var add by remember { mutableStateOf(false) }
     BoxWithConstraints {
     val compact=maxWidth<360.dp
     TopAppBar(modifier=Modifier.testTag("shell:top-bar"),scrollBehavior=scrollBehavior,title={ if(showTitle) Text(title,maxLines=1,overflow=TextOverflow.Ellipsis) },navigationIcon={
         if(canGoBack) IconButton(onClick=onBack) { ShellIcon(R.drawable.ic_shell_back,"Back") }
         else Image(painterResource(R.drawable.ic_launcher_foreground),"MyPhotosAnywhere",Modifier.size(48.dp))
-    },actions={
+    },actions={ if(showActions) {
         if(showFilters) IconButton(onClick=onFilters,modifier=Modifier.testTag("shell:filters")) {
             BadgedBox(badge={ if(filtersActive) Badge() }) {
                 ShellIcon(R.drawable.ic_shell_filter,if(filtersActive) "Filters applied" else "Filter photos")
@@ -66,7 +66,7 @@ fun ShellTopBar(title: String,canGoBack: Boolean,onBack: ()->Unit,canAddPhotos: 
         IconButton(onClick=onStorage,modifier=Modifier.testTag("shell:storage")) {
             ShellIcon(R.drawable.ic_shell_account,"Accounts and sources")
         }
-    })
+    } })
     }
 }
 

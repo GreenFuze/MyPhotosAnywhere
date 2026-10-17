@@ -60,6 +60,8 @@ class UxAcceptanceDeviceTest {
         try {
             for(dark in listOf(false,true)) {
                 largeContent(dark) { DriveStorageScreen(emptyList(),{},{},{}) }
+                waitTag("source:manage:${source.key}")
+                compose.onNodeWithTag("source:manage:${source.key}").performScrollTo().performClick()
                 waitTag("source:transfer-settings")
                 compose.onNodeWithTag("source:transfer-settings").performScrollTo().performClick()
                 compose.onNodeWithTag("source:transfer-settings").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,"Expanded"))

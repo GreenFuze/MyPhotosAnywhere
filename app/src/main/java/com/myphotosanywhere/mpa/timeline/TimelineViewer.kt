@@ -132,7 +132,7 @@ private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: Timel
             if(existing?.state !in setOf("AUTH_REQUIRED","FAILED","PENDING","DOWNLOADING")) features.download(value.cloud)
         }
     }
-    val preview=entry.thumbnailPath.takeIf { it.isNotBlank() }?.let(::File)
+    val preview=entry.thumbnailPath.takeIf { it.isNotBlank() && !it.startsWith("content://") }?.let(::File)
     val toggleControls by rememberUpdatedState(onToggleControls)
     Box(Modifier.fillMaxSize().then(if(media?.photo==null && entry.mimeType.startsWith("image/")) Modifier.pointerInput(entry.key,active,interactive) {
             detectTapGestures(onTap={ if(active && interactive) toggleControls() })
@@ -145,10 +145,12 @@ private fun TimelineViewerPage(entry: TimelineEntry,active: Boolean,model: Timel
                 resolution.problem!=null -> requireNotNull(resolution.problem)
                 task?.state=="AUTH_REQUIRED" -> "Preview only — reconnect this Drive source."
                 task?.state=="FAILED" -> task.error ?: "Original download failed. Preview remains available."
+                media?.device!=null -> "Device original unavailable — manage Android photo access or refresh the device library."
                 media?.cloud==null -> "Preview only — this original is unavailable."
                 else -> "Preview only — waiting for a verified original. Network preference applies."
             },color=Color.White,style=MaterialTheme.typography.bodySmall)
             if(resolution.problem!=null) TextButton(onClick={ resolution.attempt++ }) { Text("Retry availability") }
+            else if(media?.device!=null) TextButton(onClick=onSource) { Text("Manage photo access") }
             else if(task?.state=="AUTH_REQUIRED") TextButton(onClick=onSource) { Text("Manage source") }
             else media?.cloud?.let { cloud -> TextButton(enabled=!busy,onClick={ features.download(cloud,retry=true) }) { Text("Retry original") } }
         }

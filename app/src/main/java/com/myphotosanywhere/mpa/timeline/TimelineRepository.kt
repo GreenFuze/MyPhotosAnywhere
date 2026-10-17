@@ -19,6 +19,7 @@ import java.io.File
 
 /** All database and filesystem work stays off the UI thread and bounded by a page or cursor window. */
 internal class TimelineRepository(internal val database: PhotoDatabase,
+    private val deviceReadable: suspend (String)->Boolean={ false },
     private val originalExists: (String)->Boolean={ it.isNotBlank() && File(it).isFile }) {
     private val importedPeople=com.myphotosanywhere.mpa.people.ImportedPeopleCodec()
     suspend fun page(query: TimelineQuery,cursor: TimelineCursor?,direction: TimelineDirection,
@@ -36,7 +37,7 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
             if(batch.isEmpty()) break
             for(entry in batch) {
                 currentCoroutineContext().ensureActive()
-                if(query.filter!="Offline" || originalExists(entry.originalPath)) result.add(entry)
+                if(query.filter!="Offline" || originalAvailable(entry)) result.add(entry)
                 if(result.size==limit) break
             }
             if(result.size==limit || batch.size<minOf(90,limit)) break
@@ -137,22 +138,26 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
                 }
             }
             val photo=(entry.photoId ?: cloud?.photoId)?.let { database.photos().find(it)?.takeUnless { photo -> database.trash().hidesPhoto(photo.id) } }?.takeIf {
-                it.bytes==entry.bytes && (entry.photoId==null || it.sha256==entry.sha256)
+                it.bytes==entry.bytes && (entry.photoId==null || it.sha256==entry.sha256 || entry.sha256.isNullOrEmpty() && database.deviceMedia().find(it.id)!=null)
             }
-            TimelineMedia(entry,photo,cloud)
+            TimelineMedia(entry,photo,cloud,photo?.let { database.deviceMedia().find(it.id) })
         }
     }
 
-    internal fun observe(onChanged: ()->Unit): AutoCloseable {
-        val observer=object: InvalidationTracker.Observer("photos","cloud_photos","drive_sources","album_photos","faces","people","albums","drive_trash") {
+    internal fun observe(onChanged: ()->Unit): AutoCloseable=observe(null,onChanged)
+    internal fun observe(query: TimelineQuery?,onChanged: ()->Unit): AutoCloseable {
+        val tables=mutableSetOf("photos","cloud_photos","drive_sources","drive_trash","device_media")
+        if(query==null || query.needsMetadata || query.album!=null) tables+=listOf("albums","album_photos")
+        if(query==null || query.needsMetadata || query.person!=null) tables+=listOf("faces","people","photo_people","person_aliases")
+        val observer=object: InvalidationTracker.Observer(tables.toTypedArray()) {
             override fun onInvalidated(tables: Set<String>)=onChanged()
         }
         database.invalidationTracker.addObserver(observer)
         return AutoCloseable { database.invalidationTracker.removeObserver(observer) }
     }
 
-    internal fun accepts(query: TimelineQuery,entry: TimelineEntry): Boolean {
-        if(query.filter=="Offline" && !originalExists(entry.originalPath)) return false
+    internal suspend fun accepts(query: TimelineQuery,entry: TimelineEntry): Boolean {
+        if(query.filter=="Offline" && !originalAvailable(entry)) return false
         query.importedPerson?.let { label ->
             if(entry.photoId==null || !importedPeople.matches(label,entry.binding,requireNotNull(entry.searchDocument).metadata)) return false
         }
@@ -176,7 +181,16 @@ internal class TimelineRepository(internal val database: PhotoDatabase,
     }.distinctUntilChanged()
 
     suspend fun originalAvailable(media: TimelineMedia)=withContext(Dispatchers.IO) {
-        media.photo?.originalPath?.let(originalExists) ?: false
+        media.photo?.let { originalExists(it.originalPath) || deviceReadable(it.id) } ?: false
+    }
+
+    private suspend fun originalAvailable(entry: TimelineEntry)=originalExists(entry.originalPath) || entry.photoId?.let { deviceReadable(it) }==true
+    internal suspend fun deviceAspect(entry: TimelineEntry): Float? {
+        val id=entry.photoId ?: return null
+        val device=database.deviceMedia().find(id) ?: return null
+        if(device.width<=0 || device.height<=0) return null
+        val ratio=device.width.toFloat()/device.height
+        return if(device.orientation.mod(180)!=0) 1f/ratio else ratio
     }
 
     internal fun read(row: Cursor)=TimelineEntry(

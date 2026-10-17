@@ -1,0 +1,33 @@
+<resources>
+    <string name="menu_photos_view">Photos view</string>
+    <string name="menu_photos_view_summary">Choose how photos are arranged and how large thumbnails appear</string>
+    <string name="menu_recognition">Recognition</string>
+    <string name="menu_recognition_summary">Manage on-device face groups, object labels and scan preferences</string>
+    <string name="menu_preferences_summary">Photos view and recognition preferences</string>
+    <string name="menu_storage_summary">Manage downloaded originals and preview cache</string>
+    <string name="menu_annotations_summary">Drive destination and portable photo annotations</string>
+    <string name="menu_privacy_summary">Photo access, map consent and Android permissions</string>
+    <string name="menu_about_summary">App version, signing identity and help</string>
+    <string name="menu_backup_destination">Backup destination</string>
+    <string name="menu_backup_destination_summary">Choose the Drive account and folder for new backups and imports</string>
+    <string name="menu_group_faces">Group similar faces</string>
+    <string name="menu_group_faces_summary">Find people using face recognition on this phone. Existing names and corrections are preserved.</string>
+    <string name="menu_object_labels">Recognize objects and scenes</string>
+    <string name="menu_object_labels_summary">Add on-device labels that help you search your photos</string>
+    <string name="menu_photo_layout">Photo layout</string>
+    <string name="menu_photo_density">Thumbnail size</string>
+    <string name="menu_mosaic_summary">A varied arrangement with larger portrait photos</string>
+    <string name="menu_rows_summary">Fit photos into rows using their proportions</string>
+    <string name="menu_square_summary">Keep every thumbnail the same size</string>
+    <plurals name="menu_column_count">
+        <item quantity="one">%d column</item>
+        <item quantity="other">%d columns</item>
+    </plurals>
+    <string name="menu_layout_mosaic">Mosaic</string>
+    <string name="menu_layout_rows">Justified rows</string>
+    <string name="menu_layout_square">Square</string>
+    <string name="menu_size_large">Large</string>
+    <string name="menu_size_default">Default</string>
+    <string name="menu_size_compact">Compact</string>
+    <string name="menu_dates_summary">Dates float above the continuous grid. Use Jump to date to find older photos.</string>
+</resources>

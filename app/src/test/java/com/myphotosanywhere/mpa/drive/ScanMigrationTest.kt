@@ -49,7 +49,7 @@ class ScanMigrationTest {
         try {
             helper.writableDatabase; helper.close()
             val opened = Room.databaseBuilder(context, PhotoDatabase::class.java, name)
-                .addMigrations(SCAN_MIGRATION_5_6, com.myphotosanywhere.mpa.importing.IMPORT_MIGRATION_6_7, com.myphotosanywhere.mpa.importing.TAKEOUT_DOWNLOAD_MIGRATION_7_8, com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9, com.myphotosanywhere.mpa.trash.TRASH_MIGRATION_9_10).allowMainThreadQueries().build()
+                .addMigrations(SCAN_MIGRATION_5_6, com.myphotosanywhere.mpa.importing.IMPORT_MIGRATION_6_7, com.myphotosanywhere.mpa.importing.TAKEOUT_DOWNLOAD_MIGRATION_7_8, com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9, com.myphotosanywhere.mpa.trash.TRASH_MIGRATION_9_10, com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11).allowMainThreadQueries().build()
             db = opened
             val state = requireNotNull(opened.cloud().sync("binding"))
             assertEquals("cursor", state.changeToken)

@@ -84,6 +84,8 @@ interface DriveDao {
     suspend fun backups(bindingKey: String): List<DriveBackup>
     @Query("SELECT * FROM drive_backups WHERE photoId = :photoId")
     suspend fun backupsForPhoto(photoId: String): List<DriveBackup>
+    @Query("SELECT * FROM drive_backups WHERE photoId=:photoId ORDER BY id")
+    fun observeBackupsForPhoto(photoId: String): Flow<List<DriveBackup>>
     @Query("SELECT * FROM drive_backups WHERE bindingKey = :binding AND remoteId = :remote AND state = 'COMPLETE' LIMIT 1")
     suspend fun backupForRemote(binding: String, remote: String): DriveBackup?
     @Query("SELECT * FROM drive_backups ORDER BY photoId")

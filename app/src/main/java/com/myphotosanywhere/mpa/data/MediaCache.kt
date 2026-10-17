@@ -48,10 +48,13 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
         } }
     }
     suspend fun <T> withOriginal(id: String, action: suspend (Photo,File)->T): T = withContext(Dispatchers.IO) {
+        val current=database.photos().find(id)
+        if(current!=null && (current.originalPath.isBlank() || !File(current.originalPath).isFile) && database.deviceMedia().find(id)!=null)
+            (context.applicationContext as com.myphotosanywhere.mpa.MpaApplication).deviceMedia.materialize(id)
         lock.withLock {
-            val photo=database.photos().find(id) ?: error("This photo is no longer in the library.")
+            val photo=database.photos().find(id) ?: throw IOException("This photo is no longer in the library.")
             val file=File(photo.originalPath)
-            check(photo.originalPath.isNotBlank() && file.isFile) { "Download this photo before opening or editing it." }
+            if(photo.originalPath.isBlank() || !file.isFile) throw IOException("Download this photo before opening or editing it.")
             database.photos().update(photo.copy(lastAccess=System.currentTimeMillis()))
             action(photo,file)
         }
@@ -238,7 +241,8 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
         }
     }
     suspend fun thumbnail(photo: Photo): File? = withContext(Dispatchers.IO) {
-        val target=File(photo.thumbnailPath)
+        val provider=photo.thumbnailPath.startsWith("content://")
+        val target=if(provider) File(context.filesDir,"thumbnails/device-"+java.util.UUID.nameUUIDFromBytes(photo.id.toByteArray(Charsets.UTF_8))+".jpg") else File(photo.thumbnailPath)
         if(target.isFile) {
             if(photo.originalPath.isBlank() || target.canonicalPath!=File(photo.originalPath).canonicalPath) target.setLastModified(System.currentTimeMillis())
             return@withContext target
@@ -249,12 +253,49 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
             val latest=database.photos().find(photo.id) ?: return@withLock null
             if(latest.sha256!=photo.sha256 || latest.bytes!=photo.bytes || latest.thumbnailPath!=photo.thumbnailPath) return@withLock null
             val file=File(latest.originalPath)
-            if(latest.originalPath.isBlank() || !file.isFile || latest.thumbnailPath.isBlank()) return@withLock cloudThumbnail(latest)
+            if(latest.originalPath.isBlank() || !file.isFile || latest.thumbnailPath.isBlank()) {
+                if(provider && (latest.mimeType.startsWith("video/") || latest.mimeType.startsWith("image/")) && database.deviceMedia().find(photo.id)!=null) {
+                    val app=context.applicationContext as com.myphotosanywhere.mpa.MpaApplication
+                    val directory=checkNotNull(target.parentFile)
+                    if(!directory.isDirectory && !directory.mkdirs()) throw IOException("Cannot save a device-video preview.")
+                    if(app.storage.available(directory)<8L*1024*1024) throw IOException("More free space is needed for this preview. The camera original is unchanged.")
+                    val stage=File.createTempFile("device-preview-",".part",directory)
+                    var failure: Throwable?=null
+                    try {
+                        fun write(bitmap: android.graphics.Bitmap) {
+                            stage.outputStream().use { output ->
+                                if(!bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,output)) throw IOException("Cannot save this device preview.")
+                                output.fd.sync()
+                            }
+                        }
+                        if(latest.mimeType.startsWith("video/")) {
+                            val bitmap=app.deviceMedia.videoPreview(photo.id)
+                            try { write(bitmap) } finally { bitmap.recycle() }
+                        } else app.deviceMedia.withPreview(photo.id) { _,bitmap -> write(bitmap) }
+                        if(!stage.renameTo(target)) throw IOException("Cannot retain the video preview. The original is unchanged.")
+                        database.withTransaction {
+                            database.photos().find(latest.id)?.takeIf { it.sha256==latest.sha256 && it.bytes==latest.bytes && it.thumbnailPath==latest.thumbnailPath }
+                                ?.let { database.photos().update(it.copy(thumbnailPath=target.path)) }
+                        }
+                        return@withLock target
+                    } catch(error: Throwable) { failure=error;throw error }
+                    finally { if(stage.exists() && !stage.delete()) {
+                        val cleanup=IOException("Cannot remove an owned device preview stage.")
+                        if(failure!=null) failure.addSuppressed(cleanup) else throw cleanup
+                    } }
+                }
+                return@withLock cloudThumbnail(latest)
+            }
             // Preview-only reads must not invalidate every retained paging row.
+            if(provider && database.deviceMedia().find(photo.id)==null) throw IOException("This preview URI has no device-source record.")
             target.parentFile?.mkdirs()
             val bitmap=PhotoRepository.mediaPreview(file,latest.mimeType,480)
             try { target.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,it)) } }
             finally { bitmap.recycle() }
+            if(provider) database.withTransaction {
+                database.photos().find(latest.id)?.takeIf { it.sha256==latest.sha256 && it.bytes==latest.bytes && it.thumbnailPath==latest.thumbnailPath }
+                    ?.let { database.photos().update(it.copy(thumbnailPath=target.path)) }
+            }
             target
         }
     }

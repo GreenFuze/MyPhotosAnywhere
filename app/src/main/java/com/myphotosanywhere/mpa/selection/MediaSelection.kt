@@ -49,9 +49,12 @@ internal class MediaSelection(initial: List<SelectionTarget> = emptyList()) {
     companion object { const val MAX_ITEMS=500 }
 }
 
-internal enum class BulkKind { FAVORITE, UNFAVORITE, ARCHIVE, RESTORE, ALBUM, REMOVE_ALBUM, OFFLINE, SHARE }
-internal data class BulkAction(val kind: BulkKind,val albumId: String?=null) {
-    init { require((kind in setOf(BulkKind.ALBUM,BulkKind.REMOVE_ALBUM))==(albumId!=null)) }
+internal enum class BulkKind { FAVORITE, UNFAVORITE, ARCHIVE, RESTORE, ALBUM, REMOVE_ALBUM, OFFLINE, SHARE, BACKUP }
+internal data class BulkAction(val kind: BulkKind,val albumId: String?=null,val bindingKey: String?=null) {
+    init {
+        require((kind in setOf(BulkKind.ALBUM,BulkKind.REMOVE_ALBUM))==(albumId!=null))
+        require((kind==BulkKind.BACKUP)==(bindingKey!=null));require(bindingKey==null || bindingKey.isNotBlank())
+    }
 }
 internal data class SelectionFailure(val target: SelectionTarget,val reason: String)
-internal data class SelectionResult(val completed: Int,val failures: List<SelectionFailure>,val queued: Boolean=false,val cancelled: Boolean=false)
+internal data class SelectionResult(val completed: Int,val failures: List<SelectionFailure>,val queued: Boolean=false,val cancelled: Boolean=false,val backedUp: Boolean=false)

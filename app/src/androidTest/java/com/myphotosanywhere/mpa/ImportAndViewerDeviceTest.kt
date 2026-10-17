@@ -54,8 +54,7 @@ class ImportAndViewerDeviceTest {
                 compose.waitUntil(5000) { manager.activeNotifications.none { it.tag==job.id } }
             }
             compose.activityRule.scenario.recreate()
-            compose.onNodeWithTag("shell:activity").performClick()
-            compose.onNodeWithTag("management:Import history").performClick()
+            compose.onNodeWithTag("management:9").assertExists()
             compose.waitUntil(10000) { compose.onAllNodesWithTag("toggle-dismissed-imports").fetchSemanticsNodes().isNotEmpty() }
             jobs.forEach { compose.onNodeWithTag("import-progress:${it.id}").assertDoesNotExist() }
             compose.onNodeWithTag("toggle-dismissed-imports").performScrollTo().performClick()

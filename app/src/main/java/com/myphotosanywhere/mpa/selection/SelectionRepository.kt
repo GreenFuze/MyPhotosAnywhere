@@ -10,6 +10,7 @@ import com.myphotosanywhere.mpa.data.AlbumPhoto
 import com.myphotosanywhere.mpa.data.MediaCache
 import com.myphotosanywhere.mpa.data.StorageBudget
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.IOException
@@ -32,9 +33,17 @@ internal class SelectionRepository(private val app: MpaApplication) {
     }
 
     suspend fun apply(target: SelectionTarget,action: BulkAction)=withContext(Dispatchers.IO) {
-        if(action.kind==BulkKind.OFFLINE) {
+        if(action.kind==BulkKind.BACKUP) {
+            val cloud=target.cloudKey?.let { db.cloud().photo(it) }
+            if(cloud!=null && cloud.photoId==null && target.accepts(cloud) && !cloud.removed) return@withContext
+            val photo=resolve(target)
+            if(db.presence().inDrive(photo.id).first()) return@withContext
+            val captured=db.drive().backupsForPhoto(photo.id).filter { it.state!="COMPLETE" }.sortedBy { it.id }.firstOrNull()
+            app.drive.enqueueManual(photo.id,captured?.bindingKey ?: requireNotNull(action.bindingKey))
+        } else if(action.kind==BulkKind.OFFLINE) {
             val photo=try { resolve(target) } catch(_: Unavailable) { null }
-            if(photo!=null && photo.originalPath.isNotBlank() && File(photo.originalPath).isFile) {
+            if(photo!=null && (photo.originalPath.isNotBlank() && File(photo.originalPath).isFile || app.deviceMedia.readable(photo.id))) {
+                if(databaseDevicePhotoNeedsCopy(photo)) app.deviceMedia.materialize(photo.id)
                 app.cache.lock.withLock { db.photos().find(photo.id)?.let { db.photos().update(it.copy(pinned=true)) }
                     ?: throw Unavailable("This photo is no longer in the library.") }
             } else {
@@ -65,6 +74,9 @@ internal class SelectionRepository(private val app: MpaApplication) {
         } }
     }
 
+    private suspend fun databaseDevicePhotoNeedsCopy(photo: Photo)=
+        (photo.originalPath.isBlank() || !File(photo.originalPath).isFile) && db.deviceMedia().find(photo.id)!=null
+
     /** Prepare exact verified local bytes under leases. A failed batch never silently shares a subset. */
     suspend fun share(targets: List<SelectionTarget>,progress: (Int)->Unit): Intent {
         var staging: File?=null
@@ -77,6 +89,7 @@ internal class SelectionRepository(private val app: MpaApplication) {
             for(target in targets) {
                 currentCoroutineContext().ensureActive()
                 val photo=resolve(target)
+                if(databaseDevicePhotoNeedsCopy(photo)) app.deviceMedia.materialize(photo.id)
                 val lease=app.cache.openOriginal(photo.id) ?: throw Unavailable("${target.name}: download the original before sharing.")
                 leases.add(lease)
             }

@@ -11,10 +11,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
-internal data class PhotoFacts(val millis: Long,val provenance: TimestampProvenance,val dimensions: Pair<Int,Int>?)
+internal data class PhotoFacts(val millis: Long?,val provenance: TimestampProvenance,val dimensions: Pair<Int,Int>?)
 
 /** Read-only facts: one identity lookup and bounds-only decode under an original-file lease. */
-internal class PhotoFactsRepository(private val timeline: TimelineRepository,private val cache: MediaCache) {
+internal class PhotoFactsRepository(private val timeline: TimelineRepository,private val cache: MediaCache,
+    private val deviceMedia: com.myphotosanywhere.mpa.device.DeviceMediaLibrary) {
     suspend fun read(photo: Photo): PhotoFacts=withContext(Dispatchers.IO) {
         val entry=timeline.find(TimelineQuery(if(photo.archived) "Archive" else "All"),"photo:${photo.id}")
         val dimensions=if(!photo.mimeType.startsWith("image/")) null else cache.openOriginal(photo.id)?.use { original ->
@@ -30,7 +31,15 @@ internal class PhotoFactsRepository(private val timeline: TimelineRepository,pri
                 }
             }
         }
-        PhotoFacts(entry?.millis ?: photo.capturedAt ?: photo.importedAt,
-            entry?.provenance ?: if(photo.capturedAt!=null) TimestampProvenance.CAPTURE else TimestampProvenance.IMPORT,dimensions)
+        val reference=timeline.database.deviceMedia().find(photo.id)
+        val deviceDimensions=reference?.takeIf { it.width>0 && it.height>0 }?.let { if(it.orientation.mod(180)!=0) it.height to it.width else it.width to it.height }
+            ?: if(dimensions==null && reference!=null) try { deviceMedia.imageDimensions(photo.id) } catch(_: IOException) { null } else null
+        PhotoFacts(if(entry!=null) entry.millis else photo.capturedAt ?: photo.importedAt.takeIf { reference==null || it>0 },
+            entry?.provenance ?: when {
+                photo.capturedAt!=null -> TimestampProvenance.CAPTURE
+                reference==null -> TimestampProvenance.IMPORT
+                photo.importedAt>0 -> TimestampProvenance.DEVICE_ADDED
+                else -> TimestampProvenance.UNKNOWN
+            },dimensions ?: deviceDimensions)
     }
 }

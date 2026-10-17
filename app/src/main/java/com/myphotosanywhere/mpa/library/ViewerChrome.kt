@@ -50,8 +50,14 @@ internal fun ViewerActions(photo: Photo?,model: LibraryFeaturesModel,onEdit: (St
         photo?.let { item -> model.app.timeline.photo(item.id).collect { value=it } }
     }
     val item=live?.takeIf { it.id==photo?.id }
-    val available by produceState(false,item?.id,item?.originalPath,item?.cachedVersion,busy) {
-        value=withContext(Dispatchers.IO) { item!=null && item.originalPath.isNotBlank() && File(item.originalPath).isFile }
+    val device by produceState<com.myphotosanywhere.mpa.data.DeviceMediaRecord?>(null,item?.id) {
+        item?.let { model.app.deviceMedia.observe(it.id).collect { value=it } }
+    }
+    val available by produceState(false,item?.id,item?.originalPath,item?.cachedVersion,device?.available,busy) {
+        value=withContext(Dispatchers.IO) { item!=null && (item.originalPath.isNotBlank() && File(item.originalPath).isFile || model.app.deviceMedia.readable(item.id)) }
+    }
+    val inDrive by produceState(false,item?.id) {
+        item?.let { model.app.database.presence().inDrive(it.id).collect { value=it } }
     }
     FlowRow(Modifier.fillMaxWidth().padding(horizontal=12.dp),horizontalArrangement=Arrangement.SpaceEvenly,
         verticalArrangement=Arrangement.spacedBy(4.dp)) {
@@ -62,7 +68,9 @@ internal fun ViewerActions(photo: Photo?,model: LibraryFeaturesModel,onEdit: (St
         if(item!=null) IconLabelAction(if(item.favorite) R.drawable.ic_shell_favorite else R.drawable.ic_action_favorite_outline,"Favorite",{ model.updatePhoto(item.id) { it.copy(favorite=!it.favorite) } },
             Modifier.testTag("viewer-favorite"),enabled=!busy,description=if(item.favorite) "Remove from favorites" else "Add to favorites",selected=item.favorite,
             color=if(item.favorite) Color(0xFF8BD5BE) else Color.White)
-        if(onTrash!=null) IconLabelAction(R.drawable.ic_action_trash,"Trash",onTrash,Modifier.testTag("viewer-trash"),enabled=!busy,color=Color.White,description="Move to Google Drive Trash")
+        if(item!=null && device!=null && !inDrive) IconLabelAction(R.drawable.ic_action_backup,"Back up",{ model.requestDeviceBackup(item) },
+            Modifier.testTag("viewer-backup"),enabled=available && !busy,color=Color.White)
+        if(onTrash!=null && (device==null || inDrive)) IconLabelAction(R.drawable.ic_action_trash,"Trash",onTrash,Modifier.testTag("viewer-trash"),enabled=!busy,color=Color.White,description="Move to Google Drive Trash")
         if(showStatus) ViewerStatus(model,Color.White)
     }
 }

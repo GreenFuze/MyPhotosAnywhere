@@ -46,6 +46,7 @@ interface LibraryDao {
     @Query("DELETE FROM people WHERE id = :id") suspend fun deletePerson(id: String)
     @Query("SELECT * FROM faces ORDER BY photoId, id") fun faces(): Flow<List<FaceRecord>>
     @Query("SELECT * FROM faces") suspend fun allFaces(): List<FaceRecord>
+    @Query("SELECT * FROM faces WHERE photoId=:id ORDER BY id") suspend fun photoFaces(id: String): List<FaceRecord>
     @Query("SELECT * FROM faces WHERE id = :id") suspend fun face(id: String): FaceRecord?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun saveFace(face: FaceRecord)
     @Query("UPDATE faces SET personId = :target, suggestedPersonId = NULL, similarity = NULL, corrected = 1 WHERE personId = :source")

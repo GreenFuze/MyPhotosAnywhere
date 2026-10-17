@@ -5,12 +5,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun IndexingControls(model: LibraryFeaturesModel) {
     val settings by model.settings.collectAsStateWithLifecycle()
+    val focus=LocalFocusManager.current
+    val keyboard=LocalSoftwareKeyboardController.current
     val progress by model.indexProgress.collectAsStateWithLifecycle()
     var start by remember(settings.nightStart) { mutableStateOf("%02d:%02d".format(java.util.Locale.US,settings.nightStart/60,settings.nightStart%60)) }
     var end by remember(settings.nightEnd) { mutableStateOf("%02d:%02d".format(java.util.Locale.US,settings.nightEnd/60,settings.nightEnd%60)) }
@@ -32,7 +36,10 @@ fun IndexingControls(model: LibraryFeaturesModel) {
             OutlinedTextField(end,{ if(it.length<=5) end=it },label={ Text("End HH:mm") },singleLine=true,modifier=Modifier.weight(1f).testTag("index-end"))
         }
         val from=minute(start); val to=minute(end)
-        TextButton(enabled=from!=null && to!=null && from!=to,onClick={ model.updateSettings(settings.copy(nightStart=requireNotNull(from),nightEnd=requireNotNull(to))) }) { Text("Save window") }
+        TextButton(enabled=from!=null && to!=null && from!=to,onClick={
+            model.updateSettings(settings.copy(nightStart=requireNotNull(from),nightEnd=requireNotNull(to)))
+            focus.clearFocus(force=true);keyboard?.hide()
+        }) { Text("Save window") }
         Text("Uses your phone’s local time. Android may delay background jobs. Scans stop between photos outside this window, when unplugged, or when the phone is hot. Scan now runs on demand outside the night window.",style=MaterialTheme.typography.bodySmall)
     }
 }

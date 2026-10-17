@@ -22,6 +22,7 @@ import com.myphotosanywhere.mpa.drive.*
 import com.myphotosanywhere.mpa.importing.*
 import com.myphotosanywhere.mpa.management.ManagementSettingsMenu
 import com.myphotosanywhere.mpa.people.*
+import androidx.room.withTransaction
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
@@ -37,16 +38,45 @@ class ManagementDeviceTest {
     private fun waitTag(tag: String) { compose.waitUntil(20000) { compose.onAllNodes(if(tag.startsWith("photo:") || tag.startsWith("cloud:")) hasTestTag(tag) and isEnabled() else hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() } }
     @Test fun sourcesSettingsAndFocusedPagesRestoreTheirOriginAcrossRotation() {
         compose.onNodeWithTag("nav:Collections").performClick();compose.onNodeWithTag("shell:storage").performClick()
-        compose.onNodeWithText("MyPhotosAnywhere").assertIsDisplayed();screenshotManagement("management-sources")
+        compose.onNodeWithText("MyPhotosAnywhere").assertIsDisplayed();compose.onNodeWithTag("shell:navigation").assertDoesNotExist();screenshotManagement("management-sources")
         compose.onNodeWithTag("management:Settings").performClick()
         waitTag("management:10");compose.onNodeWithTag("management:Storage and cache").assertIsDisplayed();compose.waitForIdle();screenshotManagement("management-menu");compose.onNodeWithTag("management:Storage and cache").performClick()
         compose.onNodeWithText("Offline storage").assertIsDisplayed();back()
-        compose.onNodeWithTag("management:Recognition").performClick();compose.onNodeWithTag("scan-now").assertIsDisplayed();back()
+        compose.onNodeWithTag("management:Preferences").performClick();compose.onNodeWithTag("management:Recognition").performClick();compose.onNodeWithTag("scan-now").assertIsDisplayed();back();back()
         compose.onNodeWithTag("management:Backup and metadata").performClick();compose.onNodeWithText("Portable annotations").assertIsDisplayed();back()
         compose.onNodeWithTag("management:Privacy and permissions").performClick();compose.onNodeWithText("Allow online maps").assertIsDisplayed();back()
-        compose.onNodeWithTag("management:About MPA").performClick();compose.onNodeWithText("MPA 0.5.30 (41)",substring=true).assertExists()
-        compose.activityRule.scenario.recreate();compose.onNodeWithText("MPA 0.5.30 (41)",substring=true).assertExists();back();back();back()
+        compose.onNodeWithTag("management:About MPA").performClick();compose.onNodeWithText("MPA 0.5.31 (42)",substring=true).assertExists()
+        compose.activityRule.scenario.recreate();compose.onNodeWithText("MPA 0.5.31 (42)",substring=true).assertExists();back();back();back()
         compose.onNodeWithTag("nav:Collections").assertIsSelected()
+    }
+    @Test fun photoViewPreferencesRestoreTheGalleryIdentityWithoutChangingSourcesOrRecognition()=runBlocking<Unit> {
+        val originalLayout=app.galleryPresentation.layout.value;val originalDensity=app.galleryPresentation.density.value
+        val options=app.settings.state.value;val sources=app.database.drive().sources()
+        val prefix="menu-anchor-"+java.util.UUID.randomUUID();val ids=(0 until 90).map { "$prefix-$it" }
+        val file=File.createTempFile("menu-anchor-",".png",app.cacheDir);val image=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
+        try { image.eraseColor(Color.GREEN);file.outputStream().use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) } } finally { image.recycle() }
+        val hash=DriveBackupWorker.digest(file,"SHA-256");val time=java.time.Instant.parse("2201-01-01T00:00:00Z").toEpochMilli()
+        try {
+            app.galleryPresentation.updateLayout(com.myphotosanywhere.mpa.timeline.GalleryLayout.SQUARE)
+            app.galleryPresentation.update(com.myphotosanywhere.mpa.timeline.GridDensity.DEFAULT)
+            app.database.withTransaction { ids.forEachIndexed { i,id -> app.database.photos().insert(Photo(id,"$id.png",file.path,file.path,"image/png",file.length(),time-i,hash)) } }
+            waitTag("photo:${ids.first()}");compose.onNodeWithTag("photos:grid").performScrollToNode(hasTestTag("photo:${ids[35]}"));waitTag("photo:${ids[35]}")
+            repeat(2) { InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_TAB) }
+            compose.waitForIdle();compose.onNodeWithTag("shell:storage").assertIsDisplayed().performClick();waitTag("management:Settings")
+            compose.onNodeWithTag("management:Settings").performClick()
+            compose.onNodeWithTag("management:Preferences").performClick();compose.onNodeWithTag("management:Photos view").performClick()
+            compose.onNodeWithTag("preference:layout:SQUARE").assertIsSelected();compose.onNodeWithTag("shell:navigation").assertDoesNotExist()
+            screenshotManagement("menu-photo-view");compose.onNodeWithTag("preference:layout:ROWS").performClick()
+            compose.waitUntil(10000) { app.galleryPresentation.layout.value==com.myphotosanywhere.mpa.timeline.GalleryLayout.ROWS }
+            compose.activityRule.scenario.recreate();compose.onNodeWithTag("preference:layout:ROWS").assertIsSelected()
+            repeat(4) { back();compose.waitForIdle() };waitTag("photo:${ids[35]}");compose.onNodeWithTag("photo:${ids[35]}").assertIsDisplayed()
+            screenshotManagement("menu-gallery-return");assertEquals(options,app.settings.state.value);assertEquals(sources,app.database.drive().sources())
+            assertEquals(hash,DriveBackupWorker.digest(file,"SHA-256"))
+            ids.forEach { assertEquals(hash,app.database.photos().find(it)?.sha256) }
+        } finally {
+            app.database.withTransaction { ids.forEach { app.database.openHelper.writableDatabase.execSQL("DELETE FROM photos WHERE id=?",arrayOf(it)) } }
+            file.delete();app.galleryPresentation.updateLayout(originalLayout);app.galleryPresentation.update(originalDensity)
+        }
     }
     @Test fun activityDetailsDoNotMutateCapturedJobsOrChangeNewImportDestination() {
         val source=DriveSource("management-destination","management-account","management@test","APP_FILES","management-folder","Management fixture",backupEnabled=true)
@@ -68,26 +98,33 @@ class ManagementDeviceTest {
         val source=DriveSource("management-disconnect","management-disconnect","disconnect@test","APP_FILES","disconnect-folder","Disconnect fixture")
         try {
             runBlocking { app.database.drive().saveSource(source);app.database.drive().saveConnection(source.connection()) }
-            compose.onNodeWithTag("shell:storage").performClick();compose.waitUntil(20000) { compose.onAllNodes(hasTestTag("source:remove") and isEnabled()).fetchSemanticsNodes().size==1 };compose.onNodeWithTag("source:remove").performScrollTo().assertTextEquals("Remove this source").assertIsEnabled().performClick()
+            compose.onNodeWithTag("shell:storage").performClick();waitTag("source:manage:${source.key}");compose.onNodeWithTag("source:manage:${source.key}").performScrollTo().performClick();compose.waitUntil(20000) { compose.onAllNodes(hasTestTag("source:remove") and isEnabled()).fetchSemanticsNodes().size==1 };compose.onNodeWithTag("source:remove").performScrollTo().assertTextEquals("Remove this source").assertIsEnabled().performClick()
             compose.onNodeWithText("Disconnect source").assertIsDisplayed();compose.onNodeWithText("Drive originals are not deleted.",substring=true).assertExists()
             compose.onNodeWithText("Keep source").performClick();runBlocking { assertEquals(source,app.database.drive().source(source.key)) }
         } finally { runBlocking { app.database.drive().disconnectSource(source.key);app.database.drive().disconnect() } }
     }
-    @Test fun importedLabelsNeverEnterTheReviewedFaceNamingDialog() {
+    @Test fun importedNamesUseTheSamePersonChooserButFacesRequireConfirmation() {
         val id="management-naming-fixture";val faceId="$id-face"
         val raw="""{"title":"naming.jpg","photoTakenTime":{"timestamp":"1"},"people":[{"name":"Imported fixture name"}]}"""
         val codec=TakeoutCodec();val photo=codec.apply(Photo(id,"naming.jpg","","","image/jpeg",1,1,"naming-hash"),codec.parse(raw))
         try {
-            runBlocking { app.database.photos().insert(photo);app.database.library().saveFace(FaceRecord(faceId,id,"",null)) }
+            val canonical=runBlocking {
+                app.database.photos().insert(photo);app.database.library().saveFace(FaceRecord(faceId,id,"",null))
+                app.personLabels.drain();app.people.refreshSuggestions()
+                requireNotNull(app.database.personLabels().alias(ImportedPersonLabel("Imported fixture name",null).key)?.personId)
+            }
             compose.onNodeWithTag("nav:Collections").performClick();compose.onNodeWithTag("collections:People").performClick()
             val features=androidx.lifecycle.ViewModelProvider(compose.activity)[com.myphotosanywhere.mpa.library.LibraryFeaturesModel::class.java]
             compose.waitUntil(10000) { features.faces.value.any { it.id==faceId } };compose.waitForIdle()
-            compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("name-faces:$faceId"))
-            compose.onNodeWithTag("name-faces:$faceId").performClick();compose.onNodeWithText("Name these faces").assertIsDisplayed()
+            compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("person-review:$canonical"))
+            compose.onNodeWithTag("person-review:$canonical").performClick();compose.onNodeWithText("Name these faces").assertIsDisplayed()
+            compose.onNodeWithText("Use Imported fixture name").assertExists()
+            runBlocking { assertNull(app.database.library().face(faceId)?.personId) }
             compose.onAllNodes(hasText("Imported people") and hasAnyAncestor(isDialog())).assertCountEquals(0)
             compose.onAllNodes(hasTestTag("imported-person:${ImportedPersonLabel("Imported fixture name",null).key}") and hasAnyAncestor(isDialog())).assertCountEquals(0)
-            compose.onNodeWithText("Cancel").performClick()
-            runBlocking { assertEquals(photo,app.database.photos().find(id));assertNull(app.database.library().face(faceId)?.personId) }
+            compose.onNodeWithText("Confirm name").performClick()
+            compose.waitUntil(10000) { runBlocking { app.database.library().face(faceId)?.personId==canonical } }
+            runBlocking { assertEquals(photo,app.database.photos().find(id));assertEquals(canonical,app.database.library().face(faceId)?.personId);assertTrue(app.database.library().face(faceId)?.corrected==true) }
         } finally { runBlocking { app.database.library().deletePhotoFaces(id);app.database.photos().update(photo.copy(archived=true)) } }
     }
     @Test fun takeoutZipPeopleAppearWithoutRecognitionAndBrowseWithPreservedDetailsAndMetadata() {
@@ -107,18 +144,28 @@ class ManagementDeviceTest {
             val codec=TakeoutCodec();val photo=codec.apply(Photo(id,"photo.png",file.path,file.path,"image/png",file.length(),System.currentTimeMillis(),DriveBackupWorker.digest(file,"SHA-256")),codec.parse(requireNotNull(media.metadata)))
             saved=photo;runBlocking { app.database.photos().insert(photo) }
             val label=ImportedPersonLabel("כינרת Exported",null)
+            val canonical=runBlocking { app.personLabels.drain();requireNotNull(app.database.personLabels().alias(label.key)?.personId) }
+            val second=runBlocking { requireNotNull(app.database.personLabels().alias(ImportedPersonLabel("Sam Exported",null).key)?.personId) }
             compose.onNodeWithTag("nav:Collections").performClick();compose.onNodeWithTag("collections:People").performClick()
-            waitTag("imported-person:${label.key}");compose.onNodeWithTag("imported-person:${label.key}").performScrollTo().assertIsDisplayed()
-            screenshotManagement("takeout-imported-people");compose.onNodeWithTag("imported-person:${label.key}").performClick();waitTag("photo:$id")
+            compose.waitUntil(20000) {
+                try {
+                    compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("person:$canonical"))
+                    compose.onAllNodesWithTag("person:$canonical").fetchSemanticsNodes().isNotEmpty()
+                } catch(_: AssertionError) { false }
+            }
+            compose.onNodeWithTag("person:$canonical").assertIsDisplayed()
+            screenshotManagement("takeout-imported-people");compose.onNodeWithTag("person:$canonical").performClick();waitTag("photo:$id")
             compose.onNodeWithTag("photo:$id").performClick();waitTag("viewer-details");compose.onNodeWithTag("viewer-details").performClick()
-            waitTag("details:imported-people");compose.onNodeWithTag("details:imported-people").performScrollTo().assertTextEquals("Imported people labels: כינרת Exported, Sam Exported")
+            waitTag("details:person:$canonical");compose.onNodeWithTag("details:person:$canonical").performScrollTo().assertTextContains("כינרת Exported")
+            compose.onNodeWithTag("details:person:$second").performScrollTo().assertTextContains("Sam Exported")
+            compose.onAllNodesWithText("Imported people labels:",substring=true).assertCountEquals(0)
             compose.onNodeWithTag("photo-details-close").performClick();compose.onNodeWithTag("viewer-close").performClick();waitTag("photo:$id")
             compose.onNodeWithTag("nav:Search").performClick();compose.onNodeWithTag("search:query").performImeAction()
             compose.waitUntil(10000) {
                 compose.runOnUiThread { androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true }
             }
             back();waitTag("photo:$id")
-            compose.activityRule.scenario.recreate();waitTag("photo:$id");back();waitTag("imported-person:${label.key}")
+            compose.activityRule.scenario.recreate();waitTag("photo:$id");back();waitTag("person:$canonical")
             runBlocking {
                 val after=requireNotNull(app.database.photos().find(id))
                 assertTrue("Viewing updates only the existing cache-access checkpoint",after.lastAccess>photo.lastAccess)
@@ -126,7 +173,34 @@ class ManagementDeviceTest {
                 assertFalse(app.database.library().allFaces().any { it.photoId==id })
             }
             assertFalse(app.settings.state.value.faceIndexing);assertTrue(archive.isFile)
-        } finally { runBlocking { saved?.let { app.database.photos().update(it.copy(archived=true)) } };file.delete();archive.delete();app.settings.update(originalSettings);app.people.schedule() }
+            compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("manage-person:$canonical"))
+            compose.onNodeWithTag("manage-person:$canonical").performClick();compose.onNodeWithTag("person:rename").performClick()
+            compose.onNodeWithTag("person:name").performTextReplacement("Shared Exported")
+            compose.activityRule.scenario.recreate();waitTag("person:name")
+            compose.onNodeWithTag("person:name").assertTextContains("Shared Exported")
+            compose.onNodeWithTag("person:save").performClick()
+            compose.waitUntil(10000) { runBlocking { app.database.personLabels().person(canonical)?.name=="Shared Exported" } }
+            compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("manage-person:$second"))
+            compose.onNodeWithTag("manage-person:$second").performClick();compose.onNodeWithTag("person:merge").performClick()
+            compose.onNodeWithTag("person:find").performScrollTo().performTextInput("Shared Exported")
+            compose.onNodeWithTag("person:choices").performScrollToNode(hasTestTag("person:merge-target:$canonical"))
+            compose.onNodeWithTag("person:merge-target:$canonical").performClick();compose.onNodeWithTag("person:confirm-merge").performClick()
+            compose.waitUntil(10000) { runBlocking { app.database.personLabels().person(second)==null } }
+            runBlocking {
+                assertEquals(canonical,app.database.personLabels().alias(ImportedPersonLabel("Sam Exported",null).key)?.personId)
+                val newPhoto=photo.copy(id="$id-new",metadataAssetId=null,lastAccess=0)
+                app.database.photos().insert(newPhoto);app.personLabels.drain()
+                assertEquals(setOf(canonical),app.database.personLabels().members(newPhoto.id).map { it.personId }.toSet())
+                assertEquals(photo.importedMetadata,app.database.photos().find(id)?.importedMetadata)
+                assertEquals(2,com.myphotosanywhere.mpa.people.CanonicalPeopleRepository(app.timeline).groups().single { it.person.id==canonical }.photos)
+            }
+            compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("person:$canonical"))
+            compose.onNodeWithTag("person:$canonical").assertTextContains("Shared Exported")
+            screenshotManagement("people-unified-merged")
+        } finally { runBlocking {
+            saved?.let { app.database.photos().update(it.copy(archived=true)) }
+            app.database.photos().find("$id-new")?.let { app.database.photos().update(it.copy(archived=true)) }
+        };file.delete();archive.delete();app.settings.update(originalSettings);app.people.schedule() }
     }
 }
 
@@ -145,8 +219,7 @@ class ManagementChromeDeviceTest {
                 }
             }
         }
-        for(group in listOf("Library","Backup and privacy","Application")) compose.onNodeWithText(group).assertExists()
-        for(title in listOf("Storage and cache","Recognition","Backup and metadata","Privacy and permissions","About MPA")) {
+        for(title in listOf("Preferences","Backup and metadata","Storage and cache","Privacy and permissions","About MPA")) {
             val node=compose.onNodeWithTag("management:$title").performScrollTo().assertIsDisplayed();val bounds=node.fetchSemanticsNode().boundsInRoot
             assertTrue(bounds.width>=48*pixels-1);assertTrue(bounds.height>=48*pixels-1);node.performClick();assertEquals(title,opened)
         }

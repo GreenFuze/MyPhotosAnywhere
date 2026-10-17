@@ -111,13 +111,18 @@ class ShellNavigationDeviceTest {
             compose.onNodeWithText("All sources").assertDoesNotExist()
             compose.onNodeWithTag("photo:${ids.first()}").assertIsDisplayed()
             compose.onNodeWithTag("photos:grid").performScrollToIndex(9)
+            val beforeReturn=photoOffset("photo:${ids[9]}")
             compose.onNodeWithTag("photo:${ids[9]}").assertIsDisplayed().performClick()
             compose.onNodeWithTag("viewer-screen").assertIsDisplayed()
             compose.onNodeWithTag("viewer-close").performClick()
+            awaitGalleryReturn("photo:${ids[9]}")
             compose.onNodeWithTag("photo:${ids[9]}").assertIsDisplayed()
+            assertEquals("Viewer return preserves the same photo offset",beforeReturn,photoOffset("photo:${ids[9]}"),3f)
             compose.onNodeWithTag("nav:Collections").performClick()
             compose.onNodeWithTag("nav:Photos").performClick()
+            awaitGalleryReturn("photo:${ids[9]}")
             compose.onNodeWithTag("photo:${ids[9]}").assertIsDisplayed()
+            assertEquals("Tab return preserves the same photo offset",beforeReturn,photoOffset("photo:${ids[9]}"),3f)
             val gridBounds=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInRoot
             val navigationBounds=compose.onNodeWithTag("shell:navigation").fetchSemanticsNode().boundsInRoot
             assertTrue("Photos extend beneath floating navigation",gridBounds.bottom>navigationBounds.top)
@@ -136,6 +141,25 @@ class ShellNavigationDeviceTest {
         } finally {
             runBlocking { ids.forEach { key -> app.database.photos().find(key)?.let { app.database.photos().update(it.copy(archived=true)) } } }
             file.delete()
+        }
+    }
+
+    private fun photoOffset(tag: String): Float =
+        compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInWindow.top -
+            compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow.top
+
+    private fun awaitGalleryReturn(tag: String) {
+        // Closing the viewer or switching tabs starts a Room/Paging generation on IO.
+        // Compose idleness alone does not mean its identity-based restoration has finished.
+        // Never scroll to manufacture a passing result; the original visibility check follows.
+        try {
+            compose.waitUntil(30000) {
+                compose.onAllNodesWithTag("timeline:refreshing").fetchSemanticsNodes().isEmpty() &&
+                    compose.onAllNodes(hasTestTag(tag) and isEnabled()).fetchSemanticsNodes().size==1
+            }
+        } catch(error: Throwable) {
+            compose.onRoot().printToLog("ShellGalleryReturn")
+            throw error
         }
     }
 

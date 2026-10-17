@@ -70,15 +70,16 @@ internal class SelectionViewModel(application: Application,private val saved: Sa
                 } else {
                     for(target in batch) {
                         currentCoroutineContext().ensureActive()
-                        withContext(NonCancellable) {
+                        val process: suspend ()->Unit = {
                             try { repository.apply(target,action);completed++ }
                             catch(error: java.io.IOException) { failures.add(SelectionFailure(target,error.message ?: "Original unavailable. Retry.")) }
                             catch(error: android.database.sqlite.SQLiteException) { failures.add(SelectionFailure(target,error.message ?: "Cannot update this item. Retry.")) }
                             _progress.value++
                         }
+                        if(action.kind==BulkKind.BACKUP) process() else withContext(NonCancellable) { process() }
                     }
                     store(failures.map { it.target })
-                    _result.value=SelectionResult(completed,failures,queued=action.kind==BulkKind.OFFLINE)
+                    _result.value=SelectionResult(completed,failures,queued=action.kind==BulkKind.OFFLINE,backedUp=action.kind==BulkKind.BACKUP)
                     if(completed>0) notifyMetadata()
                 }
             } catch(cancelled: CancellationException) {

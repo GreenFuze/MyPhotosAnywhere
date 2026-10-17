@@ -16,7 +16,7 @@ jobs:
       fail-fast: true
       matrix:
         api: [29, 35, "37.0"]
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-java@v6.0.1

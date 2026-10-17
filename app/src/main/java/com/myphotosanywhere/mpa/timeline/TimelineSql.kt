@@ -33,11 +33,11 @@ internal class TimelineSql(private val query: TimelineQuery) {
           FROM photos p
         ), entries AS (
           SELECT 'photo:'||p.id AS canonicalKey,p.id AS photoId,c.key AS cloudKey,
-            COALESCE(p.capturedAt,p.linkedCapture,p.importedAt) AS effectiveMillis,
+            COALESCE(p.capturedAt,p.linkedCapture,CASE WHEN EXISTS(SELECT 1 FROM device_media d WHERE d.photoId=p.id) THEN NULLIF(p.importedAt,0) ELSE p.importedAt END) AS effectiveMillis,
             CASE WHEN p.capturedAt IS NOT NULL THEN 'CAPTURE' WHEN p.linkedCapture IS NOT NULL
-              THEN 'LINKED_CAPTURE' ELSE 'IMPORT' END AS timestampSource,
+              THEN 'LINKED_CAPTURE' WHEN EXISTS(SELECT 1 FROM device_media d WHERE d.photoId=p.id) THEN CASE WHEN p.importedAt>0 THEN 'DEVICE_ADDED' ELSE 'UNKNOWN' END ELSE 'IMPORT' END AS timestampSource,
             p.displayName AS displayName,p.mimeType AS mimeType,p.originalPath AS originalPath,
-            CASE WHEN p.thumbnailPath<>'' THEN p.thumbnailPath ELSE COALESCE(c.thumbnailPath,'') END AS thumbnailPath,
+            CASE WHEN p.thumbnailPath LIKE 'content://%' AND NOT EXISTS(SELECT 1 FROM device_media d WHERE d.photoId=p.id AND d.available=1) THEN COALESCE(c.thumbnailPath,'') WHEN p.thumbnailPath<>'' THEN p.thumbnailPath ELSE COALESCE(c.thumbnailPath,'') END AS thumbnailPath,
             COALESCE(c.thumbnailUpdatedAt,0) AS thumbnailUpdatedAt,p.bytes AS bytes,p.sha256 AS sha256,
             c.md5 AS md5,p.cachedVersion AS version,p.sourceBindingKey AS bindingKey,p.sourceRemoteId AS remoteId
           FROM linked p LEFT JOIN connected c ON c.key=p.previewKey
@@ -49,11 +49,13 @@ internal class TimelineSql(private val query: TimelineQuery) {
             OR ?3 IS NOT NULL OR ?2 IN ('Favorites','Archive'))
           AND (?1 IS NULL OR p.sourceBindingKey=?1 OR bp.live=1)
           AND ${com.myphotosanywhere.mpa.trash.TrashVisibility.PHOTO_SQL}
+          AND (p.originalPath<>'' OR bp.live=1 OR NOT EXISTS(SELECT 1 FROM device_media d WHERE d.photoId=p.id)
+            OR EXISTS(SELECT 1 FROM device_media d WHERE d.photoId=p.id AND d.available=1))
           AND p.archived=CASE WHEN ?2='Archive' THEN 1 ELSE 0 END
           AND (?2<>'Favorites' OR p.favorite=1) AND (?2<>'Videos' OR p.mimeType LIKE 'video/%')
-          AND (?2<>'Edits' OR p.parentId IS NOT NULL) AND (?2<>'Offline' OR p.originalPath<>'')
+          AND (?2<>'Edits' OR p.parentId IS NOT NULL) AND (?2<>'Offline' OR p.originalPath<>'' OR EXISTS(SELECT 1 FROM device_media d WHERE d.photoId=p.id AND d.available=1))
           AND (?3 IS NULL OR EXISTS(SELECT 1 FROM album_photos a WHERE a.albumId=?3 AND a.photoId=p.id))
-          AND (?4 IS NULL OR EXISTS(SELECT 1 FROM faces f WHERE f.personId=?4 AND f.photoId=p.id))
+          AND (?4 IS NULL OR EXISTS(SELECT 1 FROM faces f WHERE f.personId=?4 AND f.photoId=p.id) OR EXISTS(SELECT 1 FROM photo_people l WHERE l.personId=?4 AND l.photoId=p.id AND l.excluded=0))
           UNION ALL
           SELECT 'cloud:'||c.key,NULL,c.key,
             COALESCE(c.capturedAt,c.validModified),
@@ -74,6 +76,23 @@ internal class TimelineSql(private val query: TimelineQuery) {
           AND ${if(query.importedPerson!=null || query.includeMetadata) "photoId IS NOT NULL" else "1"}
         )
     """.trimIndent()
+
+    fun peopleOverview(coversOnly: Boolean=false)=statement(""", person_members AS (
+        SELECT personId,photoId FROM faces WHERE personId IS NOT NULL
+        UNION SELECT personId,photoId FROM photo_people WHERE excluded=0
+        ), member_media AS (
+          SELECT m.personId,e.photoId,e.thumbnailPath,e.effectiveMillis,e.canonicalKey
+          FROM person_members m JOIN filtered e ON e.photoId=m.photoId
+        )
+        SELECT n.id,n.name,COUNT(m.photoId),
+        COALESCE((SELECT f.cropPath FROM faces f JOIN member_media v ON v.photoId=f.photoId AND v.personId=f.personId
+            WHERE f.personId=n.id AND f.cropPath<>'' ORDER BY f.id LIMIT 1),
+          (SELECT v.thumbnailPath FROM member_media v WHERE v.personId=n.id
+            ORDER BY v.effectiveMillis DESC,v.canonicalKey COLLATE BINARY ASC LIMIT 1),''),
+        (SELECT v.photoId FROM member_media v WHERE v.personId=n.id
+            ORDER BY v.effectiveMillis DESC,v.canonicalKey COLLATE BINARY ASC LIMIT 1)
+        FROM people n LEFT JOIN member_media m ON m.personId=n.id
+        GROUP BY n.id ${if(coversOnly) "HAVING COUNT(m.photoId)>0" else ""} ORDER BY n.name COLLATE NOCASE,n.id ${if(coversOnly) "LIMIT 4" else ""}""")
 
     fun dateRange()=statement("SELECT MIN(effectiveMillis),MAX(effectiveMillis) FROM filtered")
     fun ordered()=statement("SELECT * FROM filtered ORDER BY effectiveMillis DESC,canonicalKey COLLATE BINARY ASC")
@@ -104,7 +123,7 @@ internal class TimelineSql(private val query: TimelineQuery) {
             // Enrich only the candidate cursor. The first sixteen columns retain the existing viewer-index contract.
             val order=tail.substringAfter("ORDER BY ","").substringBefore(" LIMIT ").takeIf(String::isNotBlank)
             """SELECT e.*,p.placeLabel,p.labels,COALESCE(p.capturedAt,p.importedAt),p.importedMetadata,p.favorite,p.parentId,p.latitude,p.longitude,
-                (SELECT group_concat(n.name,' ') FROM faces f JOIN people n ON n.id=f.personId WHERE f.photoId=p.id),
+                (SELECT group_concat(name,' ') FROM (SELECT n.name FROM faces f JOIN people n ON n.id=f.personId WHERE f.photoId=p.id UNION SELECT n.name FROM photo_people l JOIN people n ON n.id=l.personId WHERE l.photoId=p.id AND l.excluded=0)),
                 (SELECT group_concat(a.name,' ') FROM album_photos m JOIN albums a ON a.id=m.albumId WHERE m.photoId=p.id)
                 FROM ($tail) e LEFT JOIN photos p ON p.id=e.photoId ${order?.let { "ORDER BY $it" }.orEmpty()}"""
         }

@@ -83,8 +83,9 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
     }
     private suspend fun needed(photo: Photo): Boolean {
         val value=settings.state.value; val scan=db.library().scan(photo.id)
+        val version=(context.applicationContext as MpaApplication).deviceMedia.recognitionVersion(photo)
         return photo.mimeType.startsWith("image/") &&
-            (value.faceIndexing && (scan==null || scan.sha256!=photo.sha256 || scan.modelVersion!=SCAN_VERSION) && scan?.error==null ||
+            (value.faceIndexing && (scan==null || scan.sha256!=photo.sha256 || scan.modelVersion!=version) && scan?.error==null ||
                 value.objectIndexing && photo.labels.isBlank() && scan?.error==null)
     }
     /** At most eight cloud originals in flight, taking one source at a time in rotating rounds. */
@@ -114,6 +115,33 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
         prefs.edit { putInt("sourceCursor",(cursor+1).mod(sources.size)) }
         return queued
     }
+    private suspend fun availableBatch(limit: Int): List<Photo> {
+        val app=context.applicationContext as MpaApplication
+        var after=prefs.getString("photoCursor","").orEmpty()
+        var wrapped=false
+        val result=ArrayList<Photo>()
+        while(result.size<limit) {
+            currentCoroutineContext().ensureActive()
+            val rows=db.photos().recognitionCandidates(after,120)
+            if(rows.isEmpty()) {
+                if(result.isNotEmpty() || wrapped || after.isEmpty()) break
+                after="";wrapped=true;continue
+            }
+            for(photo in rows) {
+                currentCoroutineContext().ensureActive();after=photo.id
+                if(needed(photo) && (photo.originalPath.isNotBlank() && File(photo.originalPath).isFile || app.deviceMedia.readable(photo.id))) result+=photo
+                if(result.size==limit) break
+            }
+            if(rows.size<120) break
+        }
+        return result
+    }
+    private suspend fun withRecognitionPreview(photo: Photo,block: suspend (Photo,Bitmap)->Unit) {
+        if(photo.originalPath.isNotBlank() && File(photo.originalPath).isFile) cache.withOriginal(photo.id) { current,file ->
+            val image=PhotoRepository.preview(file,1600)
+            try { block(current,image) } finally { image.recycle() }
+        } else (context.applicationContext as MpaApplication).deviceMedia.withPreview(photo.id,block)
+    }
     /** A per-photo checksum/model checkpoint survives process death; batches cap runtime and heat. */
     suspend fun index(manual: Boolean=false): Boolean = indexLock.withLock { withContext(Dispatchers.IO) {
         if(!allowed(manual)) { report("Waiting for schedule, charging or phone to cool",0,0,0); return@withContext !settings.state.value.indexingPaused && (settings.state.value.faceIndexing || settings.state.value.objectIndexing) }
@@ -122,7 +150,7 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
         val labeler=ImageLabeling.getClient(ImageLabelerOptions.Builder().setConfidenceThreshold(.7f).build())
         var model: FaceEmbedding?=null
         var done=0; var errors=0; var changed=false
-        val available=db.photos().all().filter { it.originalPath.isNotBlank() && File(it.originalPath).isFile && needed(it) }
+        val available=availableBatch(25)
         val started=android.os.SystemClock.elapsedRealtime()
         try {
             if(settings.state.value.faceIndexing) model=FaceEmbedding(context)
@@ -130,13 +158,12 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
                 currentCoroutineContext().ensureActive()
                 if(!allowed(manual) || android.os.SystemClock.elapsedRealtime()-started>3*60*1000) break
                 val scanned=db.library().scan(photo.id)
-                val facesNeeded=settings.state.value.faceIndexing && (scanned==null || scanned.modelVersion!=SCAN_VERSION || scanned.sha256!=photo.sha256)
+                val version=(context.applicationContext as MpaApplication).deviceMedia.recognitionVersion(photo)
+                val facesNeeded=settings.state.value.faceIndexing && (scanned==null || scanned.modelVersion!=version || scanned.sha256!=photo.sha256)
                 val objectsNeeded=settings.state.value.objectIndexing && photo.labels.isBlank()
                 report("Scanning on phone",done,available.size,errors)
                 try {
-                    cache.withOriginal(photo.id) { current,file ->
-                        val image=PhotoRepository.preview(file,1600)
-                        try {
+                    withRecognitionPreview(photo) { current,image ->
                             val input=InputImage.fromBitmap(image,0)
                             if(objectsNeeded) {
                                 val labels=labeler.process(input).await().map { it.text }.distinct().joinToString(", ")
@@ -150,7 +177,7 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
                                     val r=rect.right.coerceIn(x+1,image.width); val b=rect.bottom.coerceIn(y+1,image.height)
                                     FaceRegion(x.toFloat()/image.width,y.toFloat()/image.height,r.toFloat()/image.width,b.toFloat()/image.height)
                                 }
-                                val previous=db.library().allFaces().filter { it.photoId==photo.id }
+                                val previous=db.library().photoFaces(photo.id)
                                 val matches=FaceRegions.matches(bounds,previous)
                                 val saved=mutableListOf<FaceRecord>(); val generated=mutableListOf<File>()
                                 try {
@@ -173,49 +200,59 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
                                             right=region.right,bottom=region.bottom,imageWidth=image.width,imageHeight=image.height,modelVersion=MODEL_VERSION))
                                     }
                                     if(settings.state.value.faceIndexing && allowed(manual)) db.withTransaction {
+                                        val latestPhoto=db.photos().find(photo.id) ?: throw java.io.IOException("This photo was removed during recognition.")
+                                        if(latestPhoto.sha256!=current.sha256 || (context.applicationContext as MpaApplication).deviceMedia.recognitionVersion(latestPhoto)!=version)
+                                            throw java.io.IOException("This photo changed during recognition. Refresh and retry.")
                                         saved.forEach { record ->
                                             val latest=db.library().face(record.id)
                                             db.library().saveFace(if(latest==null) record else record.copy(personId=latest.personId,
                                                 corrected=latest.corrected,suggestedPersonId=null,similarity=null))
                                         }
                                         // Ambiguous or legacy regions stay available for manual review; assignments are never transferred by list order.
-                                        db.library().saveScan(FaceScan(photo.id,current.sha256,modelVersion=SCAN_VERSION))
+                                        db.library().saveScan(FaceScan(photo.id,current.sha256,modelVersion=version))
                                         previous.filter { old -> saved.any { it.id==old.id } }.forEach { if(it.cropPath.isNotBlank()) File(it.cropPath).delete() }
                                     } else { generated.forEach { it.delete() }; throw CancellationException("Indexing paused.") }
                                 } catch(e: Exception) { generated.forEach { it.delete() }; throw e }
                             }
                             changed=true
-                        } finally { image.recycle() }
                     }
                 } catch(e: CancellationException) { throw e }
-                catch(e: Exception) { errors++; db.library().saveScan(FaceScan(photo.id,photo.sha256,e.message ?: "Indexing failed.",SCAN_VERSION)) }
+                catch(e: java.io.IOException) { errors++; db.library().saveScan(FaceScan(photo.id,photo.sha256,e.message ?: "Recognition needs retry.",version)) }
+                catch(e: com.google.mlkit.common.MlKitException) { errors++; db.library().saveScan(FaceScan(photo.id,photo.sha256,e.message ?: "Recognition needs retry.",version)) }
                 done++
+                prefs.edit { putString("photoCursor",photo.id) }
             }
             if(settings.state.value.faceIndexing) refreshSuggestions()
             if(changed) (context.applicationContext as MpaApplication).metadata.changed()
             val queued=queueCloud(manual)
-            val more=db.photos().all().any { it.originalPath.isNotBlank() && File(it.originalPath).isFile && needed(it) }
+            val more=available.size>done
+            if(!more) prefs.edit { putString("photoCursor","") }
             report(if(more) "More photos queued" else if(queued>0) "Waiting for $queued verified downloads" else "Available photos indexed",done,available.size,errors)
             more && !settings.state.value.indexingPaused
         } finally { detector.close(); labeler.close(); model?.close() }
     } }
     suspend fun refreshSuggestions() {
         val faces=db.library().allFaces()
-        val diagnostics=FaceReview.assess(faces,MODEL_VERSION)
+        val members=faces.map { it.photoId }.distinct().chunked(500).flatMap { db.personLabels().membersForPhotos(it) }
+        val suggestions=LabelFaceSuggestions().suggest(faces,members,MODEL_VERSION)
         db.withTransaction { faces.filter { it.personId==null }.forEach { f ->
-            val assessment=diagnostics[f.id]?.takeIf { it.status==FaceReview.Status.SUGGESTED }?.named
-            val suggestion=assessment?.nearest
+            val suggestion=suggestions[f.id]
             val latest=db.library().face(f.id)
             if(latest!=null && latest.personId==null && !latest.corrected && latest.modelVersion==f.modelVersion &&
-                latest.embedding.contentEquals(f.embedding)) db.library().saveFace(latest.copy(suggestedPersonId=suggestion?.first,similarity=suggestion?.second))
+                latest.embedding.contentEquals(f.embedding)) if(latest.suggestedPersonId!=suggestion?.personId || latest.similarity!=suggestion?.similarity)
+                    db.library().saveFace(latest.copy(suggestedPersonId=suggestion?.personId,similarity=suggestion?.similarity))
         } }
     }
-    suspend fun assign(faceIds: List<String>,person: Person) {
+    suspend fun assign(faceIds: List<String>,person: Person,allowCreate: Boolean=true) {
+        require(faceIds.isNotEmpty() && faceIds.distinct().size==faceIds.size)
         db.withTransaction {
-            db.library().savePerson(person)
-            faceIds.forEach { id -> db.library().face(id)?.let {
+            val existing=db.personLabels().person(person.id)
+            if(existing==null && !allowCreate) throw java.io.IOException("This person is no longer available. Choose a person again.")
+            val selected=faceIds.map { id -> db.library().face(id) ?: throw java.io.IOException("A selected face is no longer available. Close the chooser and refresh People.") }
+            db.library().savePerson(existing ?: person)
+            selected.forEach {
                 db.library().saveFace(it.copy(personId=person.id,suggestedPersonId=null,similarity=null,corrected=true))
-            } }
+            }
         }
         refreshSuggestions()
     }
@@ -223,10 +260,14 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
         db.library().saveFace(it.copy(personId=null,suggestedPersonId=null,similarity=null,corrected=true))
     } }
     suspend fun merge(source: String,target: String) = db.withTransaction {
-        require(source!=target); db.library().mergePeople(source,target)
+        require(source!=target)
+        if(db.personLabels().person(source)==null || db.personLabels().person(target)==null) throw java.io.IOException("This person is no longer available. Close the menu and choose again.")
+        db.personLabels().mergeAliases(source,target);db.personLabels().mergeMembers(source,target)
+        db.library().mergePeople(source,target)
         db.library().clearSuggestions(source); db.library().deletePerson(source)
     }
     suspend fun deletePerson(id: String) = db.withTransaction {
+        db.personLabels().ignorePerson(id);db.personLabels().clearPerson(id)
         db.library().unassignPerson(id); db.library().clearSuggestions(id); db.library().deletePerson(id)
     }
     suspend fun deleteIndex() {
@@ -235,7 +276,7 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
         WorkManager.getInstance(context).cancelUniqueWork("mpa-night-index")
         indexLock.withLock {
             cache.lock.withLock {
-                db.withTransaction { db.library().deleteFaces(); db.library().deleteScans(); db.library().deletePeople() }
+                db.withTransaction { db.library().deleteFaces(); db.library().deleteScans() }
                 File(context.filesDir,"faces").deleteRecursively()
             }
         }
@@ -256,7 +297,9 @@ class PeopleWorker(context: Context,params: WorkerParameters): CoroutineWorker(c
             if(more) Result.retry() else Result.success()
         }
         catch(e: CancellationException) { throw e }
-        catch(_: Exception) { Result.failure() }
+        catch(_: java.io.IOException) { Result.failure() }
+        catch(_: android.database.sqlite.SQLiteException) { Result.failure() }
+        catch(_: com.google.mlkit.common.MlKitException) { Result.failure() }
     }
 }
 

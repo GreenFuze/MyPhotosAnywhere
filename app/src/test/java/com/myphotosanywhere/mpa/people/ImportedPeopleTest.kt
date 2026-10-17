@@ -23,7 +23,7 @@ class ImportedPeopleTest {
     private lateinit var db: PhotoDatabase
     private lateinit var timeline: TimelineRepository
     private lateinit var imported: ImportedPeopleRepository
-    @Before fun setup()=runBlocking { db=Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(),PhotoDatabase::class.java).build();timeline=TimelineRepository(db) { it.startsWith("present") };imported=ImportedPeopleRepository(timeline) }
+    @Before fun setup()=runBlocking { db=Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(),PhotoDatabase::class.java).build();timeline=TimelineRepository(db,originalExists={ it.startsWith("present") });imported=ImportedPeopleRepository(timeline) }
     @After fun close() { db.close() }
     private suspend fun photo(id: String,names: List<String>,binding: String?="a",time: Long=100,archived: Boolean=false): Photo {
         val raw=JsonObject().apply { addProperty("title","$id.jpg");add("photoTakenTime",JsonObject().apply { addProperty("timestamp","1") });add("people",JsonArray().apply { names.forEach { name -> add(JsonObject().apply { addProperty("name",name) }) } }) }.toString()

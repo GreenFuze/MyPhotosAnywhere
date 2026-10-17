@@ -57,7 +57,7 @@ class DateScrubScaleTest {
                 }
                 started=System.nanoTime();val during=repository.seek(query,requireNotNull(focused.millis)+1);write.await()
                 val duringMs=(System.nanoTime()-started)/1000000.0
-                assertEquals(focused,during);assertEquals(10,database.openHelper.readableDatabase.version)
+                assertEquals(focused,during);assertEquals(11,database.openHelper.readableDatabase.version)
                 measurements.put(JSONObject().put("items",size).put("dateRangeMs",rangeMs).put("seekMs",times).put("seekDuringImportMs",duringMs)
                     .put("maximumRetainedRows",maximumRows).put("configuredPageBudget",TimelinePagingSource.CONFIG.maxSize)
                     .put("pssBeforeKb",before).put("pssAfterKb",Debug.getPss()))
