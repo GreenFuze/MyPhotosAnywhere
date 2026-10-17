@@ -11,6 +11,9 @@ import java.util.concurrent.Executor
 
 /** Test-only allocation traces; the production application and warning policy are unchanged. */
 class ResourceDiagnosticRunner : AndroidJUnitRunner() {
+    // ActivityThread constructs instrumentation before Application/content providers,
+    // then invokes onCreate only after providers. Trace their startup allocations too.
+    init { enable("runner construction before providers") }
     override fun onCreate(arguments: Bundle?) {
         val diagnosticArguments=arguments ?: Bundle()
         diagnosticArguments.putString("listener",listOfNotNull(diagnosticArguments.getString("listener"),ResourceDiagnosticListener::class.java.name).joinToString(","))
