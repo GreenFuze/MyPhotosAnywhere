@@ -14,7 +14,7 @@ import org.junit.runner.RunWith
 class ResourceDiagnosticTest {
     private fun abandonDiagnosticSentinel() {
         check(Build.VERSION.SDK_INT>=29)
-        val control=SurfaceControl.Builder().setName("MPA test-only CloseGuard sentinel").build()
+        val control=SurfaceControl.Builder().setName("MPA test-only CloseGuard sentinel").setBufferSize(1,1).build()
         Log.i("MPAResourceTrace","Deliberately abandoning diagnostic-only sentinel ${System.identityHashCode(control)}")
     }
     @Test fun allocationTracingRecordsTheDeliberateTestOnlySentinel() {
