@@ -48,6 +48,21 @@ class WarningGateTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.gate.evaluate(1, self.output + "warning: unrelated warning\n", self.report)
 
+    def test_runtime_resource_warning_is_rejected_with_or_without_the_upstream_exception(self):
+        for status in (0,1):
+            with self.subTest(status=status):
+                if status:
+                    self.write([self.diagnostic]);output=self.output
+                else:
+                    self.report.unlink(missing_ok=True);output="BUILD SUCCESSFUL in 1s\n"
+                with self.assertRaisesRegex(ValueError,"An unapproved warning"):
+                    self.gate.evaluate(status,output+"System.logW: A resource was acquired but never released.\n",self.report)
+
+    def test_explicit_close_guard_diagnostic_is_rejected_without_its_log_header(self):
+        self.write([self.diagnostic])
+        with self.assertRaisesRegex(ValueError,"An unapproved warning"):
+            self.gate.evaluate(1,self.output+"java.lang.Throwable: Explicit termination method 'close' not called\n",self.report)
+
     def test_native_stripping_diagnostic_is_rejected(self):
         self.write([self.diagnostic])
         with self.assertRaises(ValueError):

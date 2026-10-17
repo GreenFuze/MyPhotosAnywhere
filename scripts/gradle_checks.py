@@ -39,7 +39,7 @@ class WarningGate:
             if line == self.LABEL + " This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: " + self.LINK:
                 known_lines += 1
                 continue
-            if re.search(r"(^w:|^warning:|\bWARNING\b|has been deprecated|^.*warning:|Unable to strip the following libraries)", line, re.I):
+            if re.search(r"(^w:|^warning:|\bWARNING\b|has been deprecated|^.*warning:|Unable to strip the following libraries|System\.log[WE]:|Explicit termination method 'close' not called)", line, re.I):
                 raise ValueError("An unapproved warning was found: " + line)
         if status == 0:
             if known_lines or diagnostics:

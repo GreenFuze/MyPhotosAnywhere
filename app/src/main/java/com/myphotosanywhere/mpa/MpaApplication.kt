@@ -1,7 +1,7 @@
 package com.myphotosanywhere.mpa
 
 import android.app.Application
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import androidx.room.Room
 import com.myphotosanywhere.mpa.data.LIBRARY_MIGRATION_2_3
 import com.myphotosanywhere.mpa.data.PhotoDatabase
@@ -13,7 +13,7 @@ import com.myphotosanywhere.mpa.drive.SOURCES_MIGRATION_3_4
 class MpaApplication : Application(), androidx.work.Configuration.Provider {
     override val workManagerConfiguration: androidx.work.Configuration
         get() = androidx.work.Configuration.Builder().setJobSchedulerJobIdRange(1,999_999).build()
-    val database: PhotoDatabase by lazy {
+    private val databaseOwner=lazy {
         Room.databaseBuilder(this, PhotoDatabase::class.java, "mpa.db")
             .addMigrations(DRIVE_MIGRATION_1_2, LIBRARY_MIGRATION_2_3, SOURCES_MIGRATION_3_4, com.myphotosanywhere.mpa.data.METADATA_MIGRATION_4_5, com.myphotosanywhere.mpa.drive.SCAN_MIGRATION_5_6, com.myphotosanywhere.mpa.importing.IMPORT_MIGRATION_6_7, com.myphotosanywhere.mpa.importing.TAKEOUT_DOWNLOAD_MIGRATION_7_8, com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9, com.myphotosanywhere.mpa.trash.TRASH_MIGRATION_9_10,com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11)
             .addCallback(com.myphotosanywhere.mpa.metadata.METADATA_CALLBACK)
@@ -22,14 +22,31 @@ class MpaApplication : Application(), androidx.work.Configuration.Provider {
                 override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) { com.myphotosanywhere.mpa.data.installPersonLabelTriggers(db) }
             }).build()
     }
+    val database: PhotoDatabase by databaseOwner
     val repository: PhotoRepository by lazy {
         PhotoRepository(this, database)
     }
     internal val deviceMedia by lazy { com.myphotosanywhere.mpa.device.DeviceMediaLibrary(this,database) }
-    internal val personLabels by lazy { com.myphotosanywhere.mpa.people.CanonicalPeopleIndex(database) { if(settings.state.value.faceIndexing) people.refreshSuggestions() } }
+    private val personLabelsOwner=lazy { com.myphotosanywhere.mpa.people.CanonicalPeopleIndex(database) { if(settings.state.value.faceIndexing) people.refreshSuggestions() } }
+    internal val personLabels by personLabelsOwner
+    private val startupOwner=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     override fun onCreate() {
         super.onCreate()
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.IO).launch { personLabels.start() }
+        startupOwner.launch { personLabels.start() }
+    }
+    /** Emulated application disposal must release observers before closing their Room connection. */
+    override fun onTerminate() {
+        try {
+            runBlocking {
+                withTimeout(5000) {
+                    startupOwner.coroutineContext.job.cancelAndJoin()
+                    if(personLabelsOwner.isInitialized()) personLabels.close()
+                }
+            }
+        } finally {
+            try { if(databaseOwner.isInitialized()) database.close() }
+            finally { super.onTerminate() }
+        }
     }
     internal val galleryPresentation by lazy { com.myphotosanywhere.mpa.timeline.GalleryPresentation(this) }
     internal val timeline by lazy { com.myphotosanywhere.mpa.timeline.TimelineRepository(database,deviceReadable={ deviceMedia.readable(it) }) }

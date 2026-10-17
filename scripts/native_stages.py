@@ -81,10 +81,21 @@ class NativeStages:
                     shutil.move(str(saved), str(destination))
 
     def revoke(self):
-        fixture=subprocess.run(["adb","shell","run-as",self.PACKAGE,"test","-f",
+        # `test` is a shell builtin and is not an external executable on every API.
+        # Read the actual committed preferences with a portable external command.
+        fixture=subprocess.run(["adb","exec-out","run-as",self.PACKAGE,"cat",
                                 "shared_prefs/device-revocation-fixture.xml"],capture_output=True)
         if fixture.returncode:
-            raise ValueError("Camera-access fixture was not retained between native invocations.")
+            raise ValueError("Camera-access fixture cannot be read between native invocations: "
+                             +fixture.stderr.decode("utf-8",errors="replace").strip())
+        try:
+            preferences=ET.fromstring(fixture.stdout)
+            rows=json.loads(preferences.find("string[@name='rows']").text)
+            if (len(rows)!=2 or len({row["id"] for row in rows})!=2
+                    or any(not row["id"] or "captured" not in row for row in rows)):
+                raise ValueError("Camera-access fixture does not contain both preserved identities.")
+        except (ET.ParseError,AttributeError,TypeError,KeyError,json.JSONDecodeError) as error:
+            raise ValueError("Camera-access fixture has invalid durable metadata.") from error
         sdk = int(subprocess.check_output(["adb", "shell", "getprop", "ro.build.version.sdk"], text=True).strip())
         permissions = ["READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO"] if sdk >= 33 else ["READ_EXTERNAL_STORAGE"]
         if sdk >= 34:
