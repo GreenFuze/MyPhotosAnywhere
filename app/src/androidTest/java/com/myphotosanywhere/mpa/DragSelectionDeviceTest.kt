@@ -115,8 +115,13 @@ class DragSelectionDeviceTest {
             val root=compose.onNodeWithTag("photos:grid").fetchSemanticsNode().boundsInWindow
             compose.mainClock.autoAdvance=false
             compose.onNodeWithTag("photos:grid").performTouchInput { moveTo(Offset(root.width/2,root.height-8)) }
-            // Let native SQLite prefetch and Android layout run between simulated frames.
-            repeat(32) { compose.mainClock.advanceTimeBy(250);compose.waitForIdle() }
+            // Native SQLite is not driven by the Compose frame clock. Hold this one
+            // pointer until its real prefetched page is selected, with a bounded wait.
+            compose.waitUntil(30000) {
+                compose.mainClock.advanceTimeBy(250);compose.waitForIdle()
+                compose.onNodeWithTag("timeline:retry").assertDoesNotExist()
+                selected.targets.value.size>90
+            }
             compose.onNodeWithTag("photos:grid").performTouchInput { up() }
             compose.mainClock.autoAdvance=true;compose.waitForIdle()
             val ids=selected.targets.value.map { requireNotNull(it.photoId).removePrefix("drag-edge-").toInt() }.sorted()

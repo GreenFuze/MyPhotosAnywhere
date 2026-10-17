@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import coil.compose.AsyncImage
 import com.myphotosanywhere.mpa.data.*
 import com.myphotosanywhere.mpa.people.FaceMatching
@@ -38,8 +39,8 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
     val indexingLabels by model.app.personLabels.indexing.collectAsStateWithLifecycle()
     val state by produceState(com.myphotosanywhere.mpa.people.CanonicalPeopleState(),repository,retryPeople) {
         try { repository.changes().collect {
-            value=value.copy(loading=value.groups.isEmpty(),error=null)
-            value=com.myphotosanywhere.mpa.people.CanonicalPeopleState(repository.groups(),loading=false)
+            value=value.copy(loading=!value.hasSnapshot,error=null)
+            value=com.myphotosanywhere.mpa.people.CanonicalPeopleState(repository.groups(),loading=false,hasSnapshot=true)
         } } catch(cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch(error: android.database.sqlite.SQLiteException) { value=value.copy(loading=false,error=error.message ?: "Cannot read People. Existing names are kept. Retry.") }
     }
@@ -65,10 +66,12 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
     }
     // A temporary header-only loading list must not clamp the saved person-card anchor.
     val loadingList=androidx.compose.foundation.lazy.rememberLazyListState()
-    LazyColumn(Modifier.fillMaxSize().testTag("people-list"),state=if(state.loading && state.groups.isEmpty()) loadingList else listState,
+    LazyColumn(Modifier.fillMaxSize().testTag("people-list").semantics {
+        stateDescription=when { state.error!=null -> "People could not update";!state.hasSnapshot -> "Loading people";indexingLabels -> "Updating saved names";else -> "People ready" }
+    },state=if(!state.hasSnapshot) loadingList else listState,
         contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item { Text("People",style=MaterialTheme.typography.headlineSmall) }
-        item {
+        item(key="people:heading") { Text("People",style=MaterialTheme.typography.headlineSmall) }
+        item(key="people:controls") {
             ScanActions(model)
             com.myphotosanywhere.mpa.management.GroupedMenu(listOf(com.myphotosanywhere.mpa.management.MenuEntry(
                 "Recognition settings",if(enabled) "On-device face matching is enabled" else "Face recognition is optional",
@@ -99,7 +102,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                 }
             }
         }
-        item {
+        item(key="people:unassigned") {
             Text("Unassigned faces · ${faces.count { it.personId==null }}",style=MaterialTheme.typography.titleMedium)
             val unavailable=review.diagnostics.values.count { it.status in listOf(FaceReview.Status.NO_EMBEDDING,FaceReview.Status.INVALID_EMBEDDING,FaceReview.Status.DIFFERENT_MODEL) }
             if(unavailable>0) Text("$unavailable unassigned faces lack usable matching data. Open Why separate? to check them.")
