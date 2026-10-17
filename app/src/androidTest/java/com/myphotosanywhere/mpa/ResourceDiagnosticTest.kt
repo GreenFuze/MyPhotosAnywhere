@@ -1,10 +1,11 @@
 package com.myphotosanywhere.mpa
 
-import android.os.Build
 import android.os.SystemClock
 import android.util.Log
-import android.view.SurfaceControl
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
+import java.io.FileInputStream
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -12,18 +13,26 @@ import org.junit.runner.RunWith
 /** An explicitly deliberate test-only leak proves that the allocation tracer is active. */
 @RunWith(AndroidJUnit4::class)
 class ResourceDiagnosticTest {
-    private fun abandonDiagnosticSentinel() {
-        check(Build.VERSION.SDK_INT>=29)
-        val control=SurfaceControl.Builder().setName("MPA test-only CloseGuard sentinel").setBufferSize(1,1).build()
-        Log.i("MPAResourceTrace","Deliberately abandoning diagnostic-only sentinel ${System.identityHashCode(control)}")
+    private fun abandonDiagnosticSentinel(file: File) {
+        val stream=FileInputStream(file)
+        check(stream.fd.valid())
+        Log.i("MPAResourceTrace","Deliberately abandoning diagnostic-only sentinel ${System.identityHashCode(stream)}")
     }
     @Test fun allocationTracingRecordsTheDeliberateTestOnlySentinel() {
-        abandonDiagnosticSentinel()
-        val deadline=SystemClock.elapsedRealtime()+10000
-        fun seen()=ResourceDiagnosticRunner.violations.any { error -> error.stackTrace.any { it.className==javaClass.name } }
-        while(!seen() && SystemClock.elapsedRealtime()<deadline) {
-            System.gc();System.runFinalization();Thread.sleep(100)
+        val file=File.createTempFile("resource-trace-sentinel-",".txt",InstrumentationRegistry.getInstrumentation().targetContext.cacheDir)
+        try {
+            file.writeText("Explicitly deliberate test-only allocation sentinel")
+            abandonDiagnosticSentinel(file)
+            val deadline=SystemClock.elapsedRealtime()+10000
+            fun seen()=ResourceDiagnosticRunner.violations.any { error ->
+                generateSequence(error) { it.cause }.any { cause -> cause.stackTrace.any { it.className==javaClass.name } }
+            }
+            while(!seen() && SystemClock.elapsedRealtime()<deadline) {
+                System.gc();System.runFinalization();Thread.sleep(100)
+            }
+            assertTrue("Diagnostic sentinel must produce an allocation trace before other warnings can be attributed",seen())
+        } finally {
+            check(file.delete())
         }
-        assertTrue("Diagnostic sentinel must produce an allocation trace before other warnings can be attributed",seen())
     }
 }
