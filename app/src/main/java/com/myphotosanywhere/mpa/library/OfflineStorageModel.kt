@@ -38,7 +38,10 @@ internal class OfflineStorageModel(application: Application): AndroidViewModel(a
     }
     fun clear(cutoff: Long) {
         if(active.value || reading.value) return
-        require(current.value?.cutoff==cutoff) { "Review the current cleanup estimate first." }
+        if(current.value?.cutoff!=cutoff) {
+            status.value="The storage estimate changed. Review the refreshed estimate before clearing downloads."
+            return
+        }
         active.value=true;status.value=null;completed.value=OfflineCleanupResult()
         operation=viewModelScope.launch {
             try {

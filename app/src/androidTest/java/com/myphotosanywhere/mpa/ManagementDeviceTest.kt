@@ -60,10 +60,18 @@ class ManagementDeviceTest {
             screenshotManagement("offline-cleanup-preview")
             compose.onNodeWithTag("offline:clear").performClick();waitTag("offline:confirm")
             compose.onNodeWithTag("offline:confirm").assertIsDisplayed();screenshotManagement("offline-cleanup-confirm")
+            val model=androidx.lifecycle.ViewModelProvider(compose.activity)[com.myphotosanywhere.mpa.library.OfflineStorageModel::class.java]
+            val cutoff=checkNotNull(model.summary.value).cutoff
             compose.activityRule.scenario.recreate();waitTag("offline:confirm")
+            val restored=androidx.lifecycle.ViewModelProvider(compose.activity)[com.myphotosanywhere.mpa.library.OfflineStorageModel::class.java]
+            compose.waitUntil(10000) { !restored.loading.value }
+            assertSame(model,restored);assertEquals(cutoff,restored.summary.value?.cutoff)
             compose.onNodeWithTag("offline:cancel").performClick()
             assertEquals(photo,app.database.photos().find(id));assertEquals(hash,DriveBackupWorker.digest(file,"SHA-256"));assertTrue(preview.isFile)
             compose.onNodeWithTag("offline:confirm").assertDoesNotExist()
+            compose.runOnUiThread { restored.clear(cutoff-1) }
+            waitTag("offline:result");compose.onNodeWithTag("offline:result").performScrollTo().assertTextContains("estimate changed")
+            assertFalse(restored.working.value);assertEquals(photo,app.database.photos().find(id));assertEquals(hash,DriveBackupWorker.digest(file,"SHA-256"))
         } finally {
             app.database.openHelper.writableDatabase.execSQL("DELETE FROM cloud_photos WHERE bindingKey=?",arrayOf(source.key))
             app.database.openHelper.writableDatabase.execSQL("DELETE FROM photos WHERE id=?",arrayOf(id))

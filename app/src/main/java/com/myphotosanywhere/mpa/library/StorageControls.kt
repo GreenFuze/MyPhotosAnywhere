@@ -22,7 +22,7 @@ internal fun StorageControls(model: LibraryFeaturesModel = viewModel(),storage: 
     val message by storage.message.collectAsStateWithLifecycle()
     val progress by storage.progress.collectAsStateWithLifecycle()
     var confirm by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Long?>(null) }
-    LaunchedEffect(storage) { storage.refresh() }
+    LaunchedEffect(storage) { if(confirm==null || storage.summary.value==null) storage.refresh() }
     Text("Offline storage",style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
         Text("Free up space",style=MaterialTheme.typography.titleMedium)
@@ -42,7 +42,7 @@ internal fun StorageControls(model: LibraryFeaturesModel = viewModel(),storage: 
         message?.let { Text(it,modifier=Modifier.testTag("offline:result").semantics { liveRegion=LiveRegionMode.Polite }) }
         Text("Thumbnails and photo information stay available. MPA rechecks Drive before removing each download; an internet connection is required.",style=MaterialTheme.typography.bodySmall)
     } }
-    confirm?.let { cutoff -> OfflineCleanupConfirmation(cutoff,onConfirm={ confirm=null;storage.clear(it) },onDismiss={ confirm=null }) }
+    confirm?.takeIf { it==summary?.cutoff && !loading }?.let { cutoff -> OfflineCleanupConfirmation(cutoff,onConfirm={ confirm=null;storage.clear(it) },onDismiss={ confirm=null }) }
     Text("Disposable original budget",style=MaterialTheme.typography.titleMedium)
     FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         listOf(512L,2048L,5120L).forEach { mib -> FilterChip(selected=settings.originalBudget==mib*1024*1024,
