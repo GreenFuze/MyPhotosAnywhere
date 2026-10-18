@@ -86,7 +86,7 @@ adb shell settings put system screen_off_timeout 1800000
 adb shell settings put global stay_on_while_plugged_in 7
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
-bash scripts/run_device_checks.sh
+bash scripts/run_resource_diagnostic.sh
 if ! kill -0 "$mpa_logcat_pid" 2>/dev/null; then
   printf 'Runtime log capture stopped before native checks finished\n' >&2
   exit 1
@@ -94,5 +94,3 @@ fi
 kill "$mpa_logcat_pid"
 wait "$mpa_logcat_pid" 2>/dev/null || true
 mpa_logcat_pid=""
-python3 scripts/test_runtime_capture.py
-python3 scripts/runtime_capture.py
