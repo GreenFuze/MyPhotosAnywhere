@@ -121,10 +121,14 @@ class DeviceLibraryDeviceTest {
                 // Android10 content write passes a null calling package, which its provider
                 // can reject. Only this emulator fixture copies to the fixed UUID path.
                 shell("mkdir -p '/sdcard/$folder'\ncp '${stage.absolutePath}' '/sdcard/$folder$name'")
+                // A privileged Android10 update skips the scanner used for ordinary app
+                // publication. Supply facts of these verified bytes before publishing.
+                shell("content update --uri $uri --bind _size:l:${stage.length()} --bind width:i:720 --bind height:i:1080")
             } else shell("content write --uri $uri < '${stage.absolutePath}'")
             shell("content update --uri $uri --bind is_pending:i:0")
-            app.contentResolver.query(uri,arrayOf(MediaStore.MediaColumns.OWNER_PACKAGE_NAME),null,null,null)?.use {
+            app.contentResolver.query(uri,arrayOf(MediaStore.MediaColumns.OWNER_PACKAGE_NAME,MediaStore.MediaColumns.SIZE,MediaStore.MediaColumns.WIDTH,MediaStore.MediaColumns.HEIGHT),null,null,null)?.use {
                 check(it.moveToFirst());assertEquals("com.android.shell",it.getString(0))
+                assertEquals(stage.length(),it.getLong(1));assertEquals(720,it.getInt(2));assertEquals(1080,it.getInt(3))
             } ?: error("Cannot inspect foreign camera fixture")
             val bytes=requireNotNull(app.contentResolver.openInputStream(uri)).use { it.readBytes() }
             assertArrayEquals(stage.readBytes(),bytes)
