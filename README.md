@@ -6,6 +6,8 @@ Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAn
 
 ## Project status
 
+[MPA 0.5.32](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.32) removes the gallery scrollbar, keeps empty Search results stable and balances portrait mosaics. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.32/MPA-0.5.32-debug.apk) · [Validation and remaining acceptance](docs/releases/v0.5.32.md).
+
 [MPA 0.5.31](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.31) adds automatic device-photo browsing after Android access, explicit Drive backup, one People identity library, grouped menus and stable gallery arrivals. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.31/MPA-0.5.31-debug.apk) · [Validation and remaining acceptance](docs/releases/v0.5.31.md).
 
 The [0.5.30 release](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.30) continues other selected images after an item failure, retries only failed/unfinished items on Resume, and separates optional oversized XMP backup from original importing. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.30/MPA-0.5.30-debug.apk) · [Validation and remaining limits](docs/releases/v0.5.30.md).

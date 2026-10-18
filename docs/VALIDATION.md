@@ -1,3 +1,7 @@
+## MPA 0.5.32: balanced gallery and stable Search
+
+Application `c6fe4ad4fcd1c6b0b0059c4baf0bebb051df7774` passed 486 unit/integration tests, 155 native tests on each API29/35/37, zero failures/errors/skips and zero lint findings. Room11/schema files and the established signer are unchanged. [Evidence and acceptance limits](releases/v0.5.32.md).
+
 ## MPA 0.5.31: device library, People, menus and continuity
 
 Application `0d9d21252e749cabd83147e9a51ad192dbbdcd9d` passed 475 unit/integration tests, 153 native tests on each API29/35/37, zero failures/errors/skips and zero lint findings. Additive schema11 preserves historical schemas and the established signer. [Evidence and explicit acceptance limits](releases/v0.5.31.md).

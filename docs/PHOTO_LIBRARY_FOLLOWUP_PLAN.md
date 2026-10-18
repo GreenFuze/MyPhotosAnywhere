@@ -65,3 +65,7 @@ All four implementation workstreams are delivered and validated at `0d9d21252e74
 Remove the gallery scroll handle while retaining the floating date and accessible Jump to date. Keep settled empty Search results visible through same-query refresh, with query-bound loading and error presentation. Balance the mosaic using consistent column spans and deterministic varied portrait positions, preserving identities and pixel anchors through arrivals, rotation and viewer return. Deliver all three together with the existing full warning, regression and exact-APK publication gates; retain schema11.
 
 Object-search changes are deferred. The optional Windows/Linux/macOS MPA Processor is a discussion proposal only: phone and Processor communicate through Drive, with a usable phone-only mode. No Processor implementation is part of these releases.
+
+## UI follow-up delivered — 0.5.32 / 43
+
+All three requested UI changes are delivered at `c6fe4ad4fcd1c6b0b0059c4baf0bebb051df7774`: no gallery edge scrollbar, stable completed empty Search through refresh, and varied portrait mosaic placement with consistent columns. [Validation](releases/v0.5.32.md). Physical/live-service/human acceptance remains unverified. Object-search changes and the optional Drive-mediated Processor remain discussion-only and deferred.

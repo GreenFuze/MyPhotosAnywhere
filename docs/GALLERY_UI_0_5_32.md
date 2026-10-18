@@ -1,6 +1,6 @@
 # MPA 0.5.32 — Gallery and Search follow-up
 
-Candidate implementation. Publication requires final immutable host/device checks, complete diagnostic and screenshot review, unchanged-schema proof and verification of the established upgrade signer.
+Delivered in 0.5.32 at tested application `c6fe4ad4fcd1c6b0b0059c4baf0bebb051df7774`. [Release validation and remaining acceptance](releases/v0.5.32.md).
 
 ## Scope
 
