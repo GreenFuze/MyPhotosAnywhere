@@ -15,7 +15,7 @@ class MpaApplication : Application(), androidx.work.Configuration.Provider {
         get() = androidx.work.Configuration.Builder().setJobSchedulerJobIdRange(1,999_999).build()
     private val databaseOwner=lazy {
         Room.databaseBuilder(this, PhotoDatabase::class.java, "mpa.db")
-            .addMigrations(DRIVE_MIGRATION_1_2, LIBRARY_MIGRATION_2_3, SOURCES_MIGRATION_3_4, com.myphotosanywhere.mpa.data.METADATA_MIGRATION_4_5, com.myphotosanywhere.mpa.drive.SCAN_MIGRATION_5_6, com.myphotosanywhere.mpa.importing.IMPORT_MIGRATION_6_7, com.myphotosanywhere.mpa.importing.TAKEOUT_DOWNLOAD_MIGRATION_7_8, com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9, com.myphotosanywhere.mpa.trash.TRASH_MIGRATION_9_10,com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11)
+            .addMigrations(DRIVE_MIGRATION_1_2, LIBRARY_MIGRATION_2_3, SOURCES_MIGRATION_3_4, com.myphotosanywhere.mpa.data.METADATA_MIGRATION_4_5, com.myphotosanywhere.mpa.drive.SCAN_MIGRATION_5_6, com.myphotosanywhere.mpa.importing.IMPORT_MIGRATION_6_7, com.myphotosanywhere.mpa.importing.TAKEOUT_DOWNLOAD_MIGRATION_7_8, com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9, com.myphotosanywhere.mpa.trash.TRASH_MIGRATION_9_10,com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11, com.myphotosanywhere.mpa.data.DEVICE_STORAGE_MIGRATION_11_12)
             .addCallback(com.myphotosanywhere.mpa.metadata.METADATA_CALLBACK)
             .addCallback(object: androidx.room.RoomDatabase.Callback() {
                 override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) { com.myphotosanywhere.mpa.data.installPersonLabelTriggers(db) }

@@ -43,14 +43,14 @@ internal class RecentQueries(initial: List<String> = emptyList()) {
 }
 
 /** Search children may open another gallery; retain the original context until Search is exited. */
-internal data class GalleryContext(val filter: String,val source: String?,val album: String?,val person: String?,val importedPerson: String?=null) {
+internal data class GalleryContext(val filter: String,val source: String?,val album: String?,val person: String?,val importedPerson: String?=null,val deviceOnly: Boolean=false,val deviceFolder: String?=null) {
     init {
         require(filter in setOf("All","Favorites","Offline","Videos","Edits","Archive"))
         require(person==null || importedPerson==null)
         if(importedPerson!=null) requireNotNull(com.myphotosanywhere.mpa.people.ImportedPersonLabel.fromKey(importedPerson))
     }
-    fun save()=Bundle().apply { putString("filter",filter);putString("source",source);putString("album",album);putString("person",person);putString("importedPerson",importedPerson) }
+    fun save()=Bundle().apply { putString("filter",filter);putString("source",source);putString("album",album);putString("person",person);putString("importedPerson",importedPerson);putBoolean("deviceOnly",deviceOnly);putString("deviceFolder",deviceFolder) }
     companion object {
-        fun restore(value: Bundle)=GalleryContext(requireNotNull(value.getString("filter")),value.getString("source"),value.getString("album"),value.getString("person"),value.getString("importedPerson"))
+        fun restore(value: Bundle)=GalleryContext(requireNotNull(value.getString("filter")),value.getString("source"),value.getString("album"),value.getString("person"),value.getString("importedPerson"),value.getBoolean("deviceOnly"),value.getString("deviceFolder"))
     }
 }

@@ -72,6 +72,22 @@ internal fun DeviceLibraryLifecycle(model: DeviceLibraryModel=viewModel()) {
     LaunchedEffect(owner,model) { owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) { model.observe() } }
 }
 
+/** Access is offered where photos are browsed; a denied or partial grant is never an empty-library claim. */
+@Composable
+internal fun DevicePhotoAccessBanner(model: DeviceLibraryModel=viewModel()) {
+    val access by model.access.collectAsStateWithLifecycle()
+    val failure by model.error.collectAsStateWithLifecycle()
+    val request=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { model.refresh() }
+    if(!access.full) TextButton(onClick={ request.launch(model.library.permissions.request()) },
+        modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("device:gallery-access")) {
+        com.myphotosanywhere.mpa.ui.ShellIcon(R.drawable.ic_shell_photos)
+        Text(if(access.granted) "Manage device photo access" else "Show device photos",Modifier.padding(start=8.dp))
+    }
+    failure?.let { error -> TextButton(onClick=model::refresh,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("device:gallery-retry")) {
+        Text("Device photos: $error",color=MaterialTheme.colorScheme.error)
+    } }
+}
+
 @Composable
 internal fun DevicePhotoAccessMenu(model: DeviceLibraryModel=viewModel()) {
     val access by model.access.collectAsStateWithLifecycle()

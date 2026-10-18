@@ -17,12 +17,14 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[28],application=Application::class)
 class LibraryFollowupMigrationTest {
-    @Test fun v10RowsAndBlobsSurviveAdditiveMigration() {
+    @Test fun v10RowsAndBlobsSurviveAdditiveMigration() = preserves(10)
+    @Test fun v11DeviceReferencesAuthorizationAndEveryExistingRowSurviveMigration() = preserves(11)
+    private fun preserves(version: Int) {
         val context=RuntimeEnvironment.getApplication();val name="lf-${java.util.UUID.randomUUID()}.db"
-        val schema=JsonParser.parseString(File("schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/10.json").readText()).asJsonObject.getAsJsonObject("database")
+        val schema=JsonParser.parseString(File("schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/$version.json").readText()).asJsonObject.getAsJsonObject("database")
         val tables=schema.getAsJsonArray("entities").map { it.asJsonObject }
         val helper=FrameworkSQLiteOpenHelperFactory().create(SupportSQLiteOpenHelper.Configuration.builder(context).name(name)
-            .callback(object: SupportSQLiteOpenHelper.Callback(10) {
+            .callback(object: SupportSQLiteOpenHelper.Callback(version) {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     tables.forEach { table ->
                         val tableName=table.get("tableName").asString
@@ -41,7 +43,8 @@ class LibraryFollowupMigrationTest {
             }).build())
         fun snapshot(db: SupportSQLiteDatabase)=tables.associate { table ->
             val tableName=table.get("tableName").asString
-            tableName to db.query("SELECT * FROM `$tableName`").use { cursor ->
+            val columns=table.getAsJsonArray("fields").joinToString(",") { "`${it.asJsonObject.get("columnName").asString}`" }
+            tableName to db.query("SELECT $columns FROM `$tableName`").use { cursor ->
                 val result=ArrayList<List<String?>>()
                 while(cursor.moveToNext()) result.add((0 until cursor.columnCount).map { i ->
                     if(cursor.isNull(i)) null else if(cursor.getType(i)==android.database.Cursor.FIELD_TYPE_BLOB) cursor.getBlob(i).joinToString(",") else cursor.getString(i)
@@ -51,13 +54,19 @@ class LibraryFollowupMigrationTest {
         }
         try {
             val before=snapshot(helper.writableDatabase);helper.close()
-            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11).allowMainThreadQueries().build()
+            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11, com.myphotosanywhere.mpa.data.DEVICE_STORAGE_MIGRATION_11_12).allowMainThreadQueries().build()
             try {
                 val database=opened.openHelper.writableDatabase
-                assertEquals(11,database.version);assertEquals(before,snapshot(database))
+                assertEquals(12,database.version);assertEquals(before,snapshot(database))
                 for(table in listOf("device_media","device_scan_seen","manual_device_backups","person_aliases","photo_people","photo_people_origins"))
-                    database.query("SELECT COUNT(*) FROM `$table`").use { assertTrue(it.moveToFirst());assertEquals(0,it.getInt(0)) }
+                    database.query("SELECT COUNT(*) FROM `$table`").use { assertTrue(it.moveToFirst());assertEquals(if(version==10) 0 else 1,it.getInt(0)) }
                 database.query("SELECT COUNT(*) FROM people_index_queue").use { assertTrue(it.moveToFirst());assertEquals(1,it.getInt(0)) }
+                if(version==11) {
+                    database.query("SELECT folderPath,folderName FROM device_media").use { assertTrue(it.moveToFirst());assertEquals("",it.getString(0));assertEquals("",it.getString(1)) }
+                    database.query("SELECT metadataRequested,metadataId,metadataSha,metadataEtag FROM manual_device_backups").use {
+                        assertTrue(it.moveToFirst());assertEquals(0,it.getInt(0));for(index in 1..3) assertTrue(it.isNull(index))
+                    }
+                }
             } finally { opened.close() }
         } finally { helper.close();context.deleteDatabase(name) }
     }

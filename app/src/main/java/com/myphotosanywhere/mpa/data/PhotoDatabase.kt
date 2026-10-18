@@ -82,6 +82,11 @@ interface PhotoDao {
 
     @Query("SELECT * FROM photos ORDER BY importedAt")
     suspend fun all(): List<Photo>
+    @Query("SELECT * FROM photos WHERE originalPath<>'' AND id>:after ORDER BY id LIMIT :limit")
+    suspend fun offlineOriginals(after: String,limit: Int): List<Photo>
+    @Query("""SELECT * FROM photos WHERE originalPath<>'' AND sourceBindingKey IS NOT NULL AND sourceRemoteId IS NOT NULL
+        AND lastAccess<=:cutoff AND (lastAccess>:access OR (lastAccess=:access AND id>:after)) ORDER BY lastAccess,id LIMIT :limit""")
+    suspend fun offlineCandidates(cutoff: Long,access: Long,after: String,limit: Int): List<Photo>
     @Query("SELECT p.* FROM photos p WHERE p.mimeType LIKE 'image/%' AND p.id>:after AND "+com.myphotosanywhere.mpa.trash.TrashVisibility.PHOTO_SQL+" ORDER BY p.id LIMIT :limit")
     suspend fun recognitionCandidates(after: String,limit: Int): List<Photo>
 
@@ -111,7 +116,7 @@ interface PhotoDao {
     com.myphotosanywhere.mpa.importing.ImportJob::class, com.myphotosanywhere.mpa.importing.ImportItem::class,
     com.myphotosanywhere.mpa.importing.TakeoutSidecar::class,
     com.myphotosanywhere.mpa.importing.TakeoutDownload::class,
-    com.myphotosanywhere.mpa.trash.DriveTrashRecord::class,DeviceMediaRecord::class,DeviceScanSeen::class,ManualDeviceBackup::class,PersonAlias::class,PhotoPersonLabel::class,PhotoPeopleOrigin::class,PeopleIndexItem::class], version = 11, exportSchema = true)
+    com.myphotosanywhere.mpa.trash.DriveTrashRecord::class,DeviceMediaRecord::class,DeviceScanSeen::class,ManualDeviceBackup::class,PersonAlias::class,PhotoPersonLabel::class,PhotoPeopleOrigin::class,PeopleIndexItem::class], version = 12, exportSchema = true)
 abstract class PhotoDatabase : RoomDatabase() {
     internal abstract fun presence(): LibraryPresenceDao
     internal abstract fun deviceMedia(): DeviceMediaDao

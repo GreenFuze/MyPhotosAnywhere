@@ -21,6 +21,14 @@ import java.time.ZoneId
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[28],application=Application::class)
 class SearchRepositoryTest {
+    @Test fun savedSearchOriginRestoresTheExactDeviceFolderAndSupportsOlderBundles() {
+        val folder=com.myphotosanywhere.mpa.device.DeviceFolderKey("primary","Pictures/Screenshots/")
+        val context=GalleryContext("Favorites",null,null,null,deviceOnly=true,deviceFolder=folder.key)
+        assertEquals(context,GalleryContext.restore(context.save()))
+        val legacy=android.os.Bundle().apply { putString("filter","All") }
+        assertEquals(GalleryContext("All",null,null,null),GalleryContext.restore(legacy))
+    }
+
     private lateinit var db: PhotoDatabase
     private lateinit var repository: TimelineRepository
     private val directory=Files.createTempDirectory("mpa-search-").toFile()

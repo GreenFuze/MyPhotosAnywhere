@@ -26,7 +26,7 @@ import com.myphotosanywhere.mpa.data.*
 @Composable
 fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGridState,
     onAlbum: (String)->Unit,onFavorites: ()->Unit,onArchive: ()->Unit,onActivity: ()->Unit,
-    onPeople: ()->Unit,onPlaces: ()->Unit,onOffline: ()->Unit,onEdits: ()->Unit,bottomClearance: Dp=0.dp,onTrash: (()->Unit)?=null) {
+    onPeople: ()->Unit,onPlaces: ()->Unit,onOffline: ()->Unit,onEdits: ()->Unit,bottomClearance: Dp=0.dp,onTrash: (()->Unit)?=null,onDevice: (()->Unit)?=null) {
     var create by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var manage by remember { mutableStateOf<Album?>(null) }
@@ -41,6 +41,7 @@ fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGrid
         if(onTrash!=null) item { CollectionCard("Trash",com.myphotosanywhere.mpa.R.drawable.ic_action_trash,repository,null,onTrash,compact=true) }
         item { CollectionCard("Archive",com.myphotosanywhere.mpa.R.drawable.ic_shell_archive,repository,TimelineQuery("Archive"),onArchive,compact=true) }
         item { CollectionCard("Offline available",com.myphotosanywhere.mpa.R.drawable.ic_shell_offline,repository,TimelineQuery("Offline"),onOffline,compact=true) }
+        if(onDevice!=null) item { CollectionCard("On this device",com.myphotosanywhere.mpa.R.drawable.ic_device_folder,repository,TimelineQuery(deviceOnly=true),onDevice) }
         item { CollectionCard("People",com.myphotosanywhere.mpa.R.drawable.ic_shell_people,repository,null,onPeople) }
         item { CollectionCard("Places",com.myphotosanywhere.mpa.R.drawable.ic_shell_places,repository,null,onPlaces) }
         item { CollectionCard("Edited photos",com.myphotosanywhere.mpa.R.drawable.ic_shell_edit,repository,TimelineQuery("Edits"),onEdits) }
@@ -76,7 +77,7 @@ fun AlbumsScreen(model: LibraryFeaturesModel,albums: List<Album>,state: LazyGrid
 
 
 @Composable
-internal fun CollectionCard(title: String,icon: Int,repository: CollectionsRepository,query: TimelineQuery?,onClick: ()->Unit,tag: String="collections:$title",compact: Boolean=false) {
+internal fun CollectionCard(title: String,icon: Int,repository: CollectionsRepository,query: TimelineQuery?,onClick: ()->Unit,tag: String="collections:$title",compact: Boolean=false,countLabel: String?=null) {
     var failure by remember(query,title,compact) { mutableStateOf(false) }
     var retry by remember(query,title,compact) { mutableIntStateOf(0) }
     val preview by produceState<CollectionPreview?>(null,repository,query,title,compact,retry) {
@@ -104,7 +105,7 @@ internal fun CollectionCard(title: String,icon: Int,repository: CollectionsRepos
                     }
                 }
                 Text(title,Modifier.padding(horizontal=12.dp,vertical=8.dp),style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
-                preview?.count?.takeIf { it>=0 }?.let { Text("$it items",Modifier.padding(start=12.dp,end=12.dp,bottom=12.dp),style=MaterialTheme.typography.bodySmall) }
+                (countLabel ?: preview?.count?.takeIf { it>=0 }?.let { "$it items" })?.let { Text(it,Modifier.padding(start=12.dp,end=12.dp,bottom=12.dp),style=MaterialTheme.typography.bodySmall) }
             }
         }
         if(failure) TextButton(onClick={ retry++ },modifier=Modifier.heightIn(min=48.dp)) { Text("Retry cover") }

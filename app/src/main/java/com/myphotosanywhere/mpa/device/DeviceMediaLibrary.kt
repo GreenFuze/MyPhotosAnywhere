@@ -36,11 +36,12 @@ internal class DevicePhotoPermissions(private val context: Context) {
         return DevicePhotoAccess(granted(Manifest.permission.READ_MEDIA_IMAGES),granted(Manifest.permission.READ_MEDIA_VIDEO),
             Build.VERSION.SDK_INT>=34 && granted(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED))
     }
-    fun request(): Array<String> = when {
+    fun location()=Build.VERSION.SDK_INT<29 || ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_MEDIA_LOCATION)==PackageManager.PERMISSION_GRANTED
+    fun request(includeLocation: Boolean=false): Array<String> = (when {
         Build.VERSION.SDK_INT>=34 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES,Manifest.permission.READ_MEDIA_VIDEO,Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
         Build.VERSION.SDK_INT>=33 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES,Manifest.permission.READ_MEDIA_VIDEO)
         else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-    }
+    })+if(includeLocation && Build.VERSION.SDK_INT>=29) arrayOf(Manifest.permission.ACCESS_MEDIA_LOCATION) else emptyArray()
 }
 
 /** Metadata only, in bounded keyset batches. No camera originals are copied for gallery discovery. */
@@ -51,7 +52,8 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
     private val staging=DeviceOriginalStaging(java.io.File(context.filesDir,"device-original-staging"))
     private val resolver=context.contentResolver
     private data class Row(val id: Long,val name: String,val mime: String,val bytes: Long,val added: Long,
-        val captured: Long?,val modified: Long,val generation: Long,val width: Int,val height: Int,val orientation: Int)
+        val captured: Long?,val modified: Long,val generation: Long,val width: Int,val height: Int,val orientation: Int,
+        val folderPath: String="",val folderName: String="")
     suspend fun reconcile(): Int=withContext(Dispatchers.IO) { indexing.withLock {
         val access=permissions.current()
         if(!access.granted) { database.deviceMedia().revoke();return@withLock 0 }
@@ -62,9 +64,14 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
             currentCoroutineContext().ensureActive()
             val collection=MediaStore.Files.getContentUri(volume)
             val version=version(volume)
+            val collections=buildList {
+                if(access.images || access.selected) add(MediaStore.Images.Media.getContentUri(volume))
+                if(access.videos || access.selected) add(MediaStore.Video.Media.getContentUri(volume))
+            }
+            for(mediaCollection in collections) {
             var after=-1L
             while(true) {
-                val rows=query(collection,after,access)
+                val rows=query(mediaCollection,after,access)
                 if(rows.isEmpty()) break
                 val prepared=rows.map { row -> prepare(collection,version,volume,row) }
                 database.withTransaction {
@@ -90,6 +97,7 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
                 after=rows.last().id
                 if(rows.size<BATCH) break
             }
+            }
             if(version(volume)!=version) throw IOException("Android refreshed its media library. Retry device-photo discovery.")
         }
         if(permissions.current()!=access) throw IOException("Photo access changed. Refresh the device library.")
@@ -105,6 +113,8 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
         val generation=Build.VERSION.SDK_INT>=30
         val columns=mutableListOf("_id","_display_name","mime_type","_size","date_added","datetaken","date_modified","width","height","orientation")
         if(generation) columns+="generation_modified"
+        columns+=if(Build.VERSION.SDK_INT>=29) "relative_path" else "bucket_id"
+        columns+="bucket_display_name"
         val kinds=buildList { if(access.images || access.selected) add(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE);if(access.videos || access.selected) add(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO) }
         val selection=buildString {
             append("_id>? AND media_type IN (${kinds.joinToString(",")}) AND _size>0")
@@ -129,7 +139,9 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
                         val added=cursor.getLong(4).coerceIn(0,Long.MAX_VALUE/1000)*1000
                         add(Row(cursor.getLong(0),cursor.getString(1) ?: "Photo",cursor.getString(2) ?: "application/octet-stream",
                             cursor.getLong(3),added,cursor.getLong(5).takeIf { it>0 },cursor.getLong(6),if(generation) cursor.getLong(10) else 0,
-                            cursor.getInt(7).coerceAtLeast(0),cursor.getInt(8).coerceAtLeast(0),cursor.getInt(9)))
+                            cursor.getInt(7).coerceAtLeast(0),cursor.getInt(8).coerceAtLeast(0),cursor.getInt(9),
+                            cursor.getString(if(generation) 11 else 10)?.let { if(Build.VERSION.SDK_INT>=29) it else "bucket:$it" }.orEmpty(),
+                            cursor.getString(if(generation) 12 else 11).orEmpty()))
                     }
                 }
             } ?: throw IOException("Android did not return its device-photo library. Retry.")
@@ -148,7 +160,8 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
         val content=tuple(row.bytes,row.modified,row.added,row.mime)
         var id=exact?.photoId ?: "device-"+UUID.nameUUIDFromBytes("$uri|$version|$content".toByteArray(Charsets.UTF_8))
         var previous=database.photos().find(id);var old=database.deviceMedia().find(id)
-        var reference=DeviceMediaRecord(id,uri,volume,version,fingerprint,row.width,row.height,row.orientation,true)
+        var reference=DeviceMediaRecord(id,uri,volume,version,fingerprint,row.width,row.height,row.orientation,true,row.folderPath,
+            row.folderName.ifBlank { row.folderPath.trimEnd('/').substringAfterLast('/').ifBlank { "Other photos" } })
         if(previous!=null && previous.sha256.isNotBlank() && old?.revision!=fingerprint) {
             // Hash only a changed, previously verified device reference. Initial gallery
             // discovery and ordinary metadata-only media never hash the camera roll.
@@ -202,12 +215,13 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
         return row
     }
     /** Called only by an IO operation or the single bounded image-decoder thread. */
-    fun openDescriptor(record: DeviceMediaRecord): android.os.ParcelFileDescriptor {
+    fun openDescriptor(record: DeviceMediaRecord,originalMetadata: Boolean=false): android.os.ParcelFileDescriptor {
         check(android.os.Looper.myLooper()!=android.os.Looper.getMainLooper()) { "Device original IO must stay off the main thread." }
         check(record.uri.toUri().scheme=="content" && record.uri.toUri().authority==MediaStore.AUTHORITY)
         try {
             val row=current(record)
-            val descriptor=resolver.openFileDescriptor(record.uri.toUri(),"r") ?: throw IOException("Android could not open this device original.")
+            val uri=record.uri.toUri().let { if(originalMetadata && Build.VERSION.SDK_INT>=29 && permissions.location()) MediaStore.setRequireOriginal(it) else it }
+            val descriptor=resolver.openFileDescriptor(uri,"r") ?: throw IOException("Android could not open this device original.")
             try {
                 if(descriptor.statSize>=0 && descriptor.statSize!=row.bytes) throw IOException("The device file changed. Refresh device photos.")
                 current(record)
@@ -290,7 +304,7 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
         var failure: Throwable?=null
         try {
             val digest=java.security.MessageDigest.getInstance("SHA-256");var total=0L
-            android.os.ParcelFileDescriptor.AutoCloseInputStream(openDescriptor(reference)).use { input ->
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(openDescriptor(reference,originalMetadata=true)).use { input ->
                 stage.outputStream().use { output ->
                     val buffer=ByteArray(64*1024)
                     while(true) {
@@ -306,6 +320,9 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
             if(total!=first.bytes) throw IOException("The device original was incomplete. Its camera file is unchanged; retry.")
             current(reference)
             val sha=digest.digest().joinToString("") { "%02x".format(it) }
+            val coordinates=if(first.mimeType.startsWith("image/")) try {
+                androidx.exifinterface.media.ExifInterface(stage).latLong
+            } catch(_: IOException) { null } else null
             app.cache.lock.withLock {
                 database.withTransaction {
                     val latest=database.photos().find(id) ?: throw IOException("This photo was removed while its original was prepared.")
@@ -316,7 +333,9 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
                         if(target.length()!=total || com.myphotosanywhere.mpa.drive.DriveBackupWorker.digest(target,"SHA-256")!=sha)
                             throw IOException("A retained original differs from the device file. Both were preserved for recovery.")
                     } else if(!stage.renameTo(target)) throw IOException("Cannot retain the verified original. The camera file is unchanged.")
-                    latest.copy(originalPath=target.path,sha256=sha).also { database.photos().update(it) }
+                    val location=coordinates?.takeIf { latest.latitude==null && latest.longitude==null }
+                    latest.copy(originalPath=target.path,sha256=sha,
+                        latitude=latest.latitude ?: location?.get(0),longitude=latest.longitude ?: location?.get(1)).also { database.photos().update(it) }
                 }
             }
         } catch(error: Throwable) { failure=error;throw error }

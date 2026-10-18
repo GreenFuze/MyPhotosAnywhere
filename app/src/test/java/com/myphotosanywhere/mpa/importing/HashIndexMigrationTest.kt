@@ -53,7 +53,7 @@ class HashIndexMigrationTest {
         var db: PhotoDatabase?=null
         try {
             helper.writableDatabase; helper.close()
-            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9, com.myphotosanywhere.mpa.trash.TRASH_MIGRATION_9_10, com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11).allowMainThreadQueries().build()
+            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9, com.myphotosanywhere.mpa.trash.TRASH_MIGRATION_9_10, com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11, com.myphotosanywhere.mpa.data.DEVICE_STORAGE_MIGRATION_11_12).allowMainThreadQueries().build()
             db=opened
             assertEquals(0L,opened.cloud().sync("idle")?.lastScan)
             assertEquals(888L,opened.cloud().sync("idle")?.lastSuccess)

@@ -6,6 +6,7 @@ import androidx.paging.PagingSource
 import com.myphotosanywhere.mpa.data.*
 import com.myphotosanywhere.mpa.drive.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -49,6 +50,37 @@ class TimelineRepositoryTest {
         db.cloud().savePhoto(value);return value
     }
     private suspend fun rows(query: TimelineQuery=TimelineQuery())=repository.page(query,null,TimelineDirection.AFTER,300)
+
+    @Test fun deviceFoldersAreVolumeScopedAndUseTheSameStablePagedChronology()=runBlocking<Unit> {
+        val camera=com.myphotosanywhere.mpa.device.DeviceFolderKey("primary","DCIM/Camera/")
+        val second=camera.copy(volume="card")
+        val screenshots=camera.copy(path="Pictures/Screenshots/")
+        for(i in 0..130) {
+            val id="device-%03d".format(i)
+            photo(id,1000L+i)
+            val folder=if(i<125) camera else screenshots
+            db.deviceMedia().save(DeviceMediaRecord(id,"content://media/external/file/$i",folder.volume,"version","$i",100,200,0,true,folder.path,folder.title))
+        }
+        photo("card",9999);db.deviceMedia().save(DeviceMediaRecord("card","content://media/card/file/1",second.volume,"v","r",100,100,0,true,second.path,"Camera"))
+        photo("revoked",10000);db.deviceMedia().save(DeviceMediaRecord("revoked","content://media/external/file/999",camera.volume,"v","r",100,100,0,false,camera.path,"Camera"))
+        photo("import",99999);cloud("remote",999999)
+        val query=TimelineQuery(deviceFolder=camera)
+        val all=rows(query)
+        assertEquals(125,all.size);assertEquals("device-124",all.first().photoId)
+        val first=repository.page(query,null,TimelineDirection.AFTER,60)
+        val next=repository.page(query,first.last().cursor,TimelineDirection.AFTER,60)
+        assertEquals(all.take(120).map { it.key },(first+next).map { it.key })
+        val previous=repository.page(query,next.first().cursor,TimelineDirection.BEFORE,60)
+        assertEquals(first.map { it.key },previous.map { it.key })
+        assertEquals(listOf("card"),rows(TimelineQuery(deviceFolder=second)).map { it.photoId })
+        assertEquals(132,rows(TimelineQuery(deviceOnly=true)).size)
+        val folders=db.deviceMedia().folders().first()
+        assertEquals(3,folders.size);assertEquals(125L,folders.single { it.identity==camera }.count)
+        assertEquals(6L,folders.single { it.identity==screenshots }.count)
+        assertEquals(camera,com.myphotosanywhere.mpa.device.DeviceFolderKey.restore(camera.key))
+        db.photos().update(requireNotNull(db.photos().find("device-124")).copy(archived=true))
+        assertFalse(rows(query).any { it.photoId=="device-124" })
+    }
 
     @Test fun dateBoundsRespectSourcesVisibilityAndUnknownDates()=runBlocking<Unit> {
         photo("old",1000);photo("new",3000);photo("hidden",9999,archived=true)
@@ -285,7 +317,7 @@ class TimelineRepositoryTest {
         assertEquals(before,db.photos().all())
         assertEquals(remote,db.cloud().photo(remote.key))
         assertEquals(face,db.library().face(face.id))
-        assertEquals(11,db.openHelper.readableDatabase.version)
+        assertEquals(12,db.openHelper.readableDatabase.version)
     }
 
     @Test fun lowStoragePreparationPreservesOriginalRecordsAndCleansIndex()=runBlocking {

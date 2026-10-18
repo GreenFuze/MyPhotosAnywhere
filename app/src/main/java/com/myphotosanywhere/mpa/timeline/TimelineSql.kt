@@ -4,7 +4,7 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 
 /** One global ordering and one visibility policy for paging, seeking and viewer snapshots. */
 internal class TimelineSql(private val query: TimelineQuery) {
-    private val arguments=arrayOf<Any?>(query.source,query.filter,query.album,query.person,query.type.name,query.fromMillis,query.untilMillis)
+    private val arguments=arrayOf<Any?>(query.source,query.filter,query.album,query.person,query.type.name,query.fromMillis,query.untilMillis,if(query.deviceOnly || query.deviceFolder!=null) 1 else 0,query.deviceFolder?.volume,query.deviceFolder?.path)
     private val projection="""
         WITH connected AS (
           SELECT c.* FROM cloud_photos c JOIN drive_sources s ON s.key=c.bindingKey
@@ -73,6 +73,8 @@ internal class TimelineSql(private val query: TimelineQuery) {
         ), filtered AS (
           SELECT * FROM entries WHERE (?5='ALL' OR (?5='PHOTOS' AND mimeType LIKE 'image/%') OR (?5='VIDEOS' AND mimeType LIKE 'video/%'))
           AND (?6 IS NULL OR effectiveMillis>=?6) AND (?7 IS NULL OR effectiveMillis<?7)
+          AND (?8=0 OR EXISTS(SELECT 1 FROM device_media d WHERE d.photoId=entries.photoId AND d.available=1
+            AND (?9 IS NULL OR (d.volume=?9 AND d.folderPath=?10))))
           AND ${if(query.importedPerson!=null || query.includeMetadata) "photoId IS NOT NULL" else "1"}
         )
     """.trimIndent()
@@ -96,8 +98,8 @@ internal class TimelineSql(private val query: TimelineQuery) {
 
     fun dateRange()=statement("SELECT MIN(effectiveMillis),MAX(effectiveMillis) FROM filtered")
     fun ordered()=statement("SELECT * FROM filtered ORDER BY effectiveMillis DESC,canonicalKey COLLATE BINARY ASC")
-    fun identity(key: String)=statement("SELECT * FROM filtered WHERE canonicalKey=?8",key)
-    fun date(beforeExclusive: Long)=statement("SELECT * FROM filtered WHERE effectiveMillis<?8 ORDER BY effectiveMillis DESC,canonicalKey COLLATE BINARY ASC LIMIT 1",beforeExclusive)
+    fun identity(key: String)=statement("SELECT * FROM filtered WHERE canonicalKey=?11",key)
+    fun date(beforeExclusive: Long)=statement("SELECT * FROM filtered WHERE effectiveMillis<?11 ORDER BY effectiveMillis DESC,canonicalKey COLLATE BINARY ASC LIMIT 1",beforeExclusive)
 
     fun page(cursor: TimelineCursor?,direction: TimelineDirection,limit: Int,inclusive: Boolean=false): SimpleSQLiteQuery {
         require(limit in 1..300)
@@ -109,10 +111,10 @@ internal class TimelineSql(private val query: TimelineQuery) {
         require(limit==null || limit in 1..300)
         val reverse=direction==TimelineDirection.BEFORE
         val predicate=if(cursor==null) "1" else if(cursor.millis==null) {
-            if(reverse) "(effectiveMillis IS NOT NULL OR (effectiveMillis IS NULL AND canonicalKey COLLATE BINARY<?8))"
-            else "(effectiveMillis IS NULL AND canonicalKey COLLATE BINARY${if(inclusive) ">=" else ">"}?8)"
-        } else if(reverse) "(effectiveMillis>?8 OR (effectiveMillis=?8 AND canonicalKey COLLATE BINARY<?9))"
-        else "(effectiveMillis IS NULL OR effectiveMillis<?8 OR (effectiveMillis=?8 AND canonicalKey COLLATE BINARY${if(inclusive) ">=" else ">"}?9))"
+            if(reverse) "(effectiveMillis IS NOT NULL OR (effectiveMillis IS NULL AND canonicalKey COLLATE BINARY<?11))"
+            else "(effectiveMillis IS NULL AND canonicalKey COLLATE BINARY${if(inclusive) ">=" else ">"}?11)"
+        } else if(reverse) "(effectiveMillis>?11 OR (effectiveMillis=?11 AND canonicalKey COLLATE BINARY<?12))"
+        else "(effectiveMillis IS NULL OR effectiveMillis<?11 OR (effectiveMillis=?11 AND canonicalKey COLLATE BINARY${if(inclusive) ">=" else ">"}?12))"
         val params=if(cursor==null) emptyArray() else if(cursor.millis==null) arrayOf<Any?>(cursor.key) else arrayOf<Any?>(cursor.millis,cursor.key)
         val order=if(reverse) "effectiveMillis IS NULL DESC,effectiveMillis ASC,canonicalKey COLLATE BINARY DESC" else "effectiveMillis DESC,canonicalKey COLLATE BINARY ASC"
         return statement("SELECT * FROM filtered WHERE $predicate ORDER BY $order${limit?.let { " LIMIT $it" }.orEmpty()}",*params)

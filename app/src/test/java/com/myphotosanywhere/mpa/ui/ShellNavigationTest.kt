@@ -5,6 +5,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ShellNavigationTest {
+    @Test fun deviceFoldersKeepTheirCollectionsOriginThroughSearchAndRecreation() {
+        val nav=ShellNavigation();nav.select(ShellDestination.COLLECTIONS);nav.open(ShellDestination.DEVICE_FOLDERS);nav.open(ShellDestination.PHOTOS);nav.select(ShellDestination.SEARCH)
+        val scope=object: SaverScope { override fun canBeSaved(value: Any)=true }
+        val saved=with(ShellNavigation.Saver) { requireNotNull(scope.save(nav)) }
+        val restored=requireNotNull(ShellNavigation.Saver.restore(saved))
+        restored.back();assertEquals(ShellDestination.PHOTOS,restored.destination)
+        restored.back();assertEquals(ShellDestination.DEVICE_FOLDERS,restored.destination)
+        restored.back();assertEquals(ShellDestination.COLLECTIONS,restored.destination)
+    }
     @Test fun backReturnsToCollectionOriginInsteadOfClosingTheApp() {
         val nav=ShellNavigation()
         nav.select(ShellDestination.COLLECTIONS)

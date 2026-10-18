@@ -5,17 +5,20 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /** References belong to MediaStore; their source files are never disposable MPA cache. */
-@Entity(tableName="device_media",indices=[Index("uri"),Index("available")])
+@Entity(tableName="device_media",indices=[Index("uri"),Index("available"),Index(value=["volume","folderPath","available"])])
 internal data class DeviceMediaRecord(@PrimaryKey val photoId: String,val uri: String,val volume: String,
     val providerVersion: String,val revision: String,val width: Int,val height: Int,val orientation: Int,
-    val available: Boolean)
+    val available: Boolean,@ColumnInfo(defaultValue="''") val folderPath: String="",
+    @ColumnInfo(defaultValue="''") val folderName: String="")
 @Entity(tableName="device_scan_seen")
 internal data class DeviceScanSeen(@PrimaryKey val photoId: String,val scan: String)
 
 /** Explicit authorization is scoped to an immutable task and captured destination. */
 @Entity(tableName="manual_device_backups",indices=[Index("photoId")])
 internal data class ManualDeviceBackup(@PrimaryKey val taskId: String,val photoId: String,
-    val bindingKey: String,val sha256: String,val bytes: Long)
+    val bindingKey: String,val sha256: String,val bytes: Long,
+    @ColumnInfo(defaultValue="0") val metadataRequested: Boolean=false,
+    val metadataId: String?=null,val metadataSha: String?=null,val metadataEtag: String?=null)
 
 /** A canonical person can have several provider names, including names before a rename. */
 @Entity(tableName="person_aliases",indices=[Index("personId")])
@@ -39,7 +42,13 @@ internal interface DeviceMediaDao {
     @Query("UPDATE device_media SET available=0 WHERE available=1 AND NOT EXISTS(SELECT 1 FROM device_scan_seen s WHERE s.photoId=device_media.photoId AND s.scan=:seen)") suspend fun finish(seen: String)
     @Query("UPDATE device_media SET available=0 WHERE available=1") suspend fun revoke()
     @Query("SELECT COUNT(*) FROM device_media WHERE available=1") suspend fun count(): Int
+    @Query("""SELECT d.volume,d.folderPath,MAX(d.folderName) AS name,COUNT(*) AS count
+        FROM device_media d JOIN photos p ON p.id=d.photoId
+        WHERE d.available=1 AND p.archived=0 AND """+com.myphotosanywhere.mpa.trash.TrashVisibility.PHOTO_SQL+"""
+        GROUP BY d.volume,d.folderPath ORDER BY CASE WHEN d.folderPath='DCIM/Camera/' THEN 0 ELSE 1 END,name COLLATE NOCASE,d.volume,d.folderPath""")
+    fun folders(): kotlinx.coroutines.flow.Flow<List<com.myphotosanywhere.mpa.device.DeviceFolderSummary>>
     @Insert(onConflict=OnConflictStrategy.ABORT) suspend fun authorize(task: ManualDeviceBackup)
+    @Update suspend fun updateAuthorization(task: ManualDeviceBackup)
     @Query("SELECT * FROM manual_device_backups WHERE taskId=:id") suspend fun authorization(id: String): ManualDeviceBackup?
     @Query("SELECT m.* FROM manual_device_backups m JOIN drive_backups b ON b.id=m.taskId WHERE b.state<>'COMPLETE' AND m.taskId>:after ORDER BY m.taskId LIMIT :limit")
     suspend fun pendingManual(after: String,limit: Int): List<ManualDeviceBackup>

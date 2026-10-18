@@ -51,10 +51,10 @@ class TrashMigrationTest {
         }
         try {
             val before=snapshot(helper.writableDatabase);helper.close()
-            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(TRASH_MIGRATION_9_10, com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11).allowMainThreadQueries().build()
+            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(TRASH_MIGRATION_9_10, com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11, com.myphotosanywhere.mpa.data.DEVICE_STORAGE_MIGRATION_11_12).allowMainThreadQueries().build()
             try {
                 val database=opened.openHelper.writableDatabase
-                assertEquals(11,database.version);assertEquals(before,snapshot(database))
+                assertEquals(12,database.version);assertEquals(before,snapshot(database))
                 database.query("SELECT COUNT(*) FROM drive_trash").use { assertTrue(it.moveToFirst());assertEquals(0,it.getInt(0)) }
             } finally { opened.close() }
         } finally { helper.close();context.deleteDatabase(name) }

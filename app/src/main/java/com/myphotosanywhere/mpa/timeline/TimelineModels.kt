@@ -8,7 +8,8 @@ internal data class TimelineQuery(val filter: String="All",val source: String?=n
     val album: String?=null,val person: String?=null,val search: String?=null,
     val type: TimelineMediaType=TimelineMediaType.ALL,val fromMillis: Long?=null,val untilMillis: Long?=null,
     val searchZone: String=java.time.ZoneId.systemDefault().id,val includeMetadata: Boolean=false,
-    val importedPerson: com.myphotosanywhere.mpa.people.ImportedPersonLabel?=null) {
+    val importedPerson: com.myphotosanywhere.mpa.people.ImportedPersonLabel?=null,
+    val deviceOnly: Boolean=false,val deviceFolder: com.myphotosanywhere.mpa.device.DeviceFolderKey?=null) {
     init {
         require(filter in setOf("All","Favorites","Offline","Videos","Edits","Archive"))
         require(person==null || importedPerson==null) { "A query cannot mix reviewed and imported people" }

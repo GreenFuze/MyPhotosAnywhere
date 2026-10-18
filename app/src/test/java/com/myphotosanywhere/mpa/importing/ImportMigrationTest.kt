@@ -43,7 +43,7 @@ class ImportMigrationTest {
         var db: PhotoDatabase?=null
         try {
             helper.writableDatabase; helper.close()
-            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(IMPORT_MIGRATION_6_7, TAKEOUT_DOWNLOAD_MIGRATION_7_8, com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9, com.myphotosanywhere.mpa.trash.TRASH_MIGRATION_9_10, com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11).allowMainThreadQueries().build()
+            val opened=Room.databaseBuilder(context,PhotoDatabase::class.java,name).addMigrations(IMPORT_MIGRATION_6_7, TAKEOUT_DOWNLOAD_MIGRATION_7_8, com.myphotosanywhere.mpa.drive.HASH_INDEX_MIGRATION_8_9, com.myphotosanywhere.mpa.trash.TRASH_MIGRATION_9_10, com.myphotosanywhere.mpa.data.LIBRARY_FOLLOWUP_MIGRATION_10_11, com.myphotosanywhere.mpa.data.DEVICE_STORAGE_MIGRATION_11_12).allowMainThreadQueries().build()
             db=opened
             assertEquals("portable",opened.photos().find("photo")?.metadataAssetId)
             assertEquals("",opened.photos().find("photo")?.importedMetadata)
