@@ -222,11 +222,22 @@ fun PhotoDetails(photo: Photo,model: LibraryFeaturesModel,albums: List<Album>,me
         OutlinedTextField(longitude,{ longitude=it },label={ Text("Longitude (optional)") },singleLine=true)
         Text("Stored in your local library. Original file bytes are preserved.",style=MaterialTheme.typography.bodySmall)
         locationError?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-    } },confirmButton={ Button(onClick={
+    } },confirmButton={
+        // These locals belong to the dialog's own text-entry window.
+        val dialogFocus=androidx.compose.ui.platform.LocalFocusManager.current
+        val dialogKeyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+        Button(onClick={
         val lat=latitude.toDoubleOrNull(); val lon=longitude.toDoubleOrNull()
         if((latitude.isNotBlank() || longitude.isNotBlank()) && !LibrarySearch.validCoordinates(lat,lon)) locationError="Enter latitude −90 to 90 and longitude −180 to 180, or leave both blank."
-        else { model.updatePhoto(photo.id) { it.copy(placeLabel=place.trim(),latitude=lat,longitude=lon) }; location=false }
-    }) { Text("Save") } },dismissButton={ TextButton(onClick={ location=false }) { Text("Cancel") } })
+        else {
+            dialogFocus.clearFocus(force=true);dialogKeyboard?.hide()
+            model.updatePhoto(photo.id) { it.copy(placeLabel=place.trim(),latitude=lat,longitude=lon) };location=false
+        }
+    }) { Text("Save") } },dismissButton={
+        val dialogFocus=androidx.compose.ui.platform.LocalFocusManager.current
+        val dialogKeyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+        TextButton(onClick={ dialogFocus.clearFocus(force=true);dialogKeyboard?.hide();location=false }) { Text("Cancel") }
+    })
     naming?.let { FacePersonDialog(it,people,model) { namingId=null } }
     managingPerson?.let { PersonManagementDialog(it,people,model) { managingPersonId=null } }
     excludingPerson?.let { person -> AlertDialog(onDismissRequest={ excludingPersonId=null },title={ Text("Not ${person.name}?") },
