@@ -33,7 +33,7 @@ internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,
     val holder=rememberSaveableStateHolder()
     MotionSwap(destination) { target ->
     holder.SaveableStateProvider(target.id) {
-        if(target==ShellDestination.STORAGE) DriveStorageScreen(photos,{ onOpen(ShellDestination.ACTIVITY) },{ onOpen(ShellDestination.IMPORTS) },{ onOpen(ShellDestination.SETTINGS) })
+        if(target==ShellDestination.STORAGE) DriveStorageScreen(photos,{ onOpen(ShellDestination.ACTIVITY) },{ onOpen(ShellDestination.IMPORTS) },{ onOpen(ShellDestination.SETTINGS) },onFreeSpace={ onOpen(ShellDestination.CACHE) })
         else Column(Modifier.fillMaxSize().background(if(target in listOf(ShellDestination.SETTINGS,ShellDestination.PREFERENCES)) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(20.dp).testTag("management:${target.id}").semantics { paneTitle=target.title },verticalArrangement=Arrangement.spacedBy(14.dp)) {
             if(target in listOf(ShellDestination.SETTINGS,ShellDestination.PREFERENCES))
                 Text(target.title,style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(vertical=16.dp).semantics { heading() })
@@ -56,7 +56,7 @@ internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,
                     PreferenceCard(stringResource(R.string.menu_recognition),stringResource(R.string.menu_recognition_summary),"management:Recognition") { onOpen(ShellDestination.RECOGNITION) }
                 }
                 ShellDestination.PHOTO_VIEW -> PhotosViewPreferences()
-                ShellDestination.CACHE -> StorageControls(photos,features)
+                ShellDestination.CACHE -> StorageControls(features)
                 ShellDestination.RECOGNITION -> {
                     val settings by features.settings.collectAsStateWithLifecycle()
                     Text("People names are shared across your library. Face recognition is optional and runs on this phone. Possible matches need your review. Scanning connected originals follows your download preferences.")

@@ -2,7 +2,6 @@ package com.myphotosanywhere.mpa.data
 
 import android.content.Context
 import com.myphotosanywhere.mpa.core.*
-import com.myphotosanywhere.mpa.drive.binding
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -61,7 +60,7 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
     }
 
     /** User-directed removal is separate from Drive Trash and requires fresh exact-copy proof. */
-    internal suspend fun removeDownloadedCopy(identity: DeviceCopyIdentity): String=withContext(Dispatchers.IO) {
+    internal suspend fun removeDownloadedCopy(identity: DeviceCopyIdentity,beforeAccess: Long?=null): String=withContext(Dispatchers.IO) {
         val id=identity.id
         val unused=kotlinx.coroutines.withTimeoutOrNull(1500) {
             while(synchronized(readers) { readers[id] ?: 0 }>0) kotlinx.coroutines.delay(16)
@@ -73,6 +72,7 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
             val snapshot=lock.withLock {
                 val photo=database.photos().find(id) ?: throw IOException("This photo is no longer available.")
                 if(!identity.matches(photo)) throw IOException("This photo or its source changed. Open its details again.")
+                if(beforeAccess!=null && photo.lastAccess>beforeAccess) throw IOException("This download was used after cleanup started. It was kept.")
                 requireDisposable(photo,0)
                 val source=database.drive().source(requireNotNull(photo.sourceBindingKey))
                     ?: throw IOException("The connected source changed. The device copy was kept.")
@@ -96,6 +96,7 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
                 val latest=database.photos().find(id) ?: throw IOException("This photo is no longer available.")
                 if(!snapshot.sameOriginal(latest) || !file.isFile || file.length()!=latest.bytes || file.lastModified()!=snapshot.modified)
                     throw IOException("This photo changed while Drive was checked. The device copy was kept.")
+                if(beforeAccess!=null && latest.lastAccess>beforeAccess) throw IOException("This download was used during cleanup. It was kept.")
                 requireDisposable(latest,1)
                 val source=database.drive().source(requireNotNull(latest.sourceBindingKey))
                 if(source==null || source.accountId!=snapshot.source.accountId || source.folderId!=snapshot.source.folderId || source.mode!=snapshot.source.mode)
@@ -128,7 +129,7 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
     private suspend fun requireDisposable(photo: Photo,ownedReaders: Int) {
         val source=photo.sourceBindingKey?.let { database.drive().source(it) }
         val remote=photo.sourceRemoteId
-        if(source==null || remote.isNullOrBlank() || photo.cachedVersion==null)
+        if(source==null || !source.enabled || remote.isNullOrBlank() || photo.cachedVersion==null)
             throw IOException("This original has no connected, verified Drive copy. It cannot be removed from this device.")
         val row=database.cloud().photo("${source.key}:$remote")
         if(row==null || row.removed || row.photoId!=photo.id || row.bytes!=photo.bytes || row.version!=photo.cachedVersion ||
@@ -153,6 +154,13 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
             throw IOException("A transfer or Drive Trash operation still needs this original. It was kept.")
         if(synchronized(readers) { readers[photo.id] ?: 0 }>ownedReaders)
             throw IOException("This original is still in use. Close its viewer or editor and retry.")
+    }
+    /** Local eligibility only; a real removal still verifies both local bytes and the live Drive revision. */
+    internal suspend fun disposable(photo: Photo): Boolean=lock.withLock {
+        val identity=DeviceCopyIdentity.from(photo) ?: return@withLock false
+        val latest=database.photos().find(photo.id) ?: return@withLock false
+        if(!identity.matches(latest) || latest.originalPath!=photo.originalPath) return@withLock false
+        try { requireDisposable(latest,0);true } catch(_: IOException) { false }
     }
     private fun removalPreview(photo: Photo,original: File): File {
         val directory=File(context.filesDir,"thumbnails")
@@ -180,48 +188,9 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
         } finally { if(temporary.exists()) check(temporary.delete()) { "Cannot remove an owned preview staging file." } }
     }
     suspend fun enforce(clear: Boolean = false): String = withContext(Dispatchers.IO) {
-        lock.withLock {
-            val candidates=database.photos().all().filter { it.sourceBindingKey!=null && it.originalPath.isNotBlank() }
-            val items=candidates.map { photo ->
-                val cloud=database.cloud().photo("${photo.sourceBindingKey}:${photo.sourceRemoteId}")
-                val drafts=database.library().draft(photo.id)
-                val handoffs=database.photos().findHandoffsForPhoto(photo.id)
-                val options=settings.state.value; val scan=database.library().scan(photo.id)
-                val awaitingIndex=photo.mimeType.startsWith("image/") && !options.indexingPaused && scan?.error==null &&
-                    (options.faceIndexing && (scan==null || scan.sha256!=photo.sha256 || scan.modelVersion!=com.myphotosanywhere.mpa.people.PeopleRepository.SCAN_VERSION) ||
-                        options.objectIndexing && photo.labels.isBlank())
-                CachedFile(photo.id,File(photo.originalPath).length(),photo.lastAccess,
-                    cloud!=null && !cloud.removed && cloud.version==photo.cachedVersion && cloud.photoId==photo.id,
-                    photo.pinned || database.library().pinnedAlbumCount(photo.id)>0,drafts!=null || handoffs.isNotEmpty() || awaitingIndex,
-                    synchronized(readers) { readers[photo.id] ?: 0 })
-            }
-            val plan=CachePolicy.plan(items,if(clear) 0 else settings.state.value.originalBudget)
-            var preserved=0
-            for(id in plan.ids) {
-                val photo=database.photos().find(id) ?: continue
-                val file=File(photo.originalPath)
-                val active=photo.sourceBindingKey?.let { database.drive().source(it)?.connection() }
-                val verified=try {
-                    if(remoteVerifier!=null) remoteVerifier.invoke(photo,file)
-                    else if(active?.binding()?.key!=photo.sourceBindingKey) false
-                    else {
-                        val api=(context.applicationContext as com.myphotosanywhere.mpa.MpaApplication).sync.api(requireNotNull(active))
-                        val remote=api.file(requireNotNull(photo.sourceRemoteId))
-                        !remote.trashed && remote.version==photo.cachedVersion && remote.bytes==photo.bytes &&
-                            remote.md5==com.myphotosanywhere.mpa.drive.DriveBackupWorker.digest(file,"MD5") &&
-                            (context.applicationContext as com.myphotosanywhere.mpa.MpaApplication).sync.inside(api,remote,requireNotNull(active.folderId))
-                    }
-                } catch(cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                catch(_: Exception) { false }
-                if(!verified) { preserved++; continue }
-                // Metadata first: a crash leaves an orphan, never a row advertising a missing download.
-                database.photos().update(photo.copy(originalPath=""))
-                if(file.exists() && !file.delete()) database.photos().update(photo)
-            }
-            cleanThumbnails()
-            if(plan.budgetSatisfied && preserved==0) "Disposable downloads cleared within budget. Originals and pinned items are protected."
-            else "Pinned or unverified downloads exceed the budget. Protected files were kept."
-        }
+        val result=OfflineStorageRepository(context,database,this@MediaCache).clear(System.currentTimeMillis(),if(clear) 0 else settings.state.value.originalBudget)
+        lock.withLock { cleanThumbnails() }
+        result.message()
     }
     private suspend fun cleanThumbnails() {
         val all=database.photos().all()
@@ -230,7 +199,10 @@ class MediaCache(private val context: Context, private val database: PhotoDataba
         // remain originals and must never enter the disposable-thumbnail eviction set.
         val originalPaths=all.mapNotNull { it.originalPath.takeIf(String::isNotBlank)?.let { path -> File(path).canonicalPath } }.toSet()
         val paths=(all.map { it.thumbnailPath } + cloud.map { it.thumbnailPath }).filter { it.isNotBlank() }
-            .distinct().filter { File(it).canonicalPath !in originalPaths }
+            .distinct().filter { path ->
+                val file=File(path).canonicalFile
+                file.path !in originalPaths && (file.path.startsWith(context.filesDir.canonicalPath+File.separator) || file.path.startsWith(context.cacheDir.canonicalPath+File.separator))
+            }
         var total=paths.sumOf { File(it).length() }
         val thumbnailBudget=settings.state.value.thumbnailBudget
         val baseBudget=thumbnailBudget-com.myphotosanywhere.mpa.thumbnails.ThumbnailPolicy().diskBudget(thumbnailBudget)

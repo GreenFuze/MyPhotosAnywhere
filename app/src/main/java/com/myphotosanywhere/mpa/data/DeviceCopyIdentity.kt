@@ -7,6 +7,7 @@ internal data class DeviceCopyIdentity(val id: String,val sha: String,val bytes:
         photo.sourceBindingKey==binding && photo.sourceRemoteId==remote && photo.cachedVersion==version
     companion object {
         fun from(photo: Photo): DeviceCopyIdentity? {
+            if(photo.sha256.isBlank()) return null
             val binding=photo.sourceBindingKey?.takeIf(String::isNotBlank) ?: return null
             val remote=photo.sourceRemoteId?.takeIf(String::isNotBlank) ?: return null
             val version=photo.cachedVersion?.takeIf(String::isNotBlank) ?: return null

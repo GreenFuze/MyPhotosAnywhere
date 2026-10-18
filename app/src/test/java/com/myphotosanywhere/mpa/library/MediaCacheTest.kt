@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.room.Room
 import com.myphotosanywhere.mpa.core.LibrarySettings
 import com.myphotosanywhere.mpa.data.*
-import com.myphotosanywhere.mpa.drive.CloudPhoto
+import com.myphotosanywhere.mpa.drive.*
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -17,20 +17,41 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[28],application=Application::class)
 class MediaCacheTest {
+    private fun original(context: android.content.Context,prefix: String): File {
+        val directory=File(context.filesDir,"originals").apply { check(isDirectory || mkdirs()) }
+        val file=File.createTempFile(prefix,".png",directory)
+        val bitmap=android.graphics.Bitmap.createBitmap(40,60,android.graphics.Bitmap.Config.ARGB_8888)
+        try { bitmap.eraseColor(android.graphics.Color.BLUE);file.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)) } }
+        finally { bitmap.recycle() }
+        preview(file)
+        return file
+    }
+    private fun preview(file: File): String {
+        val directory=File(RuntimeEnvironment.getApplication().filesDir,"thumbnails").apply { check(isDirectory || mkdirs()) }
+        val target=File(directory,file.name)
+        if(!target.exists()) file.copyTo(target)
+        return target.path
+    }
+    private suspend fun remote(db: PhotoDatabase,photo: Photo) {
+        val binding=checkNotNull(photo.sourceBindingKey);val id=checkNotNull(photo.sourceRemoteId)
+        db.drive().saveSource(DriveSource(binding,"account","test@example.com","APP_FILES","folder","Fixture"))
+        db.cloud().savePhoto(CloudPhoto("$binding:$id",binding,id,"folder",photo.displayName,photo.mimeType,photo.bytes,
+            DriveBackupWorker.digest(File(photo.originalPath),"MD5"),"1",null,null,null,null,photoId=photo.id,sha256=photo.sha256))
+    }
+
     @Test fun zeroBudgetPreservesImportsDraftsPinsAndActiveViewsButEvictsVerifiedDownloads() = runBlocking {
         val context=RuntimeEnvironment.getApplication()
         val db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).allowMainThreadQueries().build()
-        val settings=LibrarySettings(context).apply { update(state.value.copy(originalBudget=0)) }
+        val settings=LibrarySettings(context).apply { update(state.value.copy(originalBudget=0,faceIndexing=false,objectIndexing=false)) }
         val files=mutableListOf<File>()
         try {
             for(id in listOf("import","draft","pin","reader","evict")) {
-                val file=File.createTempFile("cache-$id",".jpg",context.filesDir);files.add(file);file.writeText("original")
-                val photo=Photo(id,"$id.jpg",file.absolutePath,"${file.absolutePath}.thumb","image/jpeg",8,1,"hash",
+                val file=original(context,"cache-$id");files.add(file)
+                val photo=Photo(id,"$id.jpg",file.absolutePath,preview(file),"image/png",file.length(),1,DriveBackupWorker.digest(file,"SHA-256"),
                     sourceBindingKey=if(id=="import") null else "binding",sourceRemoteId=if(id=="import") null else id,
                     cachedVersion="1",pinned=id=="pin")
                 db.photos().insert(photo)
-                if(id!="import") db.cloud().savePhoto(CloudPhoto("binding:$id","binding",id,"folder","$id.jpg","image/jpeg",8,
-                    "md5","1",null,null,null,null,photoId=id))
+                if(id!="import") remote(db,photo)
             }
             db.library().saveDraft(EditDraft("draft","recipe",1))
             val cache=MediaCache(context,db,settings) { _,_ -> true }
@@ -49,14 +70,12 @@ class MediaCacheTest {
     @Test fun validatedReadsProtectTheCurrentFileAndDoubleCloseCannotReleaseAnotherView() = runBlocking<Unit> {
         val context=RuntimeEnvironment.getApplication()
         val db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).build()
-        val file=File.createTempFile("validated-cache",".jpg",context.filesDir)
+        val file=original(context,"validated-cache")
         try {
-            file.writeText("original")
-            val photo=Photo("validated","photo.jpg",file.absolutePath,"","image/jpeg",8,1,"hash",
+            val photo=Photo("validated","photo.jpg",file.absolutePath,preview(file),"image/png",file.length(),1,DriveBackupWorker.digest(file,"SHA-256"),
                 sourceBindingKey="binding",sourceRemoteId="remote",cachedVersion="1")
             db.photos().insert(photo)
-            db.cloud().savePhoto(CloudPhoto("binding:remote","binding","remote","folder","photo.jpg","image/jpeg",8,
-                "md5","1",null,null,null,null,photoId=photo.id))
+            remote(db,photo)
             val settings=LibrarySettings(context).apply { update(state.value.copy(originalBudget=0,faceIndexing=false,objectIndexing=false)) }
             val cache=MediaCache(context,db,settings) { _,_ -> true }
             val first=requireNotNull(cache.openOriginal(photo.id));val second=requireNotNull(cache.openOriginal(photo.id))
@@ -71,15 +90,13 @@ class MediaCacheTest {
     @Test fun failedRemoteVerificationKeepsAnUnpinnedDownloadAndItsPath() = runBlocking {
         val context=RuntimeEnvironment.getApplication()
         val db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).allowMainThreadQueries().build()
-        val file=File.createTempFile("offline-cache",".jpg",context.filesDir)
+        val file=original(context,"offline-cache")
         try {
-            file.writeText("original")
-            val photo=Photo("id","photo.jpg",file.absolutePath,"${file.absolutePath}.thumb","image/jpeg",8,1,"hash",
+            val photo=Photo("id","photo.jpg",file.absolutePath,preview(file),"image/png",file.length(),1,DriveBackupWorker.digest(file,"SHA-256"),
                 sourceBindingKey="binding",sourceRemoteId="remote",cachedVersion="1")
             db.photos().insert(photo)
-            db.cloud().savePhoto(CloudPhoto("binding:remote","binding","remote","folder","photo.jpg","image/jpeg",8,
-                "md5","1",null,null,null,null,photoId="id"))
-            val settings=LibrarySettings(context).apply { update(state.value.copy(originalBudget=0)) }
+            remote(db,photo)
+            val settings=LibrarySettings(context).apply { update(state.value.copy(originalBudget=0,faceIndexing=false,objectIndexing=false)) }
             MediaCache(context,db,settings) { _,_ -> false }.enforce()
             assertEquals(file.absolutePath,db.photos().find("id")?.originalPath);assertTrue(file.exists())
         } finally { db.close();file.delete() }
@@ -87,14 +104,13 @@ class MediaCacheTest {
     @Test fun originalsAwaitingAnEnabledScanAreProtectedUntilTheModelCheckpointExists() = runBlocking {
         val context=RuntimeEnvironment.getApplication()
         val db=Room.inMemoryDatabaseBuilder(context,PhotoDatabase::class.java).build()
-        val file=File.createTempFile("scan-cache",".jpg",context.filesDir)
+        val file=original(context,"scan-cache")
         try {
-            file.writeText("original")
-            val photo=Photo("pending","photo.jpg",file.absolutePath,"","image/jpeg",8,1,"hash",
+            val photo=Photo("pending","photo.jpg",file.absolutePath,preview(file),"image/png",file.length(),1,DriveBackupWorker.digest(file,"SHA-256"),
                 sourceBindingKey="source",sourceRemoteId="remote",cachedVersion="1")
             db.photos().insert(photo)
-            db.cloud().savePhoto(CloudPhoto("source:remote","source","remote","folder","photo.jpg","image/jpeg",8,"md5","1",null,null,null,null,photoId=photo.id))
-            val settings=LibrarySettings(context).apply { update(state.value.copy(originalBudget=0,faceIndexing=true)) }
+            remote(db,photo)
+            val settings=LibrarySettings(context).apply { update(state.value.copy(originalBudget=0,faceIndexing=true,objectIndexing=false)) }
             val cache=MediaCache(context,db,settings) { _,_ -> true }
             cache.enforce(); assertTrue(file.isFile)
             db.library().saveScan(FaceScan(photo.id,photo.sha256,modelVersion=com.myphotosanywhere.mpa.people.PeopleRepository.SCAN_VERSION))

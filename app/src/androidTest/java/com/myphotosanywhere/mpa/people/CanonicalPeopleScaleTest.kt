@@ -59,7 +59,7 @@ class CanonicalPeopleScaleTest {
                 assertEquals(minOf(60,size/2000),matches.size)
                 start=System.nanoTime();val session=ViewerSessionStore(directory,timeline).prepare(TimelineQuery(),first[30]);val snapshotMs=(System.nanoTime()-start)/1e6
                 session.use { assertEquals(size,it.count);assertEquals(first[30].key,it.entry(it.initialPage).key) }
-                assertEquals(300,TimelinePagingSource.CONFIG.maxSize);assertEquals(11,db.openHelper.readableDatabase.version)
+                assertEquals(300,TimelinePagingSource.CONFIG.maxSize);assertEquals(12,db.openHelper.readableDatabase.version)
                 results.put(JSONObject().put("items",size).put("labelIndexMs",indexMs).put("peopleOverviewMs",groupsMs)
                     .put("firstPageMs",firstMs).put("personPageMs",personMs).put("snapshotMs",snapshotMs)
                     .put("pssBeforeKb",pssBefore).put("pssAfterKb",Debug.getPss()).put("retainedPageBudget",300)

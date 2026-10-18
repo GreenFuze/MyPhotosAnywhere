@@ -33,6 +33,7 @@ class DeviceLibraryDeviceTest {
     private val instrumentation get()=InstrumentationRegistry.getInstrumentation()
     private val app get()=instrumentation.targetContext.applicationContext as MpaApplication
     private val uris=mutableListOf<Uri>()
+    private val foreignUris=mutableListOf<Uri>()
     private val ids=mutableSetOf<String>()
     private fun grant() {
         app.deviceMedia.permissions.request().filterNot { it==android.Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED }.forEach {
@@ -76,6 +77,7 @@ class DeviceLibraryDeviceTest {
         assertEquals(photo.id,compose.runOnUiThread { requireNotNull(timeline.viewer.value).selected.photoId })
     }
     private fun cleanup()=runBlocking {
+        for(uri in foreignUris) shell("content delete --uri $uri")
         for(uri in uris) app.contentResolver.delete(uri,null,null)
         app.deviceMedia.reconcile()
         for(id in ids) {
@@ -85,6 +87,54 @@ class DeviceLibraryDeviceTest {
             app.database.openHelper.writableDatabase.execSQL("DELETE FROM photos WHERE id=?",arrayOf(id))
             photo?.originalPath?.takeIf { it.isNotBlank() }?.let { File(it).delete() }
         }
+    }
+    private fun shell(command: String)=android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes().toString(Charsets.UTF_8) }
+    private fun foreign(folder: String): Uri {
+        check(folder in listOf("DCIM/Camera/","Pictures/Screenshots/"))
+        val name="foreign-${java.util.UUID.randomUUID()}.png"
+        val stage=File(app.filesDir,name)
+        val image=Bitmap.createBitmap(720,1080,Bitmap.Config.ARGB_8888).apply { eraseColor(Color.CYAN) }
+        try { stage.outputStream().use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) } } finally { image.recycle() }
+        try {
+            val output=shell("content insert --uri content://media/external/images/media --bind _display_name:s:$name --bind mime_type:s:image/png --bind relative_path:s:$folder --bind is_pending:i:1 --bind datetaken:l:13000000002000")
+            val uri=Uri.parse(Regex("content://media/[^\\s]+").find(output)?.value ?: error("Shell camera fixture was not inserted: $output"))
+            foreignUris+=uri
+            shell("run-as ${app.packageName} cat files/$name | content write --uri $uri")
+            shell("content update --uri $uri --bind is_pending:i:0")
+            app.contentResolver.query(uri,arrayOf(MediaStore.MediaColumns.OWNER_PACKAGE_NAME),null,null,null)?.use {
+                check(it.moveToFirst());assertEquals("com.android.shell",it.getString(0))
+            } ?: error("Cannot inspect foreign camera fixture")
+            val bytes=requireNotNull(app.contentResolver.openInputStream(uri)).use { it.readBytes() }
+            assertArrayEquals(stage.readBytes(),bytes)
+            return uri
+        } finally { check(!stage.exists() || stage.delete()) }
+    }
+    @Test fun otherAppCameraAndScreenshotsAppearInTheirOwnFoldersWithoutDriveBadges()=runBlocking<Unit> {
+        grant()
+        try {
+            val camera=indexed(foreign("DCIM/Camera/"));val screenPhoto=indexed(foreign("Pictures/Screenshots/"))
+            assertFalse(app.database.presence().inDrive(camera.id).first());assertFalse(app.database.presence().inDrive(screenPhoto.id).first())
+            for(photo in listOf(camera,screenPhoto)) { assertEquals("",photo.originalPath);assertTrue(app.deviceMedia.readable(photo.id)) }
+            val folder=requireNotNull(app.database.deviceMedia().find(screenPhoto.id))
+            assertEquals("Pictures/Screenshots/",folder.folderPath)
+            val query=TimelineQuery(deviceFolder=DeviceFolderKey(folder.volume,folder.folderPath))
+            assertTrue(app.timeline.page(query,null,TimelineDirection.AFTER,60).any { it.photoId==screenPhoto.id })
+            assertFalse(app.timeline.page(query,null,TimelineDirection.AFTER,60).any { it.photoId==camera.id })
+            compose.onNodeWithTag("nav:Collections").performClick()
+            compose.onNodeWithTag("collections:On this device").performScrollTo().performClick()
+            compose.waitUntil(20000) { compose.onAllNodesWithTag("device:folders").fetchSemanticsNodes().isNotEmpty() }
+            val tag="device:folder:${DeviceFolderKey(folder.volume,folder.folderPath).key}"
+            compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
+            screenshot("device-folders-foreign")
+            compose.onNodeWithTag(tag).performClick()
+            compose.waitUntil(20000) { compose.onAllNodesWithTag("photo:${screenPhoto.id}").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("photo:${screenPhoto.id}").assertIsDisplayed()
+            compose.onNodeWithTag("photo:${camera.id}").assertDoesNotExist()
+            screenshot("device-folder-gallery")
+            compose.onNodeWithTag("photo:${screenPhoto.id}").performClick()
+            compose.waitUntil(10000) { compose.onAllNodesWithTag("viewer-backup").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("viewer-backup").assertIsDisplayed()
+        } finally { cleanup() }
     }
     @Test fun cameraPhotosAppearWithoutCopyingAndOpenRealOriginalsWithDetailsAndBackup()=runBlocking<Unit> {
         grant()

@@ -228,6 +228,7 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
                 return descriptor
             } catch(failure: Throwable) { descriptor.close();throw failure }
         } catch(error: SecurityException) { throw IOException("Android photo access changed. Manage device photo access and retry.",error) }
+        catch(error: UnsupportedOperationException) { throw IOException("Android could not provide this original. Review device photo and location access, then retry; the camera file is unchanged.",error) }
     }
     suspend fun readable(id: String): Boolean=withContext(Dispatchers.IO) {
         val record=database.deviceMedia().find(id) ?: return@withContext false

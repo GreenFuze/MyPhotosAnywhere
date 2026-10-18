@@ -59,7 +59,7 @@ import com.myphotosanywhere.mpa.ui.MotionVisibility
 import com.myphotosanywhere.mpa.ui.MotionEdge
 
 @Composable
-fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->Unit,onSettings: ()->Unit,model: DriveViewModel = viewModel()) {
+fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->Unit,onSettings: ()->Unit,model: DriveViewModel = viewModel(),onFreeSpace: (()->Unit)?=null) {
     val active by model.connection.collectAsStateWithLifecycle()
     val sources by model.sources.collectAsStateWithLifecycle()
     val backups by model.backups.collectAsStateWithLifecycle()
@@ -105,7 +105,8 @@ fun DriveStorageScreen(photos: List<Photo>,onActivity: ()->Unit,onImports: ()->U
         GroupedMenu(listOf(
             MenuEntry("Activity","Transfers, progress and recovery",R.drawable.ic_shell_activity,"management:Activity",open=onActivity),
             MenuEntry("Import photos","Google Photos and Takeout",R.drawable.ic_shell_add,"management:Import photos",open=onImports),
-            MenuEntry("Settings","Preferences, storage and privacy",R.drawable.ic_action_settings,"management:Settings",open=onSettings)))
+            MenuEntry("Settings","Preferences, storage and privacy",R.drawable.ic_action_settings,"management:Settings",open=onSettings))+
+            listOfNotNull(onFreeSpace?.let { MenuEntry("Free up space","Clear verified downloaded originals",R.drawable.ic_shell_offline,"management:Free up space",open=it) }))
         com.myphotosanywhere.mpa.device.DevicePhotoAccessMenu()
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let {

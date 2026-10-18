@@ -52,7 +52,7 @@ class SearchScaleTest {
                         .put("snapshotMs",snapshotMs).put("duringImportMs",importMs).put("pssBeforeKb",before).put("pssAfterKb",Debug.getPss())
                         .put("pageBudget",TimelinePagingSource.CONFIG.maxSize).put("retainedMetadataDocuments",0).put("snapshotItems",session.count))
                 } finally { session.close() }
-                assertEquals(11,db.openHelper.readableDatabase.version)
+                assertEquals(12,db.openHelper.readableDatabase.version)
             } finally { db.close();context.deleteDatabase(name);directory.deleteRecursively() }
         }
         val values=android.content.ContentValues().apply {

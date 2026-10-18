@@ -36,6 +36,41 @@ class ManagementDeviceTest {
     private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MpaApplication
     private fun back()=compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
     private fun waitTag(tag: String) { compose.waitUntil(20000) { compose.onAllNodes(if(tag.startsWith("photo:") || tag.startsWith("cloud:")) hasTestTag(tag) and isEnabled() else hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() } }
+    @Test fun freeSpacePreviewAndConfirmationSurviveRotationAndCancelKeepsEveryByte()=runBlocking<Unit> {
+        val options=app.settings.state.value
+        val id="cleanup-menu-"+java.util.UUID.randomUUID()
+        val file=File(app.filesDir,"originals/$id.png");val preview=File(app.filesDir,"thumbnails/$id.png")
+        val source=DriveSource("$id-source","$id-account","cleanup@example.test","APP_FILES","$id-folder","Cleanup fixture")
+        try {
+            app.settings.update(options.copy(faceIndexing=false,objectIndexing=false))
+            check(requireNotNull(file.parentFile).isDirectory || requireNotNull(file.parentFile).mkdirs())
+            check(requireNotNull(preview.parentFile).isDirectory || requireNotNull(preview.parentFile).mkdirs())
+            val image=Bitmap.createBitmap(96,128,Bitmap.Config.ARGB_8888)
+            try { image.eraseColor(Color.BLUE);file.outputStream().use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) } } finally { image.recycle() }
+            file.copyTo(preview)
+            val hash=DriveBackupWorker.digest(file,"SHA-256")
+            val photo=Photo(id,"Camera.png",file.path,preview.path,"image/png",file.length(),1,hash,
+                sourceBindingKey=source.key,sourceRemoteId=id,cachedVersion="1",favorite=true,labels="preserved")
+            app.database.drive().saveSource(source);app.database.photos().insert(photo)
+            app.database.cloud().savePhoto(CloudPhoto("${source.key}:$id",source.key,id,source.folderId,photo.displayName,photo.mimeType,photo.bytes,
+                DriveBackupWorker.digest(file,"MD5"),"1",null,null,null,null,photoId=id,sha256=hash))
+            compose.onNodeWithTag("shell:storage").performClick();waitTag("management:Free up space")
+            compose.onNodeWithTag("management:Free up space").performScrollTo().performClick();waitTag("offline:estimate")
+            compose.onNodeWithTag("offline:clear").performScrollTo().assertIsEnabled()
+            screenshotManagement("offline-cleanup-preview")
+            compose.onNodeWithTag("offline:clear").performClick();waitTag("offline:confirm")
+            compose.onNodeWithTag("offline:confirm").assertIsDisplayed();screenshotManagement("offline-cleanup-confirm")
+            compose.activityRule.scenario.recreate();waitTag("offline:confirm")
+            compose.onNodeWithTag("offline:cancel").performClick()
+            assertEquals(photo,app.database.photos().find(id));assertEquals(hash,DriveBackupWorker.digest(file,"SHA-256"));assertTrue(preview.isFile)
+            compose.onNodeWithTag("offline:confirm").assertDoesNotExist()
+        } finally {
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM cloud_photos WHERE bindingKey=?",arrayOf(source.key))
+            app.database.openHelper.writableDatabase.execSQL("DELETE FROM photos WHERE id=?",arrayOf(id))
+            app.database.drive().disconnectSource(source.key);app.settings.update(options)
+            check(!file.exists() || file.delete());check(!preview.exists() || preview.delete())
+        }
+    }
     @Test fun sourcesSettingsAndFocusedPagesRestoreTheirOriginAcrossRotation() {
         compose.onNodeWithTag("nav:Collections").performClick();compose.onNodeWithTag("shell:storage").performClick()
         compose.onNodeWithText("MyPhotosAnywhere").assertIsDisplayed();compose.onNodeWithTag("shell:navigation").assertDoesNotExist();screenshotManagement("management-sources")
@@ -45,8 +80,8 @@ class ManagementDeviceTest {
         compose.onNodeWithTag("management:Preferences").performClick();compose.onNodeWithTag("management:Recognition").performClick();compose.onNodeWithTag("scan-now").assertIsDisplayed();back();back()
         compose.onNodeWithTag("management:Backup and metadata").performClick();compose.onNodeWithText("Portable annotations").assertIsDisplayed();back()
         compose.onNodeWithTag("management:Privacy and permissions").performClick();compose.onNodeWithText("Allow online maps").assertIsDisplayed();back()
-        compose.onNodeWithTag("management:About MPA").performClick();compose.onNodeWithText("MPA 0.5.32 (43)",substring=true).assertExists()
-        compose.activityRule.scenario.recreate();compose.onNodeWithText("MPA 0.5.32 (43)",substring=true).assertExists();back();back();back()
+        compose.onNodeWithTag("management:About MPA").performClick();compose.onNodeWithText("MPA 0.5.33 (44)",substring=true).assertExists()
+        compose.activityRule.scenario.recreate();compose.onNodeWithText("MPA 0.5.33 (44)",substring=true).assertExists();back();back();back()
         compose.onNodeWithTag("nav:Collections").assertIsSelected()
     }
     @Test fun photoViewPreferencesRestoreTheGalleryIdentityWithoutChangingSourcesOrRecognition()=runBlocking<Unit> {
