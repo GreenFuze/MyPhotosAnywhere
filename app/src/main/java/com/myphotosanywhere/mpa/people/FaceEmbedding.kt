@@ -19,10 +19,16 @@ class FaceEmbedding(context: Context): AutoCloseable {
         val hash=java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(""){"%02x".format(it)}
         check(hash=="2046ab776fba2ec7e420767ffe7eb74a7402a8412d3d7ea8b9f4ca8420e5f3d7") { "Face model checksum mismatch." }
         modelBuffer=ByteBuffer.allocateDirect(bytes.size).order(ByteOrder.nativeOrder()).apply { put(bytes); rewind() }
-        interpreter=Interpreter(modelBuffer,Interpreter.Options().setNumThreads(2))
-        for(i in 0..1) check(interpreter.getInputTensor(i).shape().contentEquals(intArrayOf(1,3,112,112)) &&
-            interpreter.getInputTensor(i).dataType()==DataType.FLOAT32) { "Face model input contract mismatch." }
-        check(interpreter.getOutputTensor(0).shape().contentEquals(intArrayOf(2,128)))
+        val created=Interpreter(modelBuffer,Interpreter.Options().setNumThreads(2))
+        try {
+            for(i in 0..1) check(created.getInputTensor(i).shape().contentEquals(intArrayOf(1,3,112,112)) &&
+                created.getInputTensor(i).dataType()==DataType.FLOAT32) { "Face model input contract mismatch." }
+            check(created.getOutputTensor(0).shape().contentEquals(intArrayOf(2,128)))
+        } catch(failure: Throwable) {
+            try { created.close() } catch(cleanup: Throwable) { if(cleanup!==failure) failure.addSuppressed(cleanup) }
+            throw failure
+        }
+        interpreter=created
     }
     fun aligned(source: Bitmap,face: Face): Bitmap? {
         if(kotlin.math.abs(face.headEulerAngleY)>25 || kotlin.math.abs(face.headEulerAngleX)>25) return null
@@ -43,7 +49,8 @@ class FaceEmbedding(context: Context): AutoCloseable {
         if(kotlin.math.hypot(mouth[0]-target[3].x,mouth[1]-target[3].y)>14 ||
             kotlin.math.hypot(mouth[2]-target[4].x,mouth[3]-target[4].y)>14) return null
         val bitmap=createBitmap(112,112,Bitmap.Config.ARGB_8888)
-        Canvas(bitmap).drawBitmap(source,matrix,Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        try { Canvas(bitmap).drawBitmap(source,matrix,Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)) }
+        catch(failure: Throwable) { bitmap.recycle();throw failure }
         return bitmap
     }
     fun embed(face: Bitmap): ByteArray {

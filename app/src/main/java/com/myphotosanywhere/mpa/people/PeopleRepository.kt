@@ -17,7 +17,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.util.UUID
 
@@ -145,15 +144,14 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
     /** A per-photo checksum/model checkpoint survives process death; batches cap runtime and heat. */
     suspend fun index(manual: Boolean=false): Boolean = indexLock.withLock { withContext(Dispatchers.IO) {
         if(!allowed(manual)) { report("Waiting for schedule, charging or phone to cool",0,0,0); return@withContext !settings.state.value.indexingPaused && (settings.state.value.faceIndexing || settings.state.value.objectIndexing) }
-        val detector=FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
-            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setMinFaceSize(.03f).build())
-        val labeler=ImageLabeling.getClient(ImageLabelerOptions.Builder().setConfidenceThreshold(.7f).build())
-        var model: FaceEmbedding?=null
         var done=0; var errors=0; var changed=false
         val available=availableBatch(25)
         val started=android.os.SystemClock.elapsedRealtime()
-        try {
-            if(settings.state.value.faceIndexing) model=FaceEmbedding(context)
+        RecognitionResources().use { resources ->
+            val detector=resources.acquire { FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setMinFaceSize(.03f).build()) }
+            val labeler=resources.acquire { ImageLabeling.getClient(ImageLabelerOptions.Builder().setConfidenceThreshold(.7f).build()) }
+            val model=if(settings.state.value.faceIndexing) resources.acquire { FaceEmbedding(context) } else null
             for(photo in available.take(24)) {
                 currentCoroutineContext().ensureActive()
                 if(!allowed(manual) || android.os.SystemClock.elapsedRealtime()-started>3*60*1000) break
@@ -166,11 +164,11 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
                     withRecognitionPreview(photo) { current,image ->
                             val input=InputImage.fromBitmap(image,0)
                             if(objectsNeeded) {
-                                val labels=labeler.process(input).await().map { it.text }.distinct().joinToString(", ")
+                                val labels=labeler.process(input).awaitOwnedInput().map { it.text }.distinct().joinToString(", ")
                                 if(settings.state.value.objectIndexing) db.photos().find(photo.id)?.let { db.photos().update(it.copy(labels=labels.ifBlank { "Unclassified" })) }
                             }
                             if(facesNeeded && settings.state.value.faceIndexing) {
-                                val found=detector.process(input).await()
+                                val found=detector.process(input).awaitOwnedInput()
                                 val bounds=found.map { face ->
                                     val rect=face.boundingBox
                                     val x=rect.left.coerceIn(0,image.width-1); val y=rect.top.coerceIn(0,image.height-1)
@@ -188,11 +186,16 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
                                         val x=(region.left*image.width).toInt().coerceIn(0,image.width-1); val y=(region.top*image.height).toInt().coerceIn(0,image.height-1)
                                         val w=((region.right-region.left)*image.width).toInt().coerceIn(1,image.width-x)
                                         val h=((region.bottom-region.top)*image.height).toInt().coerceIn(1,image.height-y)
-                                        val crop=Bitmap.createBitmap(image,x,y,w,h); val small=crop.scale(160,160,true)
-                                        // A new filename avoids destroying a previous crop if this batch is cancelled.
-                                        val path=File(context.filesDir,"faces/${UUID.randomUUID()}.jpg"); path.parentFile?.mkdirs(); generated.add(path)
-                                        try { path.outputStream().use { check(small.compress(Bitmap.CompressFormat.JPEG,85,it)) } }
-                                        finally { if(small!==crop) small.recycle(); if(crop!==image) crop.recycle() }
+                                        val crop=Bitmap.createBitmap(image,x,y,w,h)
+                                        var small: Bitmap?=null
+                                        val path=try {
+                                            val resized=crop.scale(160,160,true);small=resized
+                                            // A new filename avoids destroying a previous crop if this batch is cancelled.
+                                            File(context.filesDir,"faces/${UUID.randomUUID()}.jpg").also { output ->
+                                                output.parentFile?.mkdirs();generated.add(output)
+                                                output.outputStream().use { check(resized.compress(Bitmap.CompressFormat.JPEG,85,it)) }
+                                            }
+                                        } finally { small?.let { if(it!==crop) it.recycle() };if(crop!==image) crop.recycle() }
                                         val aligned=model?.aligned(image,face)
                                         val embedding=if(aligned==null) null else try { model.embed(aligned) } finally { aligned.recycle() }
                                         val base=old ?: FaceRecord(id,photo.id,"",null)
@@ -229,7 +232,7 @@ class PeopleRepository(private val context: Context,private val db: PhotoDatabas
             if(!more) prefs.edit { putString("photoCursor","") }
             report(if(more) "More photos queued" else if(queued>0) "Waiting for $queued verified downloads" else "Available photos indexed",done,available.size,errors)
             more && !settings.state.value.indexingPaused
-        } finally { detector.close(); labeler.close(); model?.close() }
+        }
     } }
     suspend fun refreshSuggestions() {
         val faces=db.library().allFaces()
