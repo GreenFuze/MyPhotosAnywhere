@@ -1,6 +1,8 @@
 package com.myphotosanywhere.mpa.library
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -40,10 +42,7 @@ internal fun StorageControls(model: LibraryFeaturesModel = viewModel(),storage: 
         message?.let { Text(it,modifier=Modifier.testTag("offline:result").semantics { liveRegion=LiveRegionMode.Polite }) }
         Text("Thumbnails and photo information stay available. MPA rechecks Drive before removing each download; an internet connection is required.",style=MaterialTheme.typography.bodySmall)
     } }
-    confirm?.let { cutoff -> AlertDialog(onDismissRequest={ confirm=null },title={ Text("Clear downloaded originals?") },
-        text={ Text("Remove only MPA downloads that still have a verified Drive original. Keep camera files, local-only originals, offline pins, drafts and active transfers. Thumbnails and metadata stay on this device. Downloads used after this estimate are kept.") },
-        confirmButton={ TextButton(onClick={ confirm=null;storage.clear(cutoff) },modifier=Modifier.heightIn(min=48.dp).testTag("offline:confirm")) { Text("Free up space") } },
-        dismissButton={ TextButton(onClick={ confirm=null },modifier=Modifier.heightIn(min=48.dp).testTag("offline:cancel")) { Text("Cancel") } }) }
+    confirm?.let { cutoff -> OfflineCleanupConfirmation(cutoff,onConfirm={ confirm=null;storage.clear(it) },onDismiss={ confirm=null }) }
     Text("Disposable original budget",style=MaterialTheme.typography.titleMedium)
     FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         listOf(512L,2048L,5120L).forEach { mib -> FilterChip(selected=settings.originalBudget==mib*1024*1024,
@@ -58,4 +57,13 @@ internal fun StorageControls(model: LibraryFeaturesModel = viewModel(),storage: 
         OutlinedButton(enabled=!busy,onClick={ model.trimCache() }) { Text("Apply budget") }
     }
     Text("Imports, edited copies, pinned albums, open photos, and pending AI work are protected. MPA rechecks the remote revision and checksum before removing a disposable download. Offline or changed files are kept.",style=MaterialTheme.typography.bodySmall)
+}
+
+@Composable
+internal fun OfflineCleanupConfirmation(cutoff: Long,onConfirm: (Long)->Unit,onDismiss: ()->Unit) {
+    AlertDialog(onDismissRequest=onDismiss,title={ Text("Clear downloaded originals?") },
+        text={ Text("Remove only MPA downloads that still have a verified Drive original. Keep camera files, local-only originals, offline pins, drafts and active transfers. Thumbnails and metadata stay on this device. Downloads used after this estimate are kept.",
+            modifier=Modifier.verticalScroll(rememberScrollState()).testTag("offline:protection")) },
+        confirmButton={ TextButton(onClick={ onConfirm(cutoff) },modifier=Modifier.heightIn(min=48.dp).testTag("offline:confirm")) { Text("Free up space") } },
+        dismissButton={ TextButton(onClick=onDismiss,modifier=Modifier.heightIn(min=48.dp).testTag("offline:cancel")) { Text("Cancel") } })
 }

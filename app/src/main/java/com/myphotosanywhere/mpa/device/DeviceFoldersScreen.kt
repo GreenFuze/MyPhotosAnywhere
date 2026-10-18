@@ -24,6 +24,7 @@ internal fun DeviceFoldersScreen(model: LibraryFeaturesModel,state: LazyGridStat
         catch(cancelled: CancellationException) { throw cancelled }
         catch(error: android.database.sqlite.SQLiteException) { problem=error.message ?: "Cannot read device folders. Retry." }
     }
+    val duplicateNames=remember(folders) { folders.orEmpty().groupingBy { it.title }.eachCount().filterValues { it>1 }.keys }
     LazyVerticalGrid(GridCells.Adaptive(148.dp),state=state,modifier=Modifier.fillMaxSize().testTag("device:folders"),
         contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(16.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
         item(span={ GridItemSpan(maxLineSpan) }) { DevicePhotoAccessMenu() }
@@ -42,8 +43,11 @@ internal fun DeviceFoldersScreen(model: LibraryFeaturesModel,state: LazyGridStat
             Column {
                 CollectionCard(folder.title,R.drawable.ic_device_folder,repository,TimelineQuery(deviceFolder=folder.identity),
                     { onFolder(folder.identity) },"device:folder:${folder.identity.key}",countLabel="${folder.count} items")
-                Text(if(folder.folderPath.startsWith("bucket:")) folder.volume else "${folder.folderPath} · ${folder.volume}",
-                    style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(horizontal=8.dp))
+                if(folder.title in duplicateNames) {
+                    val storage=if(folder.volume in setOf("external","external_primary")) "Phone storage" else "Storage card"
+                    Text(if(folder.folderPath.startsWith("bucket:")) storage else "${folder.folderPath.trimEnd('/')} · $storage",
+                        style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(horizontal=8.dp))
+                }
             }
         }
     }

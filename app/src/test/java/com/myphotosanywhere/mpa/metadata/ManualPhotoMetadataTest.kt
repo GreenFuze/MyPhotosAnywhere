@@ -97,4 +97,14 @@ class ManualPhotoMetadataTest {
             assertEquals("old-tag",f.db.deviceMedia().authorization(f.task.id)?.metadataEtag)
         }
     }
+    @Test fun malformedProviderMetadataIsAnActionableFailureAndKeepsTheVerifiedOriginalCheckpoint()=runBlocking<Unit> {
+        Fixture().use { f ->
+            f.create();val original=checkNotNull(f.db.photos().find(f.task.photoId)).copy(importedMetadata="{\"googleTakeout\":[]}")
+            f.db.photos().update(original)
+            try { f.metadata.backup(f.api,f.task);fail("Unsupported provider data must require repair") } catch(error: DriveBackupBlocked) {
+                assertTrue(error.message.orEmpty().contains("verified in Drive"))
+            }
+            assertEquals(f.task,f.db.drive().backup(f.task.id));assertEquals(original,f.db.photos().find(original.id));assertEquals(0,f.server.requestCount)
+        }
+    }
 }

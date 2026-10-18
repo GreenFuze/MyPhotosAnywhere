@@ -134,6 +134,12 @@ class DeviceLibraryDeviceTest {
             compose.onNodeWithTag("photo:${screenPhoto.id}").performClick()
             compose.waitUntil(10000) { compose.onAllNodesWithTag("viewer-backup").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("viewer-backup").assertIsDisplayed()
+            compose.onNodeWithTag("viewer-backup").performClick()
+            compose.waitUntil(10000) { compose.onAllNodesWithTag("device:backup-dialog").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Includes the original and available photo information:",substring=true).performScrollTo().assertIsDisplayed()
+            screenshot("device-backup-metadata")
+            compose.onNodeWithText("Cancel").performClick()
+            assertTrue(app.database.drive().backupsForPhoto(screenPhoto.id).isEmpty())
         } finally { cleanup() }
     }
     @Test fun cameraPhotosAppearWithoutCopyingAndOpenRealOriginalsWithDetailsAndBackup()=runBlocking<Unit> {

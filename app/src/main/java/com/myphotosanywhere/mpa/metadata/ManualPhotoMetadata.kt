@@ -18,6 +18,7 @@ internal class ManualPhotoMetadata(private val db: PhotoDatabase) {
         val retainedNames=try { com.myphotosanywhere.mpa.people.ImportedPeopleCodec().names(photo.importedMetadata) }
         catch(error: com.google.gson.JsonParseException) { throw DriveBackupBlocked("The original is verified in Drive, but its retained people metadata needs repair: ${error.message}") }
         catch(error: IllegalArgumentException) { throw DriveBackupBlocked("The original is verified in Drive, but its retained people metadata is unsupported: ${error.message}") }
+        catch(error: IllegalStateException) { throw DriveBackupBlocked("The original is verified in Drive, but its retained people metadata has an unsupported structure: ${error.message}") }
         val ignored=retainedNames.mapNotNull { name ->
             db.personLabels().alias(com.myphotosanywhere.mpa.people.ImportedPersonLabel(name,if(origin!=null) origin.binding else photo.sourceBindingKey).key)?.takeIf { it.ignored }
         }
@@ -38,7 +39,8 @@ internal class ManualPhotoMetadata(private val db: PhotoDatabase) {
     suspend fun backup(api: DriveGateway,task: DriveBackup) {
         var receipt=checkNotNull(db.deviceMedia().authorization(task.id))
         check(receipt.metadataRequested)
-        val xml=try { XmpCodec.encode(snapshot(task)) }
+        val catalog=snapshot(task)
+        val xml=try { XmpCodec.encode(catalog) }
         catch(error: IllegalArgumentException) { throw DriveBackupBlocked("The original is verified in Drive, but its annotations could not be encoded: ${error.message}") }
         val sha=hash(xml)
         val id=receipt.metadataId ?: api.generateId().also {

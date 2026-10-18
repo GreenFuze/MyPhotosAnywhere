@@ -71,7 +71,7 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
             for(mediaCollection in collections) {
             var after=-1L
             while(true) {
-                val rows=query(mediaCollection,after,access)
+                val rows=query(mediaCollection,after)
                 if(rows.isEmpty()) break
                 val prepared=rows.map { row -> prepare(collection,version,volume,row) }
                 database.withTransaction {
@@ -109,20 +109,10 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
         Build.VERSION.SDK_INT>=29 -> MediaStore.getVersion(context)
         else -> "legacy-media-provider"
     }
-    private suspend fun query(collection: Uri,after: Long,access: DevicePhotoAccess): List<Row> = coroutineScope {
-        val generation=Build.VERSION.SDK_INT>=30
-        val columns=mutableListOf("_id","_display_name","mime_type","_size","date_added","datetaken","date_modified","width","height","orientation")
-        if(generation) columns+="generation_modified"
-        columns+=if(Build.VERSION.SDK_INT>=29) "relative_path" else "bucket_id"
-        columns+="bucket_display_name"
-        val kinds=buildList { if(access.images || access.selected) add(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE);if(access.videos || access.selected) add(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO) }
-        val selection=buildString {
-            append("_id>? AND media_type IN (${kinds.joinToString(",")}) AND _size>0")
-            if(Build.VERSION.SDK_INT>=29) append(" AND is_pending=0")
-            if(Build.VERSION.SDK_INT>=30) append(" AND is_trashed=0")
-        }
+    private suspend fun query(collection: Uri,after: Long): List<Row> = coroutineScope {
+        val projection=DeviceMediaProjection(collection.pathSegments.contains("video"),Build.VERSION.SDK_INT)
         val args=Bundle().apply {
-            putString(ContentResolver.QUERY_ARG_SQL_SELECTION,selection)
+            putString(ContentResolver.QUERY_ARG_SQL_SELECTION,projection.selection)
             putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,arrayOf(after.toString()))
             putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER,"_id ASC")
             putInt(ContentResolver.QUERY_ARG_LIMIT,BATCH)
@@ -132,16 +122,11 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
             suspendCancellableCoroutine<Nothing> { continuation -> continuation.invokeOnCancellation { signal.cancel() } }
         }
         try {
-            resolver.query(collection,columns.toTypedArray(),args,signal)?.use { cursor ->
+            resolver.query(collection,projection.columns.toTypedArray(),args,signal)?.use { cursor ->
                 buildList {
                     while(cursor.moveToNext() && size<BATCH) {
                         currentCoroutineContext().ensureActive()
-                        val added=cursor.getLong(4).coerceIn(0,Long.MAX_VALUE/1000)*1000
-                        add(Row(cursor.getLong(0),cursor.getString(1) ?: "Photo",cursor.getString(2) ?: "application/octet-stream",
-                            cursor.getLong(3),added,cursor.getLong(5).takeIf { it>0 },cursor.getLong(6),if(generation) cursor.getLong(10) else 0,
-                            cursor.getInt(7).coerceAtLeast(0),cursor.getInt(8).coerceAtLeast(0),cursor.getInt(9),
-                            cursor.getString(if(generation) 11 else 10)?.let { if(Build.VERSION.SDK_INT>=29) it else "bucket:$it" }.orEmpty(),
-                            cursor.getString(if(generation) 12 else 11).orEmpty()))
+                        add(readRow(cursor,projection))
                     }
                 }
             } ?: throw IOException("Android did not return its device-photo library. Retry.")
@@ -150,6 +135,13 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
         } catch(error: SecurityException) { throw IOException("Photo access is no longer available. Manage Android photo access.",error) }
         finally { cancellation.cancel() }
     }
+    private fun readRow(cursor: android.database.Cursor,projection: DeviceMediaProjection): Row = Row(
+        cursor.getLong(0),cursor.getString(1) ?: "Photo",cursor.getString(2) ?: "application/octet-stream",
+        cursor.getLong(3),cursor.getLong(4).coerceIn(0,Long.MAX_VALUE/1000)*1000,cursor.getLong(5).takeIf { it>0 },cursor.getLong(6),
+        if(projection.generation) cursor.getLong(cursor.getColumnIndexOrThrow("generation_modified")) else 0,
+        cursor.getInt(7).coerceAtLeast(0),cursor.getInt(8).coerceAtLeast(0),cursor.getColumnIndex("orientation").let { if(it>=0) cursor.getInt(it) else 0 },
+        cursor.getString(cursor.getColumnIndexOrThrow(projection.directory))?.let { if(Build.VERSION.SDK_INT>=29) it else "bucket:$it" }.orEmpty(),
+        cursor.getString(cursor.getColumnIndexOrThrow("bucket_display_name")).orEmpty())
     fun observe(id: String)=database.deviceMedia().observe(id)
     suspend fun record(id: String)=withContext(Dispatchers.IO) { database.deviceMedia().find(id) }
     private class Prepared(val row: Row,val reference: DeviceMediaRecord,val previousReference: DeviceMediaRecord?,val previousSha: String?)
@@ -203,13 +195,11 @@ internal class DeviceMediaLibrary(private val context: Context,private val datab
     private fun current(record: DeviceMediaRecord): Row {
         if(!record.available || !permissions.current().granted) throw IOException("Manage Android photo access to open this device original.")
         if(version(record.volume)!=record.providerVersion) throw IOException("Android refreshed this media source. Refresh device photos before opening it.")
-        val generation=Build.VERSION.SDK_INT>=30
-        val columns=mutableListOf("_id","_display_name","mime_type","_size","date_added","datetaken","date_modified","width","height","orientation")
-        if(generation) columns+="generation_modified"
-        val row=resolver.query(record.uri.toUri(),columns.toTypedArray(),null,null,null)?.use { cursor ->
-            if(!cursor.moveToFirst()) null else Row(cursor.getLong(0),cursor.getString(1) ?: "Photo",cursor.getString(2) ?: "application/octet-stream",
-                cursor.getLong(3),cursor.getLong(4).coerceIn(0,Long.MAX_VALUE/1000)*1000,cursor.getLong(5).takeIf { it>0 },cursor.getLong(6),
-                if(generation) cursor.getLong(10) else 0,cursor.getInt(7).coerceAtLeast(0),cursor.getInt(8).coerceAtLeast(0),cursor.getInt(9))
+        val fields=com.google.gson.JsonParser.parseString(record.revision).asJsonArray
+        check(fields.size()==9) { "Invalid saved device-media revision." }
+        val projection=DeviceMediaProjection(fields[5].asString.startsWith("video/"),Build.VERSION.SDK_INT)
+        val row=resolver.query(record.uri.toUri(),projection.columns.toTypedArray(),null,null,null)?.use { cursor ->
+            if(!cursor.moveToFirst()) null else readRow(cursor,projection)
         } ?: throw IOException("This device original is no longer available. Refresh device photos.")
         if(revision(row)!=record.revision) throw IOException("This device photo changed. Refresh the gallery and open its current version.")
         return row

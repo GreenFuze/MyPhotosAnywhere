@@ -242,6 +242,27 @@ class ManagementDeviceTest {
 @RunWith(AndroidJUnit4::class)
 class ManagementChromeDeviceTest {
     @get:Rule val compose=createComposeRule()
+    @Test fun cleanupConfirmationRemainsReadableAndActionableInLightLargeText()=verifyCleanup(false,LayoutDirection.Ltr)
+    @Test fun cleanupConfirmationRemainsReadableAndActionableInDarkRtlLargeText()=verifyCleanup(true,LayoutDirection.Rtl)
+    private fun verifyCleanup(dark: Boolean,direction: LayoutDirection) {
+        var pixels=0f;var confirmed: Long?=null;var dismissed=false
+        compose.setContent {
+            pixels=LocalDensity.current.density
+            CompositionLocalProvider(LocalDensity provides Density(pixels,2f),LocalLayoutDirection provides direction) {
+                MaterialTheme(colorScheme=if(dark) darkColorScheme() else lightColorScheme()) {
+                    com.myphotosanywhere.mpa.library.OfflineCleanupConfirmation(123,onConfirm={ confirmed=it },onDismiss={ dismissed=true })
+                }
+            }
+        }
+        for(tag in listOf("offline:confirm","offline:cancel")) {
+            val bounds=compose.onNodeWithTag(tag).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertTrue(bounds.width>=48*pixels-1);assertTrue(bounds.height>=48*pixels-1)
+        }
+        compose.onNodeWithTag("offline:protection").performTouchInput { swipeUp() }
+        screenshotManagement(if(dark) "offline-cleanup-dark-rtl-large" else "offline-cleanup-light-large")
+        compose.onNodeWithTag("offline:cancel").performClick();assertTrue(dismissed);assertNull(confirmed)
+        compose.onNodeWithTag("offline:confirm").performClick();assertEquals(123L,confirmed)
+    }
     @Test fun managementTargetsRemainUsableInLightLargeText()=verify(false,LayoutDirection.Ltr)
     @Test fun managementTargetsRemainUsableInDarkRtlLargeText()=verify(true,LayoutDirection.Rtl)
     private fun verify(dark: Boolean,direction: LayoutDirection) {
