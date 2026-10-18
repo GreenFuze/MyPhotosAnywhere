@@ -350,9 +350,7 @@ class DeviceLibraryDeviceTest {
     private fun screenshot(name: String) {
         val image=requireNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
-            val values=ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME,"$name.png");put(MediaStore.MediaColumns.MIME_TYPE,"image/png");put(MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA") }
-            val uri=requireNotNull(app.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values))
-            requireNotNull(app.contentResolver.openOutputStream(uri)).use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) }
+            com.myphotosanywhere.mpa.NativeScreenshotEvidence(app).write(name,image)
         } finally { image.recycle() }
     }
 }

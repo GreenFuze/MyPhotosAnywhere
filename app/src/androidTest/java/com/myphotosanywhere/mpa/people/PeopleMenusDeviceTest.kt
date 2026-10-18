@@ -85,11 +85,7 @@ class PeopleMenusDeviceTest {
                 else { candidate.recycle();false }
             }
             val image=requireNotNull(accepted)
-            val values=android.content.ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME,"$name.png");put(MediaStore.MediaColumns.MIME_TYPE,"image/png");put(MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA")
-            }
-            val uri=requireNotNull(app.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values))
-            requireNotNull(app.contentResolver.openOutputStream(uri)).use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) }
+            com.myphotosanywhere.mpa.NativeScreenshotEvidence(app).write(name,image)
         } finally { accepted?.recycle() }
     }
     private class DialogFrame(private val bounds: Rect,private val color: Int) {

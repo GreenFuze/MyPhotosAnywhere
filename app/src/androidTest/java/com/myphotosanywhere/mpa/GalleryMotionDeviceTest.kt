@@ -161,11 +161,6 @@ private fun motionScreenshot(name: String) {
     val instrumentation=InstrumentationRegistry.getInstrumentation();val bitmap=requireNotNull(instrumentation.uiAutomation.takeScreenshot())
     try {
         val context=instrumentation.targetContext
-        val values=android.content.ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME,"$name.png");put(MediaStore.MediaColumns.MIME_TYPE,"image/png")
-            put(MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA")
-        }
-        val uri=requireNotNull(context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values))
-        requireNotNull(context.contentResolver.openOutputStream(uri)).use { check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it)) }
+        com.myphotosanywhere.mpa.NativeScreenshotEvidence(context).write(name,bitmap)
     } finally { bitmap.recycle() }
 }

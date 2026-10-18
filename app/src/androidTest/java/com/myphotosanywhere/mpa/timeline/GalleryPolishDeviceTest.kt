@@ -206,7 +206,6 @@ class FloatingDateChromeDeviceTest {
 private fun screenshotPolish(name: String) {
     val instrumentation=InstrumentationRegistry.getInstrumentation();val bitmap=requireNotNull(instrumentation.uiAutomation.takeScreenshot());val context=instrumentation.targetContext
     try {
-        val values=android.content.ContentValues().apply { put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"$name.png");put(android.provider.MediaStore.MediaColumns.MIME_TYPE,"image/png");put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA") }
-        val uri=requireNotNull(context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,values));requireNotNull(context.contentResolver.openOutputStream(uri)).use { check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it)) }
+        com.myphotosanywhere.mpa.NativeScreenshotEvidence(context).write(name,bitmap)
     } finally { bitmap.recycle() }
 }
