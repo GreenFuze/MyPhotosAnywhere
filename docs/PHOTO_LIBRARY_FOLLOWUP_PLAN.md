@@ -55,3 +55,13 @@ Acceptance: historical imported labels and named people share navigation/counts/
 Implement in the order above with focused commits and a reviewable PR. Add device and person tables together to the declared additive migration if both need persistence; never publish a partially implemented schema. Run appropriate focused tests at each step, then freeze one final application SHA for full unit/integration, lint, APK and API29/35/37 native suites. Preserve existing assertions; document intentional hierarchy/identity expectation changes explicitly. Validate complete real PNG captures, full raw logs, migration/data snapshots, benchmark and pixel-anchor evidence, package/version/checksum and established signer. Keep strict warning gates and only the already explicitly authorized narrowly documented upstream/emulator exceptions.
 
 After passing checks, fast-forward main to the tested source, prove publication-only documentation leaves application/build/workflow objects unchanged, publish the exact CI APK, and independently verify public download/assets/tag/latest/checksum/signing certificate. Report the install link and physical S23/live Google/human TalkBack/translated Hebrew/performance acceptance that cannot be established by emulators. Do not claim those passed.
+
+## Integrated delivery — 0.5.31 / 42
+
+All four implementation workstreams are delivered and validated at `0d9d21252e749cabd83147e9a51ad192dbbdcd9d`. [Release evidence](releases/v0.5.31.md) records the additive migration, full checks, source/artifact integrity and remaining physical/live-service/human acceptance.
+
+## Owner follow-up — queued for 0.5.32
+
+Remove the gallery scroll handle while retaining the floating date and accessible Jump to date. Keep settled empty Search results visible through same-query refresh, with query-bound loading and error presentation. Balance the mosaic using consistent column spans and deterministic varied portrait positions, preserving identities and pixel anchors through arrivals, rotation and viewer return. Deliver all three together with the existing full warning, regression and exact-APK publication gates; retain schema11.
+
+Object-search changes are deferred. The optional Windows/Linux/macOS MPA Processor is a discussion proposal only: phone and Processor communicate through Drive, with a usable phone-only mode. No Processor implementation is part of these releases.

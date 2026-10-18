@@ -1,3 +1,7 @@
+## MPA 0.5.31: device library, People, menus and continuity
+
+Application `0d9d21252e749cabd83147e9a51ad192dbbdcd9d` passed 475 unit/integration tests, 153 native tests on each API29/35/37, zero failures/errors/skips and zero lint findings. Additive schema11 preserves historical schemas and the established signer. [Evidence and explicit acceptance limits](releases/v0.5.31.md).
+
 ## MPA 0.5.30: independent image failure recovery
 
 Application `a9c567182679c07f229b7c8c1c92193da539c1a9` passed 428 unit/integration and 139 native tests per API29/35/37 (417 total), zero test failures/errors/skips and zero lint findings. Schema10 and upgrade signer unchanged. [Evidence and explicit limits](releases/v0.5.30.md).

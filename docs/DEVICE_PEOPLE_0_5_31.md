@@ -1,6 +1,6 @@
 # MPA 0.5.31 — Device photos, People and familiar menus
 
-Implementation candidate. Publication still requires the final immutable host/device checks, diagnostics, screenshots, migration proof and established upgrade signer.
+Delivered in 0.5.31 at tested application `0d9d21252e749cabd83147e9a51ad192dbbdcd9d`. [Release validation and remaining acceptance](releases/v0.5.31.md).
 
 ## Photos on this device
 
