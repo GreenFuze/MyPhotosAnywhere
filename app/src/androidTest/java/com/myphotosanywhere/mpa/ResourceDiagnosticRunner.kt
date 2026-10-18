@@ -46,7 +46,30 @@ class ResourceDiagnosticRunner : AndroidJUnitRunner() {
     }
     companion object {
         val violations=ConcurrentLinkedQueue<Throwable>()
+        private var allocationTracker: Any?=null
+        @Synchronized private fun requireFullAllocationStacks() {
+            // Isolated emulator research only. The public API cannot request full
+            // SurfaceControl stacks; an installed test tracker makes CloseGuard
+            // retain them instead of the optimized callsite-only string.
+            val guard=Class.forName("dalvik.system.CloseGuard")
+            val contract=Class.forName("dalvik.system.CloseGuard\$Tracker")
+            if(allocationTracker==null) allocationTracker=java.lang.reflect.Proxy.newProxyInstance(
+                contract.classLoader,arrayOf(contract)) { proxy,method,args ->
+                when(method.name) {
+                    "open","close" -> null
+                    "toString" -> "MPA diagnostic allocation tracker"
+                    "hashCode" -> System.identityHashCode(proxy)
+                    "equals" -> proxy===args?.get(0)
+                    else -> error("Unexpected CloseGuard tracker method: ${method.name}")
+                }
+            }
+            guard.getMethod("setTracker",contract).invoke(null,allocationTracker)
+            check(guard.getMethod("getTracker").invoke(null)===allocationTracker)
+            guard.getMethod("setEnabled",Boolean::class.javaPrimitiveType).invoke(null,true)
+            check(guard.getMethod("isEnabled").invoke(null)==true)
+        }
         fun enable(stage: String) {
+            requireFullAllocationStacks()
             val builder=StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy()).detectLeakedClosableObjects().penaltyLog()
             if(Build.VERSION.SDK_INT>=28) builder.penaltyListener(Executor { it.run() }) {
                 violations.add(it)

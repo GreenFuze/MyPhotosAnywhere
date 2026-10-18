@@ -25,10 +25,22 @@ fi
 adb shell svc data disable
 
 # Diagnostic subset only; this does not replace any release suite or acceptance gate.
+# Only this disposable emulator permits hidden test-tracing hooks. Production
+# app sources never use them; the device setting is restored on every exit.
+mpa_previous_hidden_policy=$(adb shell settings get global hidden_api_policy | tr -d '\r')
+adb shell settings put global hidden_api_policy 1
 adb logcat -c
 adb logcat -v threadtime > build/diagnostics/allocation-live-logcat.txt &
 mpa_diagnostic_log_pid=$!
-trap 'kill "$mpa_diagnostic_log_pid" 2>/dev/null || true' EXIT
+mpa_restore_diagnostic() {
+  kill "$mpa_diagnostic_log_pid" 2>/dev/null || true
+  if [[ "$mpa_previous_hidden_policy" == null ]]; then
+    adb shell settings delete global hidden_api_policy
+  else
+    adb shell settings put global hidden_api_policy "$mpa_previous_hidden_policy"
+  fi
+}
+trap mpa_restore_diagnostic EXIT
 adb install -r -t app/build/outputs/apk/debug/app-debug.apk
 adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell am instrument -w -r -e package com.myphotosanywhere.mpa -e notAnnotation com.myphotosanywhere.mpa.device.DeviceLibraryStage com.myphotosanywhere.mpa.test/com.myphotosanywhere.mpa.ResourceDiagnosticRunner | tee build/diagnostics/focused-camera-instrumentation.txt
