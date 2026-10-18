@@ -31,7 +31,7 @@ mpa_diagnostic_log_pid=$!
 trap 'kill "$mpa_diagnostic_log_pid" 2>/dev/null || true' EXIT
 adb install -r -t app/build/outputs/apk/debug/app-debug.apk
 adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-adb shell am instrument -w -r -e notAnnotation com.myphotosanywhere.mpa.device.DeviceLibraryStage com.myphotosanywhere.mpa.test/com.myphotosanywhere.mpa.ResourceDiagnosticRunner | tee build/diagnostics/focused-camera-instrumentation.txt
+adb shell am instrument -w -r -e package com.myphotosanywhere.mpa -e notAnnotation com.myphotosanywhere.mpa.device.DeviceLibraryStage com.myphotosanywhere.mpa.test/com.myphotosanywhere.mpa.ResourceDiagnosticRunner | tee build/diagnostics/focused-camera-instrumentation.txt
 adb exec-out run-as com.myphotosanywhere.mpa cat cache/resource-allocation-traces.json > build/diagnostics/resource-allocation-traces.json
 mkdir -p app/build/reports/androidTests/screenshots
 adb pull /sdcard/Download/MPA app/build/reports/androidTests/screenshots/raw
@@ -44,7 +44,7 @@ assert len(re.findall(r'^INSTRUMENTATION_STATUS_CODE: 0\s*$',text,re.M))==147,te
 assert 'FAILURES!!!' not in text and 'INSTRUMENTATION_FAILED' not in text
 assert 'allocationTracingRecordsTheDeliberateTestOnlySentinel' in text
 allocations=json.loads(Path('build/diagnostics/resource-allocation-traces.json').read_text(encoding='utf-8'))
-assert allocations['api']==29 and allocations['resultCode']==-1,allocations
+assert allocations['api']==37 and allocations['resultCode']==-1,allocations
 assert any('ResourceDiagnosticTest.abandonDiagnosticSentinel' in trace['stack'] for trace in allocations['traces']),allocations
 tree=subprocess.check_output(['git','rev-parse','HEAD:app/src/main'],text=True).strip()
 assert tree=='cfb8e76becaa683605966797d88629e00395f0d9',tree
