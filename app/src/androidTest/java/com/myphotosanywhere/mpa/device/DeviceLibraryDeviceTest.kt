@@ -98,6 +98,7 @@ class DeviceLibraryDeviceTest {
                 instrumentation.uiAutomation.executeShellCommand("sh ${script.absolutePath}")
             ).use { it.readBytes().toString(Charsets.UTF_8) }
             check(output.endsWith("\nMPA_FIXTURE_OK\n")) { "Shell fixture command failed: $output" }
+            check(!output.contains("Error while accessing provider:")) { "Content fixture operation failed: $output" }
             return output.removeSuffix("\nMPA_FIXTURE_OK\n")
         } finally { check(!script.exists() || script.delete()) }
     }
@@ -116,7 +117,11 @@ class DeviceLibraryDeviceTest {
             check(matches.size==1) { "Expected one foreign camera fixture: $output" }
             val uri=android.content.ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,matches.single().groupValues[1].toLong())
             foreignUris+=uri
-            shell("content write --uri $uri < '${stage.absolutePath}'")
+            if(Build.VERSION.SDK_INT==29) {
+                // Android10 content write passes a null calling package, which its provider
+                // can reject. Only this emulator fixture copies to the fixed UUID path.
+                shell("mkdir -p '/sdcard/$folder'\ncp '${stage.absolutePath}' '/sdcard/$folder$name'")
+            } else shell("content write --uri $uri < '${stage.absolutePath}'")
             shell("content update --uri $uri --bind is_pending:i:0")
             app.contentResolver.query(uri,arrayOf(MediaStore.MediaColumns.OWNER_PACKAGE_NAME),null,null,null)?.use {
                 check(it.moveToFirst());assertEquals("com.android.shell",it.getString(0))
