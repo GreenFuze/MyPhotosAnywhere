@@ -108,10 +108,10 @@ class DeviceLibraryDeviceTest {
         val image=Bitmap.createBitmap(720,1080,Bitmap.Config.ARGB_8888).apply { eraseColor(Color.CYAN) }
         try { stage.outputStream().use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) } } finally { image.recycle() }
         try {
-            shell("content insert --uri content://media/external/images/media --bind _display_name:s:$name --bind mime_type:s:image/png --bind relative_path:s:$folder --bind is_pending:i:1 --bind datetaken:l:13000000002000")
+            shell("content insert --uri content://media/external/images/media --bind _display_name:s:$name --bind mime_type:s:image/png --bind relative_path:s:$folder --bind is_pending:i:1 --bind owner_package_name:s:com.android.shell --bind datetaken:l:13000000002000")
             // content insert intentionally discards its returned URI. Resolve this unique,
             // shell-owned pending row using the same shell identity before publishing it.
-            val output=shell("content query --uri content://media/external/images/media --projection _id --where \"_display_name='$name'\"")
+            val output=shell("content query --uri 'content://media/external/images/media?includePending=1' --projection _id --where \"_display_name='$name'\"")
             val matches=Regex("_id=([0-9]+)").findAll(output).toList()
             check(matches.size==1) { "Expected one foreign camera fixture: $output" }
             val uri=android.content.ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,matches.single().groupValues[1].toLong())
