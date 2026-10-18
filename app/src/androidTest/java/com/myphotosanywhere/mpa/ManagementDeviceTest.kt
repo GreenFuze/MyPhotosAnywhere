@@ -70,7 +70,7 @@ class ManagementDeviceTest {
             assertEquals(photo,app.database.photos().find(id));assertEquals(hash,DriveBackupWorker.digest(file,"SHA-256"));assertTrue(preview.isFile)
             compose.onNodeWithTag("offline:confirm").assertDoesNotExist()
             compose.runOnUiThread { restored.clear(cutoff-1) }
-            waitTag("offline:result");compose.onNodeWithTag("offline:result").performScrollTo().assertTextContains("estimate changed")
+            waitTag("offline:result");compose.onNodeWithTag("offline:result").performScrollTo().assertTextEquals("The storage estimate changed. Review the refreshed estimate before clearing downloads.")
             assertFalse(restored.working.value);assertEquals(photo,app.database.photos().find(id));assertEquals(hash,DriveBackupWorker.digest(file,"SHA-256"))
         } finally {
             app.database.openHelper.writableDatabase.execSQL("DELETE FROM cloud_photos WHERE bindingKey=?",arrayOf(source.key))
