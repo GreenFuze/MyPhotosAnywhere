@@ -92,9 +92,16 @@ class DriveBackupWorker(context: Context, parameters: WorkerParameters) : Corout
             val uploaded = api.file(remoteId)
             if(uploaded.trashed || uploaded.bytes!=photo.bytes || uploaded.md5!=md5 || task.folderId !in uploaded.parents)
                 throw DriveBackupBlocked("Drive checksum verification failed. The local original is preserved.")
-            task=task.copy(state="COMPLETE",uploadedBytes=photo.bytes,sessionUri=null,
+            val annotations=app.database.deviceMedia().authorization(task.id)?.metadataRequested==true
+            task=task.copy(state=if(annotations) "METADATA_PENDING" else "COMPLETE",uploadedBytes=photo.bytes,sessionUri=null,
                 remoteMd5=md5,remoteVersion=uploaded.version,errorMessage=null)
             dao.updateBackup(task)
+            if(annotations) {
+                if(!stillActive()) return@withContext Result.success()
+                com.myphotosanywhere.mpa.metadata.ManualPhotoMetadata(app.database).backup(api,task)
+                if(!stillActive()) return@withContext Result.success()
+                task=task.copy(state="COMPLETE",errorMessage=null);dao.updateBackup(task)
+            }
             dao.source(task.bindingKey)?.let { app.sync.schedule(it.connection(),true) }
             try { app.metadata.changed() } catch(e: CancellationException) { throw e }
             catch(error: IOException) { app.database.metadata().error(task.bindingKey,error.message ?: "Annotation backup needs retry. The verified original is in Drive.") }
@@ -118,7 +125,8 @@ class DriveBackupWorker(context: Context, parameters: WorkerParameters) : Corout
         } catch (error: IOException) {
             val retry = runAttemptCount < 5
             dao.updateBackup(task.copy(state = if (retry) "RETRYING" else "FAILED",
-                errorMessage = "Network interrupted. Your local original is preserved."))
+                errorMessage = if(task.remoteMd5!=null) "The original is verified in Drive. Annotation backup needs retry; the saved original will be reused. ${error.message.orEmpty()}"
+                    else "Network interrupted. Your local original is preserved."))
             if (retry) Result.retry() else Result.failure()
         } catch(error: android.database.sqlite.SQLiteException) {
             // A later annotation failure cannot erase a verified transfer checkpoint.

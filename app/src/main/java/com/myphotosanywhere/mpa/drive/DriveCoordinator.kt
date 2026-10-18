@@ -61,10 +61,13 @@ class DriveCoordinator(private val context: Context, private val database: Photo
             val value=previous ?: DriveBackup("manual:"+java.util.UUID.randomUUID(),source.key,photoId,source.accountId,source.email,source.folderId,source.mode)
             database.drive().insertBackup(value)
             val authorization=database.deviceMedia().authorization(value.id)
-            if(authorization==null) database.deviceMedia().authorize(com.myphotosanywhere.mpa.data.ManualDeviceBackup(value.id,photoId,source.key,photo.sha256,photo.bytes))
+            if(authorization==null) database.deviceMedia().authorize(com.myphotosanywhere.mpa.data.ManualDeviceBackup(value.id,photoId,source.key,photo.sha256,photo.bytes,metadataRequested=true))
             else if(authorization.bindingKey!=source.key || authorization.sha256!=photo.sha256 || authorization.bytes!=photo.bytes)
                 throw java.io.IOException("The prepared original no longer matches its saved backup authorization. The captured job was preserved.")
-            value
+            else if(!authorization.metadataRequested) database.deviceMedia().updateAuthorization(authorization.copy(metadataRequested=true))
+            if(value.state=="COMPLETE" && authorization?.metadataRequested!=true)
+                value.copy(state="METADATA_PENDING",errorMessage=null).also { database.drive().updateBackup(it) }
+            else value
         }
         if(task.state=="COMPLETE") return "This original is already verified in Drive."
         val source=database.drive().source(task.bindingKey) ?: throw java.io.IOException("Reconnect the captured Drive source.")

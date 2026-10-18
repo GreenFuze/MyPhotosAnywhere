@@ -25,6 +25,8 @@ data class FaceScan(@PrimaryKey val photoId: String, val sha256: String, val err
 interface LibraryDao {
     @Query("SELECT * FROM albums ORDER BY name COLLATE NOCASE") fun albums(): Flow<List<Album>>
     @Query("SELECT * FROM albums") suspend fun allAlbums(): List<Album>
+    @Query("SELECT a.* FROM albums a JOIN album_photos m ON m.albumId=a.id WHERE m.photoId=:id ORDER BY a.id")
+    suspend fun photoAlbums(id: String): List<Album>
     @Query("SELECT * FROM album_photos") suspend fun allMemberships(): List<AlbumPhoto>
     @Query("SELECT * FROM album_photos") fun memberships(): Flow<List<AlbumPhoto>>
     @Query("SELECT * FROM album_photos WHERE albumId = :id") suspend fun members(id: String): List<AlbumPhoto>

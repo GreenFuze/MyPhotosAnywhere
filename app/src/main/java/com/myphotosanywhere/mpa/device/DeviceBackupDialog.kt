@@ -29,6 +29,7 @@ internal fun DeviceBackupDialog(model: LibraryFeaturesModel,onSources: ()->Unit)
             title={ Text(if(item.capturedBinding==null) "Back up to Google Drive" else "Resume this backup") },
             text={ LazyColumn(Modifier.heightIn(max=420.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 item { Text(item.name);Text("Only this photo is queued. Its camera original is kept. Other device photos are not uploaded automatically.") }
+                item { BackupMetadataNotice() }
                 if(item.capturedBinding!=null) item { Text("This saved job keeps its captured account and folder (${item.capturedEmail}).") }
                 if(options.isEmpty()) item {
                     Text(if(item.capturedBinding==null) "Connect a writable Drive folder to choose a destination." else "Reconnect the captured account and folder to resume this job.")

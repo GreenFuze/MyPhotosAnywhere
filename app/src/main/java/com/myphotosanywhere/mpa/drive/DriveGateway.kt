@@ -231,14 +231,14 @@ class DriveGateway(
         bytes.toString(Charsets.UTF_8) to tag
     }
     /** A conditional media PATCH can never replace photo bytes or silently clobber another device. */
-    suspend fun writeMetadata(id: String,parent: String,xml: String,etag: String?): String {
+    suspend fun writeMetadata(id: String,parent: String,xml: String,etag: String?,name: String=".mpa-catalog.xmp"): String {
         val bytes=xml.toByteArray(Charsets.UTF_8)
         require(bytes.size<=com.myphotosanywhere.mpa.metadata.XmpCodec.MAX_BYTES)
         val request=if(etag!=null) Request.Builder().url(upload.newBuilder().addPathSegment(id)
             .addQueryParameter("uploadType","media").addQueryParameter("supportsAllDrives","true").build())
             .header("If-Match",etag).patch(bytes.toRequestBody("application/rdf+xml".toMediaType()))
         else {
-            val metadata=JsonObject().apply { addProperty("id",id); addProperty("name",".mpa-catalog.xmp")
+            val metadata=JsonObject().apply { addProperty("id",id); addProperty("name",name)
                 addProperty("mimeType","application/rdf+xml"); add("parents",com.google.gson.JsonArray().apply { add(parent) }) }
             val body=okhttp3.MultipartBody.Builder().setType("multipart/related".toMediaType())
                 .addPart(metadata.toString().toRequestBody(JSON))
