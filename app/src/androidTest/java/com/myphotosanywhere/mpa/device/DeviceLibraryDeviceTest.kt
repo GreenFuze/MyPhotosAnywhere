@@ -88,18 +88,35 @@ class DeviceLibraryDeviceTest {
             photo?.originalPath?.takeIf { it.isNotBlank() }?.let { File(it).delete() }
         }
     }
-    private fun shell(command: String)=android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes().toString(Charsets.UTF_8) }
+    private fun shell(command: String): String {
+        // UiAutomation executes an argv string, not a shell expression. A readable script
+        // preserves quoting/redirection on API29 too, before executeShellCommandRw exists.
+        val script=File(requireNotNull(app.externalCacheDir),"fixture-${java.util.UUID.randomUUID()}.sh")
+        script.writeText("set -eu\nexec 2>&1\n$command\nprintf '\\nMPA_FIXTURE_OK\\n'\n")
+        try {
+            val output=android.os.ParcelFileDescriptor.AutoCloseInputStream(
+                instrumentation.uiAutomation.executeShellCommand("sh ${script.absolutePath}")
+            ).use { it.readBytes().toString(Charsets.UTF_8) }
+            check(output.endsWith("\nMPA_FIXTURE_OK\n")) { "Shell fixture command failed: $output" }
+            return output.removeSuffix("\nMPA_FIXTURE_OK\n")
+        } finally { check(!script.exists() || script.delete()) }
+    }
     private fun foreign(folder: String): Uri {
         check(folder in listOf("DCIM/Camera/","Pictures/Screenshots/"))
         val name="foreign-${java.util.UUID.randomUUID()}.png"
-        val stage=File(app.filesDir,name)
+        val stage=File(requireNotNull(app.externalCacheDir),name)
         val image=Bitmap.createBitmap(720,1080,Bitmap.Config.ARGB_8888).apply { eraseColor(Color.CYAN) }
         try { stage.outputStream().use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) } } finally { image.recycle() }
         try {
-            val output=shell("content insert --uri content://media/external/images/media --bind _display_name:s:$name --bind mime_type:s:image/png --bind relative_path:s:$folder --bind is_pending:i:1 --bind datetaken:l:13000000002000")
-            val uri=Uri.parse(Regex("content://media/[^\\s]+").find(output)?.value ?: error("Shell camera fixture was not inserted: $output"))
+            shell("content insert --uri content://media/external/images/media --bind _display_name:s:$name --bind mime_type:s:image/png --bind relative_path:s:$folder --bind is_pending:i:1 --bind datetaken:l:13000000002000")
+            // content insert intentionally discards its returned URI. Resolve this unique,
+            // shell-owned pending row using the same shell identity before publishing it.
+            val output=shell("content query --uri content://media/external/images/media --projection _id --where \"_display_name='$name'\"")
+            val matches=Regex("_id=([0-9]+)").findAll(output).toList()
+            check(matches.size==1) { "Expected one foreign camera fixture: $output" }
+            val uri=android.content.ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,matches.single().groupValues[1].toLong())
             foreignUris+=uri
-            shell("run-as ${app.packageName} cat files/$name | content write --uri $uri")
+            shell("content write --uri $uri < '${stage.absolutePath}'")
             shell("content update --uri $uri --bind is_pending:i:0")
             app.contentResolver.query(uri,arrayOf(MediaStore.MediaColumns.OWNER_PACKAGE_NAME),null,null,null)?.use {
                 check(it.moveToFirst());assertEquals("com.android.shell",it.getString(0))
