@@ -151,7 +151,18 @@ class DragSelectionDeviceTest {
             compose.runOnUiThread { model.rememberAnchor(first,0);model.restoreAnchor() };waitReady(first.key)
             val hero=compose.onNodeWithTag(first.key).fetchSemanticsNode()
             val neighbor=compose.onNodeWithTag("photo:${fixture.photos[1].id}").fetchSemanticsNode()
-            assertTrue(hero.boundsInWindow.left>neighbor.boundsInWindow.left)
+            val grid=compose.onNodeWithTag("photos:grid").fetchSemanticsNode()
+            val gap=2*compose.density.density
+            // Balanced portraits may occupy any logical column. Verify RTL mirrors
+            // each actual column, rather than requiring every hero on one fixed side.
+            for(node in listOf(hero,neighbor)) {
+                val info=node.config[SemanticsProperties.CollectionItemInfo]
+                val expectedLeft=grid.boundsInWindow.right-gap-node.boundsInWindow.width-
+                    info.columnIndex*(neighbor.boundsInWindow.width+gap)
+                assertEquals(expectedLeft,node.boundsInWindow.left,3f)
+            }
+            assertTrue(hero.boundsInWindow.right<=neighbor.boundsInWindow.left ||
+                neighbor.boundsInWindow.right<=hero.boundsInWindow.left)
             assertTrue(hero.config[SemanticsProperties.CollectionItemInfo].rowSpan>1)
             begin(first.key)
             val added=fixture.photos.first().copy(id="drag-rtl-import",capturedAt=requireNotNull(first.millis)+60000)
