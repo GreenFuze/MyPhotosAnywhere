@@ -9,7 +9,7 @@ Observed 2026-10-19 through the owner's selected Chrome session. **Immediate Gat
 - Existing configured scopes: `drive.file`, restricted `drive`, and Photos Picker's selected-media read scope. No new scope added.
 - Existing Android clients preserved. Owner explicitly approved creation of a new Desktop client named MPA Processor. Configuration is kept outside tracked files.
 - Separate empty disposable Drive folder created in the intended account; private folder ID and screenshots remain in local evidence. Existing photo library untouched.
-- Production publishing is disabled until branding is completed. The owner supplied their existing GitHub Pages custom domain. MPA-specific homepage/privacy/terms are prepared and visually reviewed locally; public publication and the security-sensitive OAuth audience change await the actual approval response. Prepared Cloud fields have not been submitted.
+- Production publishing is disabled until branding is completed. The owner supplied their existing GitHub Pages custom domain. MPA-specific homepage/privacy/terms are prepared and visually reviewed locally; the owner explicitly approved public publication and the security-sensitive OAuth audience change. Website main was fast-forwarded to the reviewed pages; deployment remains queued during a reported GitHub Pages incident. Google confirmed the domain/URL branding save. Browser attachment then failed before the production-status action; that action and live grants remain pending.
 
 ## Executable preparation
 
