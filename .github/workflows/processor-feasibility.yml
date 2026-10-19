@@ -33,6 +33,7 @@ jobs:
         with:
           name: feasibility-models
           path: processor/.models/normalized/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
   native:
