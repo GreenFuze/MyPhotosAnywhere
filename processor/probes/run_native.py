@@ -46,13 +46,27 @@ class NativeProbeRunner:
                                             native_log.read_text(encoding="utf-8"), re.IGNORECASE):
             raise RuntimeError("Unresolved source-built native dependency warning; inspect full build log")
         output = self.root / "probes/NativeFeasibility/bin/Release/net10.0"
-        if platform.system() == "Darwin" and platform.machine() == "x86_64":
+        if "MPA_ORT_NATIVE_DIRECTORY" in os.environ:
             native = Path(os.environ["MPA_ORT_NATIVE_DIRECTORY"]).resolve()
-            libraries = list(native.glob("libonnxruntime*.dylib"))
+            extension = "*.dylib" if platform.system() == "Darwin" else "*.so*"
+            libraries = list(native.glob("libonnxruntime" + extension))
             if not libraries:
-                raise RuntimeError("Intel macOS requires the pinned source-built ONNX Runtime")
+                raise RuntimeError("Pinned source-built ONNX Runtime was not found")
+            runtime_id = "osx-x64" if platform.system() == "Darwin" else "linux-x64"
+            native_output = output / "runtimes" / runtime_id / "native"
+            native_output.mkdir(parents=True, exist_ok=True)
+            native_records = []
             for library in libraries:
                 shutil.copyfile(library, output / library.name)
+                shutil.copyfile(library, native_output / library.name)
+                with library.open("rb") as stream:
+                    native_records.append({"file": library.name, "sha256": hashlib.file_digest(stream, "sha256").hexdigest()})
+            (self.evidence / "source-runtime.json").write_text(json.dumps({
+                "revision": "402979ac1bef89dcd55add41eaa7277c407599eb",
+                "deviceDiscovery": False, "telemetry": False, "files": native_records
+            }, indent=2) + "\n", encoding="utf-8")
+        elif platform.system() == "Darwin" and platform.machine() == "x86_64":
+            raise RuntimeError("Intel macOS requires the pinned source-built ONNX Runtime")
         report = self.evidence / "native.json"
         self.command("runtime", [self.dotnet, str(output / "NativeFeasibility.dll"),
                                  str(self.root / ".models/normalized"), str(report)], runtime=True)

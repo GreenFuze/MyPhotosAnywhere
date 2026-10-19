@@ -76,9 +76,12 @@ internal sealed class ModelEquivalenceProbe(IReadOnlyList<VerifiedModel> referen
                 if (expected.Count != actual.Count) throw new InvalidDataException("Output count changed");
                 foreach (var output in expected)
                 {
-                    var before = output.AsTensor<float>().ToArray();
-                    var after = actual.Single(x => x.Name == output.Name).AsTensor<float>().ToArray();
-                    if (before.Length != after.Length) throw new InvalidDataException("Output shape changed");
+                    var beforeTensor = output.AsTensor<float>();
+                    var afterTensor = actual.Single(x => x.Name == output.Name).AsTensor<float>();
+                    if (!beforeTensor.Dimensions.SequenceEqual(afterTensor.Dimensions))
+                        throw new InvalidDataException("Output shape changed");
+                    var before = beforeTensor.ToArray();
+                    var after = afterTensor.ToArray();
                     for (var index = 0; index < before.Length; index++)
                     {
                         var error = Math.Abs((double)before[index] - after[index]);

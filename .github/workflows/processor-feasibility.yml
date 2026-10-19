@@ -44,12 +44,16 @@ jobs:
         include:
           - runner: windows-2025
             target: windows-x64
+            sourceRuntime: false
           - runner: ubuntu-24.04
             target: linux-x64
+            sourceRuntime: true
           - runner: macos-15
             target: macos-arm64
+            sourceRuntime: false
           - runner: macos-15-intel
             target: macos-x64
+            sourceRuntime: true
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     steps:
@@ -66,27 +70,34 @@ jobs:
         with:
           name: feasibility-models
           path: processor/.models/normalized/
-      # 1.31.0's official NuGet package omits osx-x64. Build that exact
-      # upstream source on Intel rather than silently dropping Intel support
-      # or loading a native binary from a different runtime version.
+      # The NuGet omits Intel macOS; Linux's VM device discovery emits a
+      # warning while probing unused accelerators. Build the same official
+      # CPU runtime with hardware discovery and telemetry disabled.
       - uses: actions/checkout@v7.0.1
-        if: matrix.target == 'macos-x64'
+        if: matrix.sourceRuntime
         with:
           repository: microsoft/onnxruntime
           ref: 402979ac1bef89dcd55add41eaa7277c407599eb
           path: processor/.runtime-source
           submodules: recursive
           persist-credentials: false
-      - name: Build pinned Intel CPU runtime
-        if: matrix.target == 'macos-x64'
+      - name: Build pinned CPU runtime
+        if: matrix.sourceRuntime
         working-directory: processor/.runtime-source
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = 402979ac1bef89dcd55add41eaa7277c407599eb
           mkdir -p ../build/feasibility
-          ./build.sh --config Release --build_shared_lib --parallel 2 --skip_tests --skip_submodule_sync --no_telemetry --cmake_extra_defines CMAKE_OSX_ARCHITECTURES=x86_64 2>&1 | tee ../build/feasibility/native-dependency-build.log
-          echo "MPA_ORT_NATIVE_DIRECTORY=$PWD/build/MacOS/Release" >> "$GITHUB_ENV"
+          mpa_build_platform=Linux
+          mpa_build_args=(--config Release --build_shared_lib --parallel 2 --skip_tests --skip_submodule_sync --no_telemetry --cmake_extra_defines onnxruntime_DISABLE_DEVICE_DISCOVERY=ON)
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            mpa_build_platform=MacOS
+            mpa_build_args+=(CMAKE_OSX_ARCHITECTURES=x86_64)
+          fi
+          ./build.sh "${mpa_build_args[@]}" 2>&1 | tee ../build/feasibility/native-dependency-build.log
+          grep -q '^onnxruntime_DISABLE_DEVICE_DISCOVERY:BOOL=ON$' "build/$mpa_build_platform/Release/CMakeCache.txt"
+          echo "MPA_ORT_NATIVE_DIRECTORY=$PWD/build/$mpa_build_platform/Release" >> "$GITHUB_ENV"
       - name: Strict native model and decoder probe
         run: python processor/probes/run_native.py
       - uses: actions/upload-artifact@v7.0.2
