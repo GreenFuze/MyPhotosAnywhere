@@ -5,11 +5,11 @@ Observed 2026-10-19 through the owner's selected Chrome session. **Immediate Gat
 ## Configuration observations
 
 - Existing MyPhotosAnywhere Cloud project, Drive API enabled.
-- External OAuth audience remains **Testing**. The published seven-day Testing authorization/refresh limit applies to Drive grants; moving to a personal-test audience does not avoid it.
+- External OAuth audience is now **In production**, confirmed after the owner explicitly authorized the final Publish app/Confirm action. Google still shows the unverified sensitive/restricted-scope warning and a 100-user cap. This publication configuration is not proof of an actual durable account grant.
 - Existing configured scopes: `drive.file`, restricted `drive`, and Photos Picker's selected-media read scope. No new scope added.
 - Existing Android clients preserved. Owner explicitly approved creation of a new Desktop client named MPA Processor. Configuration is kept outside tracked files.
 - Separate empty disposable Drive folder created in the intended account; private folder ID and screenshots remain in local evidence. Existing photo library untouched.
-- Production publishing is disabled until branding is completed. The owner supplied their existing GitHub Pages custom domain. MPA-specific homepage/privacy/terms are prepared and visually reviewed locally; the owner explicitly approved public publication and the security-sensitive OAuth audience change. Website main was fast-forwarded to the reviewed pages; deployment remains queued during a reported GitHub Pages incident. Google confirmed the domain/URL branding save. Browser attachment then failed before the production-status action; that action and live grants remain pending.
+- Production publishing is disabled until branding is completed. The owner supplied their existing GitHub Pages custom domain. MPA-specific homepage/privacy/terms are prepared and visually reviewed locally; the owner explicitly approved public publication and the security-sensitive OAuth audience change. Website main was fast-forwarded to the reviewed pages; Pages run 39285652024 completed successfully for SHA `69fc184bd865b40b69de1e5a6c6d5956314ee2f6`. The public homepage, privacy policy and terms were verified in Chrome. Google confirmed both the branding save and In production status. Actual account grants remain pending.
 
 ## Executable preparation
 
@@ -21,7 +21,7 @@ The synthetic storage command passed on Windows: encrypted round trip, expiry ti
 
 | Probe | Status |
 | --- | --- |
-| Production configuration and personal-use limitations | Pending reviewed publication/Google confirmation |
+| Production configuration and personal-use limitations | In production confirmed; unverified-scope notice and 100-user cap observed; no verification approval claimed |
 | Fresh desktop consent and protected persistence | Not run; requires exact grant approval |
 | `drive.file` case with actual returned scope | Not run |
 | Manually created existing/nested/new file discovery | Not run |
@@ -44,3 +44,7 @@ Restrict future API writes to the named disposable folder. Full Drive OAuth is t
 - [Google .NET PKCE broker source, 1.77.0](https://github.com/googleapis/google-api-dotnet-client/blob/v1.77.0/Src/Support/Google.Apis.Auth/OAuth2/GoogleWebAuthorizationBroker.cs)
 
 These sources explain supported behavior; the live rows above still need observed results. Public evidence must not contain tokens, authorization codes/URLs, private folders, media or account names.
+
+## Current live authorization attempt
+
+A fresh private `drive.file` PKCE request was prepared after Production confirmation. The authorization process opens no default browser and assumes no grant. Chrome control disappeared from browser inventory while opening the consent URL; no completed authorization report has been observed. Reconnection is requested. The request expires after its bounded 15-minute deadline; recreate it if expired, without reusing Testing tokens or revoking existing Android grants. Private URLs and credentials remain excluded from public evidence.
