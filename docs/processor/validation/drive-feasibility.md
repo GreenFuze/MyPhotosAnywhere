@@ -15,7 +15,7 @@ Observed 2026-10-19 through the owner's selected Chrome session. **Immediate Gat
 
 `processor/probes/DriveFeasibility/` implements only bounded authorization/short-refresh preparation, using official Google.Apis.Auth 1.77.0, PKCE, explicit validated random state, forced loopback, and a Windows DPAPI datastore. It never copies phone credentials or stores plaintext tokens. Scope is chosen explicitly, and returned scopes are checked.
 
-The synthetic storage command passed on Windows: encrypted round trip, expiry timestamp persistence, no plaintext marker, type isolation, corrupted-ciphertext rejection, deletion. Compiler/analyzer build had zero warnings/errors. These checks did not contact Google or grant access.
+The synthetic storage command passed on Windows: encrypted round trip, expiry timestamp persistence, no plaintext marker, type isolation, corrupted-ciphertext rejection, deletion. The actual loopback receiver also passed synthetic matching-state, rejected-state and cancellation/temporary-file cleanup checks. A directory lease prevents concurrent probes; stale prepared requests fail explicitly. Compiler/analyzer build had zero warnings/errors. These checks did not contact Google or grant access.
 
 ## Required live evidence
 

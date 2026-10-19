@@ -26,11 +26,14 @@ internal static class Program
         };
         var root = Path.GetFullPath(args[2]);
         Directory.CreateDirectory(root);
+        using var probeLease = new FileStream(Path.Combine(root, "probe.lock"), FileMode.OpenOrCreate,
+            FileAccess.ReadWrite, FileShare.None);
         var vault = new WindowsProtectedDataStore(Path.Combine(root, "vault-" + args[3]));
         if (args[0] == "vault-check")
         {
             await new ProtectedStoreProbe(vault).RunAsync().ConfigureAwait(false);
-            Console.WriteLine("Synthetic credential-store round trip, ciphertext, tamper rejection and deletion checks passed.");
+            await new LoopbackStateProbe(root).RunAsync().ConfigureAwait(false);
+            Console.WriteLine("Synthetic protected-store and loopback state/cancellation checks passed; no Google request or grant occurred.");
             return 0;
         }
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(15));
@@ -48,11 +51,16 @@ internal static class Program
         });
         const string user = "stage-zero-account";
         UserCredential credential;
+        var interactive = false;
         if (args[0] == "authorize")
         {
-            var receiver = new StateCheckingCodeReceiver(Path.Combine(root, "authorization-url.txt"));
+            var reviewPath = Path.Combine(root, "authorization-url.txt");
+            if (File.Exists(reviewPath))
+                throw new InvalidOperationException("An earlier private authorization URL remains; inspect the interrupted probe before starting another request.");
+            var receiver = new StateCheckingCodeReceiver(reviewPath);
             credential = await new AuthorizationCodeInstalledApp(flow, receiver)
                 .AuthorizeAsync(user, deadline.Token).ConfigureAwait(false);
+            interactive = receiver.RequestPrepared;
         }
         else
         {
@@ -71,6 +79,8 @@ internal static class Program
         var observation = new
         {
             operation = args[0], observedAtUtc = DateTimeOffset.UtcNow,
+            interactiveAuthorizationOccurred = interactive,
+            accessTokenIssuedAtUtc = credential.Token.IssuedUtc,
             grantedScopes = granted.Order(StringComparer.Ordinal).ToArray(),
             protectedRefreshTokenPresent = true,
             accessTokenLifetimeSeconds = credential.Token.ExpiresInSeconds,
@@ -103,10 +113,12 @@ internal sealed class WindowsProtectedDataStore : IDataStore
             var encrypted = ProtectedData.Protect(plain, _entropy, DataProtectionScope.CurrentUser);
             var path = Address<T>(key);
             var pending = path + "." + Guid.NewGuid().ToString("N") + ".pending";
+            var ownsPending = false;
             try
             {
                 await using (var output = new FileStream(pending, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 {
+                    ownsPending = true;
                     await output.WriteAsync(encrypted).ConfigureAwait(false);
                     await output.FlushAsync().ConfigureAwait(false);
                     output.Flush(flushToDisk: true);
@@ -115,7 +127,7 @@ internal sealed class WindowsProtectedDataStore : IDataStore
             }
             finally
             {
-                File.Delete(pending);
+                if (ownsPending) File.Delete(pending);
             }
         }
         finally
@@ -185,6 +197,7 @@ internal sealed class StateCheckingCodeReceiver(string reviewPath) : ICodeReceiv
 {
     private readonly ReviewCodeReceiver _receiver = new(reviewPath);
     public string RedirectUri => _receiver.RedirectUri;
+    public bool RequestPrepared => _receiver.RequestPrepared;
 
     public async Task<AuthorizationCodeResponseUrl> ReceiveCodeAsync(AuthorizationCodeRequestUrl url, CancellationToken taskCancellationToken)
     {
@@ -205,7 +218,7 @@ internal sealed class StateCheckingCodeReceiver(string reviewPath) : ICodeReceiv
         }
         finally
         {
-            File.Delete(reviewPath);
+            if (_receiver.RequestPrepared) File.Delete(reviewPath);
         }
     }
 }
@@ -214,6 +227,9 @@ internal sealed class ReviewCodeReceiver(string reviewPath) : LocalServerCodeRec
     "<html><head><title>MPA authorization</title></head><body>MPA received the response. You may close this page.</body></html>",
     LocalServerCodeReceiver.CallbackUriChooserStrategy.ForceLoopbackIp)
 {
+    private int _requestPrepared;
+    public bool RequestPrepared => Volatile.Read(ref _requestPrepared) != 0;
+
     protected override bool OpenBrowser(string url)
     {
         var address = new Uri(url);
@@ -223,8 +239,68 @@ internal sealed class ReviewCodeReceiver(string reviewPath) : LocalServerCodeRec
         var bytes = Encoding.UTF8.GetBytes(url);
         output.Write(bytes);
         output.Flush(flushToDisk: true);
+        Volatile.Write(ref _requestPrepared, 1);
         Console.WriteLine("Authorization URL prepared privately; browser consent is required. No grant is assumed.");
         return true;
+    }
+}
+
+internal sealed class LoopbackStateProbe(string root)
+{
+    public async Task RunAsync()
+    {
+        await CheckAsync(wrongState: false, cancel: false).ConfigureAwait(false);
+        await CheckAsync(wrongState: true, cancel: false).ConfigureAwait(false);
+        await CheckAsync(wrongState: false, cancel: true).ConfigureAwait(false);
+    }
+
+    private async Task CheckAsync(bool wrongState, bool cancel)
+    {
+        var path = Path.Combine(root, "synthetic-auth-" + Guid.NewGuid().ToString("N") + ".txt");
+        var receiver = new StateCheckingCodeReceiver(path);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var request = new GoogleAuthorizationCodeRequestUrl(new Uri("https://accounts.google.com/o/oauth2/auth"))
+        {
+            ClientId = "synthetic.apps.googleusercontent.com", Scope = "synthetic",
+            RedirectUri = receiver.RedirectUri, ResponseType = "code"
+        };
+        var pending = receiver.ReceiveCodeAsync(request, deadline.Token);
+        while (!receiver.RequestPrepared)
+        {
+            if (pending.IsCompleted) await pending.ConfigureAwait(false);
+            await Task.Delay(10, deadline.Token).ConfigureAwait(false);
+        }
+        if (cancel)
+        {
+            await deadline.CancelAsync().ConfigureAwait(false);
+            var canceled = false;
+            try { await pending.ConfigureAwait(false); }
+            catch (OperationCanceledException) { canceled = true; }
+            if (!canceled) throw new InvalidDataException("Loopback cancellation was not propagated");
+        }
+        else
+        {
+            var callback = new Uri(receiver.RedirectUri);
+            if (callback.Scheme != "http" || callback.Host != "127.0.0.1")
+                throw new InvalidDataException("Synthetic callback escaped the loopback interface");
+            var state = wrongState ? "wrong-state" : request.State;
+            var address = new Uri(callback + "?code=synthetic-code&state=" + Uri.EscapeDataString(state));
+            using var client = new HttpClient(new SocketsHttpHandler { UseProxy = false, AllowAutoRedirect = false });
+            using var response = await client.GetAsync(address, deadline.Token).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            var rejected = false;
+            try
+            {
+                var result = await pending.ConfigureAwait(false);
+                if (result.Code != "synthetic-code") throw new InvalidDataException("Loopback response did not preserve the synthetic code");
+            }
+            catch (InvalidDataException error) when (wrongState && error.Message == "OAuth state did not match the outstanding request")
+            {
+                rejected = true;
+            }
+            if (wrongState && !rejected) throw new InvalidDataException("Mismatched OAuth state was accepted");
+        }
+        if (File.Exists(path)) throw new InvalidDataException("Completed loopback request did not release its private URL file");
     }
 }
 
