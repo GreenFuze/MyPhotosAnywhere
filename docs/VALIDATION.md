@@ -1,3 +1,7 @@
+## MPA 0.5.33: device folders and space cleanup
+
+Application `7714d96b6f8b654c8f16e6358dd9d993356380fe` passed 505 unit/integration tests, 159 native tests on each API 29/35/37, zero failures/errors/skips, and zero lint findings. Historical schemas and upgrade signer are preserved. Specific diagnostic exceptions are owner-approved. [Evidence and limits](releases/v0.5.33.md).
+
 ## MPA 0.5.32: balanced gallery and stable Search
 
 Application `c6fe4ad4fcd1c6b0b0059c4baf0bebb051df7774` passed 486 unit/integration tests, 155 native tests on each API29/35/37, zero failures/errors/skips and zero lint findings. Room11/schema files and the established signer are unchanged. [Evidence and acceptance limits](releases/v0.5.32.md).

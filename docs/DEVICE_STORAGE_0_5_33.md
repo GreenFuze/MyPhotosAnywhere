@@ -1,6 +1,6 @@
 # MPA 0.5.33 — device folders, explicit backup and safe offline cleanup
 
-Implement this before returning to the optional Processor discussion. Baseline is published 0.5.32; target is 0.5.33 / 44. No Processor or object-search rewrite is included.
+Delivered at tested application `7714d96b6f8b654c8f16e6358dd9d993356380fe`. [Validation and remaining acceptance](releases/v0.5.33.md). Return to the optional Processor discussion. Baseline is published 0.5.32; target is 0.5.33 / 44. No Processor or object-search rewrite is included.
 
 1. Make Android device-photo access discoverable from Photos and Collections. Query the image/video collections in bounded batches, respecting full, partial and revoked access. Keep existing canonical device identities and camera files. Add coverage for media owned by a different Android application, rather than relying only on MPA-created fixtures.
 2. Add Collections > On this device, with Camera and other directories, useful covers/counts, folder-specific paged galleries, viewer/selection and stable navigation/anchors. Retain volumes in folder identity. Persist only directory metadata, without duplicating media.

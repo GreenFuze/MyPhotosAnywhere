@@ -69,3 +69,7 @@ Object-search changes are deferred. The optional Windows/Linux/macOS MPA Process
 ## UI follow-up delivered — 0.5.32 / 43
 
 All three requested UI changes are delivered at `c6fe4ad4fcd1c6b0b0059c4baf0bebb051df7774`: no gallery edge scrollbar, stable completed empty Search through refresh, and varied portrait mosaic placement with consistent columns. [Validation](releases/v0.5.32.md). Physical/live-service/human acceptance remains unverified. Object-search changes and the optional Drive-mediated Processor remain discussion-only and deferred.
+
+## Device storage delivered — 0.5.33 / 44
+
+Device folders, discoverable Android access, explicit original/metadata backup and verified-download cleanup are delivered at `7714d96b6f8b654c8f16e6358dd9d993356380fe`, with scoped recognition ownership and safer place-editor input dismissal. [Validation](releases/v0.5.33.md). Physical/live-service/human acceptance remains unverified. The optional Drive-mediated Processor remains discussion-only.
