@@ -1,0 +1,96 @@
+name: Processor native feasibility
+on:
+  push:
+    paths:
+      - 'processor/**'
+      - '.github/workflows/processor-feasibility.yml'
+  pull_request:
+    paths:
+      - 'processor/**'
+      - '.github/workflows/processor-feasibility.yml'
+permissions:
+  contents: read
+concurrency:
+  group: processor-feasibility-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  models:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --only-binary=:all: -r processor/probes/requirements.txt
+      - run: python processor/probes/fetch_models.py
+      - run: python processor/probes/normalize_models.py
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: feasibility-models
+          path: processor/.models/normalized/
+          if-no-files-found: error
+          retention-days: 7
+  native:
+    needs: models
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - runner: windows-2025
+            target: windows-x64
+          - runner: ubuntu-24.04
+            target: linux-x64
+          - runner: macos-15
+            target: macos-arm64
+          - runner: macos-15-intel
+            target: macos-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.303'
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: feasibility-models
+          path: processor/.models/normalized/
+      # 1.31.0's official NuGet package omits osx-x64. Build that exact
+      # upstream source on Intel rather than silently dropping Intel support
+      # or loading a native binary from a different runtime version.
+      - uses: actions/checkout@v7.0.1
+        if: matrix.target == 'macos-x64'
+        with:
+          repository: microsoft/onnxruntime
+          ref: 402979ac1bef89dcd55add41eaa7277c407599eb
+          path: processor/.runtime-source
+          submodules: recursive
+          persist-credentials: false
+      - name: Build pinned Intel CPU runtime
+        if: matrix.target == 'macos-x64'
+        working-directory: processor/.runtime-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 402979ac1bef89dcd55add41eaa7277c407599eb
+          mkdir -p ../build/feasibility
+          ./build.sh --config Release --build_shared_lib --parallel 2 --skip_tests --skip_submodule_sync --no_telemetry --cmake_extra_defines CMAKE_OSX_ARCHITECTURES=x86_64 2>&1 | tee ../build/feasibility/native-dependency-build.log
+          echo "MPA_ORT_NATIVE_DIRECTORY=$PWD/build/MacOS/Release" >> "$GITHUB_ENV"
+      - name: Strict native model and decoder probe
+        run: python processor/probes/run_native.py
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-feasibility-${{ matrix.target }}
+          path: processor/build/feasibility/
+          if-no-files-found: error
+          retention-days: 14

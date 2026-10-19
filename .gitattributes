@@ -5,3 +5,9 @@ app/schemas/** text eol=lf
 
 # Shell scripts must also run directly on Linux CI.
 *.sh text eol=lf
+
+# Cross-platform Processor source/protocol evidence must retain native LF.
+.gitattributes text eol=lf
+processor/** text=auto eol=lf
+docs/processor/** text=auto eol=lf
+.github/workflows/processor-feasibility.yml text eol=lf
