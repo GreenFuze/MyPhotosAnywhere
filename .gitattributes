@@ -10,4 +10,4 @@ app/schemas/** text eol=lf
 .gitattributes text eol=lf
 processor/** text=auto eol=lf
 docs/processor/** text=auto eol=lf
-.github/workflows/processor-feasibility.yml text eol=lf
+.github/workflows/processor-*.yml text eol=lf
