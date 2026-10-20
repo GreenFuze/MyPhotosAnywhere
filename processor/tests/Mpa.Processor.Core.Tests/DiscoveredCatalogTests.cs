@@ -140,7 +140,7 @@ public sealed class DiscoveredCatalogTests
         using (var old = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.Combine(directory.Path, "processor.db"), Pooling = false }.ToString()))
         {
             old.Open(); using var command = old.CreateCommand();
-            command.CommandText = "DROP TABLE source_asset; DROP TABLE discovered_asset; DROP TABLE discovery_revision; PRAGMA user_version=3;"; command.ExecuteNonQuery();
+            command.CommandText = "ALTER TABLE job_item DROP COLUMN captured_context; DROP TABLE source_asset; DROP TABLE discovered_asset; DROP TABLE discovery_revision; PRAGMA user_version=3;"; command.ExecuteNonQuery();
         }
         using var upgraded = new ProcessorStateDatabase(directory.Path);
         var sources = new LibrarySourceRepository(upgraded);

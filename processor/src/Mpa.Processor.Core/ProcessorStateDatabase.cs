@@ -49,7 +49,7 @@ public sealed class ProcessorStateDatabase : IDisposable
                 var objects = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
                 if (application != ApplicationId && !(application == 0 && version == 0 && objects == 0))
                     throw new InvalidDataException("Unknown database identity; preserve it and choose an empty Processor state directory.");
-                if (version is not (0 or 1 or 2 or 3 or 4)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
+                if (version is not (0 or 1 or 2 or 3 or 4 or 5)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
                 command.CommandText = "PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;";
                 command.ExecuteNonQuery();
                 command.CommandText = "PRAGMA journal_mode=WAL";
@@ -166,6 +166,12 @@ public sealed class ProcessorStateDatabase : IDisposable
                         INSERT INTO discovery_revision VALUES(1,1);
                         PRAGMA user_version=4;
                         """;
+                    command.ExecuteNonQuery(); transaction.Commit();
+                }
+                if (version < 5)
+                {
+                    using var transaction = connection.BeginTransaction(); command.Transaction = transaction;
+                    command.CommandText = "ALTER TABLE job_item ADD COLUMN captured_context TEXT NOT NULL DEFAULT '{}'; PRAGMA user_version=5;";
                     command.ExecuteNonQuery(); transaction.Commit();
                 }
             }

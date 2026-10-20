@@ -8,11 +8,12 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.Core;
 
 public sealed record JobStageSpec(string Name, string RecipeSha256, IReadOnlyList<string> Dependencies);
-public sealed record JobItemSpec(Guid Id, string InputFingerprint, IReadOnlyList<JobStageSpec> Stages);
-public sealed record StageLease(Guid JobId, Guid ItemId, string Stage, Guid LeaseId, int Attempt, string CapturedContext, string? Checkpoint);
+public sealed record JobItemSpec(Guid Id, string InputFingerprint, IReadOnlyList<JobStageSpec> Stages, string CapturedContext = "{}");
+public sealed record StageLease(Guid JobId, Guid ItemId, string Stage, Guid LeaseId, int Attempt, string CapturedContext, string? Checkpoint, string CapturedItemContext = "{}");
 public sealed record JobSummary(int Queued, int Running, int Ready, int Failed, int Unsupported, int Canceled, bool Paused, bool IsCanceled);
 public sealed record PendingStageReceipt(Guid Id, Guid JobId, Guid ItemId, string Stage, string Receipt);
 public sealed class StaleStageLeaseException() : InvalidOperationException("Stage lease is no longer current; retain/reconcile receipts and do not publish stale results.");
+public sealed class ConflictingJobItemException() : InvalidOperationException("The durable item identity already binds different input, context or recipes. Existing work was retained.");
 
 /// <summary>Serial background coordinator repository. Transactions fence each attempt and commit
 /// successful stage receipts plus outbox together. Network/native work never runs inside a transaction.</summary>
@@ -25,65 +26,124 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
     {
         if (jobId == Guid.Empty || !Identifier(kind)) throw new ArgumentException("Invalid job identity/kind.");
         var canonicalContext = CanonicalObject(capturedContext);
+        InsertJob(null, jobId, kind, canonicalContext);
+    }
+
+    public void CreateWithInitialItem(Guid jobId, string kind, ReadOnlySpan<byte> capturedContext, JobItemSpec item)
+    {
+        if (jobId == Guid.Empty || !Identifier(kind)) throw new ArgumentException("Invalid job identity/kind.");
+        var canonical = CanonicalObject(capturedContext); var prepared = Prepare(item);
+        using var transaction = _database.Connection.BeginTransaction();
+        InsertJob(transaction, jobId, kind, canonical); InsertItem(transaction, jobId, prepared); transaction.Commit();
+    }
+    private void InsertJob(SqliteTransaction? transaction, Guid jobId, string kind, string canonicalContext)
+    {
         var context = Encoding.UTF8.GetBytes(canonicalContext);
         var hash = Convert.ToHexStringLower(SHA256.HashData(context));
-        using var command = Command(null, "INSERT INTO job(id,kind,captured_context,context_hash) VALUES($job,$kind,$context,$hash)",
+        using var command = Command(transaction, "INSERT INTO job(id,kind,captured_context,context_hash) VALUES($job,$kind,$context,$hash)",
             ("$job", Key(jobId)), ("$kind", kind), ("$context", Encoding.UTF8.GetString(context)), ("$hash", hash));
         command.ExecuteNonQuery();
     }
 
     public void AddItem(Guid jobId, JobItemSpec item)
     {
+        if (jobId == Guid.Empty) throw new ArgumentException("Job identity is required.", nameof(jobId));
+        var prepared = Prepare(item);
+        using var transaction = _database.Connection.BeginTransaction();
+        InsertItem(transaction, jobId, prepared); transaction.Commit();
+    }
+    public bool EnsureItem(Guid jobId, JobItemSpec item)
+    {
+        if (jobId == Guid.Empty) throw new ArgumentException("Job identity is required.", nameof(jobId));
+        var prepared = Prepare(item);
+        using var transaction = _database.Connection.BeginTransaction();
+        var exists = false;
+        using (var select = Command(transaction, "SELECT input_fingerprint,captured_context FROM job_item WHERE job_id=$job AND id=$item",
+            ("$job", Key(jobId)), ("$item", Key(item.Id))))
+        {
+            using var reader = select.ExecuteReader();
+            if (reader.Read())
+            {
+                exists = true;
+                if (reader.GetString(0) != prepared.InputFingerprint || reader.GetString(1) != prepared.Context) throw new ConflictingJobItemException();
+            }
+        }
+        if (!exists) InsertItem(transaction, jobId, prepared);
+        else
+        {
+            var expected = new List<(string Name, string Recipe, string? Parent)>();
+            foreach (var stage in prepared.Stages.OrderBy(stage => stage.Name, StringComparer.Ordinal))
+                if (stage.Dependencies.Count == 0) expected.Add((stage.Name, stage.RecipeSha256, null));
+                else foreach (var parent in stage.Dependencies.Order(StringComparer.Ordinal)) expected.Add((stage.Name, stage.RecipeSha256, parent));
+            var actual = new List<(string Name, string Recipe, string? Parent)>();
+            using var graph = Command(transaction, """
+                SELECT s.name,s.recipe_hash,d.depends_on FROM item_stage s LEFT JOIN stage_dependency d
+                  ON d.job_id=s.job_id AND d.item_id=s.item_id AND d.stage_name=s.name
+                WHERE s.job_id=$job AND s.item_id=$item ORDER BY s.name,d.depends_on LIMIT 1025
+                """, ("$job", Key(jobId)), ("$item", Key(item.Id)));
+            using var reader = graph.ExecuteReader();
+            while (reader.Read()) actual.Add((reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)));
+            if (!expected.SequenceEqual(actual)) throw new ConflictingJobItemException();
+        }
+        transaction.Commit(); return !exists;
+    }
+    private PreparedItem Prepare(JobItemSpec item)
+    {
         ArgumentNullException.ThrowIfNull(item);
-        if (jobId == Guid.Empty || item.Id == Guid.Empty || !Hash(item.InputFingerprint) || item.Stages.Count is < 1 or > 32)
+        if (item.Id == Guid.Empty || !Hash(item.InputFingerprint) || item.Stages.Count is < 1 or > 32)
             throw new ArgumentException("Invalid captured job item.", nameof(item));
         var stages = item.Stages.Take(33).Select(stage => stage with { Dependencies = Array.AsReadOnly(stage.Dependencies.Take(32).ToArray()) }).ToArray();
         ValidateGraph(stages);
-        using var transaction = _database.Connection.BeginTransaction();
-        using (var itemCommand = Command(transaction, "INSERT INTO job_item(job_id,id,input_fingerprint) VALUES($job,$item,$input)",
-            ("$job", Key(jobId)), ("$item", Key(item.Id)), ("$input", item.InputFingerprint))) itemCommand.ExecuteNonQuery();
-        foreach (var stage in stages)
+        return new(item.Id, item.InputFingerprint, stages, CanonicalObject(Encoding.UTF8.GetBytes(item.CapturedContext)));
+    }
+    private void InsertItem(SqliteTransaction transaction, Guid jobId, PreparedItem item)
+    {
+        using (var itemCommand = Command(transaction, "INSERT INTO job_item(job_id,id,input_fingerprint,captured_context) VALUES($job,$item,$input,$context)",
+            ("$job", Key(jobId)), ("$item", Key(item.Id)), ("$input", item.InputFingerprint), ("$context", item.Context))) itemCommand.ExecuteNonQuery();
+        foreach (var stage in item.Stages)
         {
             using var command = Command(transaction, "INSERT INTO item_stage(job_id,item_id,name,recipe_hash,state) VALUES($job,$item,$stage,$recipe,$state)",
                 ("$job", Key(jobId)), ("$item", Key(item.Id)), ("$stage", stage.Name), ("$recipe", stage.RecipeSha256),
                 ("$state", stage.Dependencies.Count == 0 ? "queued" : "waiting-dependency"));
             command.ExecuteNonQuery();
         }
-        foreach (var stage in stages)
+        foreach (var stage in item.Stages)
             foreach (var parent in stage.Dependencies)
             {
                 using var command = Command(transaction, "INSERT INTO stage_dependency VALUES($job,$item,$stage,$parent)",
                     ("$job", Key(jobId)), ("$item", Key(item.Id)), ("$stage", stage.Name), ("$parent", parent));
                 command.ExecuteNonQuery();
             }
-        transaction.Commit();
     }
+    private sealed record PreparedItem(Guid Id, string InputFingerprint, JobStageSpec[] Stages, string Context);
 
-    public StageLease? ClaimNext()
+    public StageLease? ClaimNext(string? kind = null)
     {
+        if (kind is not null && !Identifier(kind)) throw new ArgumentException("Invalid admitted job kind.", nameof(kind));
         using var transaction = _database.Connection.BeginTransaction();
         using var select = Command(transaction, """
-            SELECT s.job_id,s.item_id,s.name,s.attempt,j.captured_context,s.checkpoint
-            FROM item_stage s JOIN job j ON j.id=s.job_id
-            WHERE s.state='queued' AND j.paused=0 AND j.canceled=0
+            SELECT s.job_id,s.item_id,s.name,s.attempt,j.captured_context,s.checkpoint,i.captured_context
+            FROM item_stage s JOIN job j ON j.id=s.job_id JOIN job_item i ON i.job_id=s.job_id AND i.id=s.item_id
+            WHERE s.state='queued' AND j.paused=0 AND j.canceled=0 AND ($kind IS NULL OR j.kind=$kind)
               AND NOT EXISTS(SELECT 1 FROM stage_dependency d JOIN item_stage parent
                 ON parent.job_id=d.job_id AND parent.item_id=d.item_id AND parent.name=d.depends_on
                 WHERE d.job_id=s.job_id AND d.item_id=s.item_id AND d.stage_name=s.name AND parent.state!='ready')
             ORDER BY s.job_id,s.item_id,s.name LIMIT 1
-            """);
-        Guid job; Guid item; string name; int attempt; string context; string? checkpoint;
+            """, ("$kind", kind is null ? DBNull.Value : kind));
+        Guid job; Guid item; string name; int attempt; string context; string? checkpoint; string itemContext;
         using (var reader = select.ExecuteReader())
         {
             if (!reader.Read()) return null;
             job = Guid.Parse(reader.GetString(0)); item = Guid.Parse(reader.GetString(1)); name = reader.GetString(2);
             attempt = checked(reader.GetInt32(3) + 1); context = reader.GetString(4); checkpoint = reader.IsDBNull(5) ? null : reader.GetString(5);
+            itemContext = reader.GetString(6);
         }
         var lease = Guid.NewGuid();
         using var update = Command(transaction, "UPDATE item_stage SET state='running',attempt=$attempt,lease_id=$lease WHERE job_id=$job AND item_id=$item AND name=$stage AND state='queued'",
             ("$attempt", attempt), ("$lease", Key(lease)), ("$job", Key(job)), ("$item", Key(item)), ("$stage", name));
         if (update.ExecuteNonQuery() != 1) throw new InvalidOperationException("Serial job claim lost its selected row.");
         transaction.Commit();
-        return new(job, item, name, lease, attempt, context, checkpoint);
+        return new(job, item, name, lease, attempt, context, checkpoint, itemContext);
     }
 
     public void SaveCheckpoint(StageLease lease, ReadOnlySpan<byte> checkpoint)
@@ -148,12 +208,13 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
         }
         var leases = new List<StageLease>();
         using (var select = Command(transaction, """
-            SELECT s.item_id,s.name,s.lease_id,s.attempt,j.captured_context,s.checkpoint FROM item_stage s JOIN job j ON j.id=s.job_id
+            SELECT s.item_id,s.name,s.lease_id,s.attempt,j.captured_context,s.checkpoint,i.captured_context FROM item_stage s JOIN job j ON j.id=s.job_id
+            JOIN job_item i ON i.job_id=s.job_id AND i.id=s.item_id
             WHERE s.job_id=$job AND s.state='canceling' ORDER BY s.item_id,s.name
             """, ("$job", Key(jobId))))
         using (var reader = select.ExecuteReader())
             while (reader.Read()) leases.Add(new(jobId, Guid.Parse(reader.GetString(0)), reader.GetString(1), Guid.Parse(reader.GetString(2)),
-                reader.GetInt32(3), reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5)));
+                reader.GetInt32(3), reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5), reader.GetString(6)));
         transaction.Commit();
         return leases.AsReadOnly();
     }

@@ -110,7 +110,7 @@ public sealed class LibrarySourceTests
             jobs.AddItem(job, new(Guid.NewGuid(), new string('a', 64), [new("metadata", new string('b', 64), [])]));
         }
         using (var old = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.Combine(root.Path, "processor.db"), Pooling = false }.ToString()))
-        { old.Open(); using var command = old.CreateCommand(); command.CommandText = "DROP TABLE source_asset; DROP TABLE discovered_asset; DROP TABLE discovery_revision; DROP TABLE configuration_outbox; DROP TABLE source_binding; DROP TABLE library_configuration; PRAGMA user_version=2;"; command.ExecuteNonQuery(); }
+        { old.Open(); using var command = old.CreateCommand(); command.CommandText = "ALTER TABLE job_item DROP COLUMN captured_context; DROP TABLE source_asset; DROP TABLE discovered_asset; DROP TABLE discovery_revision; DROP TABLE configuration_outbox; DROP TABLE source_binding; DROP TABLE library_configuration; PRAGMA user_version=2;"; command.ExecuteNonQuery(); }
         using var upgraded = new ProcessorStateDatabase(root.Path);
         Assert.AreEqual(installation, upgraded.InstallationId); Assert.AreEqual(library, new ProcessorLibraryRepository(upgraded).GetOrCreateIdentity());
         Assert.AreEqual("account-A", new DriveAccountRepository(upgraded).Accounts().Single().PermissionId);
