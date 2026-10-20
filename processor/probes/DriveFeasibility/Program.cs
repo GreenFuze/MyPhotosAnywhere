@@ -55,6 +55,8 @@ internal static class Program
         const string user = "stage-zero-account";
         UserCredential credential;
         var interactive = false;
+        DateTime? previousAccessTokenExpiresAtUtc = null;
+        DateTimeOffset? refreshStartedAtUtc = null;
         if (args[0] == "authorize")
         {
             var reviewPath = Path.Combine(root, "authorization-url.txt");
@@ -69,9 +71,20 @@ internal static class Program
         {
             var token = await flow.LoadTokenAsync(user, deadline.Token).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("No protected authorization exists; interactive consent is required.");
+            if (token.ExpiresInSeconds is { } lifetime)
+                previousAccessTokenExpiresAtUtc = token.IssuedUtc.AddSeconds(lifetime);
             credential = new UserCredential(flow, user, token);
-            if (!await credential.RefreshTokenAsync(deadline.Token).ConfigureAwait(false))
-                throw new InvalidOperationException("Google did not refresh the authorization.");
+            if (args[0] == "refresh")
+            {
+                refreshStartedAtUtc = DateTimeOffset.UtcNow;
+                if (!await credential.RefreshTokenAsync(deadline.Token).ConfigureAwait(false))
+                    throw new InvalidOperationException("Google did not refresh the authorization.");
+            }
+            else
+            {
+                // Ordinary requests reuse a valid credential; Google SDK refreshes only when needed.
+                _ = await credential.GetAccessTokenForRequestAsync(cancellationToken: deadline.Token).ConfigureAwait(false);
+            }
         }
         if (string.IsNullOrWhiteSpace(credential.Token.RefreshToken) ||
             string.IsNullOrWhiteSpace(credential.Token.AccessToken))
@@ -103,6 +116,9 @@ internal static class Program
             grantedScopes = granted.Order(StringComparer.Ordinal).ToArray(),
             protectedRefreshTokenPresent = true,
             accessTokenLifetimeSeconds = credential.Token.ExpiresInSeconds,
+            previousAccessTokenExpiresAtUtc, refreshStartedAtUtc,
+            previousAccessTokenExpiredBeforeRefresh = previousAccessTokenExpiresAtUtc.HasValue && refreshStartedAtUtc.HasValue &&
+                previousAccessTokenExpiresAtUtc.Value <= refreshStartedAtUtc.Value.UtcDateTime,
             scope = "Authorization/short refresh only; not elapsed-time, Drive access or cross-client acceptance"
         };
         var report = Path.Combine(root, args[0] + "-" + Guid.NewGuid().ToString("N") + ".json");

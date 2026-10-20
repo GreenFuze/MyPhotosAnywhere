@@ -14,7 +14,8 @@ internal sealed class DriveRoundTripProbe(UserCredential credential)
     public async Task RunAsync(string folderId, string reportDirectory, CancellationToken cancellationToken)
     {
         ProbeDriveClient.CheckId(folderId);
-        using var http = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false })
+        using var transport = new CompletionLossHandler(new SocketsHttpHandler { AllowAutoRedirect = false });
+        using var http = new HttpClient(transport, disposeHandler: false)
         {
             Timeout = TimeSpan.FromSeconds(60)
         };
@@ -37,10 +38,17 @@ internal sealed class DriveRoundTripProbe(UserCredential credential)
             var digest = Convert.ToHexStringLower(SHA256.HashData(bytes));
             var payloadId = await api.ReserveIdAsync(cancellationToken).ConfigureAwait(false);
             journal.Record(new { operation = "before-payload-create", id = payloadId, parent = nested, sha256 = digest, size = bytes.Length });
-            await api.UploadResumableAsync(payloadId, nested, "synthetic-payload.bin", bytes, cancellationToken).ConfigureAwait(false);
+            var completionLost = false;
+            try
+            {
+                await api.UploadResumableAsync(payloadId, nested, "synthetic-payload.bin", bytes, cancellationToken).ConfigureAwait(false);
+            }
+            catch (SyntheticCompletionLostException) { completionLost = true; }
+            if (!completionLost || !transport.DiscardedCompletion)
+                throw new InvalidDataException("Synthetic lost-completion transport boundary was not exercised.");
 
-            // Simulate losing the successful application-level completion result: reconcile by the
-            // pre-journaled ID, then replay the same create. This is not a real socket outage test.
+            // The transport disposed the real successful HTTP response before the uploader could
+            // consume it. Reconcile the journaled identity; never invent a fresh replacement ID.
             var metadata = await api.GetMetadataAsync(payloadId, cancellationToken).ConfigureAwait(false);
             ValidatePayload(metadata, payloadId, nested, bytes.Length, digest);
             await api.ExpectDuplicateCreateAsync(payloadId, nested, cancellationToken).ConfigureAwait(false);
@@ -77,7 +85,7 @@ internal sealed class DriveRoundTripProbe(UserCredential credential)
                 reservedIdReplayStatus = 409, fullDownloadVerified = true, rangeVerified = true,
                 chunkResumeStatusVerified = true, completionManifestVerified = true,
                 recursivePagedDiscoveryVerified = true, fixtureCount = descendants.Count,
-                simulatedLostApplicationResponse = true, actualSocketLossTested = false,
+                injectedCompletionTransportFailure = true, actualSocketLossTested = false,
                 crossClientTested = false, originalsTouched = false, fixturesRetained = true
             };
             journal.Record(new { operation = "complete", runFolder });

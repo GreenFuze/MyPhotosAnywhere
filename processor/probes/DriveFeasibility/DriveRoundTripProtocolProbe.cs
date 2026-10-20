@@ -12,6 +12,7 @@ internal static class DriveRoundTripProtocolProbe
 {
     public static async Task RunAsync()
     {
+        await CheckDroppedCompletionAsync().ConfigureAwait(false);
         using var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
         {
             ClientSecrets = new ClientSecrets { ClientId = "synthetic", ClientSecret = "synthetic" },
@@ -76,6 +77,54 @@ internal static class DriveRoundTripProtocolProbe
     }
 
     private const string Session = "https://www.googleapis.com/upload/drive/v3/files?upload_id=synthetic";
+
+    private static async Task CheckDroppedCompletionAsync()
+    {
+        using var inner = new CompletionResponseHandler();
+        using var transport = new CompletionLossHandler(inner);
+        using var http = new HttpClient(transport, disposeHandler: false);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var rejected = false;
+        using (var first = new HttpRequestMessage(HttpMethod.Put, Session) { Content = new ByteArrayContent([1]) })
+        {
+            first.Content.Headers.ContentRange = new ContentRangeHeaderValue(0, 0, 1);
+            try { using var unexpected = await http.SendAsync(first, cancellation.Token).ConfigureAwait(false); }
+            catch (SyntheticCompletionLostException) { rejected = true; }
+        }
+        if (!rejected || !transport.DiscardedCompletion || inner.LastContent?.WasDisposed != true)
+            throw new InvalidDataException("Discarded completion did not fail or release its response body.");
+        using var second = new HttpRequestMessage(HttpMethod.Put, Session) { Content = new ByteArrayContent([1]) };
+        second.Content.Headers.ContentRange = new ContentRangeHeaderValue(0, 0, 1);
+        using var response = await http.SendAsync(second, cancellation.Token).ConfigureAwait(false);
+        if (response.StatusCode != HttpStatusCode.OK || inner.Requests != 2)
+            throw new InvalidDataException("Completion fault injection was not limited to exactly one response.");
+    }
+
+    private sealed class CompletionResponseHandler : HttpMessageHandler
+    {
+        public TrackedContent? LastContent { get; private set; }
+        public int Requests { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (request.Method != HttpMethod.Put || request.RequestUri?.AbsoluteUri != Session)
+                throw new InvalidDataException("Completion fault test escaped its synthetic destination.");
+            Requests++;
+            LastContent = new TrackedContent();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = LastContent });
+        }
+    }
+
+    private sealed class TrackedContent() : ByteArrayContent("{}"u8.ToArray())
+    {
+        public bool WasDisposed { get; private set; }
+        protected override void Dispose(bool disposing)
+        {
+            WasDisposed = true;
+            base.Dispose(disposing);
+        }
+    }
 
     private static async Task CheckWithFolderAsync(UserCredential credential, ProbeCreateJournal journal, Step[] additional,
         Func<ProbeDriveClient, Task> operation, Type? expected, CancellationToken cancellationToken)
