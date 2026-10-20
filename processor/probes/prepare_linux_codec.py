@@ -35,11 +35,29 @@ class CodecPreparation:
             raise RuntimeError("A supported 7-Zip extractor must already be installed on this runner")
         payload = self.root / "payload"
         tools = self.root / "tools"
-        self.command("rpm", [extractor, "x", str(fetch.root / "nasm-3.02-0.fc43.x86_64.rpm"),
-                             "-o" + str(payload), "-y", "nasm-3.02-0.fc43.x86_64.cpio"])
-        archive = payload / "nasm-3.02-0.fc43.x86_64.cpio"
-        if not archive.is_file() or archive.is_symlink() or archive.stat().st_size != 2835056:
+        self.command("rpm", [extractor, "x", str(fetch.root / "nasm-3.02-0.fc43.x86_64.rpm"), "-o" + str(payload), "-y"])
+        entries = list(payload.iterdir())
+        if len(entries) != 1 or entries[0].is_symlink() or not entries[0].is_file():
             raise RuntimeError("Unexpected official RPM payload")
+        archive = entries[0]
+        with archive.open("rb") as source:
+            magic = source.read(4)
+        if magic == bytes.fromhex("28b52ffd"):
+            # 7-Zip 23 exposes the RPM's compressed payload; newer versions unwrap it.
+            # Both routes must produce the exact same pinned CPIO before selecting tools.
+            zstd = shutil.which("zstd")
+            if not zstd:
+                raise RuntimeError("This extractor requires an already installed Zstandard decoder")
+            expanded = self.root / "assembler.cpio"
+            with expanded.open("xb") as output, (self.root / "zstd.log").open("xb") as errors:
+                result = subprocess.run([zstd, "-d", "-c", str(archive)], stdout=output, stderr=errors, check=False, timeout=30)
+            if result.returncode or (self.root / "zstd.log").stat().st_size:
+                raise RuntimeError("Pinned RPM payload decompression failed")
+            archive = expanded
+        with archive.open("rb") as source:
+            digest = hashlib.file_digest(source, "sha256").hexdigest()
+        if archive.stat().st_size != 2835056 or digest != "c1c5f7ffcd2d302b387900d7bb78d8873166cb93453ae460ffb82e1f129656a6":
+            raise RuntimeError("Unexpected official RPM CPIO bytes")
         # Never extract package build-id symlinks or install files into system directories.
         self.command("tools", [extractor, "x", str(archive), "-o" + str(tools), "-y", "./usr/bin/nasm", "./usr/bin/ndisasm"])
         nasm = tools / "usr/bin/nasm"
