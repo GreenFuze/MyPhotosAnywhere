@@ -1,4 +1,4 @@
-# Drive feasibility — Stage 0, incomplete
+# Drive feasibility â€” Stage 0, incomplete
 
 Updated October 20, 2026. Observed results are separate from pending acceptance. Private account/folder identifiers, credentials, authorization URLs and upload session URIs stay out of public evidence.
 
@@ -64,7 +64,7 @@ Fault injection is not live revoked-grant/rate-limit evidence. Full logs and obs
 | Actual crash/network-loss reconciliation | Actual socket/process interruption pending; real-server successful completion discarded before client consumption, injected I/O failure and reserved-ID reconciliation passed. |
 | Additional source/workspace accounts | Pending; current run covers one account. |
 | Live denied/revoked scopes and operational recovery | Pending; synthetic failures passed. Preserve existing Android grants. |
-| Actual expiry and beyond-seven-day refresh | Pending as dated above; immediate refresh is insufficient. |
+| Actual expiry and beyond-seven-day refresh | Actual expired access-token refresh passed in a fresh process at 2026-10-20T06:22:43.0693717Z, after recorded expiration 06:03:57.8061269Z, without interactive authorization. Beyond-seven-day refresh remains due after October 27 04:33:16 UTC. |
 
 Immediate Gate A's browser/configuration/full-scope access/short-refresh evidence and personal-test verification path are observed. Cross-client/source discovery/recovery remain explicit gates before activating corresponding product paths. Stage 0 overall remains open, including native/platform feasibility. Duration remains a Stage 9 release gate.
 

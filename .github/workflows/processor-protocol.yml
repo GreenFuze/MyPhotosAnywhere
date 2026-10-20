@@ -1,0 +1,62 @@
+name: Processor protocol contracts
+on:
+  push:
+    paths:
+      - 'processor/src/**'
+      - 'processor/tests/**'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - 'protocol/**'
+      - '.github/workflows/processor-protocol.yml'
+  pull_request:
+    paths:
+      - 'processor/src/**'
+      - 'processor/tests/**'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - 'protocol/**'
+      - '.github/workflows/processor-protocol.yml'
+permissions:
+  contents: read
+concurrency:
+  group: processor-protocol-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: true
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.303'
+      - name: Locked restore and strict contract tests
+        working-directory: processor
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/protocol-tests | Out-Null
+          dotnet restore tests/Mpa.Processor.Protocol.Tests/Mpa.Processor.Protocol.Tests.csproj --locked-mode *> build/protocol-tests/restore.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test tests/Mpa.Processor.Protocol.Tests/Mpa.Processor.Protocol.Tests.csproj --no-restore -c Release --logger 'trx;LogFileName=contracts.trx' --results-directory build/protocol-tests *> build/protocol-tests/test.log
+          $mpaContractExit = $LASTEXITCODE
+          Get-Content build/protocol-tests/test.log
+          if ($mpaContractExit -ne 0) { exit $mpaContractExit }
+          $mpaDiagnostic = Get-ChildItem build/protocol-tests/*.log | Select-String -Pattern '\bwarning\b|\berror\s+[A-Z]+\d+\s*:'
+          if ($mpaDiagnostic) { $mpaDiagnostic; throw 'Protocol diagnostics are blocking.' }
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-protocol-${{ matrix.runner }}
+          path: processor/build/protocol-tests/
+          if-no-files-found: error
+          retention-days: 14

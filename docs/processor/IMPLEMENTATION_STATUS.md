@@ -1,19 +1,19 @@
 # MPA 0.6.0 implementation ledger
 
-Updated: 2026-10-20. **Stage 0 in progress. No 0.6 application or installer is released.**
+Updated: 2026-10-20. **Stage 0 validation continues; Stage 1 contracts are in progress. No 0.6 application or installer is released.**
 
 ## Authority and baseline
 
 The owner approved implementing the complete joint release unattended, reported switching to High effort, and subsequently directed emulator-first development with the S23 reserved for final tests. The historical plan-only stop in the plan documents has been satisfied. Preserve fast failure, object ownership and original-media protections.
 
-Baseline: `6c9ead7b1d4446dc819dee71974aa7b68614f232` (0.5.33 publication revision), application source `7714d96b6f8b654c8f16e6358dd9d993356380fe`. Work branch: `feat/processor-060`. Native evidence records the exact clean committed SHA; early local experiments are explicitly provisional. No Android runtime files or schema have been changed.
+Baseline: `6c9ead7b1d4446dc819dee71974aa7b68614f232` (0.5.33 publication revision), application source `7714d96b6f8b654c8f16e6358dd9d993356380fe`. Work branch: `feat/processor-060`. Native evidence records the exact clean committed SHA; early local experiments are explicitly provisional. Only isolated protocol classes/tests have been added to Android; no UI behavior, version or Room schema has changed.
 
 ## Stage ledger
 
 | Stage | State | Evidence / remaining work |
 | --- | --- | --- |
-| 0: feasibility/baseline | In progress | Production OAuth, full desktop grant, fresh-process refresh, bounded synthetic Drive round trip passed. Cross-client/manual source discovery, expiry/duration, recovery and native targets remain open. |
-| 1: contracts | Pending | Golden codecs, causality, publication and approval contracts. |
+| 0: feasibility/baseline | In progress | Production OAuth, full desktop grant, fresh-process refresh, bounded synthetic Drive round trip passed. Manual post-consent source discovery, actual-expiry refresh and injected lost-completion reconciliation passed. Four-target two-model/decoder native matrix passed on 67607b1; expanded object model matrix is running on 9bae0a3. Actual cross-client/crash/multiple-account/duration and remaining codec/OCR/package gates stay open. |
+| 1: contracts | In progress | Shared Kotlin/C# canonical JSON and Drive identity goldens passed; public-key signature interoperability and bounded causal field contracts under test. Publication, alias and approval contracts remain. |
 | 2: core/plugins | Pending | Durable jobs, resources, worker ownership, tray/Exit. |
 | 3: accounts/LAN | Pending | Production sessions, discovery, secure pairing, acknowledged controls. |
 | 4: catalog | Pending | Immutable publishing, staged phone catalog, human synchronization. |
@@ -65,3 +65,10 @@ The next local candidate adds pinned YOLOX, embedded SFace modification notice, 
 4. Finish signing/native-test-access inventory. Missing paid publisher signing uses the already approved personal-test path; missing native execution does not.
 
 Do not stop at routine stages or ask for another Continue. Stop only for required human access/consent, unresolved diagnostics, safety or a material scope decision, while continuing useful independent work.
+
+## October 20 verified follow-up
+
+- Native CI 39373514740 on 67607b119d7e1c6b89dcbafec67c95da72964e6c passed all four OS/architecture targets. Independent downloaded evidence/report hashes and source binding verified; complete Linux/Intel build logs have zero diagnostics. Earlier failed/canceled runs above remain historical failures, not current unresolved source defects. See validation/native-compatibility.md.
+- A manually uploaded synthetic nested file added through Drive UI after consent was found and read byte-for-byte by the existing desktop credential. A real-server upload completion response was discarded by the test transport before consumption, and reserved-ID reconciliation/replay passed. This is injected I/O failure, not a real process-crash claim.
+- At 2026-10-20T06:22:43.0693717Z a fresh process refreshed the stored access token after its recorded expiry 06:03:57.8061269Z, without interactive authorization. The actual beyond-seven-day observation remains due after October 27 04:33:16 UTC.
+- Android CI on 9bae0a3 correctly failed its strict lint gate after Gradle 9.8.2 became stable. The exact official checksum is pinned in the candidate update; no check is disabled. The existing AGP setVisible diagnostic remains separately checked by owner, label, ID, origin and version.

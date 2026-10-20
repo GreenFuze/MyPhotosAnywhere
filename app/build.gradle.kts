@@ -35,6 +35,7 @@ android {
         unitTests.isReturnDefaultValues = true
         unitTests.isIncludeAndroidResources = true
     }
+    sourceSets.getByName("test").resources.directories.add(rootProject.file("protocol/fixtures").path)
 }
 
 dependencies {
