@@ -28,3 +28,9 @@ The diagnostic scanner now also detects `CMake Deprecation Warning`; the former 
 Local preparation passed Python syntax, exact-anchor application against downloaded pinned source inspection copies and diagnostic-classification checks. Subsequent native execution passed as recorded above. Model-quality, complete resource-budget and installer acceptance remain separate gates.
 
 The native workflow paths now track native probe/tool/model inputs specifically, so unrelated authorization-source edits do not repeat a long native build. Final joint-release acceptance still requires the final immutable product revision across every target.
+
+## Expanded three-model matrix - accepted feasibility increment
+
+Run39380066718, source9bae0a31e70a054fb62560aa2828b077e8bc0526, completed successfully on attempt2. Windows, Linux and Apple Silicon passed on the first attempt; Intel's hosted runner lost communication and supplied no completed build log/artifact. Its same-source rerun passed. All four downloaded evidence manifests/file hashes, model/source binding and complete source-built logs were independently verified. Each target now loads YuNet, the notice-bearing normalized SFace and unchanged YOLOX, with the synthetic JPEG decoder check. Zero unresolved diagnostics.
+
+Observed Process peaks: Windows147763200 bytes, Linux191766528 bytes. Both Mac peak values are explicitly unavailable/null, not zero. Working-set/process-tree monitoring and resource-budget acceptance remain open. This does not establish model quality, OCR/video/HEIF coverage, installer execution or the final immutable product revision.

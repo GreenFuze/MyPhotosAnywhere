@@ -4,5 +4,6 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="[10.0.13]" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="[2.1.14]" />
     <ProjectReference Include="../Mpa.Processor.Protocol/Mpa.Processor.Protocol.csproj" />
+    <ProjectReference Include="../Mpa.Processor.WorkerRuntime/Mpa.Processor.WorkerRuntime.csproj" />
   </ItemGroup>
 </Project>

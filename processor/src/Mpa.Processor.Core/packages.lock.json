@@ -51,6 +51,9 @@
       },
       "mpa.processor.protocol": {
         "type": "Project"
+      },
+      "mpa.processor.workerruntime": {
+        "type": "Project"
       }
     }
   }

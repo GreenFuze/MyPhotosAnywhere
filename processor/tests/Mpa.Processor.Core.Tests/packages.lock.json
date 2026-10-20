@@ -142,10 +142,14 @@
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.13, 10.0.13]",
           "Mpa.Processor.Protocol": "[0.6.0, )",
+          "Mpa.Processor.WorkerRuntime": "[0.6.0, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.14, 2.1.14]"
         }
       },
       "mpa.processor.protocol": {
+        "type": "Project"
+      },
+      "mpa.processor.workerruntime": {
         "type": "Project"
       }
     }
