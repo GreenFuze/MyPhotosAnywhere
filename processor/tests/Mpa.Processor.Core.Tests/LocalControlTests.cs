@@ -52,6 +52,29 @@ public sealed class LocalControlTests
     }
 
     [TestMethod]
+    public async Task ImmediatelyDisconnectedClientsDoNotStopTheListener()
+    {
+        using var root = new WorkerProcessTests.WorkerTestDirectory();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var calls = 0;
+        await using var server = new LocalProcessorControl(root.Path, (_, _) =>
+        {
+            Interlocked.Increment(ref calls);
+            return Task.FromResult(new LocalProcessorReply(true, "ready", null));
+        });
+        for (var index = 0; index < 20; index++)
+        {
+            using (var client = new NamedPipeClientStream(".", LocalProcessorControl.PipeName(root.Path), PipeDirection.InOut,
+                PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
+            { await client.ConnectAsync(deadline.Token).ConfigureAwait(false); }
+            var reply = await LocalProcessorControl.TrySendAsync(root.Path, LocalProcessorCommand.Status, deadline.Token).ConfigureAwait(false);
+            Assert.IsNotNull(reply); Assert.IsTrue(reply.Ok);
+        }
+        Assert.AreEqual(20, calls);
+        Assert.AreEqual(20, server.RejectedConnections);
+    }
+
+    [TestMethod]
     public async Task UnavailableProcessorDoesNotLaunchOneOrCreateState()
     {
         using var root = new WorkerProcessTests.WorkerTestDirectory();

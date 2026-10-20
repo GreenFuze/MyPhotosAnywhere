@@ -29,8 +29,11 @@ public sealed class LocalProcessorControl : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(handler);
         _handler = handler; _stopAcknowledged = stopAcknowledged;
+        // Protocol framing owns the 8 KiB limit. Leave transport buffers at OS defaults: .NET
+        // sets explicit Unix socket buffers after accept, which can fail on macOS when a peer
+        // disconnects immediately. A closed client must not terminate the command listener.
         _pipe = new NamedPipeServerStream(PipeName(stateDirectory), PipeDirection.InOut, 1, PipeTransmissionMode.Byte,
-            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly | PipeOptions.FirstPipeInstance, FrameLimit, FrameLimit);
+            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly | PipeOptions.FirstPipeInstance, 0, 0);
         Completion = ServeAsync();
     }
 
@@ -119,7 +122,9 @@ public sealed class LocalProcessorControl : IAsyncDisposable
                 catch (Exception error) when (!executingHandler && (error is ProtocolFormatException or EndOfStreamException || error is IOException && !_stop.IsCancellationRequested ||
                     error is OperationCanceledException && !_stop.IsCancellationRequested))
                 { Interlocked.Increment(ref _rejected); } // Invalid/disconnected local client; never execute an unparsed command.
-                finally { if (_pipe.IsConnected) _pipe.Disconnect(); }
+                // A peer that closes immediately can mark a Windows pipe Broken. IsConnected
+                // is then false, but Disconnect is still required before the next accept.
+                finally { if (!_stop.IsCancellationRequested) _pipe.Disconnect(); }
                 if (acknowledgedStop) _stopAcknowledged?.Invoke(); // After reply, never dispose/join this server from inside its handler.
             }
         }

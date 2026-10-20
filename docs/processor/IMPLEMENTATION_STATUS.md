@@ -122,3 +122,5 @@ Do not stop at routine stages or ask for another Continue. Stop only for require
 - No 0.6.0 Android UI/runtime activation, signed joint installers or publication yet. Accounts/pairing/catalog/plugins/phone thinning and full acceptance remain open.
 
 Desktop CI39443445552 on75dd7d10c4e2b40ce8b4fbc5fadea1fe69b03faf passed strict builds on all4 targets. Core IPC CI39443445237 correctly failed on macOS: the standard per-user TMPDIR plus the long endpoint name exceeded Unix socket path limits. Candidate shortens only the label from MPA.Processor.Control.v1 to mpac1-, preserving the same128-bit state digest and CurrentUserOnly checks. Actual Mac IPC must pass before acceptance; no exception requested.
+
+Native IPC run39444762318 onbbd346a got past the socket-path issue, then caught an immediate-disconnect race in .NET's explicit Unix socket buffer setup on Apple Silicon. Use default transport buffers while preserving the independent8KiB protocol frame cap. Add20 repeated disconnect/status exchanges; native revalidation pending. No native failure was waived.
