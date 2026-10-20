@@ -79,7 +79,7 @@ public sealed class LocalProcessorControl : IAsyncDisposable
     {
         try
         {
-            while (true)
+            while (!_stop.IsCancellationRequested)
             {
                 await _pipe.WaitForConnectionAsync(_stop.Token).ConfigureAwait(false);
                 var acknowledgedStop = false;
