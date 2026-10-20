@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-19",
+  "date": "2026-10-20",
   "status": "Stage 0 provisional candidates; not final release inventory or license acceptance",
   "lockedProbeDependencies": {
     "dotnetSdk": "10.0.303",
@@ -32,20 +32,23 @@
       "capability": "object categories",
       "candidate": "OpenCV Zoo YOLOX-s",
       "license": "Apache-2.0 according to model-directory license",
-      "source": "https://github.com/opencv/opencv_zoo/tree/main/models/object_detection_yolox",
-      "status": "License/source reviewed only; immutable weights, native execution, postprocessing, vocabulary and quality evaluation pending"
+      "source": "https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98/models/object_detection_yolox",
+      "status": "Immutable source/weights/license pinned; static NCHW contract checked; provisional Windows CPU execution finite/nonempty with zero warnings. Postprocessing, vocabulary/quality and other native targets pending.",
+      "pins": "processor/probes/models.json"
     },
     {
       "capability": "OCR",
       "candidate": "Tesseract and explicitly selected language data",
-      "source": "https://tesseract-ocr.github.io/tessdoc/",
-      "status": "Candidate only; source/data versions, per-component notices, native packaging, languages and quality remain unverified"
+      "source": "https://github.com/tesseract-ocr/tesseract/releases/tag/5.5.3",
+      "status": "Official stable release and Windows asset digest observed; native package/closure, language data and quality not accepted.",
+      "observedStableVersion": "5.5.3"
     },
     {
       "capability": "video facts/posters",
       "candidate": "Restricted FFmpeg build without GPL/nonfree options",
       "source": "https://ffmpeg.org/legal.html",
-      "status": "Candidate only; exact build flags, source/license closure, codecs, target execution and notices remain unverified"
+      "status": "Official source release observed; source signature, exact restricted flags/codec inventory, native execution and redistribution closure pending.",
+      "observedStableVersion": "9.0.2"
     },
     {
       "capability": "desktop status/tray",
@@ -59,7 +62,8 @@
     "officialRevision": "402979ac1bef89dcd55add41eaa7277c407599eb",
     "intelMac": "Official ONNX Runtime 1.31.0 NuGet omits osx-x64; native source-build proof required",
     "linux": "Stock VM run blocked device-discovery GetPciBusId warning; test CPU source build with onnxruntime_DISABLE_DEVICE_DISCOVERY=ON and no telemetry",
-    "exceptionsGranted": false
+    "exceptionsGranted": false,
+    "sourceFixIncrement": "67607b119d7e1c6b89dcbafec67c95da72964e6c; source patch inventories and append regression checks; Linux/Intel CI still in progress"
   },
   "remainingExitRequirements": [
     "All required native targets and complete diagnostic review",
@@ -67,5 +71,6 @@
     "Representative quality evidence, separate from smoke tests",
     "Resource/process ownership and CPU limits validated",
     "No phone inference or paid-service dependency introduced"
-  ]
+  ],
+  "modelDerivativeNotice": "Changed SFace embeds a dated modification notice; restoring original declarations and notice presence restores exact original protobuf. Other model bytes unchanged."
 }

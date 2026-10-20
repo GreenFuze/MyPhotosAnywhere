@@ -4,6 +4,7 @@ import hashlib
 import json
 import shutil
 import urllib.request
+import uuid
 
 
 class ProbeModelFetcher:
@@ -24,25 +25,34 @@ class ProbeModelFetcher:
             else:
                 url = (f"https://media.githubusercontent.com/media/opencv/opencv_zoo/{revision}"
                        f"/models/{model['directory']}/{model['file']}")
-                pending = path.with_suffix(".pending")
-                with urllib.request.urlopen(url, timeout=90) as source, pending.open("xb") as output:
-                    remaining = model["bytes"]
-                    while remaining:
-                        block = source.read(min(remaining, 1024 * 1024))
-                        if not block:
-                            raise ValueError("Truncated model download")
-                        output.write(block)
-                        remaining -= len(block)
-                    if source.read(1):
-                        raise ValueError("Model download exceeds pinned size")
-                self.verify(pending, model)
-                pending.replace(path)
+                pending = path.with_name(path.name + "." + uuid.uuid4().hex + ".pending")
+                owns_pending = False
+                try:
+                    with urllib.request.urlopen(url, timeout=90) as source, pending.open("xb") as output:
+                        owns_pending = True
+                        remaining = model["bytes"]
+                        while remaining:
+                            block = source.read(min(remaining, 1024 * 1024))
+                            if not block:
+                                raise ValueError("Truncated model download")
+                            output.write(block)
+                            remaining -= len(block)
+                        if source.read(1):
+                            raise ValueError("Model download exceeds pinned size")
+                    self.verify(pending, model)
+                    pending.replace(path)
+                    owns_pending = False
+                finally:
+                    if owns_pending:
+                        pending.unlink(missing_ok=True)
             license_url = (f"https://raw.githubusercontent.com/opencv/opencv_zoo/{revision}"
                            f"/models/{model['directory']}/LICENSE")
             with urllib.request.urlopen(license_url, timeout=30) as source:
                 license_bytes = source.read(128 * 1024 + 1)
             if not license_bytes or len(license_bytes) > 128 * 1024:
                 raise ValueError("Invalid model license document")
+            if hashlib.sha256(license_bytes).hexdigest() != model["licenseSha256"]:
+                raise ValueError("Model license digest mismatch")
             (self.destination / (model["file"] + ".LICENSE")).write_bytes(license_bytes)
             print(model["file"], model["sha256"], "verified")
         shutil.copyfile(self.probes / "models.json", self.destination / "models.json")

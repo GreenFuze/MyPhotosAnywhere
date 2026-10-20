@@ -42,6 +42,11 @@ class NativeProbeRunner:
         self.command("restore", [self.dotnet, "restore", project, "--locked-mode", "--verbosity", "minimal"])
         self.command("build", [self.dotnet, "build", project, "--no-restore", "-c", "Release", "--verbosity", "minimal"])
         native_log = self.root / "build/feasibility/native-dependency-build.log"
+        if native_log.exists():
+            shutil.copyfile(native_log, self.evidence / "native-dependency-build.log")
+        elf_log = self.root / "build/feasibility/native-elf-program-headers.log"
+        if elf_log.exists():
+            shutil.copyfile(elf_log, self.evidence / "native-elf-program-headers.log")
         if native_log.exists() and re.search(r"CMake(?: [A-Za-z()_-]+)* Warning|\bwarning\s*(?::|[A-Z]+\d+:)",
                                             native_log.read_text(encoding="utf-8"), re.IGNORECASE):
             raise RuntimeError("Unresolved source-built native dependency warning; inspect full build log")

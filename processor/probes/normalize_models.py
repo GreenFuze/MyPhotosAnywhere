@@ -31,19 +31,32 @@ class ProbeModelNormalizer:
                 raise ValueError("Cannot remove initializer inputs from this ONNX IR")
             source_proto = model.SerializeToString(deterministic=True)
             original_inputs = list(model.graph.input)
+            original_notice = model.doc_string
+            had_notice = model.HasField("doc_string")
             initializers = {item.name for item in model.graph.initializer}
             removed = [item.name for item in original_inputs if item.name in initializers]
             kept = [item for item in original_inputs if item.name not in initializers]
             del model.graph.input[:]
             model.graph.input.extend(kept)
+            notice = ("Modified by MPA on 2026-10-20: removed redundant initializer graph-input declarations; "
+                      "graph operations and weights unchanged. Original: OpenCV Zoo SFace 2021dec, Apache-2.0.")
+            if removed:
+                if entry["file"] != "face_recognition_sface_2021dec.onnx":
+                    raise ValueError("Unreviewed model modification")
+                model.doc_string = (original_notice + "\n" if original_notice else "") + notice
             onnx.checker.check_model(model)
             normalized = model.SerializeToString(deterministic=True)
             if hashlib.sha256(normalized).hexdigest() != entry["normalizedSha256"]:
                 raise ValueError("Normalized model differs from reviewed derivative")
             # Structural equivalence proof: restoring only the original input
-            # declarations must reconstruct the entire original protobuf.
+            # declarations and documentary notice must reconstruct the entire
+            # original protobuf. No operation or weight may change.
             del model.graph.input[:]
             model.graph.input.extend(original_inputs)
+            if had_notice:
+                model.doc_string = original_notice
+            else:
+                model.ClearField("doc_string")
             if model.SerializeToString(deterministic=True) != source_proto:
                 raise ValueError("Normalization unexpectedly changed computation or weights")
             if len(kept) != 1:
@@ -56,12 +69,15 @@ class ProbeModelNormalizer:
             entry["sourceSha256"] = entry["sha256"]
             entry["sha256"] = hashlib.sha256(normalized).hexdigest()
             entry["bytes"] = len(normalized)
-            entry["modification"] = "Removed redundant initializer graph input declarations only; MPA 2026-10-19"
+            entry["modification"] = notice if removed else "Original model bytes retained; no modification"
+            license_path = self.root / (entry["file"] + ".LICENSE")
+            if hashlib.sha256(license_path.read_bytes()).hexdigest() != entry["licenseSha256"]:
+                raise ValueError("Unverified model license")
             shutil.copyfile(self.root / (entry["file"] + ".LICENSE"),
                             self.destination / (entry["file"] + ".LICENSE"))
         (self.destination / "models.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         (self.destination / "normalization.json").write_text(json.dumps(changes, indent=2) + "\n", encoding="utf-8")
-        print("Validated graph-only normalization; originals unchanged.")
+        print("Validated graph-input normalization and embedded modification notice; original files unchanged.")
 
 
 if __name__ == "__main__":

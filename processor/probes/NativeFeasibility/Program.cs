@@ -13,6 +13,11 @@ internal static class Program
     public static int Main(string[] args)
     {
         OrtEnv.Instance().DisableTelemetryEvents();
+        if (args.Length == 2 && args[0] == "--ocr-fixture")
+        {
+            new TextFixtureProbe(args[1]).Write();
+            return 0;
+        }
         if (args.Length == 4 && args[0] == "--compare")
         {
             var reference = new VerifiedModelDirectory(args[1]);
@@ -132,8 +137,13 @@ internal sealed class VerifiedModelDirectory
                 throw new InvalidDataException("Model hash mismatch: " + name);
             entries.Add(new VerifiedModel(name, path, expected));
         }
-        if (entries.Count != 2 || entries.Select(x => x.Name).Distinct(StringComparer.Ordinal).Count() != 2)
-            throw new InvalidDataException("Probe needs exactly the reviewed detector and embedding models");
+        var reviewed = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "face_detection_yunet_2023mar.onnx", "face_recognition_sface_2021dec.onnx",
+            "object_detection_yolox_2022nov.onnx"
+        };
+        if (entries.Count != reviewed.Count || !reviewed.SetEquals(entries.Select(x => x.Name)))
+            throw new InvalidDataException("Probe needs exactly the reviewed face detector, embedding and object models");
         Entries = entries;
     }
 }
