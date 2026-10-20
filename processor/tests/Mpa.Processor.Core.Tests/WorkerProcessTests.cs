@@ -174,7 +174,7 @@ public sealed class WorkerProcessTests
         return new(host, digest, [fixture, scenario, root], Path.GetDirectoryName(fixture)!, Path.Combine(root, "diagnostics-" + Guid.NewGuid().ToString("N") + ".log"));
     }
 
-    private sealed class WorkerTestDirectory : IDisposable
+    internal sealed class WorkerTestDirectory : IDisposable
     {
         private readonly string _temporaryRoot = System.IO.Path.TrimEndingDirectorySeparator(System.IO.Path.GetFullPath(System.IO.Path.GetTempPath()));
         public string Path { get; }

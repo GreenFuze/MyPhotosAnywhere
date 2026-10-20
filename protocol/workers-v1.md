@@ -45,3 +45,9 @@ outcomes use the catalog's error taxonomy. Known malformed-item/unsupported/auth
 storage problems isolate the affected stage/item and preserve retry evidence. Unexpected
 internal invariants terminate work promptly and surface an actionable failure. Native
 warnings/crashes are retained for investigation; they are not silently downgraded.
+
+## Implemented conversation ordering
+
+Core sends hello; Worker returns capabilities. For each captured attempt: prepare, prepared, run, then result/failure; Worker progress/checkpoint is permitted only during running. Preparation can return a typed per-item failure. Core cancel fences further results immediately; exact canceled acknowledgement returns to ready. A result generated before the Worker receives cancellation may cross Core cancel in transit: it remains fenced at Core; Worker still acknowledges cancel for that last completed attempt. Ready can enter exit/exited. Wrong role, phase, sequence, launch or attempt poisons the conversation. Version 1.0 envelope fields are closed; compatibility changes require explicit negotiation.
+
+The first executable product host is a harmless byte-facts worker, not a media analyzer. It verifies an assigned snapshot under a read lease, produces a separate canonical facts artifact, supports prepare cancellation, and isolates changed/unavailable snapshot failures so the next item can proceed. Core must independently verify artifacts before publication. Integration tests launch the real host and verify byte identity, output hash/size and lease release.
