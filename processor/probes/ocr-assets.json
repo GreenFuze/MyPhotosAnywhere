@@ -30,5 +30,14 @@
       "bytes": 11358,
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     }
+  ],
+  "fixtures": [
+    {
+      "file": "fixtures/ocr-latin.png",
+      "bytes": 9848,
+      "sha256": "48080df465398bf7bdc872f9cd2ad1dbfe86ea93ac41fa1786db01b9da07d132",
+      "expectedText": "MPA PROCESSOR 6045",
+      "scope": "Generated non-private Latin text, smoke only; not representative OCR quality"
+    }
   ]
 }

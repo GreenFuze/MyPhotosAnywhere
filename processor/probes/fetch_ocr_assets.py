@@ -16,6 +16,14 @@ class OcrAssetFetcher:
 
     def run(self):
         self.root.mkdir(parents=True, exist_ok=True)
+        for fixture in self.manifest.get("fixtures", []):
+            name = fixture["file"]
+            if not re.fullmatch(r"fixtures/[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", name) or not 0 < fixture["bytes"] <= 128 * 1024:
+                raise ValueError("Unsafe synthetic fixture identity/bound")
+            path = (self.probes / name).resolve(strict=True)
+            if not path.is_relative_to((self.probes / "fixtures").resolve(strict=True)):
+                raise ValueError("Synthetic fixture escaped its selected root")
+            self.verify(path, fixture)
         names = set()
         for asset in self.manifest["assets"]:
             name = asset["file"]

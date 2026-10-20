@@ -38,6 +38,7 @@ internal static class Program
 
         var decoder = new DecoderProbe().Run();
         using var process = Process.GetCurrentProcess();
+        var peakWorkingSet = process.PeakWorkingSet64;
         var report = new
         {
             scope = "Native loading/CPU inference/decoder feasibility only; not recognition quality or product acceptance",
@@ -46,7 +47,8 @@ internal static class Program
             architecture = RuntimeInformation.ProcessArchitecture.ToString(),
             models = results,
             decoder,
-            peakWorkingSetBytes = process.PeakWorkingSet64
+            peakWorkingSetBytes = peakWorkingSet > 0 ? (long?)peakWorkingSet : null,
+            memoryMeasurement = peakWorkingSet > 0 ? "Process.PeakWorkingSet64" : "Unavailable from Process API; not a zero-memory result"
         };
         using var output = new FileStream(args[1], FileMode.CreateNew, FileAccess.Write, FileShare.None);
         JsonSerializer.Serialize(output, report, ReportJson.Options);

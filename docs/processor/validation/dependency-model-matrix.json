@@ -63,7 +63,8 @@
     "intelMac": "Official ONNX Runtime 1.31.0 NuGet omits osx-x64; native source-build proof required",
     "linux": "Stock VM run blocked device-discovery GetPciBusId warning; test CPU source build with onnxruntime_DISABLE_DEVICE_DISCOVERY=ON and no telemetry",
     "exceptionsGranted": false,
-    "sourceFixIncrement": "67607b119d7e1c6b89dcbafec67c95da72964e6c; source patch inventories and append regression checks; Linux/Intel CI still in progress"
+    "sourceFixIncrement": "67607b119d7e1c6b89dcbafec67c95da72964e6c; all four native jobs passed run 39373514740. Source/hash/full-diagnostic review verified independently. Two-model compatibility proof, not final plugin acceptance.",
+    "memoryMeasurement": "Positive Process peak on Windows/Linux; zero from Mac Process API is unavailable, not a zero footprint. Resource-budget acceptance remains open."
   },
   "remainingExitRequirements": [
     "All required native targets and complete diagnostic review",

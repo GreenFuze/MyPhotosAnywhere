@@ -1,6 +1,10 @@
-# Native CPU compatibility increment — awaiting CI
+# Native CPU compatibility increment — passed
 
 October 20, 2026. The prior Linux/Intel runs are **not accepted**. This increment attempts source/build fixes against ONNX Runtime revision `402979ac1bef89dcd55add41eaa7277c407599eb`; it is not a diagnostic waiver.
+
+**Verified result:** CI run 39373514740, application revision `67607b119d7e1c6b89dcbafec67c95da72964e6c`, passed Windows x64, Ubuntu x64, Intel Mac and Apple Silicon. Downloaded evidence file hashes/source binding and complete Linux/Intel build logs independently verified. All four corrected runtime logs and both complete source build logs contain zero unresolved warnings/errors. Five source-change inventories and native append boundary assertions passed on both source-build targets; Linux GNU_STACK is RW.
+
+This accepts the two-model/decoder compatibility increment, not the newer object/OCR candidate or final product. Peak Process memory was approximately 132 MB on Windows and 180 MB on Linux. Mac's Process API returned zero, which is an **unavailable measurement**, not zero memory; resource-budget acceptance remains open and the newer reporter makes this field nullable. No exception granted or used.
 
 `patch_native_source.py` requires that revision and exact edit anchors, keeps upstream license text, and records original/final SHA-256 and reasons for each changed file. Upstream dependency archives remain version/hash-pinned by the runtime. Existing upstream patches run before the additional dependency fixes.
 
@@ -21,6 +25,6 @@ Only the shared-runtime target is built. Earlier invocations compiled upstream u
 
 The diagnostic scanner now also detects `CMake Deprecation Warning`; the former expression missed that spelling. It still rejects compiler/linker/CMake warnings and errors. No severity reduction, warning filter, baseline or exception added.
 
-Local preparation passed Python syntax, exact-anchor application against downloaded pinned source inspection copies and diagnostic-classification checks. **This is not Linux/Intel compilation, inference-equivalence, memory or installer acceptance.** Complete CI logs and source-change inventories must be reviewed before recording a pass.
+Local preparation passed Python syntax, exact-anchor application against downloaded pinned source inspection copies and diagnostic-classification checks. Subsequent native execution passed as recorded above. Model-quality, complete resource-budget and installer acceptance remain separate gates.
 
 The native workflow paths now track native probe/tool/model inputs specifically, so unrelated authorization-source edits do not repeat a long native build. Final joint-release acceptance still requires the final immutable product revision across every target.
