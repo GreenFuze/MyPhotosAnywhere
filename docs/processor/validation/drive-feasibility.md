@@ -79,3 +79,13 @@ Immediate Gate A's browser/configuration/full-scope access/short-refresh evidenc
 - [File checksum fields](https://developers.google.com/workspace/drive/api/reference/rest/v3/files)
 - [Partial downloads](https://developers.google.com/workspace/drive/api/guides/manage-downloads)
 - [Google .NET PKCE broker 1.77.0](https://github.com/googleapis/google-api-dotnet-client/blob/v1.77.0/Src/Support/Google.Apis.Auth/OAuth2/GoogleWebAuthorizationBroker.cs)
+
+## Conditional metadata and Trash feasibility - October 20
+
+A read-only v3 metadata request for the existing synthetic payload returned version 2 and no ETag header. A new tiny fixture was then created and journaled under a new folder within the disposable test root. All mutation endpoints were bound to that new ID; no original-content update or permanent deletion endpoint was exposed.
+
+At 07:41:54 UTC, v2 supplied a file ETag. A matching tag permitted a metadata change; the formerly valid stale tag was rejected with HTTP 412. Stale-tag Trash and restore were also rejected 412, while their matching tags succeeded and final downloaded bytes were unchanged. The v3 metadata PATCH accepted an intentionally invalid condition with HTTP 200, so v3 is not accepted for this safety precondition. A deliberately arbitrary opaque tag returned HTTP 500 on v2; this diagnostic is recorded, not treated as a successful precondition check. Actual captured-valid/stale tags provide the accepted evidence.
+
+The product will isolate the supported v2 conditional metadata adapter while retaining v3 for ordinary discovery/transfers. This proves one synthetic owned-file path only; live user-original actions still require controller-approved scopes, current revision/content checks, actual workspace/source boundaries and durable replay records. Additional-account/shared-drive support remains separate acceptance. Synthetic transport tests reject unexpected statuses, wrong identity, oversized bodies and unexposed operations; strict build has zero warnings/errors.
+
+[Google v2 File ETag resource](https://developers.google.com/workspace/drive/api/reference/rest/v2/files), [v2/v3 comparison](https://developers.google.com/workspace/drive/api/guides/v2-to-v3-reference), [metadata patch semantics](https://developers.google.com/workspace/drive/api/guides/performance).

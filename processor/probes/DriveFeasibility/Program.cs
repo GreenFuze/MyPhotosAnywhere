@@ -16,9 +16,9 @@ internal static class Program
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("This Stage 0 credential probe requires Windows DPAPI; product vault adapters remain separate work.");
-        if (args.Length < 4 || args[0] is not ("authorize" or "refresh" or "vault-check" or "inspect" or "round-trip" or "discover") ||
-            args.Length != (args[0] == "discover" ? 6 : args[0] is "inspect" or "round-trip" ? 5 : 4))
-            throw new ArgumentException("Usage: DriveFeasibility <authorize|refresh|vault-check|inspect|round-trip|discover> <desktop-client-json> <private-directory> <file|drive> [disposable-folder-id] [local-synthetic-fixture for discover]");
+        if (args.Length < 4 || args[0] is not ("authorize" or "refresh" or "vault-check" or "inspect" or "round-trip" or "discover" or "revision" or "conditional") ||
+            args.Length != (args[0] == "discover" ? 6 : args[0] is "inspect" or "round-trip" or "revision" or "conditional" ? 5 : 4))
+            throw new ArgumentException("Usage: DriveFeasibility <authorize|refresh|vault-check|inspect|round-trip|discover|revision|conditional> <desktop-client-json> <private-directory> <file|drive> [disposable-folder/file-id] [local-synthetic-fixture for discover]");
         var scope = args[3] switch
         {
             "file" => "https://www.googleapis.com/auth/drive.file",
@@ -36,6 +36,7 @@ internal static class Program
             await new LoopbackStateProbe(root).RunAsync().ConfigureAwait(false);
             await DriveReadProtocolProbe.RunAsync().ConfigureAwait(false);
             await DriveRoundTripProtocolProbe.RunAsync().ConfigureAwait(false);
+            await DriveConditionalProtocolProbe.RunAsync(root).ConfigureAwait(false);
             Console.WriteLine("Synthetic protected-store, loopback state/cancellation and bounded Drive protocol checks passed; no Google request or grant occurred.");
             return 0;
         }
@@ -95,6 +96,17 @@ internal static class Program
         if (args[0] == "inspect")
         {
             await new DriveReadProbe(credential).RunAsync(args[4], root, deadline.Token).ConfigureAwait(false);
+            return 0;
+        }
+        if (args[0] == "revision")
+        {
+            await new DriveRevisionProbe(credential).RunAsync(args[4], root, deadline.Token).ConfigureAwait(false);
+            return 0;
+        }
+        if (args[0] == "conditional")
+        {
+            if (args[3] != "drive") throw new InvalidOperationException("Synthetic conditional probe requires the approved full Drive grant.");
+            await new DriveConditionalProbe(credential).RunAsync(args[4], root, deadline.Token).ConfigureAwait(false);
             return 0;
         }
         if (args[0] == "round-trip")

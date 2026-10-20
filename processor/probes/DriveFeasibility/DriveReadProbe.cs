@@ -83,8 +83,8 @@ internal sealed class DriveReadProbe(UserCredential credential)
             if (!allowInvisible || !invisible)
                 throw new HttpRequestException($"Drive read probe failed with HTTP {(int)response.StatusCode}; no success or empty library is inferred.", null, response.StatusCode);
         }
-        return new ReadResult((int)response.StatusCode, body, reasons);
+        return new ReadResult((int)response.StatusCode, body, reasons, response.Headers.ETag?.ToString());
     }
 
-    internal sealed record ReadResult(int Status, JsonElement Body, string[] Reasons);
+    internal sealed record ReadResult(int Status, JsonElement Body, string[] Reasons, string? Etag);
 }
