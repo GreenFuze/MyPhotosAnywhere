@@ -5,7 +5,7 @@ namespace Mpa.Processor.Credentials;
 
 /// <summary>One owner serializes and joins native secret-store calls. No plaintext fallback.
 /// Cancellation does not imply a write was rolled back: reread before retrying an uncertain write.</summary>
-public sealed class NativeCredentialVault : IAsyncDisposable
+public sealed class NativeCredentialVault : ICredentialVault
 {
     public const int MaximumSecretBytes = 128 * 1024;
     private readonly ISecretBackend _backend;

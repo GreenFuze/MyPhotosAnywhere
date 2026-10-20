@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Version>0.6.0</Version></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" Version="[1.77.0]" />
+    <ProjectReference Include="../Mpa.Processor.Credentials/Mpa.Processor.Credentials.csproj" />
+  </ItemGroup>
+</Project>

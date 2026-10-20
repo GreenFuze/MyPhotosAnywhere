@@ -8,6 +8,11 @@ public sealed class SecretLease : IDisposable
 {
     private byte[]? _bytes;
     internal SecretLease(byte[] bytes) => _bytes = bytes;
+    public static SecretLease CopyFrom(ReadOnlySpan<byte> bytes)
+    {
+        if (bytes.Length is <= 0 or > NativeCredentialVault.MaximumSecretBytes) throw new ArgumentOutOfRangeException(nameof(bytes));
+        return new(bytes.ToArray());
+    }
     [JsonIgnore]
     public ReadOnlyMemory<byte> Bytes => _bytes ?? throw new ObjectDisposedException(nameof(SecretLease));
     public void Dispose()
