@@ -38,7 +38,9 @@ public sealed class LocalProcessorControl : IAsyncDisposable
     {
         var path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(stateDirectory));
         if (OperatingSystem.IsWindows()) path = path.ToUpperInvariant();
-        return "MPA.Processor.Control.v1." + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(path)))[..32];
+        // macOS per-user TMPDIR already consumes much of its 104-byte Unix socket path limit.
+        // Keep the full 128-bit state digest; shorten only the nonsecret protocol label.
+        return "mpac1-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(path)))[..32];
     }
 
     public static async Task<LocalProcessorReply?> TrySendAsync(string stateDirectory, LocalProcessorCommand command, CancellationToken cancellationToken)
