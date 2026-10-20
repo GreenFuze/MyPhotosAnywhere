@@ -3,8 +3,11 @@ on:
   push:
     paths:
       - 'processor/probes/NativeFeasibility/**'
-      - 'processor/probes/*.py'
-      - 'processor/probes/*.cpp'
+      - 'processor/probes/fetch_models.py'
+      - 'processor/probes/normalize_models.py'
+      - 'processor/probes/run_native.py'
+      - 'processor/probes/patch_native_source.py'
+      - 'processor/probes/flatbuffer_append_check.cpp'
       - 'processor/probes/requirements.txt'
       - 'processor/probes/models.json'
       - 'processor/Directory.Build.props'
@@ -14,8 +17,11 @@ on:
   pull_request:
     paths:
       - 'processor/probes/NativeFeasibility/**'
-      - 'processor/probes/*.py'
-      - 'processor/probes/*.cpp'
+      - 'processor/probes/fetch_models.py'
+      - 'processor/probes/normalize_models.py'
+      - 'processor/probes/run_native.py'
+      - 'processor/probes/patch_native_source.py'
+      - 'processor/probes/flatbuffer_append_check.cpp'
       - 'processor/probes/requirements.txt'
       - 'processor/probes/models.json'
       - 'processor/Directory.Build.props'

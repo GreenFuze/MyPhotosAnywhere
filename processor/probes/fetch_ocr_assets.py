@@ -9,10 +9,13 @@ import uuid
 
 
 class OcrAssetFetcher:
-    def __init__(self):
+    def __init__(self, manifest_name="ocr-assets.json", output_name="ocr-assets", allowed_hosts=None):
         self.probes = Path(__file__).resolve().parent
-        self.root = self.probes.parent / "build/ocr-assets"
-        self.manifest = json.loads((self.probes / "ocr-assets.json").read_text(encoding="utf-8"))
+        if not re.fullmatch(r"[a-z][a-z0-9-]*\.json", manifest_name) or not re.fullmatch(r"[a-z][a-z0-9-]*", output_name):
+            raise ValueError("Unsafe asset manifest/output identity")
+        self.root = self.probes.parent / "build" / output_name
+        self.manifest = json.loads((self.probes / manifest_name).read_text(encoding="utf-8"))
+        self.allowed_hosts = frozenset(allowed_hosts if allowed_hosts is not None else {"github.com", "raw.githubusercontent.com"})
 
     def run(self):
         self.root.mkdir(parents=True, exist_ok=True)
@@ -31,7 +34,7 @@ class OcrAssetFetcher:
                 raise ValueError("Asset identity is unsafe or repeated")
             names.add(name)
             address = urllib.parse.urlsplit(asset["url"])
-            if address.scheme != "https" or address.hostname not in {"github.com", "raw.githubusercontent.com"} or address.username:
+            if address.scheme != "https" or address.hostname not in self.allowed_hosts or address.username:
                 raise ValueError("Asset escaped its official source")
             if not 0 < asset["bytes"] <= 32 * 1024 * 1024 or not re.fullmatch(r"[0-9a-f]{64}", asset["sha256"]):
                 raise ValueError("Asset bound/digest is invalid")

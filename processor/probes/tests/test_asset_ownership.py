@@ -116,6 +116,22 @@ class AssetOwnershipTests(unittest.TestCase):
                 fetcher.fetch()
         self.assertEqual(pending.read_bytes(), b"not owned")
 
+    def test_explicit_codec_sources_do_not_expand_ocr_source_allowlist(self):
+        codec = ocr.OcrAssetFetcher("codec-assets.json", "codec-assets", {"ffmpeg.org", "www.nasm.us"})
+        codec.root = self.root / "codec"
+        codec.manifest = {"assets": [dict(self.asset, url="https://ffmpeg.org/releases/fixture.bin")]}
+        with patch.object(ocr.urllib.request, "urlopen", return_value=io.BytesIO(self.payload)):
+            codec.run()
+        self.asset["url"] = "https://ffmpeg.org/releases/fixture.bin"
+        with patch.object(ocr.urllib.request, "urlopen", side_effect=AssertionError("Wrong source reached network")):
+            with self.assertRaisesRegex(ValueError, "official source"):
+                self.fetcher.run()
+
+    def test_manifest_and_output_names_cannot_escape_probe_root(self):
+        for manifest, output in [("../codec-assets.json", "codec-assets"), ("codec-assets.json", "../outside")]:
+            with self.assertRaisesRegex(ValueError, "Unsafe"):
+                ocr.OcrAssetFetcher(manifest, output)
+
 
 if __name__ == "__main__":
     unittest.main(failfast=True)
