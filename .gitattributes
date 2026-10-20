@@ -11,3 +11,6 @@ app/schemas/** text eol=lf
 processor/** text=auto eol=lf
 docs/processor/** text=auto eol=lf
 .github/workflows/processor-*.yml text eol=lf
+protocol/** text=auto eol=lf
+app/src/main/java/com/myphotosanywhere/mpa/processor/** text eol=lf
+app/src/test/java/com/myphotosanywhere/mpa/ProcessorProtocol*.kt text eol=lf
