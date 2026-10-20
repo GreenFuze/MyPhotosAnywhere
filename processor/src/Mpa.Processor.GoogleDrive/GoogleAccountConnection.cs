@@ -10,9 +10,25 @@ namespace Mpa.Processor.GoogleDrive;
 
 public sealed record ConnectedDriveAccount(Guid ConnectionId, string PermissionId, string DisplayName, string? EmailAddress);
 
+public interface IGoogleAccountConnection : IAsyncDisposable
+{
+    Task<ConnectedDriveAccount> AuthorizeAsync(IAuthorizationBrowser browser, CancellationToken cancellationToken);
+    Task<ConnectedDriveAccount?> CheckAsync(CancellationToken cancellationToken);
+}
+
+public interface IGoogleAccountConnectionFactory
+{
+    IGoogleAccountConnection Create(Guid connectionId, string? expectedPermissionId);
+}
+
+public sealed class GoogleAccountConnectionFactory(DesktopOAuthConfiguration configuration, ICredentialVault vault) : IGoogleAccountConnectionFactory
+{
+    public IGoogleAccountConnection Create(Guid connectionId, string? expectedPermissionId) => new GoogleAccountConnection(configuration, vault, connectionId, expectedPermissionId);
+}
+
 /// <summary>Owns one connection's SDK flow, browser callback and bounded read-only identity
 /// requests. No caller receives a raw UserCredential or token. The vault is borrowed.</summary>
-public sealed class GoogleAccountConnection : IAsyncDisposable
+public sealed class GoogleAccountConnection : IGoogleAccountConnection
 {
     private readonly Guid _connectionId;
     private readonly string? _expectedPermissionId;

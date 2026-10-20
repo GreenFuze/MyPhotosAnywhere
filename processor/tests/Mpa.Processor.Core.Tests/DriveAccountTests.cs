@@ -89,6 +89,7 @@ public sealed class DriveAccountTests
         using var reopened = new ProcessorStateDatabase(root.Path);
         var durable = new DriveAccountRepository(reopened);
         Assert.AreEqual("abandoned", durable.PendingCleanup().Single().Reason);
+        Assert.ThrowsExactly<ArgumentException>(() => durable.Begin(id));
         Assert.ThrowsExactly<StaleDriveConnectionException>(() => durable.Promote(id, "permission-A", "A", null));
         durable.ConfirmCleanup(id);
     }

@@ -39,6 +39,8 @@ public sealed class DriveAccountRepository(ProcessorStateDatabase database)
     {
         if (connectionId == Guid.Empty || expectedPermissionId is not null && !Identity(expectedPermissionId)) throw new ArgumentException("Invalid connection/account identity.");
         if (PendingConnections().Count >= 32) throw new InvalidOperationException("Finish or dismiss an earlier account setup before starting another.");
+        using (var cleanup = Command(null, "SELECT 1 FROM credential_cleanup WHERE connection_id=$id", ("$id", connectionId.ToString("D"))))
+            if (cleanup.ExecuteScalar() is not null) throw new ArgumentException("A retired credential identity cannot be reused.", nameof(connectionId));
         var accounts = Accounts();
         if (accounts.Any(account => account.ConnectionId == connectionId)) throw new ArgumentException("A connection identity cannot be reused.", nameof(connectionId));
         if (expectedPermissionId is null && accounts.Count >= 128) throw new InvalidOperationException("Maximum Processor account count reached.");
@@ -109,10 +111,16 @@ public sealed class DriveAccountRepository(ProcessorStateDatabase database)
     }
     public void ConfirmCleanup(Guid connectionId)
     {
-        if (Accounts().Any(account => account.Connected && account.ConnectionId == connectionId) || PendingConnections().Any(pending => pending.Id == connectionId))
-            throw new InvalidOperationException("An active connection cannot be acknowledged as removed.");
+        AssertCleanupAllowed(connectionId);
         using var remove = Command(null, "DELETE FROM credential_cleanup WHERE connection_id=$id", ("$id", connectionId.ToString("D")));
         if (remove.ExecuteNonQuery() != 1) throw new InvalidOperationException("Unknown credential cleanup acknowledgement.");
+    }
+    public void AssertCleanupAllowed(Guid connectionId)
+    {
+        if (Accounts().Any(account => account.Connected && account.ConnectionId == connectionId) || PendingConnections().Any(pending => pending.Id == connectionId))
+            throw new InvalidOperationException("An active connection cannot be acknowledged as removed.");
+        using var find = Command(null, "SELECT 1 FROM credential_cleanup WHERE connection_id=$id", ("$id", connectionId.ToString("D")));
+        if (find.ExecuteScalar() is null) throw new InvalidOperationException("Unknown credential cleanup acknowledgement.");
     }
 
     private void QueueCleanup(SqliteTransaction transaction, Guid id, string reason)
