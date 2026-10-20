@@ -84,7 +84,8 @@ public sealed class WorkerProcessTests
         using var root = new WorkerTestDirectory();
         var spec = await SpecAsync(root.Path, "echo").ConfigureAwait(false);
         await Assert.ThrowsExactlyAsync<InvalidDataException>(() => FramedWorkerProcess.StartAsync(spec with { ExecutableSha256 = new string('0', 64) }, CancellationToken.None)).ConfigureAwait(false);
-        Assert.IsFalse(File.Exists(Path.Combine(root.Path, "worker-read-lease.bin")));
+        Assert.IsFalse(File.Exists(Path.Combine(root.Path, "worker-started.marker")));
+        CollectionAssert.AreEqual(new byte[] { 42 }, File.ReadAllBytes(Path.Combine(root.Path, "worker-read-lease.bin")));
     }
 
     [TestMethod]
@@ -118,7 +119,8 @@ public sealed class WorkerProcessTests
         var spec = await SpecAsync(root.Path, "echo").ConfigureAwait(false);
         await Assert.ThrowsExactlyAsync<ArgumentOutOfRangeException>(() => FramedWorkerProcess.StartAsync(
             spec with { ResourcePolicy = new(1, TimeSpan.FromSeconds(1)) }, CancellationToken.None)).ConfigureAwait(false);
-        Assert.IsFalse(File.Exists(Path.Combine(root.Path, "worker-read-lease.bin")));
+        Assert.IsFalse(File.Exists(Path.Combine(root.Path, "worker-started.marker")));
+        CollectionAssert.AreEqual(new byte[] { 42 }, File.ReadAllBytes(Path.Combine(root.Path, "worker-read-lease.bin")));
     }
 
     [TestMethod]
@@ -187,6 +189,10 @@ public sealed class WorkerProcessTests
         var digest = Convert.ToHexStringLower(await SHA256.HashDataAsync(source).ConfigureAwait(false));
         var fixture = Path.Combine(AppContext.BaseDirectory, "WorkerFixture", "Mpa.Processor.TestWorkerHost.dll");
         if (!File.Exists(fixture)) throw new InvalidOperationException("Synthetic worker fixture was not built/copied.");
+        // Originals exist before work starts. The synthetic child may hold/read this byte,
+        // but must never create/write it or rely on surviving long enough to flush it.
+        using (var input = new FileStream(Path.Combine(root, "worker-read-lease.bin"), FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        { input.WriteByte(42); input.Flush(flushToDisk: true); }
         return new(host, digest, [fixture, scenario, root], Path.GetDirectoryName(fixture)!, Path.Combine(root, "diagnostics-" + Guid.NewGuid().ToString("N") + ".log"));
     }
 

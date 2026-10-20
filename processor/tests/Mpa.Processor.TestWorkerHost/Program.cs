@@ -44,8 +44,10 @@ var port = int.Parse(Environment.GetEnvironmentVariable("MPA_PARENT_PORT") ?? "0
 Environment.SetEnvironmentVariable("MPA_PARENT_KEY", null);
 Environment.SetEnvironmentVariable("MPA_PARENT_PORT", null);
 await using var guard = await ParentLifetimeGuard.ConnectAsync(new(port, secret), CancellationToken.None).ConfigureAwait(false);
-using var held = new FileStream(Path.Combine(root, "worker-read-lease.bin"), FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
-held.WriteByte(42); held.Flush(flushToDisk: true);
+using var held = new FileStream(Path.Combine(root, "worker-read-lease.bin"), FileMode.Open, FileAccess.Read, FileShare.None);
+if (held.Length != 1 || held.ReadByte() != 42) throw new InvalidDataException("Synthetic preexisting input changed before worker readiness.");
+using (var started = new FileStream(Path.Combine(root, "worker-started.marker"), FileMode.CreateNew, FileAccess.Write, FileShare.None))
+{ started.WriteByte(1); started.Flush(flushToDisk: true); }
 using var output = Console.OpenStandardOutput();
 using var writer = new WorkerFrameWriter(output);
 await writer.WriteAsync("{\"type\":\"hello\"}"u8.ToArray(), CancellationToken.None).ConfigureAwait(false);
