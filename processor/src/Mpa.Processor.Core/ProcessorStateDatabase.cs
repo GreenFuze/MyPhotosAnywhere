@@ -73,7 +73,7 @@ public sealed class ProcessorStateDatabase : IDisposable
                         ) STRICT;
                         CREATE TABLE item_stage(
                           job_id TEXT NOT NULL, item_id TEXT NOT NULL, name TEXT NOT NULL, recipe_hash TEXT NOT NULL,
-                          state TEXT NOT NULL CHECK(state IN('queued','running','canceling','ready','failed','unsupported','canceled')),
+                          state TEXT NOT NULL CHECK(state IN('queued','waiting-dependency','running','canceling','ready','failed','unsupported','canceled')),
                           attempt INTEGER NOT NULL DEFAULT 0, lease_id TEXT, checkpoint TEXT, result_receipt TEXT,
                           error_code TEXT, error_message TEXT, retryable INTEGER NOT NULL DEFAULT 0 CHECK(retryable IN(0,1)),
                           PRIMARY KEY(job_id,item_id,name), FOREIGN KEY(job_id,item_id) REFERENCES job_item(job_id,id)

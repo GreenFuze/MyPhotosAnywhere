@@ -44,8 +44,9 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
             ("$job", Key(jobId)), ("$item", Key(item.Id)), ("$input", item.InputFingerprint))) itemCommand.ExecuteNonQuery();
         foreach (var stage in stages)
         {
-            using var command = Command(transaction, "INSERT INTO item_stage(job_id,item_id,name,recipe_hash,state) VALUES($job,$item,$stage,$recipe,'queued')",
-                ("$job", Key(jobId)), ("$item", Key(item.Id)), ("$stage", stage.Name), ("$recipe", stage.RecipeSha256));
+            using var command = Command(transaction, "INSERT INTO item_stage(job_id,item_id,name,recipe_hash,state) VALUES($job,$item,$stage,$recipe,$state)",
+                ("$job", Key(jobId)), ("$item", Key(item.Id)), ("$stage", stage.Name), ("$recipe", stage.RecipeSha256),
+                ("$state", stage.Dependencies.Count == 0 ? "queued" : "waiting-dependency"));
             command.ExecuteNonQuery();
         }
         foreach (var stage in stages)
@@ -101,6 +102,12 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
             "UPDATE item_stage SET state='ready',result_receipt=$receipt,lease_id=NULL,error_code=NULL,error_message=NULL,retryable=0 " + LeaseWhere,
             ("$receipt", canonical));
         if (command.ExecuteNonQuery() != 1) throw new StaleStageLeaseException();
+        using (var unblock = Command(transaction, """
+            UPDATE item_stage SET state='queued' WHERE job_id=$job AND item_id=$item AND state='waiting-dependency'
+              AND NOT EXISTS(SELECT 1 FROM stage_dependency d JOIN item_stage parent
+                ON parent.job_id=d.job_id AND parent.item_id=d.item_id AND parent.name=d.depends_on
+                WHERE d.job_id=item_stage.job_id AND d.item_id=item_stage.item_id AND d.stage_name=item_stage.name AND parent.state!='ready')
+            """, ("$job", Key(lease.JobId)), ("$item", Key(lease.ItemId)))) unblock.ExecuteNonQuery();
         using var outbox = Command(transaction, "INSERT INTO state_outbox(id,job_id,item_id,stage_name,receipt) VALUES($id,$job,$item,$stage,$receipt)",
             ("$id", Key(lease.LeaseId)), ("$job", Key(lease.JobId)), ("$item", Key(lease.ItemId)), ("$stage", lease.Stage), ("$receipt", canonical));
         outbox.ExecuteNonQuery();
@@ -136,7 +143,7 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
         using (var fence = Command(transaction, "UPDATE item_stage SET state='canceling' WHERE job_id=$job AND state='running'", ("$job", Key(jobId)))) fence.ExecuteNonQuery();
         if (cancelJob)
         {
-            using var cancel = Command(transaction, "UPDATE item_stage SET state='canceled' WHERE job_id=$job AND state IN('queued','failed')", ("$job", Key(jobId)));
+            using var cancel = Command(transaction, "UPDATE item_stage SET state='canceled' WHERE job_id=$job AND state IN('queued','waiting-dependency','failed')", ("$job", Key(jobId)));
             cancel.ExecuteNonQuery();
         }
         var leases = new List<StageLease>();
@@ -202,7 +209,7 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
             if (!reader.IsDBNull(2)) counts[reader.GetString(2)] = reader.GetInt32(3);
         }
         if (!found) throw new KeyNotFoundException("Job does not exist.");
-        return new(counts.GetValueOrDefault("queued"), counts.GetValueOrDefault("running") + counts.GetValueOrDefault("canceling"),
+        return new(counts.GetValueOrDefault("queued") + counts.GetValueOrDefault("waiting-dependency"), counts.GetValueOrDefault("running") + counts.GetValueOrDefault("canceling"),
             counts.GetValueOrDefault("ready"), counts.GetValueOrDefault("failed"), counts.GetValueOrDefault("unsupported"), counts.GetValueOrDefault("canceled"), paused, canceled);
     }
 

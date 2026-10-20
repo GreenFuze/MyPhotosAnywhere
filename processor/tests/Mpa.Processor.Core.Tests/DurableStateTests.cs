@@ -132,6 +132,62 @@ public sealed class DurableStateTests
     private static JobItemSpec Item(Guid id, params JobStageSpec[] stages) => new(id, Hash, stages);
 
     [TestMethod]
+    public void BlockedStagesWaitForEveryDependencyAcrossReopenAndFailedOnlyRetry()
+    {
+        using var directory = new TestStateDirectory();
+        var job = Guid.NewGuid(); var item = Guid.NewGuid();
+        using (var state = new ProcessorStateDatabase(directory.Path))
+        {
+            var jobs = new DurableJobRepository(state);
+            jobs.Create(job, "takeout-import", "{}"u8);
+            jobs.AddItem(job, Item(item, new JobStageSpec("a", Hash, []), new JobStageSpec("b", Hash, []),
+                new JobStageSpec("combine", Hash, ["a", "b"]), new JobStageSpec("publish", Hash, ["combine"])));
+            jobs.Complete(jobs.ClaimNext()!, "{}"u8);
+            var failed = jobs.ClaimNext()!;
+            Assert.AreEqual("b", failed.Stage);
+            jobs.Fail(failed, "temporary-network", "Synthetic interrupted input", retryable: true);
+            Assert.IsNull(jobs.ClaimNext());
+            Assert.AreEqual(2, jobs.Summary(job).Queued);
+        }
+        using var reopened = new ProcessorStateDatabase(directory.Path);
+        var durable = new DurableJobRepository(reopened);
+        Assert.IsNull(durable.ClaimNext());
+        Assert.AreEqual(1, durable.RetryFailed(job));
+        var retry = durable.ClaimNext()!;
+        Assert.AreEqual("b", retry.Stage);
+        Assert.AreEqual(2, retry.Attempt);
+        Assert.IsNull(durable.ClaimNext());
+        durable.Complete(retry, "{}"u8);
+        var combined = durable.ClaimNext()!;
+        Assert.AreEqual("combine", combined.Stage);
+        Assert.IsNull(durable.ClaimNext());
+        durable.Complete(combined, "{}"u8);
+        var publish = durable.ClaimNext()!;
+        Assert.AreEqual("publish", publish.Stage);
+        durable.Complete(publish, "{}"u8);
+        Assert.AreEqual(4, durable.Summary(job).Ready);
+        Assert.AreEqual(0, durable.Summary(job).Queued);
+        Assert.IsNull(durable.ClaimNext());
+    }
+
+    [TestMethod]
+    public void CancellationIncludesDependencyBlockedStagesWithoutUnlockingThem()
+    {
+        using var directory = new TestStateDirectory();
+        using var state = new ProcessorStateDatabase(directory.Path);
+        var jobs = new DurableJobRepository(state);
+        var job = Guid.NewGuid();
+        jobs.Create(job, "takeout-import", "{}"u8);
+        jobs.AddItem(job, Item(Guid.NewGuid(), new JobStageSpec("original", Hash, []), new JobStageSpec("preview", Hash, ["original"])));
+        var running = jobs.ClaimNext()!;
+        jobs.Pause(job, cancelJob: true);
+        jobs.ReleaseStoppedAttempt(running);
+        Assert.AreEqual(2, jobs.Summary(job).Canceled);
+        Assert.AreEqual(0, jobs.Summary(job).Queued);
+        Assert.IsNull(jobs.ClaimNext());
+    }
+
+    [TestMethod]
     public void PauseFencesLateResultsAndResumeWaitsForActualWorkerExitAcknowledgement()
     {
         using var directory = new TestStateDirectory();

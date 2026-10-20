@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Mpa.Processor.Protocol;
+using Mpa.Processor.TestSupport;
 
 namespace Mpa.Processor.Core.Tests;
 
@@ -109,7 +110,7 @@ public sealed class WorkerProcessTests
             }
             using var marker = JsonDocument.Parse(await File.ReadAllBytesAsync(markerPath, deadline.Token).ConfigureAwait(false));
             child = Process.GetProcessById(marker.RootElement.GetProperty("childPid").GetInt32());
-            Assert.AreEqual(marker.RootElement.GetProperty("startTicks").GetInt64(), child.StartTime.ToUniversalTime().Ticks);
+            Assert.AreEqual(marker.RootElement.GetProperty("instance").GetString(), TestProcessIdentity.Read(child));
             ownedChild = true;
             Assert.IsFalse(child.HasExited);
             parent.Kill(entireProcessTree: false); // Deliberate controller loss, not test cleanup of its child.

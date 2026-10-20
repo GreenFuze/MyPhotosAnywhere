@@ -5,6 +5,7 @@ using System.Text.Json;
 using Mpa.Processor.Core;
 using Mpa.Processor.Protocol;
 using Mpa.Processor.WorkerRuntime;
+using Mpa.Processor.TestSupport;
 
 // Synthetic child-process fixture only. Never included in the product installer/plugin registry.
 if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "malformed" or "exit-error" or "parent-launcher"))
@@ -27,7 +28,7 @@ if (args[0] == "parent-launcher")
     var pendingMarker = Path.Combine(root, "parent-ready-" + Guid.NewGuid().ToString("N") + ".pending");
     using (var marker = new FileStream(pendingMarker, FileMode.CreateNew, FileAccess.Write, FileShare.None))
     {
-        JsonSerializer.Serialize(marker, new { childPid = child.ProcessId, startTicks = childProcess.StartTime.ToUniversalTime().Ticks });
+        JsonSerializer.Serialize(marker, new { childPid = child.ProcessId, instance = TestProcessIdentity.Read(childProcess) });
         marker.Flush(flushToDisk: true);
     }
     File.Move(pendingMarker, Path.Combine(root, "parent-ready.json"), overwrite: false);
