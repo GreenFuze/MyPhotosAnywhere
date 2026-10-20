@@ -30,7 +30,8 @@ public sealed class DesktopWebHost : IAsyncDisposable
     private readonly object _gate = new();
     private Task? _disposal;
     public Uri LocalEndpoint { get; private set; } = null!;
-    public Uri? LanEndpoint { get; private set; }
+    public Uri? HttpsEndpoint { get; private set; }
+    public IReadOnlyList<Uri> ListeningEndpoints { get; private set; } = [];
     public event Action<Exception>? Diagnostic;
     public IReadOnlyList<Exception> FrameworkDiagnostics => _diagnostics.Failures;
 
@@ -61,7 +62,9 @@ public sealed class DesktopWebHost : IAsyncDisposable
             options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(10);
             options.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(30);
             options.Listen(IPAddress.Loopback, 0, listen => listen.Protocols = HttpProtocols.Http1);
-            if (lanIdentity is not null) options.ListenAnyIP(0, listen =>
+            // Development includes the HTTPS acceptance fixture, but never a wildcard or
+            // LAN listener. Remote binding is deferred until explicit LAN onboarding exists.
+            if (lanIdentity is not null) options.Listen(IPAddress.Loopback, 0, listen =>
             {
                 listen.Protocols = HttpProtocols.Http1;
                 listen.UseHttps(lanIdentity.ServerCertificate, https => https.SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13);
@@ -75,13 +78,16 @@ public sealed class DesktopWebHost : IAsyncDisposable
             if (diagnostics.Failures.Count != 0) throw new AggregateException("Web host startup diagnostics are blocking.", diagnostics.Failures);
             var addresses = host.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()?.Addresses
                 ?? throw new InvalidOperationException("Web listener did not publish its actual bound endpoints.");
+            var boundEndpoints = addresses.Select(address => new Uri(address)).ToArray();
+            if (boundEndpoints.Any(endpoint => endpoint.Host != "127.0.0.1")) throw new InvalidOperationException("Development web listeners must bind exclusively to 127.0.0.1.");
+            owner.ListeningEndpoints = Array.AsReadOnly(boundEndpoints);
             owner.LocalEndpoint = new(addresses.Single(address => address.StartsWith("http://127.0.0.1:", StringComparison.Ordinal)));
             owner._endpoints.Add(owner.LocalEndpoint.GetLeftPart(UriPartial.Authority));
             if (lanIdentity is not null)
             {
                 var bound = new Uri(addresses.Single(address => address.StartsWith("https://", StringComparison.Ordinal)));
-                owner.LanEndpoint = new UriBuilder(Uri.UriSchemeHttps, lanIdentity.DnsName, bound.Port).Uri;
-                owner._endpoints.Add(owner.LanEndpoint.GetLeftPart(UriPartial.Authority));
+                owner.HttpsEndpoint = new UriBuilder(Uri.UriSchemeHttps, lanIdentity.DnsName, bound.Port).Uri;
+                owner._endpoints.Add(owner.HttpsEndpoint.GetLeftPart(UriPartial.Authority));
             }
             return owner;
         }
@@ -89,7 +95,7 @@ public sealed class DesktopWebHost : IAsyncDisposable
     }
 
     public BrowserInvitation OpenLocalBrowser() => _access.Invite(LocalEndpoint, hostOwner: true);
-    public BrowserInvitation InviteLanBrowser() => _access.Invite(LanEndpoint ?? throw new InvalidOperationException("Local-network access is not enabled."), hostOwner: false);
+    public BrowserInvitation InviteBrowser() => _access.Invite(HttpsEndpoint ?? throw new InvalidOperationException("HTTPS access is not enabled."), hostOwner: false);
 
     private void MapRequests()
     {
@@ -137,6 +143,10 @@ public sealed class DesktopWebHost : IAsyncDisposable
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This account changed. Refresh settings before trying again." }, context.RequestAborted).ConfigureAwait(false); }
             catch (DriveAccountAlreadyConnectedException)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This Google account already exists. Reconnect its existing entry." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (StaleLibraryConfigurationException)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Library settings changed. Refresh Sources before applying this change." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (ExistingLibrarySourceException)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This account and folder are already configured. Update their existing source entry." }, context.RequestAborted).ConfigureAwait(false); }
             catch (TokenResponseException)
             { context.Response.StatusCode = 503; await context.Response.WriteAsJsonAsync(new { message = "Google authorization could not finish. Reconnect or resume account setup on the host computer." }, context.RequestAborted).ConfigureAwait(false); }
             catch (HttpRequestException)
@@ -166,6 +176,18 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 await context.Response.WriteAsJsonAsync(await _application.SnapshotAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
             case ("GET", "/api/photos"):
                 await context.Response.WriteAsJsonAsync(await _application.PhotosAsync(RequiredQuery(context, "account"), OptionalQuery(context, "cursor", 4096), token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("GET", "/api/sources"):
+                await context.Response.WriteAsJsonAsync(await _application.SourcesAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("GET", "/api/folders"):
+                await context.Response.WriteAsJsonAsync(await _application.FoldersAsync(RequiredQuery(context, "account"), RequiredQuery(context, "folder"), OptionalQuery(context, "cursor", 4096), token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("POST", "/api/sources"):
+                var addition = await context.Request.ReadFromJsonAsync<DesktopAddSource>(token).ConfigureAwait(false) ?? throw new BadHttpRequestException("Source selection is required.");
+                if (!Identity(addition.AccountId) || !Identity(addition.FolderId) || addition.ExpectedRevision < 1) throw new BadHttpRequestException("Invalid captured source selection.");
+                await context.Response.WriteAsJsonAsync(await _application.AddSourceAsync(addition, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("PUT", "/api/sources"):
+                var change = await context.Request.ReadFromJsonAsync<DesktopUpdateSource>(token).ConfigureAwait(false) ?? throw new BadHttpRequestException("Source policy is required.");
+                if (change.Id == Guid.Empty || change.ExpectedRevision < 1 || change.ExpectedSourceRevision < 1) throw new BadHttpRequestException("Invalid captured source policy.");
+                await context.Response.WriteAsJsonAsync(await _application.UpdateSourceAsync(change, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
             case ("GET", "/api/preview"):
                 var preview = await _application.PreviewAsync(RequiredQuery(context, "account"), RequiredQuery(context, "file"), token).ConfigureAwait(false);
                 if (preview is null) { context.Response.StatusCode = 404; break; }
@@ -192,7 +214,7 @@ public sealed class DesktopWebHost : IAsyncDisposable
             default: context.Response.StatusCode = 404; break;
         }
     }
-    private static bool Identity(string value) => value.Length is > 0 and <= 256 && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
+    private static bool Identity(string? value) => value is { Length: > 0 and <= 256 } && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
     private static string RequiredQuery(HttpContext context, string key) => OptionalQuery(context, key, 256) is { } value && Identity(value) ? value : throw new BadHttpRequestException("Invalid query identity.");
     private static string? OptionalQuery(HttpContext context, string key, int maximum)
     {

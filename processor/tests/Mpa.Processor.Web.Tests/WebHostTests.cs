@@ -29,14 +29,16 @@ public sealed class WebHostTests
                 catch { socket.Dispose(); throw; }
             } };
         handler.SslOptions.RemoteCertificateValidationCallback = (_, certificate, _, errors) => TlsPeerPin.Matches(certificate, identity.Identity.TlsKeyId, errors, DateTimeOffset.UtcNow);
-        using var http = new HttpClient(handler) { BaseAddress = host.LanEndpoint, Timeout = TimeSpan.FromSeconds(15) };
-        using var accepted = await LoginAsync(http, host.InviteLanBrowser(), host.LanEndpoint!.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false);
+        Assert.AreEqual(2, host.ListeningEndpoints.Count);
+        Assert.IsTrue(host.ListeningEndpoints.All(endpoint => endpoint.Host == "127.0.0.1"), "Even the HTTPS fixture must never trigger an all-interface listener.");
+        using var http = new HttpClient(handler) { BaseAddress = host.HttpsEndpoint, Timeout = TimeSpan.FromSeconds(15) };
+        using var accepted = await LoginAsync(http, host.InviteBrowser(), host.HttpsEndpoint!.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false);
         accepted.EnsureSuccessStatusCode();
         var session = await accepted.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false);
         Assert.IsFalse(session.GetProperty("hostOwner").GetBoolean());
         StringAssert.Contains(accepted.Headers.GetValues("Set-Cookie").Single(), "secure");
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/accounts") { Content = JsonContent.Create(new { operation = "connect" }) };
-        request.Headers.Add("Origin", host.LanEndpoint.GetLeftPart(UriPartial.Authority)); request.Headers.Add("X-MPA-CSRF", session.GetProperty("csrf").GetString());
+        request.Headers.Add("Origin", host.HttpsEndpoint.GetLeftPart(UriPartial.Authority)); request.Headers.Add("X-MPA-CSRF", session.GetProperty("csrf").GetString());
         using var denied = await http.SendAsync(request).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
         using var status = await http.GetAsync("api/status").ConfigureAwait(false); status.EnsureSuccessStatusCode();
         Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
@@ -117,6 +119,46 @@ public sealed class WebHostTests
         Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
     }
 
+    [TestMethod]
+    public async Task SourceChangesRequireCsrfAndCapturedRevisionsAndReportConflictsWithoutLosingTheSession()
+    {
+        using var assets = new Assets(); var engine = new Engine();
+        await using var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
+        using var http = Client(host.LocalEndpoint);
+        using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false);
+        login.EnsureSuccessStatusCode();
+        var csrf = (await login.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("csrf").GetString()!;
+        var selection = new DesktopAddSource("account-A", "folder-A", true, 1);
+        using (var forged = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, selection, null).ConfigureAwait(false))
+            Assert.AreEqual(HttpStatusCode.Unauthorized, forged.StatusCode);
+        Assert.IsNull(engine.AddedSource);
+        using (var invalid = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, new { accountId = (string?)null, folderId = "folder-A", expectedRevision = 1 }, csrf).ConfigureAwait(false))
+            Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+        Assert.IsNull(engine.AddedSource);
+        using (var added = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, selection, csrf).ConfigureAwait(false))
+        {
+            added.EnsureSuccessStatusCode();
+            Assert.AreEqual(2L, (await added.Content.ReadFromJsonAsync<Mpa.Processor.Core.LibrarySourceSnapshot>().ConfigureAwait(false))!.Revision);
+        }
+        Assert.AreEqual(selection, engine.AddedSource);
+        using (var stale = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Put,
+            new DesktopUpdateSource(Guid.NewGuid(), false, false, 1, 1), csrf).ConfigureAwait(false))
+        {
+            Assert.AreEqual(HttpStatusCode.Conflict, stale.StatusCode);
+            StringAssert.Contains(await stale.Content.ReadAsStringAsync().ConfigureAwait(false), "Refresh Sources");
+        }
+        using var stillUsable = await http.GetAsync("api/status").ConfigureAwait(false); stillUsable.EnsureSuccessStatusCode();
+        Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
+    }
+
+    private static async Task<HttpResponseMessage> SourceMutationAsync(HttpClient http, Uri endpoint, HttpMethod method, object body, string? csrf)
+    {
+        using var request = new HttpRequestMessage(method, "api/sources") { Content = JsonContent.Create(body) };
+        request.Headers.Add("Origin", endpoint.GetLeftPart(UriPartial.Authority));
+        if (csrf is not null) request.Headers.Add("X-MPA-CSRF", csrf);
+        return await http.SendAsync(request).ConfigureAwait(false);
+    }
+
     private static HttpClient Client(Uri endpoint) => new(new SocketsHttpHandler { UseProxy = false, AllowAutoRedirect = false, CookieContainer = new CookieContainer() })
         { BaseAddress = endpoint, Timeout = TimeSpan.FromSeconds(15) };
     private static async Task<HttpResponseMessage> LoginAsync(HttpClient http, BrowserInvitation invitation, string origin)
@@ -135,6 +177,7 @@ public sealed class WebHostTests
         public bool Paused { get; private set; }
         public bool Hold { get; init; }
         public bool Unavailable { get; init; }
+        public DesktopAddSource? AddedSource { get; private set; }
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<DesktopSnapshot> SnapshotAsync(CancellationToken cancellationToken) => Task.FromResult(new DesktopSnapshot(Guid.NewGuid(), "ready", []));
@@ -148,6 +191,11 @@ public sealed class WebHostTests
         public Task PauseAsync(CancellationToken cancellationToken) { Paused = true; return Task.CompletedTask; }
         public Task ResumeAsync(CancellationToken cancellationToken) { Paused = false; return Task.CompletedTask; }
         public Task AccountAsync(DesktopAccountCommand command, CancellationToken cancellationToken) => throw new InvalidOperationException("This test must not perform Google account actions.");
+        public Task<Mpa.Processor.Core.LibrarySourceSnapshot> SourcesAsync(CancellationToken cancellationToken) => throw new InvalidOperationException("This test does not configure sources.");
+        public Task<DesktopFolderLocation> FoldersAsync(string accountId, string folderId, string? cursor, CancellationToken cancellationToken) => throw new InvalidOperationException("This test does not read folders.");
+        public Task<Mpa.Processor.Core.LibrarySourceSnapshot> AddSourceAsync(DesktopAddSource request, CancellationToken cancellationToken)
+        { cancellationToken.ThrowIfCancellationRequested(); AddedSource = request; return Task.FromResult(new Mpa.Processor.Core.LibrarySourceSnapshot(2, [])); }
+        public Task<Mpa.Processor.Core.LibrarySourceSnapshot> UpdateSourceAsync(DesktopUpdateSource request, CancellationToken cancellationToken) => throw new Mpa.Processor.Core.StaleLibraryConfigurationException();
     }
     private sealed class Assets : IDisposable
     {

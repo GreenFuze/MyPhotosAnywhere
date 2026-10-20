@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AuthenticationRequired, DesktopApi } from './api';
 import type { Photo, Snapshot } from './api';
+import { SourceSettings } from './sources';
 import './app.css';
 
 const api = new DesktopApi();
@@ -64,6 +65,7 @@ function App() {
   const [account, setAccount] = useState('');
   const [gallery, setGallery] = useState<GalleryState | null>(null);
   const [settings, setSettings] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const generation = useRef(0);
@@ -130,12 +132,13 @@ function App() {
     <header className="app-bar"><a className="brand" href="/" aria-label="My Photos Anywhere home"><img src="/mpa.svg" alt="" /><span>My Photos Anywhere</span></a>
       <div className="bar-actions">{access === 'ready' && <><label className="account"><span className="visually-hidden">Google Drive account</span><select value={account} onChange={event => setAccount(event.target.value)}>
         {snapshot?.accounts.filter(item => item.connected).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <button className="icon" onClick={() => setSettings(value => !value)} aria-label="Settings" aria-expanded={settings}><Icon name="settings" /></button></>}</div>
+        <button className="icon" onClick={() => { setSettings(value => !value); setSourcesOpen(false); }} aria-label="Settings" aria-expanded={settings}><Icon name="settings" /></button></>}</div>
     </header>
     <main>
       {access !== 'ready' ? <section className="welcome"><Icon name="photos" /><h1>{access === 'connecting' ? 'Opening your photos…' : 'Connect to My Photos Anywhere'}</h1>
-        <p>{notice ?? 'Open MPA on the computer running your library to connect this browser.'}</p></section> : settings ?
+        <p>{notice ?? 'Open MPA on the computer running your library to connect this browser.'}</p></section> : sourcesOpen && snapshot ? <SourceSettings api={api} accounts={snapshot.accounts} back={() => setSourcesOpen(false)} /> : settings ?
         <section className="settings"><button className="back" onClick={() => setSettings(false)}><Icon name="back" />Back to Photos</button><h1>Settings</h1>
+          <button className="setting-card setting-link" onClick={() => setSourcesOpen(true)}><span><strong>Sources</strong><span>Choose the Drive folders in your library</span></span><span aria-hidden="true">›</span></button>
           <section className="setting-card"><h2>Processing</h2><p>{snapshot?.state === 'paused' ? 'Paused. Your saved jobs are retained.' : 'The engine runs independently of this browser.'}</p>
             <button onClick={pause} disabled={busy}><Icon name={snapshot?.state === 'paused' ? 'play' : 'pause'} />{snapshot?.state === 'paused' ? 'Resume processing' : 'Pause processing'}</button></section>
           <section className="setting-card"><h2>Google Drive</h2>{snapshot?.accounts.map(item => <div className="account-entry" key={item.id}><p>{item.name} · {item.connected ? 'Connected' : 'Disconnected'}</p>

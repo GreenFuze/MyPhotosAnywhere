@@ -4,6 +4,8 @@ Owner-approved revision, 2026-10-20. This supersedes the small Avalonia setup/st
 
 **Latest owner correction:** Android communicates **only with Google Drive**, with no direct connection to Desktop/Processor in any circumstances. This supersedes every older phone LAN/API/pairing/discovery instruction. Browser-to-Desktop LAN access remains included. Do not implement phone LAN pairing, phone mDNS, phone private-network permission or a direct-transfer fallback.
 
+**Development constraint:** bind every development HTTP/HTTPS listener, including TLS fixtures, exclusively to `127.0.0.1`. The owner reported repeated firewall prompts while binaries changed. Do not create firewall rules or change OS security settings. Real LAN binding remains release work behind explicit onboarding; loopback tests do not establish remote browser acceptance.
+
 ## Product and responsibilities
 
 MPA Desktop is a full photo client: Photos, viewer/Details, Collections, People, indexed Search, imports, explicit backup, Drive Trash/restore, sources and settings. It shares the photo-first vocabulary with Android and adapts to keyboard, mouse, large screens and accessible browser controls. Browser UI is React/TypeScript, bundled locally; the application/processing engine remains C#/.NET. No CDN, hosted website or Node runtime is required on an installed user's computer.

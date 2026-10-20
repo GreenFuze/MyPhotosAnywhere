@@ -2,6 +2,10 @@ export interface Account { id: string; name: string; connected: boolean; revisio
 export interface Snapshot { libraryId: string; state: string; accounts: Account[]; pending: { id: string; expectedAccountId: string | null }[]; credentialCleanupCount: number }
 export interface Photo { id: string; name: string; mimeType: string; width: number | null; height: number | null; capturedTime: string | null; modifiedTime: string | null }
 export interface PhotoPage { photos: Photo[]; nextCursor: string | null; incompleteSearch: boolean }
+export interface Source { id: string; accountId: string; folderId: string; displayName: string; includeDescendants: boolean; enabled: boolean; revision: number; accountConnected: boolean }
+export interface Sources { revision: number; sources: Source[] }
+export interface Folder { id: string; name: string; canListChildren: boolean }
+export interface FolderLocation { current: Folder; children: Folder[]; nextCursor: string | null; incompleteSearch: boolean }
 
 export class AuthenticationRequired extends Error {}
 
@@ -34,6 +38,21 @@ export class DesktopApi {
     return await this.get<PhotoPage>('/api/photos?' + query, signal);
   }
   preview(account: string, file: string): string { return '/api/preview?' + new URLSearchParams({ account, file }); }
+  async sources(signal: AbortSignal): Promise<Sources> { return await this.get<Sources>('/api/sources', signal); }
+  async folders(account: string, folder: string, cursor: string | null, signal: AbortSignal): Promise<FolderLocation> {
+    const query = new URLSearchParams({ account, folder }); if (cursor !== null) query.set('cursor', cursor);
+    return await this.get<FolderLocation>('/api/folders?' + query, signal);
+  }
+  async addSource(accountId: string, folderId: string, includeDescendants: boolean, expectedRevision: number): Promise<Sources> {
+    return await this.sourceChange('POST', { accountId, folderId, includeDescendants, expectedRevision });
+  }
+  async updateSource(source: Source, enabled: boolean, includeDescendants: boolean, expectedRevision: number): Promise<Sources> {
+    return await this.sourceChange('PUT', { id: source.id, enabled, includeDescendants, expectedSourceRevision: source.revision, expectedRevision });
+  }
+  private async sourceChange(method: 'POST' | 'PUT', body: object): Promise<Sources> {
+    const response = await fetch('/api/sources', { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-MPA-CSRF': this.csrf }, body: JSON.stringify(body) });
+    await this.check(response); return await response.json() as Sources;
+  }
   async pause(paused: boolean): Promise<void> {
     await this.check(await fetch(paused ? '/api/resume' : '/api/pause', { method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-MPA-CSRF': this.csrf }, body: '{}' }));
