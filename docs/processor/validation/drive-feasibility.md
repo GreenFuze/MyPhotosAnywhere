@@ -57,7 +57,7 @@ Fault injection is not live revoked-grant/rate-limit evidence. Full logs and obs
 
 | Probe | State |
 | --- | --- |
-| Manual files added after authorization, existing nested source traversal | Pending; API-created nested fixtures are a different case. |
+| Manual files added after authorization, existing nested source traversal | Passed for synthetic metadata: Drive UI created a nested folder and uploaded a 92-byte fixture after consent. The existing desktop grant found it through paged recursive traversal and downloaded exact matching bytes. Real media discovery/Android interoperability remain separate acceptance. |
 | Android/Desktop shared protocol-file access | Pending; never copy desktop credentials to Android. |
 | Actual crash/network-loss reconciliation | Pending; simulated lost result and reserved-ID replay passed. |
 | Additional source/workspace accounts | Pending; current run covers one account. |

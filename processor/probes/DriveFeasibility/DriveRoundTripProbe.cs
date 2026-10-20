@@ -242,7 +242,7 @@ internal sealed class ProbeDriveClient(HttpClient http, UserCredential credentia
 
     public async Task<HashSet<string>> ListTreeAsync(string root, CancellationToken cancellationToken)
     {
-        RequireCreatedParent(root);
+        CheckId(root);
         var pending = new Queue<string>();
         pending.Enqueue(root);
         var found = new HashSet<string>(StringComparer.Ordinal);

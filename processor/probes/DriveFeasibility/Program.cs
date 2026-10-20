@@ -16,9 +16,9 @@ internal static class Program
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("This Stage 0 credential probe requires Windows DPAPI; product vault adapters remain separate work.");
-        if (args.Length < 4 || args[0] is not ("authorize" or "refresh" or "vault-check" or "inspect" or "round-trip") ||
-            args.Length != (args[0] is "inspect" or "round-trip" ? 5 : 4))
-            throw new ArgumentException("Usage: DriveFeasibility <authorize|refresh|vault-check|inspect|round-trip> <desktop-client-json> <private-directory> <file|drive> [disposable-folder-id for inspect/round-trip]");
+        if (args.Length < 4 || args[0] is not ("authorize" or "refresh" or "vault-check" or "inspect" or "round-trip" or "discover") ||
+            args.Length != (args[0] == "discover" ? 6 : args[0] is "inspect" or "round-trip" ? 5 : 4))
+            throw new ArgumentException("Usage: DriveFeasibility <authorize|refresh|vault-check|inspect|round-trip|discover> <desktop-client-json> <private-directory> <file|drive> [disposable-folder-id] [local-synthetic-fixture for discover]");
         var scope = args[3] switch
         {
             "file" => "https://www.googleapis.com/auth/drive.file",
@@ -88,6 +88,11 @@ internal static class Program
         {
             if (args[3] != "drive") throw new InvalidOperationException("Existing-folder round trip requires the explicitly approved full Drive grant.");
             await new DriveRoundTripProbe(credential).RunAsync(args[4], root, deadline.Token).ConfigureAwait(false);
+            return 0;
+        }
+        if (args[0] == "discover")
+        {
+            await new DriveExternalFixtureProbe(credential).RunAsync(args[4], args[5], root, deadline.Token).ConfigureAwait(false);
             return 0;
         }
         var observation = new
