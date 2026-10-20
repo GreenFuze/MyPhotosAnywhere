@@ -2,11 +2,23 @@ name: Processor native feasibility
 on:
   push:
     paths:
-      - 'processor/**'
+      - 'processor/probes/NativeFeasibility/**'
+      - 'processor/probes/*.py'
+      - 'processor/probes/*.cpp'
+      - 'processor/probes/requirements.txt'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - 'processor/NuGet.Config'
       - '.github/workflows/processor-feasibility.yml'
   pull_request:
     paths:
-      - 'processor/**'
+      - 'processor/probes/NativeFeasibility/**'
+      - 'processor/probes/*.py'
+      - 'processor/probes/*.cpp'
+      - 'processor/probes/requirements.txt'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - 'processor/NuGet.Config'
       - '.github/workflows/processor-feasibility.yml'
 permissions:
   contents: read
@@ -89,14 +101,19 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = 402979ac1bef89dcd55add41eaa7277c407599eb
           mkdir -p ../build/feasibility
+          python ../probes/patch_native_source.py runtime .
           mpa_build_platform=Linux
-          mpa_build_args=(--config Release --build_shared_lib --parallel 2 --skip_tests --skip_submodule_sync --no_telemetry --cmake_extra_defines onnxruntime_DISABLE_DEVICE_DISCOVERY=ON)
+          mpa_build_args=(--config Release --build_shared_lib --parallel 2 --skip_tests --targets onnxruntime --skip_submodule_sync --no_telemetry --no_sve --no_kleidiai --cmake_extra_defines onnxruntime_DISABLE_DEVICE_DISCOVERY=ON "MPA_NATIVE_PATCHER=$PWD/../probes/patch_native_source.py")
           if [[ "$RUNNER_OS" == macOS ]]; then
             mpa_build_platform=MacOS
             mpa_build_args+=(CMAKE_OSX_ARCHITECTURES=x86_64)
           fi
           ./build.sh "${mpa_build_args[@]}" 2>&1 | tee ../build/feasibility/native-dependency-build.log
           grep -q '^onnxruntime_DISABLE_DEVICE_DISCOVERY:BOOL=ON$' "build/$mpa_build_platform/Release/CMakeCache.txt"
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            readelf -W -l "build/$mpa_build_platform/Release/libonnxruntime.so" | tee ../build/feasibility/native-elf-program-headers.log
+            python -c 'from pathlib import Path; p=Path("../build/feasibility/native-elf-program-headers.log"); rows=[line.split() for line in p.read_text().splitlines() if "GNU_STACK" in line]; assert len(rows)==1 and rows[0][-2]=="RW", "Runtime must declare a non-executable stack"'
+          fi
           echo "MPA_ORT_NATIVE_DIRECTORY=$PWD/build/$mpa_build_platform/Release" >> "$GITHUB_ENV"
       - name: Strict native model and decoder probe
         run: python processor/probes/run_native.py

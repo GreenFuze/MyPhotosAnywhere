@@ -42,12 +42,27 @@ class NativeProbeRunner:
         self.command("restore", [self.dotnet, "restore", project, "--locked-mode", "--verbosity", "minimal"])
         self.command("build", [self.dotnet, "build", project, "--no-restore", "-c", "Release", "--verbosity", "minimal"])
         native_log = self.root / "build/feasibility/native-dependency-build.log"
-        if native_log.exists() and re.search(r"CMake Warning|\bwarning\s*(?::|[A-Z]+\d+:)",
+        if native_log.exists() and re.search(r"CMake(?: [A-Za-z()_-]+)* Warning|\bwarning\s*(?::|[A-Z]+\d+:)",
                                             native_log.read_text(encoding="utf-8"), re.IGNORECASE):
             raise RuntimeError("Unresolved source-built native dependency warning; inspect full build log")
         output = self.root / "probes/NativeFeasibility/bin/Release/net10.0"
         if "MPA_ORT_NATIVE_DIRECTORY" in os.environ:
             native = Path(os.environ["MPA_ORT_NATIVE_DIRECTORY"]).resolve()
+            changes = [self.root / ".runtime-source/.mpa-source-changes.json"]
+            changes.extend(sorted((native / "_deps").glob("*-src/.mpa-source-changes.json")))
+            if len(changes) != 5:
+                raise RuntimeError("Runtime and all four dependency change inventories are required")
+            inventories = [json.loads(path.read_text(encoding="utf-8")) for path in changes]
+            (self.evidence / "source-changes.json").write_text(json.dumps(inventories, indent=2) + "\n", encoding="utf-8")
+            compiler = shutil.which("c++")
+            flatbuffers = native / "_deps/flatbuffers-build/libflatbuffers.a"
+            if not compiler or not flatbuffers.is_file():
+                raise RuntimeError("Append regression check requires a compiler and the built FlatBuffers archive")
+            executable = self.evidence / "flatbuffer-append-check"
+            self.command("append-check-build", [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror",
+                "-I", str(native / "_deps/flatbuffers-src/include"),
+                str(self.root / "probes/flatbuffer_append_check.cpp"), str(flatbuffers), "-o", str(executable)])
+            self.command("append-check", [str(executable)], runtime=True)
             extension = "*.dylib" if platform.system() == "Darwin" else "*.so*"
             libraries = list(native.glob("libonnxruntime" + extension))
             if not libraries:
