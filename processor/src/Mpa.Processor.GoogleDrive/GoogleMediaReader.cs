@@ -34,15 +34,7 @@ public sealed partial class GoogleAccountConnection
             foreach (var file in root.GetProperty("files").EnumerateArray())
             {
                 if (files.Count == 60) throw new InvalidDataException("Drive returned more media than the requested page bound.");
-                var id = Text(file.GetProperty("id"), 256);
-                if (!ValidIdentity(id)) throw new InvalidDataException("Drive returned an invalid media identity.");
-                var mime = Text(file.GetProperty("mimeType"), 256);
-                if (!mime.StartsWith("image/", StringComparison.Ordinal) && !mime.StartsWith("video/", StringComparison.Ordinal)) throw new InvalidDataException("Drive media query returned an unsupported media type.");
-                var image = file.TryGetProperty("imageMediaMetadata", out var imageValue) ? imageValue : default;
-                var metadata = image.ValueKind == JsonValueKind.Object ? image : file.TryGetProperty("videoMediaMetadata", out var video) ? video : default;
-                files.Add(new(id, Text(file.GetProperty("name"), 4096), mime, Dimension(metadata, "width"), Dimension(metadata, "height"),
-                    image.ValueKind == JsonValueKind.Object && image.TryGetProperty("time", out var captured) ? Text(captured, 128) : null,
-                    file.TryGetProperty("modifiedTime", out var modified) ? Text(modified, 128) : null));
+                files.Add(MediaFile(file));
             }
             return new DriveMediaPage(files.AsReadOnly(), next, root.TryGetProperty("incompleteSearch", out var incomplete) && incomplete.GetBoolean());
         }, cancellationToken);
@@ -96,6 +88,18 @@ public sealed partial class GoogleAccountConnection
         throw new InvalidOperationException("Drive media authorization retry was exhausted.");
     }
     private static string Text(JsonElement value, int maximum) => value.GetString() is { } text && text.Length <= maximum ? text : throw new InvalidDataException("Drive media text exceeds its bound.");
+    private static DriveMediaFile MediaFile(JsonElement file)
+    {
+        var id = Text(file.GetProperty("id"), 256);
+        if (!ValidIdentity(id)) throw new InvalidDataException("Drive returned an invalid media identity.");
+        var mime = Text(file.GetProperty("mimeType"), 256);
+        if (!mime.StartsWith("image/", StringComparison.Ordinal) && !mime.StartsWith("video/", StringComparison.Ordinal)) throw new InvalidDataException("Drive media query returned an unsupported media type.");
+        var image = file.TryGetProperty("imageMediaMetadata", out var imageValue) ? imageValue : default;
+        var metadata = image.ValueKind == JsonValueKind.Object ? image : file.TryGetProperty("videoMediaMetadata", out var video) ? video : default;
+        return new(id, Text(file.GetProperty("name"), 4096), mime, Dimension(metadata, "width"), Dimension(metadata, "height"),
+            image.ValueKind == JsonValueKind.Object && image.TryGetProperty("time", out var captured) ? Text(captured, 128) : null,
+            file.TryGetProperty("modifiedTime", out var modified) ? Text(modified, 128) : null);
+    }
     private static int? Dimension(JsonElement element, string name) => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value)
         ? value.TryGetInt32(out var dimension) && dimension is > 0 and <= 1000000 ? dimension : null : null;
     private static string? PreviewType(ReadOnlySpan<byte> bytes) => bytes.Length >= 3 && bytes[..3].SequenceEqual(new byte[] { 255, 216, 255 }) ? "image/jpeg" :
