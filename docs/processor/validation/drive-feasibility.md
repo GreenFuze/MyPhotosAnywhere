@@ -1,58 +1,79 @@
 # Drive feasibility — Stage 0, incomplete
 
-Observed 2026-10-19 through the owner's selected Chrome session. **Immediate Gate A has not passed.** Browser access and a client registration are not API/refresh proof.
+Updated October 20, 2026. Observed results are separate from pending acceptance. Private account/folder identifiers, credentials, authorization URLs and upload session URIs stay out of public evidence.
 
-## Configuration observations
+## Configuration and permission boundary
 
-- Existing MyPhotosAnywhere Cloud project, Drive API enabled.
-- External OAuth audience is now **In production**, confirmed after the owner explicitly authorized the final Publish app/Confirm action. Google still shows the unverified sensitive/restricted-scope warning and a 100-user cap. This publication configuration is not proof of an actual durable account grant.
-- Existing configured scopes: `drive.file`, restricted `drive`, and Photos Picker's selected-media read scope. No new scope added.
-- Existing Android clients preserved. Owner explicitly approved creation of a new Desktop client named MPA Processor. Configuration is kept outside tracked files.
-- Separate empty disposable Drive folder created in the intended account; private folder ID and screenshots remain in local evidence. Existing photo library untouched.
-- Production publishing is disabled until branding is completed. The owner supplied their existing GitHub Pages custom domain. MPA-specific homepage/privacy/terms are prepared and visually reviewed locally; the owner explicitly approved public publication and the security-sensitive OAuth audience change. Website main was fast-forwarded to the reviewed pages; Pages run 39285652024 completed successfully for SHA `69fc184bd865b40b69de1e5a6c6d5956314ee2f6`. The public homepage, privacy policy and terms were verified in Chrome. Google confirmed both the branding save and In production status. Actual account grants remain pending.
+- Existing MyPhotosAnywhere project, Drive API enabled; both Android clients preserved.
+- Owner-approved MPA Processor Desktop client created. No scopes added: the project already configured `drive.file`, restricted `drive`, and Photos Picker selected-media access.
+- Reviewed website pages deployed and verified in Chrome. Pages run 39285652024 succeeded for website SHA `69fc184bd865b40b69de1e5a6c6d5956314ee2f6`. Existing pages and domain-verification files preserved.
+- OAuth audience is **In production**, after explicit owner approval. Google still displays unverified sensitive/restricted-scope status and a 100-user lifetime cap. No Google verification approval is claimed.
+- The owner selected personal testing with known users. Google's personal-use exception provides a viable initial verification path; it does not establish general-public eligibility or remove the cap. Reevaluate before expanding the audience.
+- Full Drive authorization is account-wide. Internal root checks do not create a Google-enforced folder grant. Existing Android grants were not revoked to isolate tests.
+- All API writes create synthetic fixtures under the separate disposable folder. No existing media has been changed, moved, deleted or trashed.
 
-## Executable preparation
+## Authorization observations
 
-`processor/probes/DriveFeasibility/` implements only bounded authorization/short-refresh preparation, using official Google.Apis.Auth 1.77.0, PKCE, explicit validated random state, forced loopback, and a Windows DPAPI datastore. It never copies phone credentials or stores plaintext tokens. Scope is chosen explicitly, and returned scopes are checked.
+The Windows probe uses Google.Apis.Auth 1.77.0, PKCE, forced loopback, random validated state, a concurrent-operation lease and a DPAPI CurrentUser datastore. No phone credentials copied or plaintext tokens stored.
 
-The synthetic storage command passed on Windows: encrypted round trip, expiry timestamp persistence, no plaintext marker, type isolation, corrupted-ciphertext rejection, deletion. The actual loopback receiver also passed synthetic matching-state, rejected-state and cancellation/temporary-file cleanup checks. A directory lease prevents concurrent probes; stale prepared requests fail explicitly. Compiler/analyzer build had zero warnings/errors. These checks did not contact Google or grant access.
-
-## Required live evidence
-
-| Probe | Status |
+| Probe | Observed result |
 | --- | --- |
-| Production configuration and personal-use limitations | In production confirmed; unverified-scope notice and 100-user cap observed; no verification approval claimed |
-| Fresh desktop consent and protected persistence | Narrow drive.file consent completed Oct 20 after owner approval; DPAPI refresh record persisted; full scope still pending |
-| `drive.file` case with actual returned scope | Returned exactly drive.file; manually created folder GET 404 and child list 200/zero visible items; same folder verified present in owner browser |
-| Manually created existing/nested/new file discovery | Not run |
-| Android/Desktop shared protocol-file access | Not run |
-| Immutable publication, range reads, checksum fields | Not run |
-| Lost upload response and reserved-ID reconciliation | Not run |
-| Short refresh after expiry, restart and network interruption | Fresh-process immediate narrow-token refresh passed without browser; expiry/network-interruption cases remain pending |
-| Denied/revoked grants, 401/403/429/5xx handling | Not run |
-| Real beyond-seven-day authorization | Narrow grant observation started Oct 20; no elapsed-duration acceptance yet; full-scope grant has not started |
+| Narrow consent | Oct 20 03:42 UTC: fresh interactive grant returned exactly `drive.file`; protected refresh credential persisted. |
+| Narrow fresh-process refresh | Passed without a browser. |
+| Narrow existing-folder visibility | Folder GET 404; child list 200/zero visible. Same manually created folder verified present in Drive UI. This is an access boundary, not an empty-library result. |
+| Full consent | Oct 20 **04:33:16 UTC**: after explicit account-wide approval, the owner completed Google's unverified-app interstitial personally. Callback completed; returned exactly `drive`, protected refresh credential present. |
+| Full fresh-process refresh | Oct 20 04:37:29 UTC: passed without a browser. |
+| Full existing-folder visibility | Folder GET 200; child list 200/zero before fixture creation. |
+| Actual expiry/restart/suspension/network loss | Immediate new-process refresh passed; other cases pending. Initial sandbox DNS failure did not revoke credentials; the same protected grant worked with authorized network access. |
+| Beyond-seven-day observation | Started at **2026-10-20T04:33:16Z**. Requires real successful refresh after **2026-10-27T04:33:16Z**; no clock manipulation or duration pass claimed. |
 
-Restrict future API writes to the named disposable folder. Full Drive OAuth is technically account-wide; internal folder checks do not turn it into a Google-enforced folder grant. Do not revoke the existing app's working grants merely to manufacture an isolated narrow-scope test. Record any actual grant coupling and resolve it explicitly.
+## Live synthetic round trip
+
+Oct 20 04:41:28 UTC, bounded private run, 524,425 generated bytes:
+
+- Reserved IDs durably journaled before creates; only newly created probe subfolders admitted as upload parents.
+- Resumable upload used 256 KiB chunks and a final short chunk. Server received-range responses and empty-body status queries verified before continuing.
+- Replaying a reserved-ID create returned **409**, followed by identity/parent/size/SHA-256 reconciliation. Recursive discovery found no duplicate identity.
+- Full download matched every byte. Partial download returned HTTP 206, exact Content-Range and matching byte slice.
+- Drive SHA-256 matched `7cd2545de4849c065b059d99b524abd21ccb49314bf443f046aba28feeb06a62`.
+- Separate completion manifest published after payload verification; download matched exactly.
+- Nested traversal with one-item pages found exactly three expected descendants. Fixtures retained for independent-client tests.
+- Successful application-level completion was deliberately ignored before reconciliation. **This simulates a lost application result, not an actual socket outage/process crash.**
+
+This proves observed Drive primitives, not a production catalog or final Android protocol.
+
+## Offline fault checks
+
+Strict local compiler/analyzer build: **zero warnings/errors**. Checks run without Google access:
+
+- Protected-store round trip, issued-time persistence, plaintext-marker exclusion, type isolation, corruption rejection and scoped deletion.
+- Actual loopback valid/mismatched state, cancellation and private-URL ownership/cleanup.
+- Reader permission boundaries, HTTP 401/403/404/429/503, redirect rejection, malformed/oversized known/unknown-length bodies and cancellation.
+- Fixture ID/parent boundaries, unsafe session scheme/host/path/port, wrong/missing upload receipt/status ranges, wrong final ID, unexpected duplicate-create success, wrong download status/range and oversized body rejection.
+
+Fault injection is not live revoked-grant/rate-limit evidence. Full logs and observations remain private. Source is provisional Stage 0 work, not a frozen application release.
+
+## Remaining acceptance
+
+| Probe | State |
+| --- | --- |
+| Manual files added after authorization, existing nested source traversal | Pending; API-created nested fixtures are a different case. |
+| Android/Desktop shared protocol-file access | Pending; never copy desktop credentials to Android. |
+| Actual crash/network-loss reconciliation | Pending; simulated lost result and reserved-ID replay passed. |
+| Additional source/workspace accounts | Pending; current run covers one account. |
+| Live denied/revoked scopes and operational recovery | Pending; synthetic failures passed. Preserve existing Android grants. |
+| Actual expiry and beyond-seven-day refresh | Pending as dated above; immediate refresh is insufficient. |
+
+Immediate Gate A's browser/configuration/full-scope access/short-refresh evidence and personal-test verification path are observed. Cross-client/source discovery/recovery remain explicit gates before activating corresponding product paths. Stage 0 overall remains open, including native/platform feasibility. Duration remains a Stage 9 release gate.
 
 ## Primary sources
 
 - [Installed-app OAuth](https://developers.google.com/identity/protocols/oauth2/native-app)
 - [Refresh-token expiration](https://developers.google.com/identity/protocols/oauth2#expiration)
 - [Drive scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth)
+- [Verification and personal-use exception](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification)
 - [OAuth audience/publishing](https://support.google.com/cloud/answer/15549945)
-- [Branding and app-domain links](https://support.google.com/cloud/answer/15549049)
-- [Google .NET PKCE broker source, 1.77.0](https://github.com/googleapis/google-api-dotnet-client/blob/v1.77.0/Src/Support/Google.Apis.Auth/OAuth2/GoogleWebAuthorizationBroker.cs)
-
-These sources explain supported behavior; the live rows above still need observed results. Public evidence must not contain tokens, authorization codes/URLs, private folders, media or account names.
-
-## Current live authorization attempt
-
-A fresh private `drive.file` PKCE request was prepared after Production confirmation. The authorization process opens no default browser and assumes no grant. Chrome control disappeared from browser inventory while opening the consent URL; no completed authorization report has been observed. Reconnection is requested. The request expires after its bounded 15-minute deadline; recreate it if expired, without reusing Testing tokens or revoking existing Android grants. Private URLs and credentials remain excluded from public evidence.
-
-## October 20 observed results
-
-The owner explicitly approved the displayed desktop test. A fresh interactive narrow grant completed and returned exactly `https://www.googleapis.com/auth/drive.file`, with a protected refresh credential. A new process refreshed it successfully with no browser. A bounded read-only API probe returned folder 404, child list 200 and zero visible items. The same named empty folder was verified present in the intended account through Drive's UI. No Drive writes occurred. These observations are not proof of whole-library discovery, recursive access, cross-client sharing or duration.
-
-The revised read probe passes synthetic permission-boundary, HTTP 401/403/404/429/503, redirect, malformed/oversized-body and cancellation cases. Strict local build: zero warnings/errors. Logs/reports remain in private local evidence; source is a provisional Stage 0 increment, not an immutable final application release.
-
-A separate full-Drive request is prepared because the narrow grant did not expose the manually created folder. Google displays its unverified-app notice. The owner has been asked specifically about account-wide permissions; no broader grant has been made. Existing Android grants have not been revoked.
+- [Upload chunks, status queries and reserved-ID replay](https://developers.google.com/workspace/drive/api/guides/manage-uploads)
+- [File checksum fields](https://developers.google.com/workspace/drive/api/reference/rest/v3/files)
+- [Partial downloads](https://developers.google.com/workspace/drive/api/guides/manage-downloads)
+- [Google .NET PKCE broker 1.77.0](https://github.com/googleapis/google-api-dotnet-client/blob/v1.77.0/Src/Support/Google.Apis.Auth/OAuth2/GoogleWebAuthorizationBroker.cs)

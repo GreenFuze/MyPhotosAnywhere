@@ -16,9 +16,9 @@ internal static class Program
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("This Stage 0 credential probe requires Windows DPAPI; product vault adapters remain separate work.");
-        if (args.Length < 4 || args[0] is not ("authorize" or "refresh" or "vault-check" or "inspect") ||
-            args.Length != (args[0] == "inspect" ? 5 : 4))
-            throw new ArgumentException("Usage: DriveFeasibility <authorize|refresh|vault-check|inspect> <desktop-client-json> <private-directory> <file|drive> [disposable-folder-id for inspect]");
+        if (args.Length < 4 || args[0] is not ("authorize" or "refresh" or "vault-check" or "inspect" or "round-trip") ||
+            args.Length != (args[0] is "inspect" or "round-trip" ? 5 : 4))
+            throw new ArgumentException("Usage: DriveFeasibility <authorize|refresh|vault-check|inspect|round-trip> <desktop-client-json> <private-directory> <file|drive> [disposable-folder-id for inspect/round-trip]");
         var scope = args[3] switch
         {
             "file" => "https://www.googleapis.com/auth/drive.file",
@@ -35,6 +35,7 @@ internal static class Program
             await new ProtectedStoreProbe(vault).RunAsync().ConfigureAwait(false);
             await new LoopbackStateProbe(root).RunAsync().ConfigureAwait(false);
             await DriveReadProtocolProbe.RunAsync().ConfigureAwait(false);
+            await DriveRoundTripProtocolProbe.RunAsync().ConfigureAwait(false);
             Console.WriteLine("Synthetic protected-store, loopback state/cancellation and bounded Drive protocol checks passed; no Google request or grant occurred.");
             return 0;
         }
@@ -81,6 +82,12 @@ internal static class Program
         if (args[0] == "inspect")
         {
             await new DriveReadProbe(credential).RunAsync(args[4], root, deadline.Token).ConfigureAwait(false);
+            return 0;
+        }
+        if (args[0] == "round-trip")
+        {
+            if (args[3] != "drive") throw new InvalidOperationException("Existing-folder round trip requires the explicitly approved full Drive grant.");
+            await new DriveRoundTripProbe(credential).RunAsync(args[4], root, deadline.Token).ConfigureAwait(false);
             return 0;
         }
         var observation = new

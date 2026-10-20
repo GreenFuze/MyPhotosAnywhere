@@ -1,6 +1,6 @@
 # MPA 0.6.0 implementation ledger
 
-Updated: 2026-10-19. **Stage 0 in progress. No 0.6 application or installer is released.**
+Updated: 2026-10-20. **Stage 0 in progress. No 0.6 application or installer is released.**
 
 ## Authority and baseline
 
@@ -12,7 +12,7 @@ Baseline: `6c9ead7b1d4446dc819dee71974aa7b68614f232` (0.5.33 publication revisio
 
 | Stage | State | Evidence / remaining work |
 | --- | --- | --- |
-| 0: feasibility/baseline | In progress | Baseline audit; desktop OAuth identity created with actual owner approval; disposable Drive workspace; Windows model/decoder probes. OAuth production/functional/cross-client/refresh/duration proof and other native targets remain open. |
+| 0: feasibility/baseline | In progress | Production OAuth, full desktop grant, fresh-process refresh, bounded synthetic Drive round trip passed. Cross-client/manual source discovery, expiry/duration, recovery and native targets remain open. |
 | 1: contracts | Pending | Golden codecs, causality, publication and approval contracts. |
 | 2: core/plugins | Pending | Durable jobs, resources, worker ownership, tray/Exit. |
 | 3: accounts/LAN | Pending | Production sessions, discovery, secure pairing, acknowledged controls. |
@@ -28,9 +28,9 @@ Baseline: `6c9ead7b1d4446dc819dee71974aa7b68614f232` (0.5.33 publication revisio
 
 - Existing app: 0.5.33/code 44, min SDK 26, compile/target 37, Room 12. New release target remains 0.6.0/code 45, protocol major 1; no premature version bump.
 - Chrome is signed into the owner's intended Cloud project; Drive API enabled. A new empty disposable test folder was created separately from the existing library. Private identifiers/screenshots remain in the local preflight evidence, not this repository.
-- Existing OAuth project has External/Testing status, two Android clients and configured `drive.file`, `drive` and Photos Picker scopes. The owner explicitly approved creating a separate Desktop client named MPA Processor. Config is stored outside tracked files. No account grant or scope expansion has been performed by creating it.
-- Bounded Windows authorization/refresh probe prepared with official Google library, PKCE/state and DPAPI. Synthetic storage round trip, expiry persistence, plaintext-marker exclusion, type isolation, corruption rejection and deletion passed with zero build warnings/errors. The actual loopback server also passed synthetic valid-state, mismatched-state and cancellation/temporary-request cleanup checks; concurrent probes are excluded by a private file lease. On October 20, narrow desktop consent and new-process immediate refresh passed. A read-only folder probe observed the existing manual folder as inaccessible under the returned drive.file scope. Full-scope, cross-client, write and duration acceptance remain pending. See `validation/drive-feasibility.md`.
-- Production publishing is blocked by incomplete branding URLs. The owner supplied their existing website; The owner reviewed and approved MPA-specific homepage/privacy/terms plus the domain/production configuration. Website main was fast-forwarded to the reviewed pages; Pages deployment completed successfully and all three public pages were verified. Google confirmed the branding save and **In production** status after a fresh action-time owner confirmation. Verification is still incomplete and the unapproved-scope 100-user cap is visible. Chrome control recovered after transient disconnects. The owner approved the narrow desktop grant, and immediate fresh-process refresh passed. Full-Drive access needs the specifically requested account-wide grant; no full grant or Drive mutation is claimed. Existing website and domain ownership verification files are preserved.
+- Initial OAuth inspection found External/Testing status and two Android clients and configured `drive.file`, `drive` and Photos Picker scopes. The owner explicitly approved creating a separate Desktop client named MPA Processor. Config is stored outside tracked files. Creating the client did not itself grant account access or expand configured scopes; subsequent explicit grants are recorded below.
+- Bounded Windows authorization/refresh probe prepared with official Google library, PKCE/state and DPAPI. Synthetic storage round trip, expiry persistence, plaintext-marker exclusion, type isolation, corruption rejection and deletion passed with zero build warnings/errors. The actual loopback server also passed synthetic valid-state, mismatched-state and cancellation/temporary-request cleanup checks; concurrent probes are excluded by a private file lease. On October 20, narrow desktop consent and new-process immediate refresh passed. A read-only folder probe observed the existing manual folder as inaccessible under the returned drive.file scope. Full scope and immediate refresh subsequently passed, followed by bounded synthetic uploads, status/resume, hash/range reads, reserved-ID replay and nested paged discovery. Cross-client/manual-source and duration acceptance remain pending. See `validation/drive-feasibility.md`.
+- The initial branding blocker was resolved. The owner supplied their existing website and reviewed and approved MPA-specific homepage/privacy/terms plus the domain/production configuration. Website main was fast-forwarded to the reviewed pages; Pages deployment completed successfully and all three public pages were verified. Google confirmed the branding save and **In production** status after a fresh action-time owner confirmation. Verification is still incomplete and the unapproved-scope 100-user cap is visible. Chrome control recovered after transient disconnects. The owner approved the narrow desktop grant, and immediate fresh-process refresh passed. The owner explicitly approved full Drive and completed the safety interstitial personally. The callback returned exactly drive at 2026-10-20T04:33:16Z. New-process refresh and folder reads passed; synthetic-only fixtures were created beneath the disposable root. Real beyond-seven-day observation is due after October 27 04:33:16 UTC. Existing website and domain ownership verification files are preserved.
 - Installed .NET SDK 10.0.303/runtime 10.0.13 works outside sandbox; the sandbox SCM error was an execution restriction, not an SDK defect.
 - Separate headless API 35 development emulator booted; checksum-verified 0.5.33 baseline installed and launched there. No physical device changed. The old global emulator is development-only; final tests still require the pinned matrix.
 - ONNX Runtime 1.31.0 + SkiaSharp 4.153.1 build with zero compiler/analyzer warnings/errors on Windows. Native execution runs YuNet/SFace and an in-memory JPEG round trip.
@@ -53,8 +53,8 @@ Local evidence outside Git: `preflight-060/native-build-normalized.log`, `native
 
 ## Open gates / next packet
 
-1. Finish website review, authorized publishing/domain setup and OAuth Production configuration. Obtain action-time confirmation for security-sensitive access/publication changes; do not treat personal testing as a fix for seven-day Testing grants.
-2. Implement bounded Drive feasibility/refresh probes, authorize exact grants explicitly, prove cross-client behavior, and start real elapsed-time observation. Full product implementation remains gated on immediate Gate A.
+1. Website and OAuth Production configuration are complete. Preserve the existing approvals and the personal-test/unverified-app limitations; do not ask again for the completed grant.
+2. Complete independent Android/Desktop access, manual-source discovery, actual expiry and operational-recovery tests. Configuration/full access/short-refresh and the personal-use path are observed; real elapsed-time observation started October 20. Native feasibility remains open before Stage 0 completes.
 3. Execute native feasibility on Linux, macOS ARM64 and Intel; resolve all warnings and freeze dependency/model/license/tool evidence. Check object/OCR/video backend redistribution and runtime support too.
 4. Finish signing/native-test-access inventory. Missing paid publisher signing uses the already approved personal-test path; missing native execution does not.
 
