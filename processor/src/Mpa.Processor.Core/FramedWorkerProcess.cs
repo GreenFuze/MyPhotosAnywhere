@@ -8,7 +8,8 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.Core;
 
 public sealed record WorkerLaunchSpec(string ExecutablePath, string ExecutableSha256,
-    IReadOnlyList<string> Arguments, string InstalledWorkingDirectory, string NewDiagnosticPath);
+    IReadOnlyList<string> Arguments, string InstalledWorkingDirectory, string NewDiagnosticPath,
+    WorkerResourcePolicy? ResourcePolicy = null);
 public sealed class WorkerStartCleanupException(FramedWorkerProcess retainedWorker, Exception startup, Exception cleanup)
     : AggregateException("Worker startup failed and exit/cleanup could not be confirmed. Retain ownership and investigate.", startup, cleanup)
 {
@@ -34,6 +35,9 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     private readonly Task _framePump;
     private readonly Task _diagnosticPump;
     private readonly Task _processExit;
+    private readonly Task _resourceMonitor;
+    private readonly CancellationTokenSource _stopMonitoring = new();
+    private readonly TaskCompletionSource _ownershipReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object _disposalGate = new();
     private readonly object _exitOutcomeGate = new();
     private readonly HashSet<Task> _writes = [];
@@ -44,8 +48,10 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     private AggregateException? _releaseError;
     public int ProcessId { get; }
     public Task Completion { get; }
+    private long _observedPeakResidentBytes;
+    public long ObservedPeakResidentBytes => Interlocked.Read(ref _observedPeakResidentBytes);
 
-    private FramedWorkerProcess(Process process, FileStream executableLease, ParentLifetimeListener parent, FileStream diagnostics)
+    private FramedWorkerProcess(Process process, FileStream executableLease, ParentLifetimeListener parent, FileStream diagnostics, WorkerResourcePolicy policy)
     {
         _process = process; _executableLease = executableLease; _parent = parent;
         ProcessId = process.Id;
@@ -53,12 +59,15 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         _processExit = process.WaitForExitAsync();
         _framePump = PumpFramesAsync();
         _diagnosticPump = PumpDiagnosticsAsync(diagnostics);
+        _resourceMonitor = MonitorResourcesAsync(policy);
         Completion = SuperviseAsync();
     }
 
     public static async Task<FramedWorkerProcess> StartAsync(WorkerLaunchSpec spec, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(spec);
+        var policy = spec.ResourcePolicy ?? WorkerResourcePolicy.Default;
+        policy.Validate();
         if (!Path.IsPathFullyQualified(spec.ExecutablePath) || !Path.IsPathFullyQualified(spec.InstalledWorkingDirectory) ||
             !Path.IsPathFullyQualified(spec.NewDiagnosticPath) || !Directory.Exists(spec.InstalledWorkingDirectory) ||
             spec.Arguments.Count > 128 || spec.Arguments.Any(argument => argument is null || argument.Length > 4096))
@@ -96,11 +105,12 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
             process = new Process { StartInfo = start };
             if (!process.Start()) throw new InvalidOperationException("Worker process did not start.");
             started = true;
-            var worker = new FramedWorkerProcess(process, executable, parent, diagnostic);
+            var worker = new FramedWorkerProcess(process, executable, parent, diagnostic, policy);
             transferred = true;
             try
             {
                 await parent.AcceptAsync(cancellationToken).ConfigureAwait(false);
+                worker._ownershipReady.SetResult();
                 return worker;
             }
             catch (Exception startup)
@@ -188,10 +198,40 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         var first = await Task.WhenAny(_processExit, _fault.Task).ConfigureAwait(false);
         if (first == _fault.Task) KillOwned(requestedStop: false);
         await _processExit.ConfigureAwait(false);
-        await Task.WhenAll(_framePump, _diagnosticPump).ConfigureAwait(false);
+        await _stopMonitoring.CancelAsync().ConfigureAwait(false);
+        await Task.WhenAll(_framePump, _diagnosticPump, _resourceMonitor).ConfigureAwait(false);
         if (_fault.Task.IsCompletedSuccessfully) throw await _fault.Task.ConfigureAwait(false);
         lock (_exitOutcomeGate)
             if (_process.ExitCode != 0 && !_forcedStop) throw new WorkerProcessFailedException(_process.ExitCode);
+    }
+
+    private async Task MonitorResourcesAsync(WorkerResourcePolicy policy)
+    {
+        try
+        {
+            await _ownershipReady.Task.WaitAsync(_stopMonitoring.Token).ConfigureAwait(false);
+            var started = Stopwatch.GetTimestamp();
+            while (!_process.HasExited)
+            {
+                _process.Refresh();
+                var resident = _process.WorkingSet64;
+                if (resident <= 0)
+                {
+                    if (_process.HasExited) return;
+                    throw new InvalidDataException("Running worker resident-memory measurement is unavailable.");
+                }
+                Interlocked.Exchange(ref _observedPeakResidentBytes, Math.Max(ObservedPeakResidentBytes, resident));
+                if (resident > policy.ResidentMemoryStopBytes)
+                    throw new WorkerResourceLimitException("resident-memory", resident, policy.ResidentMemoryStopBytes);
+                var elapsed = Stopwatch.GetElapsedTime(started);
+                if (elapsed >= policy.MaximumLifetime)
+                    throw new WorkerResourceLimitException("lifetime-milliseconds", (long)elapsed.TotalMilliseconds, (long)policy.MaximumLifetime.TotalMilliseconds);
+                await Task.Delay(TimeSpan.FromMilliseconds(100), _stopMonitoring.Token).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (_stopMonitoring.IsCancellationRequested) { /* Owner joined monitoring on shutdown/exit. */ }
+        catch (InvalidOperationException) when (_process.HasExited) { /* Exit raced the final sample. */ }
+        catch (Exception error) { _fault.TrySetResult(error); }
     }
 
     public ValueTask DisposeAsync()
@@ -207,6 +247,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     {
         try
         {
+            await _stopMonitoring.CancelAsync().ConfigureAwait(false);
             await _stopReading.CancelAsync().ConfigureAwait(false);
             _process.StandardInput.BaseStream.Close();
             try { await _processExit.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); }
@@ -265,7 +306,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
             if (!_processExit.IsCompletedSuccessfully) throw new InvalidOperationException("Cannot release worker resources before exit.");
             _resourcesReleased = true;
             var failures = new List<Exception>();
-            foreach (var close in new Action[] { _parent.Dispose, _writer.Dispose, _stopReading.Dispose, _process.Dispose, _executableLease.Dispose })
+            foreach (var close in new Action[] { _parent.Dispose, _writer.Dispose, _stopReading.Dispose, _stopMonitoring.Dispose, _process.Dispose, _executableLease.Dispose })
                 try { close(); } catch (Exception error) { failures.Add(error); }
             if (failures.Count != 0) { _releaseError = new AggregateException("Worker resource cleanup failed.", failures); throw _releaseError; }
         }

@@ -88,6 +88,40 @@ public sealed class WorkerProcessTests
     }
 
     [TestMethod]
+    public async Task ActualWorkerResourceStopsJoinTheProcessAndKeepItsInputIntact()
+    {
+        foreach (var resource in new[] { "resident-memory", "lifetime-milliseconds" })
+        {
+            using var root = new WorkerTestDirectory();
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var policy = resource == "resident-memory"
+                ? new WorkerResourcePolicy(16 * 1024 * 1024, TimeSpan.FromSeconds(10))
+                : new WorkerResourcePolicy(1024L * 1024 * 1024, TimeSpan.FromMilliseconds(700));
+            var spec = await SpecAsync(root.Path, "ignore-eof").ConfigureAwait(false);
+            var worker = await FramedWorkerProcess.StartAsync(spec with { ResourcePolicy = policy }, deadline.Token).ConfigureAwait(false);
+            using var child = Process.GetProcessById(worker.ProcessId);
+            var error = await Assert.ThrowsExactlyAsync<WorkerResourceLimitException>(() => worker.Completion.WaitAsync(deadline.Token)).ConfigureAwait(false);
+            Assert.AreEqual(resource, error.Resource);
+            Assert.IsTrue(error.Observed >= error.Allowed);
+            Assert.IsTrue(worker.ObservedPeakResidentBytes > 0);
+            await Assert.ThrowsExactlyAsync<WorkerResourceLimitException>(() => worker.DisposeAsync().AsTask()).ConfigureAwait(false);
+            Assert.IsTrue(child.HasExited);
+            using var released = File.Open(Path.Combine(root.Path, "worker-read-lease.bin"), FileMode.Open, FileAccess.Read, FileShare.None);
+            Assert.AreEqual(42, released.ReadByte());
+        }
+    }
+
+    [TestMethod]
+    public async Task InvalidResourcePolicyFailsBeforeLaunchingAnyChild()
+    {
+        using var root = new WorkerTestDirectory();
+        var spec = await SpecAsync(root.Path, "echo").ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<ArgumentOutOfRangeException>(() => FramedWorkerProcess.StartAsync(
+            spec with { ResourcePolicy = new(1, TimeSpan.FromSeconds(1)) }, CancellationToken.None)).ConfigureAwait(false);
+        Assert.IsFalse(File.Exists(Path.Combine(root.Path, "worker-read-lease.bin")));
+    }
+
+    [TestMethod]
     public async Task ActualControllerCrashReleasesItsOtherwiseStubbornWorkerAndInputLease()
     {
         using var root = new WorkerTestDirectory();

@@ -45,3 +45,5 @@ percentage changes require acknowledged settings and retain the 2 GiB floor. The
 budget manager never decides which files may be deleted. Scoped cache cleanup must
 separately prove disposable ownership, no readers/pins and a verified available remote
 original, and protect local-only originals and human/job state.
+
+Managed process supervision also samples actual resident bytes every 100 ms and enforces a monotonic per-process lifetime. Defaults are a 1 GiB resident stop threshold and 30-minute lifetime; installed adapters may select stricter validated limits. These are supervisor stop thresholds, not a claim of kernel allocation quotas. Measurement failure is actionable, never treated as zero usage. Resource failures terminate/join the exact child and retain its input/checkpoint; monitored tasks join before process handles are disposed. Windows local tests exercise actual memory/lifetime stops and unchanged input bytes. Native OS containment and real model allocation bounds remain separate acceptance work.
