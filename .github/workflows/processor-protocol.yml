@@ -49,7 +49,8 @@ jobs:
             @{ Name = 'protocol'; Path = 'tests/Mpa.Processor.Protocol.Tests/Mpa.Processor.Protocol.Tests.csproj' },
             @{ Name = 'core'; Path = 'tests/Mpa.Processor.Core.Tests/Mpa.Processor.Core.Tests.csproj' },
             @{ Name = 'google'; Path = 'tests/Mpa.Processor.GoogleDrive.Tests/Mpa.Processor.GoogleDrive.Tests.csproj' },
-            @{ Name = 'setup'; Path = 'tests/Mpa.Processor.AppServices.Tests/Mpa.Processor.AppServices.Tests.csproj' }
+            @{ Name = 'setup'; Path = 'tests/Mpa.Processor.AppServices.Tests/Mpa.Processor.AppServices.Tests.csproj' },
+            @{ Name = 'lan'; Path = 'tests/Mpa.Processor.Lan.Tests/Mpa.Processor.Lan.Tests.csproj' }
           )
           foreach ($mpaProject in $mpaProjects) {
             $mpaName = $mpaProject.Name
