@@ -1,0 +1,138 @@
+using System.Globalization;
+using System.Text.Json;
+using Microsoft.Data.Sqlite;
+
+namespace Mpa.Processor.Core;
+
+/// <summary>Owns the local single-instance lease and SQLite connection. All calls belong to the
+/// coordinator's serial background queue, never the UI thread. No source photo path is accepted.</summary>
+public sealed class ProcessorStateDatabase : IDisposable
+{
+    private const int ApplicationId = 0x4d504130;
+    private readonly FileStream _instanceLease;
+    private readonly SqliteConnection _connection;
+    private bool _disposed;
+    internal SqliteConnection Connection => !_disposed ? _connection : throw new ObjectDisposedException(nameof(ProcessorStateDatabase));
+    public string SqliteVersion { get; }
+
+    public ProcessorStateDatabase(string stateDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stateDirectory);
+        var root = Path.GetFullPath(stateDirectory);
+        if (Path.TrimEndingDirectorySeparator(root) == Path.GetPathRoot(root)) throw new ArgumentException("A dedicated local state directory is required.", nameof(stateDirectory));
+        Directory.CreateDirectory(root);
+        if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0) throw new IOException("Processor state directory cannot be a link/reparse point.");
+        foreach (var name in new[] { "processor.lock", "processor.db", "processor.db-wal", "processor.db-shm" })
+        {
+            var candidate = Path.Combine(root, name);
+            if (File.Exists(candidate) && (File.GetAttributes(candidate) & FileAttributes.ReparsePoint) != 0)
+                throw new IOException("Processor state/sidecar cannot be a link: " + name);
+        }
+        var lease = new FileStream(Path.Combine(root, "processor.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        SqliteConnection? connection = null;
+        try
+        {
+            ValidateOrCreateMarker(root);
+            var path = Path.Combine(root, "processor.db");
+            if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new IOException("Processor database cannot be a link.");
+            connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadWriteCreate,
+                Pooling = false, DefaultTimeout = 5 }.ToString());
+            connection.Open();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "PRAGMA application_id";
+                var application = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+                command.CommandText = "PRAGMA user_version";
+                var version = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+                command.CommandText = "SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'";
+                var objects = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+                if (application != ApplicationId && !(application == 0 && version == 0 && objects == 0))
+                    throw new InvalidDataException("Unknown database identity; preserve it and choose an empty Processor state directory.");
+                if (version is not (0 or 1)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
+                command.CommandText = "PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;";
+                command.ExecuteNonQuery();
+                command.CommandText = "PRAGMA journal_mode=WAL";
+                if (!string.Equals(command.ExecuteScalar() as string, "wal", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Durable WAL mode was not established.");
+                command.CommandText = "SELECT sqlite_version()";
+                SqliteVersion = command.ExecuteScalar() as string ?? throw new InvalidDataException("SQLite did not identify its runtime version.");
+                if (version == 0)
+                {
+                    using var transaction = connection.BeginTransaction();
+                    command.Transaction = transaction;
+                    command.CommandText = """
+                        CREATE TABLE processor_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
+                        INSERT INTO processor_meta VALUES('format','mpa-processor-state');
+                        CREATE TABLE job(
+                          id TEXT PRIMARY KEY, kind TEXT NOT NULL, captured_context TEXT NOT NULL,
+                          context_hash TEXT NOT NULL, paused INTEGER NOT NULL DEFAULT 0 CHECK(paused IN(0,1)),
+                          canceled INTEGER NOT NULL DEFAULT 0 CHECK(canceled IN(0,1))
+                        ) STRICT;
+                        CREATE TABLE job_item(
+                          job_id TEXT NOT NULL REFERENCES job(id), id TEXT NOT NULL, input_fingerprint TEXT NOT NULL,
+                          PRIMARY KEY(job_id,id)
+                        ) STRICT;
+                        CREATE TABLE item_stage(
+                          job_id TEXT NOT NULL, item_id TEXT NOT NULL, name TEXT NOT NULL, recipe_hash TEXT NOT NULL,
+                          state TEXT NOT NULL CHECK(state IN('queued','running','canceling','ready','failed','unsupported','canceled')),
+                          attempt INTEGER NOT NULL DEFAULT 0, lease_id TEXT, checkpoint TEXT, result_receipt TEXT,
+                          error_code TEXT, error_message TEXT, retryable INTEGER NOT NULL DEFAULT 0 CHECK(retryable IN(0,1)),
+                          PRIMARY KEY(job_id,item_id,name), FOREIGN KEY(job_id,item_id) REFERENCES job_item(job_id,id)
+                        ) STRICT;
+                        CREATE TABLE stage_dependency(
+                          job_id TEXT NOT NULL, item_id TEXT NOT NULL, stage_name TEXT NOT NULL, depends_on TEXT NOT NULL,
+                          PRIMARY KEY(job_id,item_id,stage_name,depends_on),
+                          FOREIGN KEY(job_id,item_id,stage_name) REFERENCES item_stage(job_id,item_id,name),
+                          FOREIGN KEY(job_id,item_id,depends_on) REFERENCES item_stage(job_id,item_id,name)
+                        ) STRICT;
+                        CREATE INDEX stage_ready_queue ON item_stage(state,job_id,item_id,name);
+                        CREATE TABLE state_outbox(
+                          id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES job(id), item_id TEXT NOT NULL,
+                          stage_name TEXT NOT NULL, receipt TEXT NOT NULL, published INTEGER NOT NULL DEFAULT 0 CHECK(published IN(0,1))
+                        ) STRICT;
+                        PRAGMA application_id=1297105200;
+                        PRAGMA user_version=1;
+                        """;
+                    command.ExecuteNonQuery();
+                    transaction.Commit();
+                }
+            }
+            _instanceLease = lease;
+            _connection = connection;
+        }
+        catch
+        {
+            connection?.Dispose();
+            lease.Dispose();
+            throw;
+        }
+    }
+
+    private static void ValidateOrCreateMarker(string root)
+    {
+        var path = Path.Combine(root, "mpa-processor-state.json");
+        if (File.Exists(path))
+        {
+            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new IOException("State marker cannot be a link.");
+            using var input = File.OpenRead(path);
+            if (input.Length is < 1 or > 4096) throw new InvalidDataException("Invalid state directory marker size.");
+            using var marker = JsonDocument.Parse(input);
+            if (marker.RootElement.GetProperty("format").GetString() != "mpa-processor-state" ||
+                marker.RootElement.GetProperty("major").GetInt32() != 1 || !Guid.TryParseExact(marker.RootElement.GetProperty("installationId").GetString(), "D", out var id) || id == Guid.Empty)
+                throw new InvalidDataException("Unknown Processor state directory marker.");
+            return;
+        }
+        if (Directory.EnumerateFileSystemEntries(root).Any(entry => Path.GetFileName(entry) != "processor.lock"))
+            throw new InvalidDataException("Refusing to claim a directory containing unrecognized files.");
+        using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        JsonSerializer.Serialize(output, new { format = "mpa-processor-state", major = 1, installationId = Guid.NewGuid().ToString("D") });
+        output.Flush(flushToDisk: true);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        try { _connection.Dispose(); }
+        finally { _instanceLease.Dispose(); }
+    }
+}

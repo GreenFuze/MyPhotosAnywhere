@@ -1,6 +1,6 @@
 # MPA 0.6.0 implementation ledger
 
-Updated: 2026-10-20. **Stage 0 validation continues; Stage 1 contracts are in progress. No 0.6 application or installer is released.**
+Updated: 2026-10-20. **Stage 0 validation continues; Stage 1 contract integration and Stage 2 foundations are in progress. No 0.6 application or installer is released.**
 
 ## Authority and baseline
 
@@ -14,7 +14,7 @@ Baseline: `6c9ead7b1d4446dc819dee71974aa7b68614f232` (0.5.33 publication revisio
 | --- | --- | --- |
 | 0: feasibility/baseline | In progress | Production OAuth, full desktop grant, fresh-process refresh, bounded synthetic Drive round trip passed. Manual post-consent source discovery, actual-expiry refresh and injected lost-completion reconciliation passed. Four-target two-model/decoder native matrix passed on 67607b1; expanded object model matrix is running on 9bae0a3. Actual cross-client/crash/multiple-account/duration and remaining codec/OCR/package gates stay open. |
 | 1: contracts | In progress | Shared Kotlin/C# canonical JSON and Drive identity goldens passed; Kotlin 11 targeted tests plus zero-findings lint passed; C# 25 tests now cover signatures, causality, aliases, closed approval scopes, artifact integrity and worker framing. The earlier 17-test contract revision passed all four native OS/architecture targets. Catalog/worker wire and staged-index contracts are specified; integration/scale acceptance remains. |
-| 2: core/plugins | Pending | Durable jobs, resources, worker ownership, tray/Exit. |
+| 2: core/plugins | In progress | Local SQLite ownership, durable stage/checkpoint/receipt outbox and failed-only retry foundation under test. Resource reservations, actual process ownership/recovery, complete plugins and tray/Exit remain. |
 | 3: accounts/LAN | Pending | Production sessions, discovery, secure pairing, acknowledged controls. |
 | 4: catalog | Pending | Immutable publishing, staged phone catalog, human synchronization. |
 | 5: imports/previews | Pending | All three Takeout paths, per-stage retry, previews/video. |
@@ -79,3 +79,10 @@ Do not stop at routine stages or ask for another Continue. Stop only for require
 - Gradle 9.8.2 pin passed full Android build/unit/lint CI 39385167843 on 8e50af7, in addition to local targeted checks. New source/fixture LF rules resolve Git conversion warnings.
 - Expanded native run 39380066718 on 9bae0a3 passed Windows/Linux/Apple Silicon; their downloaded evidence hashes, source/model binding and logs independently verified. Intel failed because the hosted runner lost communication; no completed log/artifact was available. That failed job was rerun on the same source, not waived.
 - Read-only v3 synthetic metadata returned no ETag. A separate bounded synthetic-only probe confirmed v3 accepted an invalid If-Match (HTTP200). v2 exposes the ETag and rejected formerly-valid stale ETags (HTTP412), including Trash/restore, while matching ETags permitted those changes. Original bytes stayed exact. No existing originals changed; fixture retained. A deliberately arbitrary opaque ETag caused HTTP500 in v2; this negative observation is retained and is not evidence of successful conditional enforcement. Only the valid/stale captured-tag cases establish that capability. Product mutation adapters must use the independently verified conditional path and preserve replay/source/destination checks. See validation/drive-feasibility.md.
+
+## Durable core foundation
+
+- Microsoft.Data.Sqlite 10.0.13 with exact compatible SQLitePCLRaw 2.1.14 pins; the Windows test runtime reports SQLite 3.54.0. The 2.x patch branch matches Microsoft.Data.Sqlite's native provider dependency family; no preview/dynamic selectors. Lockfiles capture all transitive bytes. Actual native core testing on the other platforms is still required.
+- The new core owns a dedicated marked local state directory, single-instance file lease and SQLite connection. Unknown directories/databases/future versions are preserved and rejected; no silent reset. WAL/FULL durability, foreign keys, parameterized statements and bounded transactions are explicit. SQLite calls belong to the serial background coordinator, not the UI thread; async wrappers do not make SQLite disk I/O asynchronous.
+- Job contexts are immutable captured JSON/hash, including destinations. Stage attempts have fresh lease IDs; checkpoints survive retries. Completion and the publication outbox are one transaction. A failed item does not block independent work, and failed-only resume never requeues verified ready stages. Pause/cancel fence late results, wait for the worker owner to confirm exit, and retain completed receipts. A reopened running attempt stays fenced until the actual worker recovery owner resolves it.
+- Seven local core tests passed. A repeated TRX filename caused a test-harness overwrite warning; the verification rerun uses a fresh unique result file. Native child/process-tree cleanup and crash recovery are NOT established by these repository-level tests; they are the next owner/service work.

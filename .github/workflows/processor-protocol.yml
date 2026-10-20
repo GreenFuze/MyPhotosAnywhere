@@ -45,12 +45,19 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force build/protocol-tests | Out-Null
-          dotnet restore tests/Mpa.Processor.Protocol.Tests/Mpa.Processor.Protocol.Tests.csproj --locked-mode *> build/protocol-tests/restore.log
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet test tests/Mpa.Processor.Protocol.Tests/Mpa.Processor.Protocol.Tests.csproj --no-restore -c Release --logger 'trx;LogFileName=contracts.trx' --results-directory build/protocol-tests *> build/protocol-tests/test.log
-          $mpaContractExit = $LASTEXITCODE
-          Get-Content build/protocol-tests/test.log
-          if ($mpaContractExit -ne 0) { exit $mpaContractExit }
+          $mpaProjects = @(
+            @{ Name = 'protocol'; Path = 'tests/Mpa.Processor.Protocol.Tests/Mpa.Processor.Protocol.Tests.csproj' },
+            @{ Name = 'core'; Path = 'tests/Mpa.Processor.Core.Tests/Mpa.Processor.Core.Tests.csproj' }
+          )
+          foreach ($mpaProject in $mpaProjects) {
+            $mpaName = $mpaProject.Name
+            dotnet restore $mpaProject.Path --locked-mode *> "build/protocol-tests/$mpaName-restore.log"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            dotnet test $mpaProject.Path --no-restore -c Release --logger "trx;LogFileName=$mpaName.trx" --results-directory build/protocol-tests *> "build/protocol-tests/$mpaName-test.log"
+            $mpaContractExit = $LASTEXITCODE
+            Get-Content "build/protocol-tests/$mpaName-test.log"
+            if ($mpaContractExit -ne 0) { exit $mpaContractExit }
+          }
           $mpaDiagnostic = Get-ChildItem build/protocol-tests/*.log | Select-String -Pattern '\bwarning\b|\berror\s+[A-Z]+\d+\s*:'
           if ($mpaDiagnostic) { $mpaDiagnostic; throw 'Protocol diagnostics are blocking.' }
       - uses: actions/upload-artifact@v7.0.2
