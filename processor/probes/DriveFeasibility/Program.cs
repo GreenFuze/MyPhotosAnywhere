@@ -16,8 +16,9 @@ internal static class Program
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("This Stage 0 credential probe requires Windows DPAPI; product vault adapters remain separate work.");
-        if (args.Length != 4 || args[0] is not ("authorize" or "refresh" or "vault-check"))
-            throw new ArgumentException("Usage: DriveFeasibility <authorize|refresh|vault-check> <desktop-client-json> <private-directory> <file|drive>");
+        if (args.Length < 4 || args[0] is not ("authorize" or "refresh" or "vault-check" or "inspect") ||
+            args.Length != (args[0] == "inspect" ? 5 : 4))
+            throw new ArgumentException("Usage: DriveFeasibility <authorize|refresh|vault-check|inspect> <desktop-client-json> <private-directory> <file|drive> [disposable-folder-id for inspect]");
         var scope = args[3] switch
         {
             "file" => "https://www.googleapis.com/auth/drive.file",
@@ -33,7 +34,8 @@ internal static class Program
         {
             await new ProtectedStoreProbe(vault).RunAsync().ConfigureAwait(false);
             await new LoopbackStateProbe(root).RunAsync().ConfigureAwait(false);
-            Console.WriteLine("Synthetic protected-store and loopback state/cancellation checks passed; no Google request or grant occurred.");
+            await DriveReadProtocolProbe.RunAsync().ConfigureAwait(false);
+            Console.WriteLine("Synthetic protected-store, loopback state/cancellation and bounded Drive protocol checks passed; no Google request or grant occurred.");
             return 0;
         }
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(15));
@@ -76,6 +78,11 @@ internal static class Program
         var granted = (credential.Token.Scope ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (!granted.Contains(scope, StringComparer.Ordinal))
             throw new InvalidDataException("Google did not return the requested scope; do not infer permission from the request");
+        if (args[0] == "inspect")
+        {
+            await new DriveReadProbe(credential).RunAsync(args[4], root, deadline.Token).ConfigureAwait(false);
+            return 0;
+        }
         var observation = new
         {
             operation = args[0], observedAtUtc = DateTimeOffset.UtcNow,

@@ -22,15 +22,15 @@ The synthetic storage command passed on Windows: encrypted round trip, expiry ti
 | Probe | Status |
 | --- | --- |
 | Production configuration and personal-use limitations | In production confirmed; unverified-scope notice and 100-user cap observed; no verification approval claimed |
-| Fresh desktop consent and protected persistence | Not run; requires exact grant approval |
-| `drive.file` case with actual returned scope | Not run |
+| Fresh desktop consent and protected persistence | Narrow drive.file consent completed Oct 20 after owner approval; DPAPI refresh record persisted; full scope still pending |
+| `drive.file` case with actual returned scope | Returned exactly drive.file; manually created folder GET 404 and child list 200/zero visible items; same folder verified present in owner browser |
 | Manually created existing/nested/new file discovery | Not run |
 | Android/Desktop shared protocol-file access | Not run |
 | Immutable publication, range reads, checksum fields | Not run |
 | Lost upload response and reserved-ID reconciliation | Not run |
-| Short refresh after expiry, restart and network interruption | Not run |
+| Short refresh after expiry, restart and network interruption | Fresh-process immediate narrow-token refresh passed without browser; expiry/network-interruption cases remain pending |
 | Denied/revoked grants, 401/403/429/5xx handling | Not run |
-| Real beyond-seven-day authorization | Not started; do not claim a short refresh substitutes |
+| Real beyond-seven-day authorization | Narrow grant observation started Oct 20; no elapsed-duration acceptance yet; full-scope grant has not started |
 
 Restrict future API writes to the named disposable folder. Full Drive OAuth is technically account-wide; internal folder checks do not turn it into a Google-enforced folder grant. Do not revoke the existing app's working grants merely to manufacture an isolated narrow-scope test. Record any actual grant coupling and resolve it explicitly.
 
@@ -48,3 +48,11 @@ These sources explain supported behavior; the live rows above still need observe
 ## Current live authorization attempt
 
 A fresh private `drive.file` PKCE request was prepared after Production confirmation. The authorization process opens no default browser and assumes no grant. Chrome control disappeared from browser inventory while opening the consent URL; no completed authorization report has been observed. Reconnection is requested. The request expires after its bounded 15-minute deadline; recreate it if expired, without reusing Testing tokens or revoking existing Android grants. Private URLs and credentials remain excluded from public evidence.
+
+## October 20 observed results
+
+The owner explicitly approved the displayed desktop test. A fresh interactive narrow grant completed and returned exactly `https://www.googleapis.com/auth/drive.file`, with a protected refresh credential. A new process refreshed it successfully with no browser. A bounded read-only API probe returned folder 404, child list 200 and zero visible items. The same named empty folder was verified present in the intended account through Drive's UI. No Drive writes occurred. These observations are not proof of whole-library discovery, recursive access, cross-client sharing or duration.
+
+The revised read probe passes synthetic permission-boundary, HTTP 401/403/404/429/503, redirect, malformed/oversized-body and cancellation cases. Strict local build: zero warnings/errors. Logs/reports remain in private local evidence; source is a provisional Stage 0 increment, not an immutable final application release.
+
+A separate full-Drive request is prepared because the narrow grant did not expose the manually created folder. Google displays its unverified-app notice. The owner has been asked specifically about account-wide permissions; no broader grant has been made. Existing Android grants have not been revoked.
