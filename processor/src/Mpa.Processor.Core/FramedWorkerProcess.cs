@@ -48,6 +48,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     private AggregateException? _releaseError;
     public int ProcessId { get; }
     public Task Completion { get; }
+    public bool ExitConfirmed => _processExit.IsCompletedSuccessfully;
     private long _observedPeakResidentBytes;
     public long ObservedPeakResidentBytes => Interlocked.Read(ref _observedPeakResidentBytes);
 
@@ -217,8 +218,10 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
                 var resident = _process.WorkingSet64;
                 if (resident <= 0)
                 {
-                    if (_process.HasExited) return;
-                    throw new InvalidDataException("Running worker resident-memory measurement is unavailable.");
+                    // A process shedding its address space can report zero just before its exit
+                    // notification is delivered. Confirm that exit; never accept zero for live work.
+                    try { await _processExit.WaitAsync(TimeSpan.FromMilliseconds(250), _stopMonitoring.Token).ConfigureAwait(false); return; }
+                    catch (TimeoutException error) { throw new InvalidDataException("Running worker resident-memory measurement is unavailable.", error); }
                 }
                 Interlocked.Exchange(ref _observedPeakResidentBytes, Math.Max(ObservedPeakResidentBytes, resident));
                 if (resident > policy.ResidentMemoryStopBytes)

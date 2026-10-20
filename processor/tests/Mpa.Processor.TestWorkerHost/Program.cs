@@ -8,7 +8,7 @@ using Mpa.Processor.WorkerRuntime;
 using Mpa.Processor.TestSupport;
 
 // Synthetic child-process fixture only. Never included in the product installer/plugin registry.
-if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "malformed" or "exit-error" or "parent-launcher"))
+if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "malformed" or "exit-error" or "exit-clean" or "parent-launcher"))
     throw new ArgumentException("Expected a known synthetic scenario and an owned test directory.");
 var root = Path.GetFullPath(args[1]);
 if (!Directory.Exists(root) || !Path.GetFileName(root).StartsWith("MPA-Worker-Test-", StringComparison.Ordinal))
@@ -50,6 +50,7 @@ using var output = Console.OpenStandardOutput();
 using var writer = new WorkerFrameWriter(output);
 await writer.WriteAsync("{\"type\":\"hello\"}"u8.ToArray(), CancellationToken.None).ConfigureAwait(false);
 if (args[0] == "exit-error") return 7;
+if (args[0] == "exit-clean") return 0;
 if (args[0] == "malformed")
 {
     await output.WriteAsync(new byte[4]).ConfigureAwait(false); // Deliberately invalid zero-length frame.

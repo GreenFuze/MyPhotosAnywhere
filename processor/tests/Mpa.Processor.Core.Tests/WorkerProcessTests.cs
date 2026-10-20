@@ -122,6 +122,22 @@ public sealed class WorkerProcessTests
     }
 
     [TestMethod]
+    public async Task RepeatedRapidCleanExitsJoinWithoutMisclassifyingAddressSpaceTeardown()
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        for (var run = 0; run < 20; run++)
+        {
+            using var root = new WorkerTestDirectory();
+            var worker = await FramedWorkerProcess.StartAsync(await SpecAsync(root.Path, "exit-clean").ConfigureAwait(false), deadline.Token).ConfigureAwait(false);
+            await worker.Completion.WaitAsync(deadline.Token).ConfigureAwait(false);
+            await worker.DisposeAsync().ConfigureAwait(false);
+            Assert.IsTrue(worker.ExitConfirmed);
+            using var input = File.Open(Path.Combine(root.Path, "worker-read-lease.bin"), FileMode.Open, FileAccess.Read, FileShare.None);
+            Assert.AreEqual(42, input.ReadByte());
+        }
+    }
+
+    [TestMethod]
     public async Task ActualControllerCrashReleasesItsOtherwiseStubbornWorkerAndInputLease()
     {
         using var root = new WorkerTestDirectory();
@@ -164,7 +180,7 @@ public sealed class WorkerProcessTests
         }
     }
 
-    private static async Task<WorkerLaunchSpec> SpecAsync(string root, string scenario)
+    internal static async Task<WorkerLaunchSpec> SpecAsync(string root, string scenario)
     {
         var host = Path.GetFullPath(Path.Combine(RuntimeEnvironment.GetRuntimeDirectory(), "..", "..", "..", OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet"));
         using var source = File.OpenRead(host);
