@@ -47,6 +47,7 @@ internal static class Program
         }
         Logger.Sink = new DiagnosticSink();
         ProcessorStateDatabase? database = null;
+        ProcessorStateCoordinator? state = null;
         Exception? startupError = null;
         try
         {
@@ -63,10 +64,15 @@ internal static class Program
                 startupError = new IOException("Another Processor owns this local state but its controls are unavailable. Open or exit it from its tray menu, then try again.", error);
             }
             catch (Exception error) { startupError = error; }
-            try { return AppBuilder.Configure(() => new ProcessorApp(startupError)).UsePlatformDetect().StartWithClassicDesktopLifetime(args); }
+            if (database is not null) state = new ProcessorStateCoordinator(database);
+            try { return AppBuilder.Configure(() => new ProcessorApp(startupError, state, database?.InstallationId ?? Guid.Empty)).UsePlatformDetect().StartWithClassicDesktopLifetime(args); }
             finally { if (Application.Current is ProcessorApp app) app.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
         }
-        finally { database?.Dispose(); }
+        finally
+        {
+            try { state?.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
+            finally { database?.Dispose(); }
+        }
     }
 
     private sealed class DiagnosticSink : ILogSink

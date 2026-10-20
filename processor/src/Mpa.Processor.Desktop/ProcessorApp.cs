@@ -30,8 +30,17 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
     private Task? _ownedStop;
     private LocalProcessorControl? _control;
     private Task? _controlMonitor;
+    private readonly ProcessorStateCoordinator? _stateCoordinator;
+    private readonly Guid _installationId;
+    private readonly ProcessorAccountPanel _accounts;
+    private bool _hasGoogleAccount;
 
-    public ProcessorApp(Exception? startupError = null) => _startupError = startupError;
+    public ProcessorApp(Exception? startupError = null, ProcessorStateCoordinator? stateCoordinator = null, Guid installationId = default)
+    {
+        _startupError = startupError; _stateCoordinator = stateCoordinator; _installationId = installationId;
+        _accounts = new ProcessorAccountPanel(error => ShowFailure("Google account setup stopped", error));
+        _accounts.StateChanged += snapshot => { _hasGoogleAccount = snapshot.Accounts.Any(account => account.Connected); RefreshReadyStatus(); };
+    }
 
     public override void Initialize() => Styles.Add(new FluentTheme());
 
@@ -77,11 +86,10 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
         var status = new StackPanel { Spacing = 12 };
         status.Children.Add(_state); status.Children.Add(_detail); status.Children.Add(_pause);
         content.Children.Add(Card(status));
+        content.Children.Add(Card(_accounts));
         content.Children.Add(Card(new StackPanel { Spacing = 10, Children =
         {
-            new TextBlock { Text = "Google Drive", FontSize = 20, FontWeight = FontWeight.SemiBold },
-            new TextBlock { Text = "No accounts connected", TextWrapping = TextWrapping.Wrap },
-            new TextBlock { Text = "Phone", FontSize = 20, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 12, 0, 0) },
+            new TextBlock { Text = "Phone", FontSize = 20, FontWeight = FontWeight.SemiBold },
             new TextBlock { Text = "No phone paired", TextWrapping = TextWrapping.Wrap }
         } }));
         content.Children.Add(new TextBlock { Text = "Your originals stay in Google Drive. The Processor publishes previews and metadata separately.", TextWrapping = TextWrapping.Wrap, Opacity = 0.75 });
@@ -94,23 +102,24 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
     private static Border Card(Control content) => new() { Child = content, Padding = new Thickness(24), CornerRadius = new CornerRadius(24),
         Background = new SolidColorBrush(Color.FromArgb(20, 120, 140, 140)) };
 
-    private Task InitializeStateAsync()
+    private async Task InitializeStateAsync()
     {
-        if (_initialized) return Task.CompletedTask; // Opened fires again after close-to-tray and Show.
+        if (_initialized) return; // Opened fires again after close-to-tray and Show.
         _initialized = true;
-        if (_startupError is not null) { ShowFailure("Processor could not start", _startupError); return Task.CompletedTask; }
+        if (_startupError is not null) { ShowFailure("Processor could not start", _startupError); return; }
         try
         {
-            if (_shutdown is not null) return Task.CompletedTask;
+            if (_shutdown is not null) return;
+            if (_stateCoordinator is null || _installationId == Guid.Empty) throw new InvalidOperationException("Processor state owner/installation identity is unavailable.");
             _control = new LocalProcessorControl(Program.StateDirectory, HandleControlAsync,
                 () => Dispatcher.UIThread.Post(async () => await RequestExitAsync()));
             _controlMonitor = ObserveControlAsync(_control);
-            _state.Text = "Ready to connect";
-            _detail.Text = "The Processor is running. Account connection and phone pairing are the next setup steps.";
+            RefreshReadyStatus();
             _pause.IsEnabled = true; _trayPause.IsEnabled = true;
+            await _accounts.InitializeAsync(_stateCoordinator, _installationId, Program.StateDirectory);
+            if (_accounts.Failure is not null) throw _accounts.Failure;
         }
         catch (Exception error) { ShowFailure("Processor could not start", error); }
-        return Task.CompletedTask;
     }
 
     private async Task TogglePauseAsync()
@@ -123,8 +132,7 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
             else { _state.Text = "Pausing…"; await _work.PauseAsync(); }
             if (_work.State == ProcessorWorkState.Faulted) throw _work.Failure ?? new InvalidOperationException("Processor entered a faulted state.");
             var paused = _work.State == ProcessorWorkState.Paused;
-            _state.Text = paused ? "Processing paused" : "Ready to connect";
-            _detail.Text = paused ? "No processing work will start until you resume." : "The Processor is running. Account connection and phone pairing are the next setup steps.";
+            RefreshReadyStatus();
             _pause.Content = paused ? "Resume processing" : "Pause processing";
             _trayPause.Header = paused ? "Resume processing" : "Pause processing";
         }
@@ -134,6 +142,18 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
             _actionPending = false;
             var usable = _shutdown is null && _work.State is ProcessorWorkState.Ready or ProcessorWorkState.Paused;
             _pause.IsEnabled = usable; _trayPause.IsEnabled = usable;
+        }
+    }
+
+    private void RefreshReadyStatus()
+    {
+        if (_hasFailure || _shutdown is not null) return;
+        if (_work.State == ProcessorWorkState.Paused)
+        { _state.Text = "Processing paused"; _detail.Text = "No processing work will start until you resume."; }
+        else if (_work.State == ProcessorWorkState.Ready)
+        {
+            _state.Text = _hasGoogleAccount ? "Ready to pair your phone" : "Connect Google Drive";
+            _detail.Text = _hasGoogleAccount ? "Google Drive is connected. Pair your phone to finish setup." : "Connect the Google accounts containing your photos, then pair your phone.";
         }
     }
 
@@ -147,7 +167,7 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
         {
             await _shutdown;
             _allowClose = true;
-            _desktop!.Shutdown(!_hasFailure && _work.Failure is null ? 0 : 1);
+            _desktop!.Shutdown(!_hasFailure && _work.Failure is null && _accounts.Failure is null ? 0 : 1);
         }
         catch (Exception error)
         {
@@ -158,7 +178,9 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
 
     private async Task StopOwnedAsync()
     {
-        await _work.DisposeAsync().ConfigureAwait(false);
+        var owners = Task.WhenAll(_work.DisposeAsync().AsTask(), _accounts.DisposeAsync().AsTask());
+        try { await owners.ConfigureAwait(false); }
+        catch { throw owners.Exception ?? throw new InvalidOperationException("Processor owners failed to stop without an exception."); }
         if (_control is not null)
         {
             try { await _control.DisposeAsync().ConfigureAwait(false); }
