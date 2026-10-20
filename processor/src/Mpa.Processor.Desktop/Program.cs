@@ -8,6 +8,7 @@ namespace Mpa.Processor.Desktop;
 internal static class Program
 {
     public static string StateDirectory { get; private set; } = "";
+    public static bool Background { get; private set; }
     [STAThread]
     public static int Main(string[] args)
     {
@@ -22,11 +23,12 @@ internal static class Program
         {
             if (args[index] == "--state-directory" && index + 1 < args.Length && StateDirectory.Length == 0)
                 StateDirectory = Path.GetFullPath(args[++index]);
+            else if (args[index] == "--background" && !Background) Background = true;
             else if (!hasCommand)
             {
                 command = args[index] switch { "--show" => LocalProcessorCommand.Show, "--status" => LocalProcessorCommand.Status,
                     "--pause" => LocalProcessorCommand.Pause, "--resume" => LocalProcessorCommand.Resume, "--stop" => LocalProcessorCommand.Stop,
-                    _ => throw new ArgumentException("Unknown Processor command. Use --show, --status, --pause, --resume, --stop and optional --state-directory.") };
+                    _ => throw new ArgumentException("Unknown Processor command. Use --show, --status, --pause, --resume, --stop and optional --state-directory/--background.") };
                 hasCommand = true;
             }
             else throw new ArgumentException("Repeated/invalid Processor command.");

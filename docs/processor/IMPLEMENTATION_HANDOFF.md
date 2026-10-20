@@ -2,6 +2,8 @@
 
 Date: 2026-10-19. Governing specification: [MPA_PROCESSOR_REDESIGN_PLAN.md](MPA_PROCESSOR_REDESIGN_PLAN.md).
 
+**2026-10-20 owner revisions take precedence:** see `DESKTOP_WEB_REVISION.md`. Desktop is a full web-based photo client with browser access on the same LAN and a background engine. Android communicates exclusively with Google Drive, never a Processor LAN/API endpoint. Supersede older phone pairing/discovery and deferred-Drive-command instructions in this historical stage outline. Mobile configuration/requests need durable Drive delivery and explicit applied/conflict receipts.
+
 ## Start condition
 
 The original effort-change/start checkpoint has been satisfied: the owner reported switching to High and instructed emulator-first implementation. Stage 0 has started. Do not request another start confirmation, change model settings, spawn agents or create chats. Track evidence and remaining gates in `IMPLEMENTATION_STATUS.md`.

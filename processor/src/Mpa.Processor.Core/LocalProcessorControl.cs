@@ -10,7 +10,8 @@ public enum LocalProcessorCommand { Show, Status, Pause, Resume, Stop }
 public sealed record LocalProcessorReply(bool Ok, string State, string? Error, int ProcessId = 0);
 
 /// <summary>Current-OS-user control only. No Google credentials, media, arbitrary paths or jobs
-/// cross this endpoint. Phone/LAN pairing is a different authenticated protocol.</summary>
+/// cross this endpoint. Browser LAN sessions use a different authenticated protocol; Android
+/// communicates only with Drive and never uses this local endpoint.</summary>
 public sealed class LocalProcessorControl : IAsyncDisposable
 {
     private const int FrameLimit = 8 * 1024;

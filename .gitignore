@@ -25,3 +25,5 @@ __pycache__/
 processor/.models/
 processor/.private/
 processor/.runtime-source/
+**/node_modules/
+processor/web/dist/

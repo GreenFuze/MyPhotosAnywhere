@@ -1,0 +1,233 @@
+using System.Net;
+using System.Security.Authentication;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Mpa.Processor.Lan;
+using Mpa.Processor.Core;
+using Google.Apis.Auth.OAuth2.Responses;
+using BadHttpRequestException = Microsoft.AspNetCore.Http.BadHttpRequestException;
+
+namespace Mpa.Processor.Web;
+
+/// <summary>Owns listeners and browser sessions, borrows the engine/identity. Closing a tab
+/// does not stop this owner. Dispose joins request handlers before releasing borrowed owners.</summary>
+public sealed class DesktopWebHost : IAsyncDisposable
+{
+    private const string CookieName = "mpa_browser";
+    private readonly WebApplication _host;
+    private readonly BrowserSessionAuthority _access = new();
+    private readonly IDesktopWebApplication _application;
+    private readonly HashSet<string> _endpoints = new(StringComparer.Ordinal);
+    private readonly string _assets;
+    private readonly WebDiagnostics _diagnostics;
+    private readonly object _gate = new();
+    private Task? _disposal;
+    public Uri LocalEndpoint { get; private set; } = null!;
+    public Uri? LanEndpoint { get; private set; }
+    public event Action<Exception>? Diagnostic;
+    public IReadOnlyList<Exception> FrameworkDiagnostics => _diagnostics.Failures;
+
+    private DesktopWebHost(WebApplication host, IDesktopWebApplication application, string assets, WebDiagnostics diagnostics)
+    {
+        _host = host; _application = application; _assets = assets; _diagnostics = diagnostics;
+        diagnostics.Reported += error => Diagnostic?.Invoke(error);
+    }
+
+    public static async Task<DesktopWebHost> StartAsync(IDesktopWebApplication application, string assetsDirectory,
+        ProcessorLanIdentity? lanIdentity, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        var assets = Path.GetFullPath(assetsDirectory);
+        if (!File.Exists(Path.Combine(assets, "index.html"))) throw new FileNotFoundException("The complete MPA web interface is missing from this package.");
+        var builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions { ApplicationName = typeof(DesktopWebHost).Assembly.FullName,
+            ContentRootPath = assets, EnvironmentName = Environments.Production });
+        var diagnostics = new WebDiagnostics();
+        builder.Logging.AddProvider(diagnostics);
+        builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(25));
+        builder.WebHost.UseKestrel(options =>
+        {
+            options.AddServerHeader = false;
+            options.Limits.MaxConcurrentConnections = 32;
+            options.Limits.MaxRequestBodySize = 16384;
+            options.Limits.MaxRequestHeadersTotalSize = 8192;
+            options.Limits.MaxRequestHeaderCount = 32;
+            options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(10);
+            options.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(30);
+            options.Listen(IPAddress.Loopback, 0, listen => listen.Protocols = HttpProtocols.Http1);
+            if (lanIdentity is not null) options.ListenAnyIP(0, listen =>
+            {
+                listen.Protocols = HttpProtocols.Http1;
+                listen.UseHttps(lanIdentity.ServerCertificate, https => https.SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13);
+            });
+        });
+        var host = builder.Build(); var owner = new DesktopWebHost(host, application, assets, diagnostics);
+        try
+        {
+            owner.MapRequests();
+            await host.StartAsync(cancellationToken).ConfigureAwait(false);
+            if (diagnostics.Failures.Count != 0) throw new AggregateException("Web host startup diagnostics are blocking.", diagnostics.Failures);
+            var addresses = host.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()?.Addresses
+                ?? throw new InvalidOperationException("Web listener did not publish its actual bound endpoints.");
+            owner.LocalEndpoint = new(addresses.Single(address => address.StartsWith("http://127.0.0.1:", StringComparison.Ordinal)));
+            owner._endpoints.Add(owner.LocalEndpoint.GetLeftPart(UriPartial.Authority));
+            if (lanIdentity is not null)
+            {
+                var bound = new Uri(addresses.Single(address => address.StartsWith("https://", StringComparison.Ordinal)));
+                owner.LanEndpoint = new UriBuilder(Uri.UriSchemeHttps, lanIdentity.DnsName, bound.Port).Uri;
+                owner._endpoints.Add(owner.LanEndpoint.GetLeftPart(UriPartial.Authority));
+            }
+            return owner;
+        }
+        catch { await owner.DisposeAsync().ConfigureAwait(false); throw; }
+    }
+
+    public BrowserInvitation OpenLocalBrowser() => _access.Invite(LocalEndpoint, hostOwner: true);
+    public BrowserInvitation InviteLanBrowser() => _access.Invite(LanEndpoint ?? throw new InvalidOperationException("Local-network access is not enabled."), hostOwner: false);
+
+    private void MapRequests()
+    {
+        _host.Run(async context =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            context.Response.Headers.XContentTypeOptions = "nosniff";
+            context.Response.Headers["Referrer-Policy"] = "no-referrer";
+            context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
+            try
+            {
+                var endpoint = RequestEndpoint(context);
+                if (endpoint is null) { context.Response.StatusCode = 403; return; }
+                var path = context.Request.Path.Value;
+                var mutation = context.Request.Method != "GET";
+                if (mutation && (!SameOrigin(context, endpoint) || !context.Request.HasJsonContentType()))
+                { context.Response.StatusCode = 403; return; }
+                if (path == "/api/session" && context.Request.Method == "POST")
+                {
+                    var body = await context.Request.ReadFromJsonAsync<SessionRequest>(context.RequestAborted).ConfigureAwait(false);
+                    var grant = _access.Exchange(body?.Secret ?? "", endpoint);
+                    context.Response.Cookies.Append(CookieName, grant.Cookie, CookieOptions(endpoint));
+                    var approved = _access.Authenticate(grant.Cookie, endpoint, null, false);
+                    await context.Response.WriteAsJsonAsync(new { csrf = grant.Csrf, hostOwner = approved.HostOwner }, context.RequestAborted).ConfigureAwait(false); return;
+                }
+                if (path?.StartsWith("/api/", StringComparison.Ordinal) == true)
+                {
+                    if (context.Request.Headers["Sec-Fetch-Site"] == "cross-site") { context.Response.StatusCode = 403; return; }
+                    var session = _access.Authenticate(context.Request.Cookies[CookieName], endpoint, context.Request.Headers["X-MPA-CSRF"], mutation);
+                    await ApiAsync(context, session).ConfigureAwait(false); return;
+                }
+                if (context.Request.Method != "GET") { context.Response.StatusCode = 405; return; }
+                // Explicit allowlist; no user-supplied path is ever mapped to the filesystem.
+                var asset = path switch { "/" => ("index.html", "text/html; charset=utf-8"), "/app.js" => ("app.js", "text/javascript; charset=utf-8"),
+                    "/app.css" => ("app.css", "text/css; charset=utf-8"), "/mpa.svg" => ("mpa.svg", "image/svg+xml"), _ => (null, null) };
+                if (asset.Item1 is null) { context.Response.StatusCode = 404; return; }
+                context.Response.ContentType = asset.Item2;
+                await context.Response.SendFileAsync(Path.Combine(_assets, asset.Item1), context.RequestAborted).ConfigureAwait(false);
+            }
+            catch (BrowserAuthenticationException) { if (!context.Response.HasStarted) context.Response.StatusCode = 401; }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { /* Kestrel joins this read; no durable work is canceled. */ }
+            catch (BadHttpRequestException error) { if (!context.Response.HasStarted) context.Response.StatusCode = error.StatusCode; }
+            catch (System.Text.Json.JsonException) { if (!context.Response.HasStarted) context.Response.StatusCode = 400; }
+            catch (StaleDriveConnectionException)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This account changed. Refresh settings before trying again." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (DriveAccountAlreadyConnectedException)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This Google account already exists. Reconnect its existing entry." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (TokenResponseException)
+            { context.Response.StatusCode = 503; await context.Response.WriteAsJsonAsync(new { message = "Google authorization could not finish. Reconnect or resume account setup on the host computer." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (HttpRequestException)
+            {
+                if (!context.Response.HasStarted)
+                { context.Response.StatusCode = 503; await context.Response.WriteAsJsonAsync(new { message = "Google Drive is unavailable. Your library and saved work were preserved." }, context.RequestAborted).ConfigureAwait(false); }
+            }
+            catch (Exception error)
+            {
+                Diagnostic?.Invoke(error);
+                if (context.Response.HasStarted) context.Abort();
+                else { context.Response.StatusCode = 500; await context.Response.WriteAsJsonAsync(new { message = "MPA encountered an unexpected failure. Open host diagnostics; existing photos and saved work were preserved." }, context.RequestAborted).ConfigureAwait(false); }
+            }
+        });
+    }
+
+    private async Task ApiAsync(HttpContext context, BrowserSession session)
+    {
+        var path = context.Request.Path.Value; var token = context.RequestAborted;
+        switch (context.Request.Method, path)
+        {
+            case ("GET", "/api/session"):
+                await context.Response.WriteAsJsonAsync(new { csrf = session.Csrf, hostOwner = session.HostOwner }, token).ConfigureAwait(false); break;
+            case ("DELETE", "/api/session"):
+                _access.Revoke(session.Id); context.Response.Cookies.Delete(CookieName, CookieOptions(RequestEndpoint(context)!)); context.Response.StatusCode = 204; break;
+            case ("GET", "/api/status"):
+                await context.Response.WriteAsJsonAsync(await _application.SnapshotAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("GET", "/api/photos"):
+                await context.Response.WriteAsJsonAsync(await _application.PhotosAsync(RequiredQuery(context, "account"), OptionalQuery(context, "cursor", 4096), token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("GET", "/api/preview"):
+                var preview = await _application.PreviewAsync(RequiredQuery(context, "account"), RequiredQuery(context, "file"), token).ConfigureAwait(false);
+                if (preview is null) { context.Response.StatusCode = 404; break; }
+                if (preview.Bytes.Length is < 1 or > 4 * 1024 * 1024 || preview.MimeType is not ("image/jpeg" or "image/png" or "image/webp"))
+                    throw new InvalidDataException("Preview provider returned an unsupported or oversized result.");
+                context.Response.ContentType = preview.MimeType; await context.Response.Body.WriteAsync(preview.Bytes, token).ConfigureAwait(false); break;
+            case ("POST", "/api/pause"):
+                await _application.PauseAsync(token).ConfigureAwait(false); context.Response.StatusCode = 204; break;
+            case ("POST", "/api/resume"):
+                await _application.ResumeAsync(token).ConfigureAwait(false); context.Response.StatusCode = 204; break;
+            case ("POST", "/api/accounts"):
+                if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
+                var account = await context.Request.ReadFromJsonAsync<AccountRequest>(token).ConfigureAwait(false) ?? throw new BadHttpRequestException("An account operation is required.");
+                var operation = account.Operation switch { "connect" => DesktopAccountOperation.Connect, "check" => DesktopAccountOperation.Check,
+                    "disconnect" => DesktopAccountOperation.Disconnect, "resume" => DesktopAccountOperation.Resume, "abandon" => DesktopAccountOperation.Abandon,
+                    "cleanup" => DesktopAccountOperation.Cleanup, _ => throw new BadHttpRequestException("Unknown account operation.") };
+                if (account.AccountId is not null && !Identity(account.AccountId) || account.PendingId == Guid.Empty || account.ExpectedRevision < 1 ||
+                    operation is DesktopAccountOperation.Check or DesktopAccountOperation.Disconnect && account.AccountId is null ||
+                    operation == DesktopAccountOperation.Disconnect && account.ExpectedRevision is null ||
+                    operation is DesktopAccountOperation.Resume or DesktopAccountOperation.Abandon && account.PendingId is null)
+                    throw new BadHttpRequestException("Invalid captured account operation fields.");
+                await _application.AccountAsync(new(operation, account.AccountId, account.PendingId, account.ExpectedRevision), token).ConfigureAwait(false);
+                context.Response.StatusCode = 204; break;
+            default: context.Response.StatusCode = 404; break;
+        }
+    }
+    private static bool Identity(string value) => value.Length is > 0 and <= 256 && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
+    private static string RequiredQuery(HttpContext context, string key) => OptionalQuery(context, key, 256) is { } value && Identity(value) ? value : throw new BadHttpRequestException("Invalid query identity.");
+    private static string? OptionalQuery(HttpContext context, string key, int maximum)
+    {
+        var values = context.Request.Query[key];
+        if (values.Count > 1 || values.ToString().Length > maximum || values.ToString().Any(char.IsControl)) throw new BadHttpRequestException("Query field exceeds its bound.");
+        return values.Count == 0 ? null : values.ToString();
+    }
+    private Uri? RequestEndpoint(HttpContext context)
+    {
+        if (!Uri.TryCreate(context.Request.Scheme + "://" + context.Request.Host + "/", UriKind.Absolute, out var endpoint) ||
+            !_endpoints.Contains(endpoint.GetLeftPart(UriPartial.Authority))) return null;
+        var remote = context.Connection.RemoteIpAddress;
+        if (remote is null || !PrivateAddress(remote)) return null;
+        return endpoint;
+    }
+    internal static bool PrivateAddress(IPAddress address)
+    {
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        if (IPAddress.IsLoopback(address)) return true;
+        var bytes = address.GetAddressBytes();
+        return bytes.Length == 4 ? bytes[0] == 10 || bytes[0] == 172 && bytes[1] is >= 16 and <= 31 || bytes[0] == 192 && bytes[1] == 168
+            : address.IsIPv6LinkLocal || (bytes[0] & 0xfe) == 0xfc;
+    }
+    private static bool SameOrigin(HttpContext context, Uri endpoint) => context.Request.Headers.Origin.Count == 1 && context.Request.Headers.Origin == endpoint.GetLeftPart(UriPartial.Authority);
+    private static CookieOptions CookieOptions(Uri endpoint) => new() { HttpOnly = true, Secure = endpoint.Scheme == Uri.UriSchemeHttps,
+        SameSite = SameSiteMode.Strict, Path = "/", IsEssential = true };
+    public ValueTask DisposeAsync()
+    {
+        lock (_gate) return new(_disposal ??= StopAsync());
+    }
+    private async Task StopAsync()
+    {
+        try { await _host.StopAsync(CancellationToken.None).ConfigureAwait(false); }
+        finally { try { await _host.DisposeAsync().ConfigureAwait(false); } finally { _access.Dispose(); } }
+    }
+    private sealed record SessionRequest(string Secret);
+    private sealed record AccountRequest(string Operation, string? AccountId, Guid? PendingId, long? ExpectedRevision);
+}

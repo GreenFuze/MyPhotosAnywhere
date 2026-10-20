@@ -7,6 +7,8 @@ using Avalonia.Platform;
 using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
 using Mpa.Processor.Core;
+using Mpa.Processor.Web;
+using System.Diagnostics;
 
 namespace Mpa.Processor.Desktop;
 
@@ -32,14 +34,14 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
     private Task? _controlMonitor;
     private readonly ProcessorStateCoordinator? _stateCoordinator;
     private readonly Guid _installationId;
-    private readonly ProcessorAccountPanel _accounts;
-    private bool _hasGoogleAccount;
+    private DesktopWebRuntime? _web;
+    private Task<DesktopWebRuntime>? _webStartup;
+    private readonly CancellationTokenSource _stop = new();
+    private readonly Button _open = new() { Content = "Open My Photos Anywhere", MinHeight = 48, IsEnabled = false };
 
     public ProcessorApp(Exception? startupError = null, ProcessorStateCoordinator? stateCoordinator = null, Guid installationId = default)
     {
         _startupError = startupError; _stateCoordinator = stateCoordinator; _installationId = installationId;
-        _accounts = new ProcessorAccountPanel(error => ShowFailure("Google account setup stopped", error));
-        _accounts.StateChanged += snapshot => { _hasGoogleAccount = snapshot.Accounts.Any(account => account.Connected); RefreshReadyStatus(); };
     }
 
     public override void Initialize() => Styles.Add(new FluentTheme());
@@ -54,15 +56,15 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
         var icon = new WindowIcon(iconStream);
         _window = BuildWindow(icon);
         desktop.MainWindow = _window;
-        var show = new NativeMenuItem("Open My Photos Anywhere Processor");
+        var show = new NativeMenuItem("Open My Photos Anywhere");
         var exit = new NativeMenuItem("Exit Processor");
-        show.Click += (_, _) => ShowWindow();
+        show.Click += (_, _) => { if (_web is null) ShowWindow(); else OpenWeb(); };
         exit.Click += async (_, _) => await RequestExitAsync();
         _trayPause.Click += async (_, _) => await TogglePauseAsync();
         var menu = new NativeMenu();
         menu.Add(show); menu.Add(_trayPause); menu.Add(new NativeMenuItemSeparator()); menu.Add(exit);
-        _tray = new TrayIcon { Icon = icon, Menu = menu, ToolTipText = "My Photos Anywhere Processor", IsVisible = true };
-        _tray.Clicked += (_, _) => ShowWindow();
+        _tray = new TrayIcon { Icon = icon, Menu = menu, ToolTipText = "My Photos Anywhere", IsVisible = true };
+        _tray.Clicked += (_, _) => { if (_web is null) ShowWindow(); else OpenWeb(); };
         TrayIcon.SetIcons(this, new TrayIcons { _tray });
         _window.Closing += (_, args) =>
         {
@@ -74,6 +76,7 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
         desktop.ShutdownRequested += async (_, args) => { if (!_allowClose) { args.Cancel = true; await RequestExitAsync(); } };
         _pause.Click += async (_, _) => await TogglePauseAsync();
         _exit.Click += async (_, _) => await RequestExitAsync();
+        _open.Click += (_, _) => OpenWeb();
         _window.Opened += async (_, _) => await InitializeStateAsync();
         base.OnFrameworkInitializationCompleted();
     }
@@ -82,19 +85,13 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
     {
         var content = new StackPanel { Spacing = 20, Margin = new Thickness(32) };
         content.Children.Add(new TextBlock { Text = "MY PHOTOS ANYWHERE", FontSize = 14, LetterSpacing = 2, FontWeight = FontWeight.SemiBold });
-        content.Children.Add(new TextBlock { Text = "Processor", FontSize = 36, FontWeight = FontWeight.Bold });
+        content.Children.Add(new TextBlock { Text = "Desktop", FontSize = 36, FontWeight = FontWeight.Bold });
         var status = new StackPanel { Spacing = 12 };
-        status.Children.Add(_state); status.Children.Add(_detail); status.Children.Add(_pause);
+        status.Children.Add(_state); status.Children.Add(_detail); status.Children.Add(_open); status.Children.Add(_pause);
         content.Children.Add(Card(status));
-        content.Children.Add(Card(_accounts));
-        content.Children.Add(Card(new StackPanel { Spacing = 10, Children =
-        {
-            new TextBlock { Text = "Phone", FontSize = 20, FontWeight = FontWeight.SemiBold },
-            new TextBlock { Text = "No phone paired", TextWrapping = TextWrapping.Wrap }
-        } }));
         content.Children.Add(new TextBlock { Text = "Your originals stay in Google Drive. The Processor publishes previews and metadata separately.", TextWrapping = TextWrapping.Wrap, Opacity = 0.75 });
         content.Children.Add(_exit);
-        return new Window { Title = "My Photos Anywhere Processor", Width = 620, Height = 720, MinWidth = 440, MinHeight = 520,
+        return new Window { Title = "My Photos Anywhere Desktop", Width = 560, Height = 560, MinWidth = 440, MinHeight = 480,
             Icon = icon, Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled },
             WindowStartupLocation = WindowStartupLocation.CenterScreen };
     }
@@ -116,8 +113,19 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
             _controlMonitor = ObserveControlAsync(_control);
             RefreshReadyStatus();
             _pause.IsEnabled = true; _trayPause.IsEnabled = true;
-            await _accounts.InitializeAsync(_stateCoordinator, _installationId, Program.StateDirectory);
-            if (_accounts.Failure is not null) throw _accounts.Failure;
+            _webStartup = Task.Run(() => DesktopWebRuntime.StartAsync(_stateCoordinator, _installationId, Program.StateDirectory, _work,
+                Path.Combine(AppContext.BaseDirectory, "MPA.Processor.oauth.json"), Path.Combine(AppContext.BaseDirectory, "wwwroot"), enableLan: false, _stop.Token));
+            _web = await _webStartup;
+            _web.Failed += error => Dispatcher.UIThread.Post(() => ShowFailure("Desktop engine needs attention", error));
+            if (_shutdown is not null) return;
+            _open.IsEnabled = true;
+            RefreshReadyStatus();
+            if (Program.Background)
+            {
+                if (OperatingSystem.IsLinux()) _window!.WindowState = WindowState.Minimized;
+                else _window!.Hide();
+            }
+            else OpenWeb();
         }
         catch (Exception error) { ShowFailure("Processor could not start", error); }
     }
@@ -152,8 +160,8 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
         { _state.Text = "Processing paused"; _detail.Text = "No processing work will start until you resume."; }
         else if (_work.State == ProcessorWorkState.Ready)
         {
-            _state.Text = _hasGoogleAccount ? "Ready to pair your phone" : "Connect Google Drive";
-            _detail.Text = _hasGoogleAccount ? "Google Drive is connected. Pair your phone to finish setup." : "Connect the Google accounts containing your photos, then pair your phone.";
+            _state.Text = _web is null ? "Starting desktop interface…" : "MPA is running";
+            _detail.Text = "Open your photo library in the browser. Closing the browser leaves this engine running in the background.";
         }
     }
 
@@ -167,7 +175,7 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
         {
             await _shutdown;
             _allowClose = true;
-            _desktop!.Shutdown(!_hasFailure && _work.Failure is null && _accounts.Failure is null ? 0 : 1);
+            _desktop!.Shutdown(!_hasFailure && _work.Failure is null && _web?.Failure is null ? 0 : 1);
         }
         catch (Exception error)
         {
@@ -178,9 +186,15 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
 
     private async Task StopOwnedAsync()
     {
-        var owners = Task.WhenAll(_work.DisposeAsync().AsTask(), _accounts.DisposeAsync().AsTask());
-        try { await owners.ConfigureAwait(false); }
-        catch { throw owners.Exception ?? throw new InvalidOperationException("Processor owners failed to stop without an exception."); }
+        await _stop.CancelAsync().ConfigureAwait(false);
+        if (_webStartup is not null)
+        {
+            try { _web = await _webStartup.ConfigureAwait(false); }
+            catch (OperationCanceledException) when (_stop.IsCancellationRequested) { /* Joined canceled startup released partial owners. */ }
+            catch when (_webStartup.IsFaulted && _hasFailure) { /* Startup already released its partial owners and the UI retains the failure. */ }
+        }
+        if (_web is not null) await _web.DisposeAsync().ConfigureAwait(false);
+        await _work.DisposeAsync().ConfigureAwait(false);
         if (_control is not null)
         {
             try { await _control.DisposeAsync().ConfigureAwait(false); }
@@ -189,6 +203,17 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
             if (_controlMonitor is not null) await _controlMonitor.ConfigureAwait(false);
         }
         // Program owns the database until the desktop loop returns, after this work/IPC join.
+    }
+
+    private void OpenWeb()
+    {
+        if (_web is null || _shutdown is not null || _hasFailure) return;
+        try
+        {
+            var invitation = _web.Host.OpenLocalBrowser();
+            using var launched = Process.Start(new ProcessStartInfo(invitation.OpenLink.AbsoluteUri) { UseShellExecute = true });
+        }
+        catch (Exception error) { ShowFailure("Could not open MPA in your browser", error); }
     }
     private Task<LocalProcessorReply> HandleControlAsync(LocalProcessorCommand command, CancellationToken token)
     {
@@ -202,7 +227,7 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
                 { result.TrySetResult(new(false, "faulted", "Processor needs attention; open its status window.")); return; }
                 switch (command)
                 {
-                    case LocalProcessorCommand.Show: ShowWindow(); break;
+                    case LocalProcessorCommand.Show: if (_web is not null) OpenWeb(); else ShowWindow(); break;
                     case LocalProcessorCommand.Status: break;
                     case LocalProcessorCommand.Pause:
                         if (_work.State is ProcessorWorkState.Ready or ProcessorWorkState.Running) await TogglePauseAsync();
@@ -220,7 +245,7 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
                 var state = _work.State;
                 var accepted = command switch { LocalProcessorCommand.Show => true, LocalProcessorCommand.Pause => state == ProcessorWorkState.Paused,
                     LocalProcessorCommand.Resume => state == ProcessorWorkState.Ready, _ => !_hasFailure && state != ProcessorWorkState.Faulted };
-                result.TrySetResult(new(accepted, _hasFailure ? "faulted" : state.ToString().ToLowerInvariant(), accepted ? null : "Processor state did not permit this command; open its status window."));
+                result.TrySetResult(new(accepted, _hasFailure ? "faulted" : _web is null ? "starting" : state.ToString().ToLowerInvariant(), accepted ? null : "Processor state did not permit this command; open its status window."));
             }
             catch (Exception error) { ShowFailure("Processor control failed", error); result.TrySetException(error); }
         });

@@ -4,6 +4,10 @@ Date: 2026-10-19, Asia/Jerusalem. Status: approved implementation specification;
 
 Planned first joint release: **MPA 0.6.0**, Android versionCode **45** if it remains the next available code, Processor version **0.6.0**, library/protocol major **1**. Verify these against the repository before implementation; do not overwrite an existing release or reuse a versionCode.
 
+**Owner revision, 2026-10-20:** MPA Desktop becomes a full photo client with a locally hosted web UI usable from another computer on the same LAN. The engine keeps running independently of browser sessions. See `DESKTOP_WEB_REVISION.md`, which supersedes the small Avalonia interface and related setup-only journeys below. Internet access remains deferred. All unattended completion and integrity gates remain applicable.
+
+**Latest owner correction:** the mobile app communicates only with Google Drive, never directly with Desktop/Processor. All older phone LAN/API/pairing/discovery instructions below are superseded. Required mobile settings/processing requests and applied receipts must use the Drive-only coordination described in `DESKTOP_WEB_REVISION.md`. LAN access is exclusively for desktop browser clients.
+
 This document supersedes the architectural recommendations in `MPA_PROCESSOR_DISCUSSION_2026_10_17.md` and `PROCESSOR_DISCUSSION_NOTES.md`. Those are historical research, not instructions to retain phone inference or avoid LAN communication.
 
 ## 1. Execution boundary and effort handoff

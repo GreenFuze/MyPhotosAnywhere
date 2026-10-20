@@ -1,5 +1,7 @@
 # LAN identity and pairing implementation
 
+**Scope correction, 2026-10-20:** Android communicates only with Google Drive. The earlier phone-pairing proposal below is historical and must not be implemented. Retain the tested TLS/signing key owner for desktop browser LAN access and portable document signing. Current architecture and Drive-only mobile enrollment/acknowledgments are in `DESKTOP_WEB_REVISION.md`.
+
 This is the concrete continuation of REDESIGN_PLAN section12. Current implementation status is explicit below; these choices do not claim complete phone pairing.
 
 ## Identity owner implemented
@@ -14,7 +16,7 @@ Windows Schannel requires a named key container. The first real handshake correc
 
 Seven local tests cover retained independent keys, canonical document signatures, restart without rekeying, wrong-library/corrupt-record preservation, same-pin renewal, joined cancellation, actual native mutual TLS with a client-auth certificate, real handshake rejection for wrong server pin/name, and temporary Windows container deletion (the last assertion is Windows-specific). Cross-platform native acceptance is still required. Synthetic clocks apply only to certificate fixtures; they do not satisfy the actual elapsed-time Google refresh gate.
 
-## Pairing transport selected, not yet implemented
+## Historical phone pairing proposal — superseded, do not implement
 
 - Automatically discover `_mpa-processor._tcp` using DNS-SD/mDNS. Advertisements contain only display/protocol/endpoint hints. Keep automatic rediscovery; never transfer Google tokens or source/photo lists in discovery.
 - The user starts pairing locally on the computer. Show a short-lived QR bootstrap containing library/Processor IDs, the TLS pin, signing-key identity and a strong one-use random secret. The phone can use discovery to locate the endpoint; QR is the authenticated out-of-band trust bootstrap. It supplies no manual-IP/router setup. Avoid short-code-only authentication or a custom password protocol.

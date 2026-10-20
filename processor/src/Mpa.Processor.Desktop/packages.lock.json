@@ -312,8 +312,22 @@
           "Mpa.Processor.Credentials": "[0.6.0, )"
         }
       },
+      "mpa.processor.lan": {
+        "type": "Project",
+        "dependencies": {
+          "Mpa.Processor.Credentials": "[0.6.0, )",
+          "Mpa.Processor.Protocol": "[0.6.0, )"
+        }
+      },
       "mpa.processor.protocol": {
         "type": "Project"
+      },
+      "mpa.processor.web": {
+        "type": "Project",
+        "dependencies": {
+          "Mpa.Processor.AppServices": "[0.6.0, )",
+          "Mpa.Processor.Lan": "[0.6.0, )"
+        }
       },
       "mpa.processor.workerruntime": {
         "type": "Project"
