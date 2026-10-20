@@ -56,9 +56,13 @@ class CodecSmoke:
         with self.nasm.open("rb") as assembler:
             if hashlib.file_digest(assembler, "sha256").hexdigest() != "dc7ccb5acebb072f1cc4fe8fd4ba47997de595434aa01a540eabc5e4543372fb":
                 raise RuntimeError("Official extracted assembler changed")
-        self.output.mkdir(exist_ok=False)
+        self.output.mkdir(parents=True, exist_ok=False)
         with tempfile.TemporaryDirectory(prefix="mpa-codec-") as staging:
             self.work = Path(staging)
+            local_nasm = self.work / "nasm"
+            shutil.copyfile(self.nasm, local_nasm)
+            local_nasm.chmod(0o700)
+            self.nasm = local_nasm
             with tarfile.open(self.archive, "r:xz") as archive:
                 members = archive.getmembers()
                 if len(members) > 30000 or sum(member.size for member in members) > 512 * 1024 * 1024:
