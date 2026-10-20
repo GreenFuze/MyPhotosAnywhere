@@ -1,0 +1,88 @@
+using System.IO.Pipes;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace Mpa.Processor.Core.Tests;
+
+[TestClass]
+public sealed class LocalControlTests
+{
+    [TestMethod]
+    public async Task LocalCommandsAreAcknowledgedAndStopCallbackRunsAfterReply()
+    {
+        using var root = new WorkerProcessTests.WorkerTestDirectory();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var commands = new List<LocalProcessorCommand>();
+        await using var server = new LocalProcessorControl(root.Path, (command, _) =>
+        {
+            commands.Add(command);
+            return Task.FromResult(new LocalProcessorReply(true, "ready", null));
+        }, () => stopped.TrySetResult());
+        foreach (var command in new[] { LocalProcessorCommand.Status, LocalProcessorCommand.Show, LocalProcessorCommand.Pause, LocalProcessorCommand.Resume, LocalProcessorCommand.Stop })
+        {
+            var reply = await LocalProcessorControl.TrySendAsync(root.Path, command, deadline.Token).ConfigureAwait(false);
+            Assert.IsNotNull(reply); Assert.IsTrue(reply.Ok); Assert.AreEqual("ready", reply.State); Assert.IsNull(reply.Error);
+        }
+        await stopped.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
+        Assert.AreEqual(5, commands.Count);
+        await Task.WhenAll(server.DisposeAsync().AsTask(), server.DisposeAsync().AsTask()).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    public async Task MalformedClientCannotExecuteACommandAndNextClientStillWorks()
+    {
+        using var root = new WorkerProcessTests.WorkerTestDirectory();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var called = 0;
+        await using var server = new LocalProcessorControl(root.Path, (_, _) =>
+        {
+            Interlocked.Increment(ref called);
+            return Task.FromResult(new LocalProcessorReply(true, "paused", null));
+        });
+        using (var malformed = new NamedPipeClientStream(".", LocalProcessorControl.PipeName(root.Path), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
+        {
+            await malformed.ConnectAsync(deadline.Token).ConfigureAwait(false);
+            await malformed.WriteAsync(new byte[4], deadline.Token).ConfigureAwait(false);
+            await malformed.FlushAsync(deadline.Token).ConfigureAwait(false);
+        }
+        var reply = await LocalProcessorControl.TrySendAsync(root.Path, LocalProcessorCommand.Status, deadline.Token).ConfigureAwait(false);
+        Assert.IsNotNull(reply); Assert.IsTrue(reply.Ok);
+        Assert.AreEqual(1, called);
+        Assert.AreEqual(1, server.RejectedConnections);
+    }
+
+    [TestMethod]
+    public async Task UnavailableProcessorDoesNotLaunchOneOrCreateState()
+    {
+        using var root = new WorkerProcessTests.WorkerTestDirectory();
+        Assert.IsNull(await LocalProcessorControl.TrySendAsync(root.Path, LocalProcessorCommand.Status, CancellationToken.None).ConfigureAwait(false));
+        Assert.AreEqual(0, Directory.EnumerateFileSystemEntries(root.Path).Count());
+    }
+
+    [TestMethod]
+    public async Task UnexpectedHandlerIoFailureIsNotDisguisedAsAnInvalidClient()
+    {
+        using var root = new WorkerProcessTests.WorkerTestDirectory();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var server = new LocalProcessorControl(root.Path, (_, _) => throw new IOException("Synthetic internal storage failure"));
+        await Assert.ThrowsAsync<IOException>(() => LocalProcessorControl.TrySendAsync(root.Path, LocalProcessorCommand.Status, deadline.Token)).ConfigureAwait(false);
+        var failure = await Assert.ThrowsExactlyAsync<IOException>(() => server.Completion.WaitAsync(deadline.Token)).ConfigureAwait(false);
+        Assert.AreEqual("Synthetic internal storage failure", failure.Message);
+        Assert.AreEqual(0, server.RejectedConnections);
+        await Assert.ThrowsExactlyAsync<IOException>(() => server.DisposeAsync().AsTask()).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    public async Task ShutdownClosesAndJoinsAPartialLocalFrame()
+    {
+        using var root = new WorkerProcessTests.WorkerTestDirectory();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        await using var server = new LocalProcessorControl(root.Path, (_, _) => throw new InvalidOperationException("Partial input must not reach its handler."));
+        using var client = new NamedPipeClientStream(".", LocalProcessorControl.PipeName(root.Path), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        await client.ConnectAsync(deadline.Token).ConfigureAwait(false);
+        await client.WriteAsync(new byte[] { 0, 0 }, deadline.Token).ConfigureAwait(false);
+        await client.FlushAsync(deadline.Token).ConfigureAwait(false);
+        await server.DisposeAsync().AsTask().WaitAsync(deadline.Token).ConfigureAwait(false);
+        await server.Completion.ConfigureAwait(false);
+    }
+}

@@ -1,0 +1,62 @@
+name: Processor desktop shell
+on:
+  push:
+    paths:
+      - 'processor/src/**'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - 'processor/NuGet.Config'
+      - '.github/workflows/processor-desktop.yml'
+  pull_request:
+    paths:
+      - 'processor/src/**'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - 'processor/NuGet.Config'
+      - '.github/workflows/processor-desktop.yml'
+permissions:
+  contents: read
+concurrency:
+  group: processor-desktop-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: true
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.303'
+      - name: Locked restore and strict desktop build
+        working-directory: processor
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/desktop-checks | Out-Null
+          dotnet restore src/Mpa.Processor.Desktop/Mpa.Processor.Desktop.csproj --locked-mode *> build/desktop-checks/restore.log
+          if ($LASTEXITCODE -ne 0) { Get-Content build/desktop-checks/restore.log; exit $LASTEXITCODE }
+          dotnet build src/Mpa.Processor.Desktop/Mpa.Processor.Desktop.csproj --no-restore -c Release *> build/desktop-checks/build.log
+          $mpaBuildExit = $LASTEXITCODE
+          Get-Content build/desktop-checks/build.log
+          if ($mpaBuildExit -ne 0) { exit $mpaBuildExit }
+          $mpaDiagnostic = Get-ChildItem build/desktop-checks/*.log | Get-Content | Where-Object { $_ -notmatch '^\s*0 (Warning|Error)\(s\)\s*$' } | Select-String -Pattern '\bwarning\b|\berror\b'
+          if ($mpaDiagnostic) { $mpaDiagnostic; throw 'Desktop diagnostics are blocking.' }
+          @{ Source = '${{ github.sha }}'; Runner = '${{ matrix.runner }}'; Scope = 'strict native desktop build only; UI/install acceptance separate';
+             AssemblySha256 = (Get-FileHash src/Mpa.Processor.Desktop/bin/Release/net10.0/MPA.Processor.dll -Algorithm SHA256).Hash.ToLowerInvariant() } |
+            ConvertTo-Json | Set-Content build/desktop-checks/report.json -Encoding utf8
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-desktop-${{ matrix.runner }}
+          path: processor/build/desktop-checks/
+          if-no-files-found: error
+          retention-days: 14
