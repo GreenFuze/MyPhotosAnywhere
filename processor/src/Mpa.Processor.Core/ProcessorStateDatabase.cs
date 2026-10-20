@@ -49,7 +49,7 @@ public sealed class ProcessorStateDatabase : IDisposable
                 var objects = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
                 if (application != ApplicationId && !(application == 0 && version == 0 && objects == 0))
                     throw new InvalidDataException("Unknown database identity; preserve it and choose an empty Processor state directory.");
-                if (version is not (0 or 1 or 2 or 3)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
+                if (version is not (0 or 1 or 2 or 3 or 4)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
                 command.CommandText = "PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;";
                 command.ExecuteNonQuery();
                 command.CommandText = "PRAGMA journal_mode=WAL";
@@ -139,6 +139,32 @@ public sealed class ProcessorStateDatabase : IDisposable
                           published INTEGER NOT NULL DEFAULT 0 CHECK(published IN(0,1))
                         ) STRICT;
                         PRAGMA user_version=3;
+                        """;
+                    command.ExecuteNonQuery(); transaction.Commit();
+                }
+                if (version < 4)
+                {
+                    using var transaction = connection.BeginTransaction(); command.Transaction = transaction;
+                    command.CommandText = """
+                        CREATE TABLE discovered_asset(
+                          id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES drive_account(permission_id),
+                          file_id TEXT NOT NULL, drive_version INTEGER NOT NULL CHECK(drive_version>0),
+                          name TEXT NOT NULL, mime_type TEXT NOT NULL, width INTEGER, height INTEGER,
+                          captured_utc INTEGER, raw_capture TEXT, modified_utc INTEGER,
+                          date_unknown INTEGER NOT NULL CHECK(date_unknown IN(0,1)), date_sort INTEGER NOT NULL,
+                          facts_hash TEXT NOT NULL, UNIQUE(account_id,file_id)
+                        ) STRICT;
+                        CREATE INDEX discovered_timeline ON discovered_asset(date_unknown,date_sort,id);
+                        CREATE TABLE source_asset(
+                          source_id TEXT NOT NULL REFERENCES source_binding(id),
+                          asset_id TEXT NOT NULL REFERENCES discovered_asset(id),
+                          depth INTEGER NOT NULL CHECK(depth>=0 AND depth<=256),
+                          PRIMARY KEY(source_id,asset_id)
+                        ) STRICT;
+                        CREATE INDEX asset_sources ON source_asset(asset_id,source_id,depth);
+                        CREATE TABLE discovery_revision(id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL CHECK(revision>=1)) STRICT;
+                        INSERT INTO discovery_revision VALUES(1,1);
+                        PRAGMA user_version=4;
                         """;
                     command.ExecuteNonQuery(); transaction.Commit();
                 }
