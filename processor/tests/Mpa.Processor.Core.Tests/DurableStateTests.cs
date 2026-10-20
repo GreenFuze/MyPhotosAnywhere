@@ -103,7 +103,7 @@ public sealed class DurableStateTests
         {
             external.Open();
             using var command = external.CreateCommand();
-            command.CommandText = "PRAGMA user_version=2";
+            command.CommandText = "PRAGMA user_version=3";
             command.ExecuteNonQuery();
         }
         var before = File.ReadAllBytes(System.IO.Path.Combine(directory.Path, "processor.db"));

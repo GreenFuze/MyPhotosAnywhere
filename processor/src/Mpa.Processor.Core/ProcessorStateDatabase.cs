@@ -14,6 +14,7 @@ public sealed class ProcessorStateDatabase : IDisposable
     private bool _disposed;
     internal SqliteConnection Connection => !_disposed ? _connection : throw new ObjectDisposedException(nameof(ProcessorStateDatabase));
     public string SqliteVersion { get; }
+    public Guid InstallationId { get; }
 
     public ProcessorStateDatabase(string stateDirectory)
     {
@@ -32,7 +33,7 @@ public sealed class ProcessorStateDatabase : IDisposable
         SqliteConnection? connection = null;
         try
         {
-            ValidateOrCreateMarker(root);
+            InstallationId = ValidateOrCreateMarker(root);
             var path = Path.Combine(root, "processor.db");
             if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new IOException("Processor database cannot be a link.");
             connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadWriteCreate,
@@ -48,7 +49,7 @@ public sealed class ProcessorStateDatabase : IDisposable
                 var objects = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
                 if (application != ApplicationId && !(application == 0 && version == 0 && objects == 0))
                     throw new InvalidDataException("Unknown database identity; preserve it and choose an empty Processor state directory.");
-                if (version is not (0 or 1)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
+                if (version is not (0 or 1 or 2)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
                 command.CommandText = "PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;";
                 command.ExecuteNonQuery();
                 command.CommandText = "PRAGMA journal_mode=WAL";
@@ -95,6 +96,29 @@ public sealed class ProcessorStateDatabase : IDisposable
                     command.ExecuteNonQuery();
                     transaction.Commit();
                 }
+                if (version < 2)
+                {
+                    using var transaction = connection.BeginTransaction();
+                    command.Transaction = transaction;
+                    command.CommandText = """
+                        CREATE TABLE drive_account(
+                          permission_id TEXT PRIMARY KEY, connection_id TEXT NOT NULL UNIQUE,
+                          display_name TEXT NOT NULL, email_address TEXT,
+                          connected INTEGER NOT NULL CHECK(connected IN(0,1)),
+                          revision INTEGER NOT NULL CHECK(revision>0)
+                        ) STRICT;
+                        CREATE TABLE pending_drive_connection(
+                          id TEXT PRIMARY KEY, expected_permission_id TEXT UNIQUE REFERENCES drive_account(permission_id),
+                          expected_revision INTEGER
+                        ) STRICT;
+                        CREATE TABLE credential_cleanup(
+                          connection_id TEXT PRIMARY KEY, reason TEXT NOT NULL CHECK(reason IN('reconnected','disconnected','abandoned'))
+                        ) STRICT;
+                        PRAGMA user_version=2;
+                        """;
+                    command.ExecuteNonQuery();
+                    transaction.Commit();
+                }
             }
             _instanceLease = lease;
             _connection = connection;
@@ -107,7 +131,7 @@ public sealed class ProcessorStateDatabase : IDisposable
         }
     }
 
-    private static void ValidateOrCreateMarker(string root)
+    private static Guid ValidateOrCreateMarker(string root)
     {
         var path = Path.Combine(root, "mpa-processor-state.json");
         if (File.Exists(path))
@@ -119,13 +143,15 @@ public sealed class ProcessorStateDatabase : IDisposable
             if (marker.RootElement.GetProperty("format").GetString() != "mpa-processor-state" ||
                 marker.RootElement.GetProperty("major").GetInt32() != 1 || !Guid.TryParseExact(marker.RootElement.GetProperty("installationId").GetString(), "D", out var id) || id == Guid.Empty)
                 throw new InvalidDataException("Unknown Processor state directory marker.");
-            return;
+            return id;
         }
         if (Directory.EnumerateFileSystemEntries(root).Any(entry => Path.GetFileName(entry) != "processor.lock"))
             throw new InvalidDataException("Refusing to claim a directory containing unrecognized files.");
         using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-        JsonSerializer.Serialize(output, new { format = "mpa-processor-state", major = 1, installationId = Guid.NewGuid().ToString("D") });
+        var installation = Guid.NewGuid();
+        JsonSerializer.Serialize(output, new { format = "mpa-processor-state", major = 1, installationId = installation.ToString("D") });
         output.Flush(flushToDisk: true);
+        return installation;
     }
 
     public void Dispose()
