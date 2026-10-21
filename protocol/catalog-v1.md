@@ -172,3 +172,26 @@ cross-workspace/account references, duplicate roles/partitions, wrong types, cou
 bounds, transport/expanded bounds and depth. Fixture reference digests are synthetic
 schema inputs, not evidence of any uploaded or hash-verified publication. Shared signature
 tests separately exercise the approved actor boundary before the typed manifest parser.
+
+
+## Compressed chunk reader acceptance
+
+C# and Kotlin now decode the same independent Python gzip fixture and reject 16 shared
+corruption/resource-limit cases. The typed index's `CatalogChunkReference` supplies exact
+compressed/expanded lengths and SHA-256 values. Both readers take one bounded owned copy
+of the compressed input before verification, enforce 4 MiB transport and 16 MiB expanded
+ceilings (or smaller consumer budgets), reject expansion beyond the declaration, verify
+both hashes and require already canonical JSON. The footer's CRC32 and ISIZE must describe
+the complete expanded body; producers emit one gzip member. CRC32 checks format framing,
+while the signed SHA-256 reference provides integrity. Matching declared hashes alone
+cannot turn a truncated gzip footer into a valid container.
+
+The shared truncated-footer case reproduced acceptance in the prior desktop decoder even
+with the matching expanded SHA-256. Explicit complete-body footer validation now rejects
+it. Kotlin's gzip reader already rejected that case; its explicit footer check also keeps
+the agreed complete-body profile consistent. No diagnostic was suppressed or failed case
+removed. Android performs decoding on its background dispatcher and checks cancellation
+between bounded reads, checksum batches and completion. Desktop propagates cancellation
+through reads/checksums and checks again after canonical validation. These codecs neither
+write originals nor activate a generation. Asset schemas, actual Drive membership, graph
+completeness, authority enrollment and transactional activation remain separate checks.

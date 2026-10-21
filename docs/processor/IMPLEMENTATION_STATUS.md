@@ -244,3 +244,14 @@ Contract run 39601550164 on dc4e20d exposed a macOS ARM null reference inside th
 All eight focused control tests pass locally. New coverage holds a real admitted handler after cancellation and verifies that the peer does not receive premature EOF, then releases it and verifies joined closure. Forty idle accept/shutdown cycles reuse the same pipe identity after actual completion. Existing malformed/disconnected-client, partial-frame, concurrent disposal and unexpected-handler-failure assertions remain. Native macOS and complete matrix revalidation are required for the correction; the failed earlier run is retained.
 
 The same dc4e20d Android build and all API29/35/37 device jobs passed. Its enhanced restricted Linux codec probe also passed actual synthetic H.264 frame decoding. Independent compressed-codec report review remains separate; codec redistribution, other formats/platforms and the complete joint product remain open.
+
+
+## Bounded compressed catalog readers
+
+The next increment adds Android's background catalog decoder and a typed-reference overload for the desktop decoder. Both consume independent Python gzip/hash fixtures. Sixteen shared cases cover transport/expanded hash changes, lengths, CRC corruption, a truncated footer with a matching transport reference, noncanonical/duplicate/invalid-Unicode JSON, excess entries, smaller consumer budgets and expansion beyond the declared 16 MiB ceiling. Existing tests remain intact.
+
+The footer fixture exposed a real desktop acceptance gap: the runtime returned decoded bytes for a truncated gzip footer. Explicit complete-body CRC32/ISIZE validation now rejects that input, alongside both SHA-256 checks. It does not replace cryptographic integrity with CRC32. Android runs decoding off the main thread and propagates cancellation; neither codec mutates files or activates a catalog.
+
+Local acceptance passes all 35 C# Protocol tests, 17 Android Protocol tests, all 522 Android unit tests and lint with zero findings. Complete Desktop strict compilation passes with zero warnings/errors. The unchanged Gradle gate accepts only the exact already approved AGP deprecation. Current-source native matrix results and full staged-generation integration remain required. No persisted schema or Android product behavior was changed by enabling these isolated codecs.
+
+Independent H.264 evidence review also verifies run 39601550192 on dc4e20d: pinned 2,272-byte source, H.264/320x240, exactly 230,400 decoded RGB bytes, expected green center, unchanged input and clean complete logs. Actual application/codec binaries were not present in these report artifacts. Other formats/platforms, recognition quality and redistribution closure remain open.

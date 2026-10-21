@@ -88,6 +88,13 @@ public sealed class CatalogChunkDecoder
         _verifier = new ArtifactVerifier(Math.Max(compressedLimit, expandedLimit));
     }
 
+    public Task<byte[]> DecodeAsync(ReadOnlyMemory<byte> compressed, CatalogChunkReference expected, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        return DecodeAsync(compressed, new ArtifactDescriptor(expected.Encoded.Bytes, expected.Encoded.Sha256, "chunk.json.gz"),
+            new ArtifactDescriptor(expected.ExpandedBytes, expected.ExpandedSha256, "chunk.json"), cancellationToken);
+    }
+
     public async Task<byte[]> DecodeAsync(ReadOnlyMemory<byte> compressed, ArtifactDescriptor encoded,
         ArtifactDescriptor expanded, CancellationToken cancellationToken)
     {
@@ -97,7 +104,8 @@ public sealed class CatalogChunkDecoder
         if (compressed.IsEmpty || compressed.Length > _compressedLimit || encoded.Bytes != compressed.Length || expanded.Bytes > _expandedLimit)
             throw new ProtocolFormatException("Catalog chunk exceeds its transport/expanded bound.");
         // Copy the borrowed memory once: its caller cannot change bytes between verification and decoding.
-        using var source = new MemoryStream(compressed.ToArray(), writable: false);
+        var snapshot = compressed.ToArray();
+        using var source = new MemoryStream(snapshot, writable: false);
         await _verifier.VerifyAsync(source, encoded, cancellationToken).ConfigureAwait(false);
         source.Position = 0;
         using var inflater = new GZipStream(source, CompressionMode.Decompress, leaveOpen: true);
@@ -118,8 +126,10 @@ public sealed class CatalogChunkDecoder
         output.Position = 0;
         await _verifier.VerifyAsync(output, expanded, cancellationToken).ConfigureAwait(false);
         var bytes = output.ToArray();
+        CatalogGzipFooter.Validate(snapshot, bytes, cancellationToken);
         if (!bytes.AsSpan().SequenceEqual(new CanonicalJson().Encode(bytes)))
             throw new ProtocolFormatException("Expanded catalog bytes must already be canonical JSON.");
+        cancellationToken.ThrowIfCancellationRequested();
         return bytes;
     }
 }
