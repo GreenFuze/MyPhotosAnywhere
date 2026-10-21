@@ -54,21 +54,36 @@ public sealed class LanIdentityOwner : IAsyncDisposable
         try
         {
             using var record = await _vault.ReadAsync(Address, linked.Token).ConfigureAwait(false);
-            linked.Token.ThrowIfCancellationRequested();
+            ThrowIfCanceled(cancellationToken);
             var save = record is null;
             candidate = record is null ? ProcessorLanIdentity.Create(_libraryId, _processorId, _time.GetUtcNow())
                 : ProcessorLanIdentity.Decode(record.Bytes.Span, _libraryId, _processorId, _time.GetUtcNow(), out save);
             if (save)
             {
                 var bytes = candidate.EncodePrivateRecord();
-                try { await _vault.WriteAsync(Address, bytes, linked.Token).ConfigureAwait(false); }
+                try
+                {
+                    ThrowIfCanceled(cancellationToken);
+                    await _vault.WriteAsync(Address, bytes, linked.Token).ConfigureAwait(false);
+                }
                 finally { CryptographicOperations.ZeroMemory(bytes); }
             }
-            _identity = candidate; candidate = null;
+            lock (_gate)
+            {
+                ThrowIfCanceled(cancellationToken);
+                if (_stopping) throw new OperationCanceledException(_stop.Token);
+                _identity = candidate; candidate = null;
+            }
         }
-        catch (OperationCanceledException) when (linked.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException) when (_stop.IsCancellationRequested || cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception error) { Failure = error; throw; }
         finally { candidate?.Dispose(); }
+    }
+    private void ThrowIfCanceled(CancellationToken caller)
+    {
+        // CancelAsync marks the originating source immediately, but dispatches linked
+        // callbacks asynchronously. A borrowed vault may also ignore cancellation.
+        _stop.Token.ThrowIfCancellationRequested(); caller.ThrowIfCancellationRequested();
     }
     public ValueTask DisposeAsync()
     {

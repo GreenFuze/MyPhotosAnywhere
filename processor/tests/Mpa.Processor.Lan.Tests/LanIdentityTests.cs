@@ -92,24 +92,82 @@ public sealed class LanIdentityTests
         await owner.DisposeAsync().ConfigureAwait(false);
     }
 
+    [TestMethod]
+    public async Task CallerCancellationIsObservedEvenWhileLinkedTokenDeliveryIsBlocked()
+    {
+        await using var vault = new Vault { Hold = true };
+        await using var owner = new LanIdentityOwner(vault, Guid.NewGuid(), Guid.NewGuid());
+        using var caller = new CancellationTokenSource();
+        var start = owner.InitializeAsync(caller.Token);
+        await vault.Started.Task.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        using var unblockCallback = new ManualResetEventSlim();
+        var callbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = caller.Token.Register(() =>
+        {
+            callbackStarted.TrySetResult();
+            if (!unblockCallback.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException("Synthetic cancellation callback was not joined.");
+        });
+        // This later LIFO callback blocks propagation to the startup's linked token.
+        var cancel = caller.CancelAsync();
+        try
+        {
+            await callbackStarted.Task.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+            Assert.IsFalse(vault.ReadToken.IsCancellationRequested);
+            vault.Release.TrySetResult();
+            await Assert.ThrowsAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
+            Assert.AreEqual(0, vault.Writes); Assert.IsNull(owner.Failure);
+        }
+        finally
+        {
+            vault.Release.TrySetResult(); unblockCallback.Set();
+            await cancel.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }
+    }
+
+    [TestMethod]
+    public async Task ShutdownJoinsAnUnresponsiveVaultWriteWithoutPublishingItsIdentity()
+    {
+        await using var vault = new Vault { HoldWrite = true };
+        var owner = new LanIdentityOwner(vault, Guid.NewGuid(), Guid.NewGuid());
+        var start = owner.InitializeAsync(CancellationToken.None);
+        await vault.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        var stop = owner.DisposeAsync().AsTask();
+        try
+        {
+            Assert.IsFalse(stop.IsCompleted);
+            Assert.ThrowsExactly<ObjectDisposedException>(() => _ = owner.Identity);
+        }
+        finally { vault.WriteRelease.TrySetResult(); }
+        await Assert.ThrowsAsync<OperationCanceledException>(() => start).ConfigureAwait(false);
+        await stop.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        Assert.AreEqual(1, vault.Writes); Assert.IsNull(owner.Failure);
+        Assert.ThrowsExactly<ObjectDisposedException>(() => _ = owner.Identity);
+        await owner.DisposeAsync().ConfigureAwait(false);
+    }
+
     internal sealed class Vault : ICredentialVault
     {
         public byte[]? Bytes { get; set; }
         public int Writes { get; private set; }
         public bool Hold { get; init; }
+        public bool HoldWrite { get; init; }
+        public CancellationToken ReadToken { get; private set; }
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource WriteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource WriteRelease { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public async Task<SecretLease?> ReadAsync(string key, CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested(); ReadToken = cancellationToken;
             if (Hold) { Started.TrySetResult(); await Release.Task.ConfigureAwait(false); }
             return Bytes is null ? null : SecretLease.CopyFrom(Bytes);
         }
-        public Task WriteAsync(string key, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+        public async Task WriteAsync(string key, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested(); Writes++;
+            if (HoldWrite) { WriteStarted.TrySetResult(); await WriteRelease.Task.ConfigureAwait(false); }
             if (Bytes is not null) CryptographicOperations.ZeroMemory(Bytes);
-            Bytes = bytes.ToArray(); return Task.CompletedTask;
+            Bytes = bytes.ToArray();
         }
         public Task DeleteAsync(string key, CancellationToken cancellationToken) => throw new InvalidOperationException("Identity tests must never clear keys to recover.");
         public ValueTask DisposeAsync() { if (Bytes is not null) CryptographicOperations.ZeroMemory(Bytes); return ValueTask.CompletedTask; }

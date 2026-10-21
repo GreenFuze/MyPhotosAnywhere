@@ -255,3 +255,26 @@ The footer fixture exposed a real desktop acceptance gap: the runtime returned d
 Local acceptance passes all 35 C# Protocol tests, 17 Android Protocol tests, all 522 Android unit tests and lint with zero findings. Complete Desktop strict compilation passes with zero warnings/errors. The unchanged Gradle gate accepts only the exact already approved AGP deprecation. Current-source native matrix results and full staged-generation integration remain required. No persisted schema or Android product behavior was changed by enabling these isolated codecs.
 
 Independent H.264 evidence review also verifies run 39601550192 on dc4e20d: pinned 2,272-byte source, H.264/320x240, exactly 230,400 decoded RGB bytes, expected green center, unchanged input and clean complete logs. Actual application/codec binaries were not present in these report artifacts. Other formats/platforms, recognition quality and redistribution closure remain open.
+
+## Originating cancellation before identity promotion
+
+The local-control correction at 4720b6a passed all four native contract and desktop jobs,
+plus Android APIs 29/35/37. Downloaded native artifacts independently verify 226 tests per
+desktop target (904 total), complete clean logs and both scale fixtures. The next decoder
+revision f8595a5 passed its desktop and Android build jobs, but Linux contract validation
+exposed an existing identity-startup cancellation race. Its failed run 39634600821 is kept.
+
+`LanIdentityOwner` previously checked only a linked token after a delayed vault read.
+`CancelAsync` marks the originating source synchronously and dispatches callbacks
+asynchronously, as documented by [Microsoft](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtokensource.cancelasync?view=net-10.0).
+A read could finish before the callback marked its linked token. The owner now checks the
+original shutdown/caller sources after borrowed operations and before a protected write,
+and promotes the identity under its lifetime gate only after a final cancellation check.
+Unresponsive writes remain owned and joined; a completed write cannot publish a canceled
+startup identity. Candidate keys and serialized private bytes retain their existing cleanup.
+
+All nine LAN tests pass locally. A deterministic test blocks caller-cancellation delivery
+to the linked token, then completes the vault read and requires cancellation without a key
+write. Another holds a write through shutdown and requires joined cancellation without an
+exposed identity. Existing assertions remain. Native revalidation is required; no warning,
+test failure or cancellation was converted to success.
