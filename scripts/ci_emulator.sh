@@ -77,6 +77,10 @@ fi
 adb logcat -v threadtime > build/diagnostics/logcat.txt 2> build/diagnostics/logcat-reader.txt &
 mpa_logcat_pid=$!
 mpa_logcat_started=true
+python3 scripts/test_emulator_heap.py
+if [[ "$mpa_api" == "29" ]]; then
+  python3 scripts/emulator_heap.py "$mpa_api"
+fi
 adb shell settings put global window_animation_scale 0
 adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
