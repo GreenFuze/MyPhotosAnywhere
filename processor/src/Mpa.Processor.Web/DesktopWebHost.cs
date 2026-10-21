@@ -161,6 +161,8 @@ public sealed class DesktopWebHost : IAsyncDisposable
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This account and folder are already configured. Update their existing source entry." }, context.RequestAborted).ConfigureAwait(false); }
             catch (ProcessorWorkStateConflictException)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Processing state changed. Refresh Activity before trying again." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (InvalidDesktopCatalogQueryException error)
+            { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
             catch (InsufficientStorageBudgetException)
             { context.Response.StatusCode = 507; await context.Response.WriteAsJsonAsync(new { message = "Free space on the computer running this library, then retry. Existing photos and progress were retained." }, context.RequestAborted).ConfigureAwait(false); }
             catch (TokenResponseException)
@@ -195,8 +197,22 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 _access.Revoke(session.Id); context.Response.Cookies.Delete(CookieName, CookieOptions(RequestEndpoint(context)!)); context.Response.StatusCode = 204; break;
             case ("GET", "/api/status"):
                 await context.Response.WriteAsJsonAsync(await _application.SnapshotAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
-            case ("GET", "/api/photos"):
-                await context.Response.WriteAsJsonAsync(await _application.PhotosAsync(RequiredQuery(context, "account"), OptionalQuery(context, "cursor", 4096), token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("GET", "/api/catalog"):
+                var filter = OptionalQuery(context, "account", 256);
+                if (filter is not null && !Identity(filter)) throw new BadHttpRequestException("Invalid account filter.");
+                var direction = OptionalQuery(context, "direction", 5);
+                if (direction is not (null or "older" or "newer")) throw new BadHttpRequestException("Invalid gallery direction.");
+                var rawDate = OptionalQuery(context, "date", 16); long? date = null;
+                if (rawDate is not null)
+                {
+                    if (!long.TryParse(rawDate, System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out var dateValue) || dateValue.ToString(System.Globalization.CultureInfo.InvariantCulture) != rawDate)
+                        throw new BadHttpRequestException("Invalid gallery date.");
+                    date = dateValue;
+                }
+                await context.Response.WriteAsJsonAsync(await _application.CatalogAsync(filter, OptionalQuery(context, "cursor", 340), direction == "newer", date, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("GET", "/api/catalog-preview"):
+                if (!Guid.TryParseExact(RequiredQuery(context, "asset"), "D", out var assetId) || assetId == Guid.Empty) throw new BadHttpRequestException("Invalid media identity.");
+                await WritePreviewAsync(context, await _application.CatalogPreviewAsync(assetId, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
             case ("GET", "/api/sources"):
                 await context.Response.WriteAsJsonAsync(await _application.SourcesAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
             case ("GET", "/api/activity"):
@@ -225,12 +241,6 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 var change = await context.Request.ReadFromJsonAsync<DesktopUpdateSource>(token).ConfigureAwait(false) ?? throw new BadHttpRequestException("Source policy is required.");
                 if (change.Id == Guid.Empty || change.ExpectedRevision < 1 || change.ExpectedSourceRevision < 1) throw new BadHttpRequestException("Invalid captured source policy.");
                 await context.Response.WriteAsJsonAsync(await _application.UpdateSourceAsync(change, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
-            case ("GET", "/api/preview"):
-                var preview = await _application.PreviewAsync(RequiredQuery(context, "account"), RequiredQuery(context, "file"), token).ConfigureAwait(false);
-                if (preview is null) { context.Response.StatusCode = 404; break; }
-                if (preview.Bytes.Length is < 1 or > 4 * 1024 * 1024 || preview.MimeType is not ("image/jpeg" or "image/png" or "image/webp"))
-                    throw new InvalidDataException("Preview provider returned an unsupported or oversized result.");
-                context.Response.ContentType = preview.MimeType; await context.Response.Body.WriteAsync(preview.Bytes, token).ConfigureAwait(false); break;
             case ("POST", "/api/pause"):
                 await _application.PauseAsync(token).ConfigureAwait(false); context.Response.StatusCode = 204; break;
             case ("POST", "/api/resume"):
@@ -250,6 +260,13 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 context.Response.StatusCode = 204; break;
             default: context.Response.StatusCode = 404; break;
         }
+    }
+    private static async Task WritePreviewAsync(HttpContext context, DesktopPreview? preview, CancellationToken cancellationToken)
+    {
+        if (preview is null) { context.Response.StatusCode = 404; return; }
+        if (preview.Bytes.Length is < 1 or > 4 * 1024 * 1024 || preview.MimeType is not ("image/jpeg" or "image/png" or "image/webp"))
+            throw new InvalidDataException("Preview provider returned an unsupported or oversized result.");
+        context.Response.ContentType = preview.MimeType; await context.Response.Body.WriteAsync(preview.Bytes, cancellationToken).ConfigureAwait(false);
     }
     private static bool Identity(string? value) => value is { Length: > 0 and <= 256 } && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
     private static string RequiredQuery(HttpContext context, string key) => OptionalQuery(context, key, 256) is { } value && Identity(value) ? value : throw new BadHttpRequestException("Invalid query identity.");

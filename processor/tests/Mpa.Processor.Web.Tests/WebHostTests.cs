@@ -14,6 +14,21 @@ namespace Mpa.Processor.Web.Tests;
 public sealed class WebHostTests
 {
     [TestMethod]
+    public async Task CatalogRequiresBrowserAuthenticationAndRejectsMalformedPositionsWithoutFaultingTheEngine()
+    {
+        using var assets = new Assets(); var engine = new Engine();
+        await using var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
+        using var http = Client(host.LocalEndpoint); var diagnostics = new List<Exception>(); host.Diagnostic += diagnostics.Add;
+        using (var denied = await http.GetAsync("api/catalog").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Unauthorized, denied.StatusCode);
+        using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false); login.EnsureSuccessStatusCode();
+        using (var valid = await http.GetAsync("api/catalog").ConfigureAwait(false))
+        { valid.EnsureSuccessStatusCode(); Assert.AreEqual(0, (await valid.Content.ReadFromJsonAsync<DesktopCatalogPage>().ConfigureAwait(false))!.Photos.Count); }
+        foreach (var invalid in new[] { "api/catalog?direction=wrong", "api/catalog?date=+1", "api/catalog?cursor=invalid", "api/catalog?account=a&account=b", "api/catalog-preview?asset=not-a-uuid" })
+        { using var rejected = await http.GetAsync(invalid).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.BadRequest, rejected.StatusCode, invalid); }
+        using (var unavailable = await http.GetAsync("api/catalog-preview?asset=" + Guid.NewGuid().ToString("D")).ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.NotFound, unavailable.StatusCode);
+        using var usable = await http.GetAsync("api/status").ConfigureAwait(false); usable.EnsureSuccessStatusCode(); Assert.AreEqual(0, diagnostics.Count); Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
+    }
+    [TestMethod]
     public async Task ActualHttpsBrowserSessionUsesTheApprovedServerPinAndCannotManageHostGoogleAccounts()
     {
         using var assets = new Assets(); var engine = new Engine();
@@ -79,9 +94,10 @@ public sealed class WebHostTests
             using var login = await LoginAsync(first, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false); login.EnsureSuccessStatusCode();
         }
         using var second = await LoginAsync(other, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false); second.EnsureSuccessStatusCode();
-        using var response = await other.GetAsync("api/photos?account=synthetic").ConfigureAwait(false); response.EnsureSuccessStatusCode();
-        var page = await response.Content.ReadFromJsonAsync<DesktopPhotoPage>().ConfigureAwait(false);
-        Assert.AreEqual("synthetic-file", page!.Photos.Single().Id);
+        using var response = await other.GetAsync("api/catalog?account=synthetic").ConfigureAwait(false); response.EnsureSuccessStatusCode();
+        var page = await response.Content.ReadFromJsonAsync<DesktopCatalogPage>().ConfigureAwait(false);
+        Assert.AreEqual(Guid.Parse("00000000-0000-4000-8000-000000000001"), page!.Photos.Single().Id);
+        Assert.AreEqual("synthetic.jpg", page.Photos.Single().Name);
         Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
     }
 
@@ -92,7 +108,7 @@ public sealed class WebHostTests
         var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
         using var http = Client(host.LocalEndpoint);
         using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false); login.EnsureSuccessStatusCode();
-        var response = http.GetAsync("api/photos?account=synthetic");
+        var response = http.GetAsync("api/catalog?account=synthetic");
         await engine.Started.Task.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
         var stop = host.DisposeAsync().AsTask();
         try { Assert.IsFalse(stop.IsCompleted, "Request owner must join before the application can be released."); Assert.IsFalse(host.ExitConfirmed); }
@@ -111,7 +127,7 @@ public sealed class WebHostTests
         await using var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
         using var http = Client(host.LocalEndpoint);
         using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false); login.EnsureSuccessStatusCode();
-        using var response = await http.GetAsync("api/photos?account=synthetic").ConfigureAwait(false);
+        using var response = await http.GetAsync("api/catalog?account=synthetic").ConfigureAwait(false);
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         StringAssert.Contains(await response.Content.ReadAsStringAsync().ConfigureAwait(false), "preserved");
         using var missing = await http.GetAsync("private-key.json").ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.NotFound, missing.StatusCode);
@@ -244,13 +260,15 @@ public sealed class WebHostTests
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<DesktopSnapshot> SnapshotAsync(CancellationToken cancellationToken) => Task.FromResult(new DesktopSnapshot(Guid.NewGuid(), "ready", []));
-        public async Task<DesktopPhotoPage> PhotosAsync(string accountId, string? cursor, CancellationToken cancellationToken)
+        public async Task<DesktopCatalogPage> CatalogAsync(string? accountId, string? position, bool newer, long? dateUtc, CancellationToken cancellationToken)
         {
+            if (position == "invalid") throw new InvalidDesktopCatalogQueryException();
             if (Unavailable) throw new HttpRequestException("Synthetic Google outage.");
             Started.TrySetResult(); if (Hold) await Release.Task.ConfigureAwait(false);
-            return new([new("synthetic-file", "synthetic.jpg", "image/jpeg", 40, 30, null, null)], null, false);
+            return new DesktopCatalogPage(1, 1, accountId is null ? [] : [new(Guid.Parse("00000000-0000-4000-8000-000000000001"), accountId,
+                "synthetic.jpg", "image/jpeg", 40, 30, null, "Unknown", null)], null, null);
         }
-        public Task<DesktopPreview?> PreviewAsync(string accountId, string fileId, CancellationToken cancellationToken) => Task.FromResult<DesktopPreview?>(null);
+        public Task<DesktopPreview?> CatalogPreviewAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<DesktopPreview?>(null);
         public Task PauseAsync(CancellationToken cancellationToken) { if (ControlConflict) throw new Mpa.Processor.Core.ProcessorWorkStateConflictException(); Paused = true; return Task.CompletedTask; }
         public Task ResumeAsync(CancellationToken cancellationToken) { Paused = false; return Task.CompletedTask; }
         public Task AccountAsync(DesktopAccountCommand command, CancellationToken cancellationToken) => throw new InvalidOperationException("This test must not perform Google account actions.");

@@ -6,8 +6,6 @@ public sealed record DesktopSnapshot(Guid LibraryId, string State, IReadOnlyList
     IReadOnlyList<DesktopPendingAccount>? Pending = null, int CredentialCleanupCount = 0, Mpa.Processor.Core.StorageBudgetStatus? StorageAttention = null);
 public enum DesktopAccountOperation { Connect, Check, Disconnect, Resume, Abandon, Cleanup }
 public sealed record DesktopAccountCommand(DesktopAccountOperation Operation, string? AccountId, Guid? PendingId, long? ExpectedRevision);
-public sealed record DesktopPhoto(string Id, string Name, string MimeType, int? Width, int? Height, string? CapturedTime, string? ModifiedTime);
-public sealed record DesktopPhotoPage(IReadOnlyList<DesktopPhoto> Photos, string? NextCursor, bool IncompleteSearch);
 public sealed record DesktopPreview(byte[] Bytes, string MimeType);
 public sealed record DesktopFolder(string Id, string Name, bool CanListChildren);
 public sealed record DesktopFolderLocation(DesktopFolder Current, IReadOnlyList<DesktopFolder> Children, string? NextCursor, bool IncompleteSearch);
@@ -19,8 +17,8 @@ public sealed record DesktopUpdateSource(Guid Id, bool Enabled, bool IncludeDesc
 public interface IDesktopWebApplication
 {
     Task<DesktopSnapshot> SnapshotAsync(CancellationToken cancellationToken);
-    Task<DesktopPhotoPage> PhotosAsync(string accountId, string? cursor, CancellationToken cancellationToken);
-    Task<DesktopPreview?> PreviewAsync(string accountId, string fileId, CancellationToken cancellationToken);
+    Task<DesktopCatalogPage> CatalogAsync(string? accountId, string? position, bool newer, long? dateUtc, CancellationToken cancellationToken);
+    Task<DesktopPreview?> CatalogPreviewAsync(Guid id, CancellationToken cancellationToken);
     Task PauseAsync(CancellationToken cancellationToken);
     Task ResumeAsync(CancellationToken cancellationToken);
     Task AccountAsync(DesktopAccountCommand command, CancellationToken cancellationToken);

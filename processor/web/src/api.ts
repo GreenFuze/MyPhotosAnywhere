@@ -1,8 +1,8 @@
 export interface Account { id: string; name: string; connected: boolean; revision: number }
 export interface StorageBudget { reserveBytes: number; cacheLimitBytes: number; reservedBytes: number; reservableBytes: number }
 export interface Snapshot { libraryId: string; state: string; accounts: Account[]; pending: { id: string; expectedAccountId: string | null }[]; credentialCleanupCount: number; storageAttention: StorageBudget | null }
-export interface Photo { id: string; name: string; mimeType: string; width: number | null; height: number | null; capturedTime: string | null; modifiedTime: string | null }
-export interface PhotoPage { photos: Photo[]; nextCursor: string | null; incompleteSearch: boolean }
+export interface CatalogPhoto { id: string; accountId: string; name: string; mimeType: string; width: number | null; height: number | null; effectiveUtc: number | null; dateProvenance: 'Unknown' | 'DriveCapture' | 'DriveModification'; rawCapture: string | null }
+export interface CatalogPage { discoveryRevision: number; configurationRevision: number; photos: CatalogPhoto[]; olderCursor: string | null; newerCursor: string | null }
 export interface Source { id: string; accountId: string; folderId: string; displayName: string; includeDescendants: boolean; enabled: boolean; revision: number; accountConnected: boolean }
 export interface Sources { revision: number; sources: Source[] }
 export interface Folder { id: string; name: string; canListChildren: boolean }
@@ -41,12 +41,12 @@ export class DesktopApi {
   async status(signal: AbortSignal): Promise<Snapshot> {
     return await this.get<Snapshot>('/api/status', signal);
   }
-  async photos(account: string, cursor: string | null, signal: AbortSignal): Promise<PhotoPage> {
-    const query = new URLSearchParams({ account });
-    if (cursor !== null) query.set('cursor', cursor);
-    return await this.get<PhotoPage>('/api/photos?' + query, signal);
+  async catalog(account: string | null, cursor: string | null, newer: boolean, date: number | null, signal: AbortSignal): Promise<CatalogPage> {
+    const query = new URLSearchParams(); if (account) query.set('account', account); if (cursor) query.set('cursor', cursor);
+    if (newer) query.set('direction', 'newer'); if (date !== null) query.set('date', date.toString());
+    return await this.get<CatalogPage>('/api/catalog?' + query, signal);
   }
-  preview(account: string, file: string): string { return '/api/preview?' + new URLSearchParams({ account, file }); }
+  catalogPreview(asset: string): string { return '/api/catalog-preview?' + new URLSearchParams({ asset }); }
   async sources(signal: AbortSignal): Promise<Sources> { return await this.get<Sources>('/api/sources', signal); }
   async activity(cursor: string | null, signal: AbortSignal): Promise<ActivityPage> {
     return await this.get<ActivityPage>('/api/activity' + (cursor ? '?' + new URLSearchParams({ cursor }) : ''), signal);

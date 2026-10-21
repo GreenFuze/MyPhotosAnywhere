@@ -13,6 +13,24 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
     private readonly ProcessorAccountService _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
     private readonly IProcessorWorkControl _work = work ?? throw new ArgumentNullException(nameof(work));
     private readonly ProcessorSourceRuntime? _sources = sources;
+    private readonly DesktopCatalogReader _catalog = new(state);
+    public Task<DesktopCatalogPage> CatalogAsync(string? accountId, string? position, bool newer, long? dateUtc, CancellationToken cancellationToken) =>
+        _catalog.ReadAsync(accountId, position, newer, dateUtc, cancellationToken);
+    public async Task<DesktopPreview?> CatalogPreviewAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var captured = await _catalog.ResolveAsync(id, cancellationToken).ConfigureAwait(false);
+        if (captured is null) return null;
+        var preview = await _accounts.ReadDriveAsync<DesktopPreview?>(captured.AccountId, async (reader, _, token) =>
+        {
+            var result = await reader.ReadMediaPreviewAsync(captured.Facts.FileId, token).ConfigureAwait(false);
+            return result is null ? null : new(result.Bytes, result.MimeType);
+        }, cancellationToken).ConfigureAwait(false);
+        // A source can be disabled or its media updated while the actual Google read
+        // finishes. Never publish that late preview as the newly visible revision.
+        var current = await _catalog.ResolveAsync(id, cancellationToken).ConfigureAwait(false);
+        return current is not null && current.AccountId == captured.AccountId && current.Facts.FileId == captured.Facts.FileId &&
+            current.Facts.DriveVersion == captured.Facts.DriveVersion ? preview : null;
+    }
     public async Task<DesktopSnapshot> SnapshotAsync(CancellationToken cancellationToken)
     {
         var snapshot = await _accounts.SnapshotAsync(cancellationToken).ConfigureAwait(false);
@@ -20,17 +38,6 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
             account.DisplayName, account.Connected, account.Revision)).ToArray(),
             snapshot.Pending.Select(pending => new DesktopPendingAccount(pending.Id, pending.ExpectedPermissionId)).ToArray(), snapshot.Cleanup.Count, _sources?.StorageAttention);
     }
-    public Task<DesktopPhotoPage> PhotosAsync(string accountId, string? cursor, CancellationToken cancellationToken) => _accounts.ReadDriveAsync(accountId, async (reader, _, token) =>
-    {
-        var page = await reader.ReadMediaPageAsync(cursor, token).ConfigureAwait(false);
-        return new DesktopPhotoPage(page.Files.Select(file => new DesktopPhoto(file.Id, file.Name, file.MimeType, file.Width, file.Height,
-            file.CapturedTime, file.ModifiedTime)).ToArray(), page.NextPageToken, page.IncompleteSearch);
-    }, cancellationToken);
-    public Task<DesktopPreview?> PreviewAsync(string accountId, string fileId, CancellationToken cancellationToken) => _accounts.ReadDriveAsync<DesktopPreview?>(accountId, async (reader, _, token) =>
-    {
-        var preview = await reader.ReadMediaPreviewAsync(fileId, token).ConfigureAwait(false);
-        return preview is null ? null : new(preview.Bytes, preview.MimeType);
-    }, cancellationToken);
     public Task PauseAsync(CancellationToken cancellationToken)
     { cancellationToken.ThrowIfCancellationRequested(); return ChangeWorkAsync(resume: false); }
     public Task ResumeAsync(CancellationToken cancellationToken)
