@@ -1,6 +1,6 @@
 """Bounded local Stage 0 CPU codec build; uses already verified/extracted public source.
 
-No install step, no input media, no network access, no shell-built commands. This is not
+No install step, no user media, no network access, no shell-built commands. This is not
 the installer/runtime closure or a production video importer.
 """
 from pathlib import Path
@@ -142,17 +142,50 @@ class CodecSmoke:
         if stream["width"] != 64 or stream["height"] != 48 or stream["codec_name"] != "rawvideo":
             raise RuntimeError("Unexpected synthetic video facts")
         self.command("decode", [str(self.work / "ffmpeg"), "-v", "warning", "-nostdin", "-n", "-i", "synthetic.avi",
-            "-frames:v", "1", "-threads", "2", "-pix_fmt", "rgb24", "-f", "rawvideo", "decoded.rgb"], 30)
+            "-frames:v", "1", "-threads", "2", "-filter_threads", "2", "-pix_fmt", "rgb24", "-f", "rawvideo", "decoded.rgb"], 30)
         if (self.work / "decoded.rgb").read_bytes() != frame:
             raise RuntimeError("Synthetic lossless frame changed")
+        h264 = self._check_public_h264()
         report = {"status": "passed", "scope": "local Linux restricted CPU synthetic video only",
-                  "frameSha256": hashlib.sha256(frame).hexdigest(), "stream": stream,
+                  "frameSha256": hashlib.sha256(frame).hexdigest(), "stream": stream, "h264": h264,
                   "source": "FFmpeg 9.0.2 verified detached publisher signature; NASM 3.02 official Fedora binary",
                   "redistributionClosureAccepted": False}
         (self.output / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         for name in ("ffmpeg", "ffprobe", "synthetic.avi"):
             shutil.copyfile(self.work / name, self.output / name)
         print("Linux synthetic codec feasibility passed; no system installation or user media access.")
+
+    def _check_public_h264(self):
+        # Reuse the existing public synthetic green camera-test clip. Do not introduce
+        # owner footage, fetch arbitrary media, or use an encoder in the shipped decoder.
+        fixture = Path(__file__).resolve().parents[2] / "app/src/androidTest/assets/device-camera.mp4"
+        source = fixture.read_bytes()
+        expected = "7440b66d0cd715ba031676c1fe6820eeaa8930266b9c1696379991a4927aecd8"
+        if len(source) != 2272 or hashlib.sha256(source).hexdigest() != expected:
+            raise RuntimeError("The public synthetic H.264 fixture changed; review before decoding")
+        target = self.work / "synthetic-h264.mp4"
+        target.write_bytes(source)
+        facts = json.loads(self.command("h264-facts", [str(self.work / "ffprobe"), "-v", "warning",
+            "-select_streams", "v:0", "-show_streams", "-of", "json", str(target)], 30))
+        streams = facts.get("streams", [])
+        if len(streams) != 1 or streams[0].get("codec_name") != "h264" or streams[0].get("width") != 320 or streams[0].get("height") != 240:
+            raise RuntimeError("The compressed synthetic clip's codec/dimensions changed")
+        self.command("h264-decode", [str(self.work / "ffmpeg"), "-v", "warning", "-nostdin", "-n",
+            "-threads", "2", "-i", str(target), "-map", "0:v:0", "-frames:v", "1", "-threads", "2",
+            "-filter_threads", "2", "-pix_fmt", "rgb24", "-f", "rawvideo", "h264-decoded.rgb"], 30)
+        decoded = (self.work / "h264-decoded.rgb").read_bytes()
+        if len(decoded) != 320 * 240 * 3:
+            raise RuntimeError("The H.264 worker did not return exactly one bounded RGB frame")
+        center = (120 * 320 + 160) * 3
+        red, green, blue = decoded[center:center + 3]
+        if green <= red + 20 or green <= blue + 10:
+            raise RuntimeError("The independently declared green fixture did not decode as green")
+        if fixture.read_bytes() != source or target.read_bytes() != source:
+            raise RuntimeError("Read-only compressed video verification changed its input")
+        return {"fixtureSha256": expected, "codec": "h264", "width": 320, "height": 240,
+                "frameBytes": len(decoded), "frameSha256": hashlib.sha256(decoded).hexdigest(),
+                "centerRgb": [red, green, blue], "originalUnchanged": True,
+                "scope": "one public synthetic compressed frame; not HEVC/AVIF/HEIF or all-platform acceptance"}
 
 
 if __name__ == "__main__":

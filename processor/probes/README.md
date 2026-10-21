@@ -29,3 +29,13 @@ dotnet processor/probes/NativeFeasibility/bin/Release/net10.0/NativeFeasibility.
 This comparison intentionally loads the original warning-producing reference model; retain that complete reference log separately. It checks all outputs on zero input and two seeded pixel-range inputs with absolute-plus-relative tolerance `1e-5 + 1e-5 * abs(reference)`. This is not proof of face detection/identity quality. The corrected normal runtime probe must still have zero diagnostics; reference warnings are not suppressed or accepted for shipping.
 
 The official 1.31.0 NuGet omits Intel macOS. Linux's virtual-machine hardware discovery also emits a warning while probing unused accelerators. The feasibility workflow builds the native CPU library from exact upstream revision `402979ac1bef89dcd55add41eaa7277c407599eb`, with telemetry and accelerator discovery disabled, on Linux and Intel Mac. This supported build configuration avoids unnecessary discovery; diagnostics remain enabled and blocking. Native execution on Windows, Linux and both Mac architectures is required before selecting the final backend. Source compilation is not a native pass.
+
+
+The restricted Linux FFmpeg probe now also checks the existing repository's 2,272-byte
+synthetic green H.264 camera-test clip (`app/src/androidTest/assets/device-camera.mp4`).
+Its exact input SHA-256 is pinned before use. The probe verifies H.264/320x240 metadata,
+one bounded RGB frame, the independently declared green center and unchanged input bytes,
+with all diagnostics blocking. This adds actual compressed-bitstream work to the existing
+independently generated lossless AVI check; it does not establish HEVC/HEIF/AVIF, other OS
+codec packages, redistribution closure or final product-worker containment. Native execution
+of this new check is required; syntax inspection alone is not a pass.
