@@ -4,7 +4,8 @@ using Mpa.Processor.GoogleDrive;
 
 namespace Mpa.Processor.AppServices;
 
-public sealed record SourceDiscoveryStep(Guid JobId, Guid ItemId, bool Repair, bool Complete, bool Failed);
+public sealed record SourceDiscoveryStep(Guid JobId, Guid ItemId, bool Repair, bool Complete, bool Failed)
+{ public string Stage { get; init; } = Repair ? "repair-metadata" : "list-metadata"; }
 
 /// <summary>Owns one bounded metadata step at a time, independent from any browser. It borrows
 /// the engine account/state owners, never reads original bytes, and joins reads before yielding
@@ -20,6 +21,18 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
     private Task? _disposal;
     private Exception? _failure;
     public Exception? Failure { get { lock (_gate) return _failure; } }
+
+    public Task<int> RecoverInterruptedReadsAfterExclusiveRestartAsync(CancellationToken cancellationToken) => ExecuteAsync(token =>
+        _state.ExecuteAsync(database => new SourceDiscoveryRepository(database).RecoverInterruptedReadsAfterExclusiveRestart(), token), cancellationToken);
+
+    public Task<SourceDiscoverySchedule> EnsureScheduledAsync(Guid sourceId, long expectedSourceRevision, CancellationToken cancellationToken) => ExecuteAsync(token =>
+        _state.ExecuteAsync(database =>
+        {
+            var source = new LibrarySourceRepository(database).Snapshot().Sources.SingleOrDefault(source => source.Id == sourceId && source.Revision == expectedSourceRevision && source.Enabled && source.AccountConnected)
+                ?? throw new StaleLibraryConfigurationException();
+            var account = new DriveAccountRepository(database).Accounts().Single(account => account.PermissionId == source.AccountId && account.Connected);
+            return new SourceDiscoveryRepository(database).EnsureScheduled(source.Id, source.Revision, account.Revision);
+        }, token), cancellationToken);
 
     public Task<Guid> ScheduleAsync(Guid sourceId, long expectedSourceRevision, CancellationToken cancellationToken) => ExecuteAsync(async token =>
     {
@@ -49,13 +62,15 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
         var captured = await _state.ExecuteAsync(database =>
         {
             var repository = new SourceDiscoveryRepository(database);
-            var folder = repository.ClaimNext();
-            return (Folder: folder, Repair: folder is null ? repository.ClaimRepair() : null);
+            var verification = repository.ClaimVerification();
+            var folder = verification is null ? repository.ClaimNext() : null;
+            return (Verification: verification, Folder: folder, Repair: verification is null && folder is null ? repository.ClaimRepair() : null);
         }, token).ConfigureAwait(false);
-        var lease = captured.Folder?.Lease ?? captured.Repair?.Lease;
+        var lease = captured.Verification?.Lease ?? captured.Folder?.Lease ?? captured.Repair?.Lease;
         if (lease is null) return null;
         try
         {
+            if (captured.Verification is not null) return await VerifyAsync(captured.Verification, token).ConfigureAwait(false);
             return captured.Folder is not null ? await FolderAsync(captured.Folder, token).ConfigureAwait(false) :
                 await RepairAsync(captured.Repair!, token).ConfigureAwait(false);
         }
@@ -66,7 +81,7 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
             var policy = await _state.ExecuteAsync(database => new DurableJobRepository(database).Summary(lease.JobId), CancellationToken.None).ConfigureAwait(false);
             if (!policy.Paused && !policy.IsCanceled)
             { lock (_gate) _failure = new StaleStageLeaseException(); throw; }
-            await ReturnAsync(lease).ConfigureAwait(false); return new(lease.JobId, lease.ItemId, captured.Repair is not null, false, false);
+            await ReturnAsync(lease).ConfigureAwait(false); return new(lease.JobId, lease.ItemId, captured.Repair is not null, false, false) { Stage = lease.Stage };
         }
         catch (StaleLibraryConfigurationException)
         { return await FailAsync(lease, captured.Repair is not null, "source-changed", "The source or account changed. Start a scan using its current settings.", false).ConfigureAwait(false); }
@@ -93,6 +108,26 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
             throw;
         }
     }, cancellationToken, faultOnError: true);
+
+    private async Task<SourceDiscoveryStep> VerifyAsync(SourceDiscoveryVerification work, CancellationToken token)
+    {
+        var accepted = await _state.ExecuteAsync(database =>
+        {
+            var repository = new SourceDiscoveryRepository(database); repository.ValidateCurrent(work); return repository.VerifiedRoot(work);
+        }, token).ConfigureAwait(false);
+        if (accepted is null)
+        {
+            var root = await _accounts.ReadDriveAsync(work.Scope.AccountId, (reader, revision, readToken) =>
+            {
+                if (revision != work.Scope.AccountRevision) throw new StaleLibraryConfigurationException();
+                return reader.ReadFolderAsync(work.Scope.RootFolderId, readToken);
+            }, token).ConfigureAwait(false);
+            if (!root.CanListChildren) throw new HttpRequestException("Google does not allow reading the captured source folder.", null, HttpStatusCode.Forbidden);
+            work = await _state.ExecuteAsync(database => new SourceDiscoveryRepository(database).SaveVerifiedRoot(work, root.Id, root.SharedDriveId), token).ConfigureAwait(false);
+        }
+        await _state.ExecuteAsync(database => { new SourceDiscoveryRepository(database).CompleteVerification(work); return true; }, token).ConfigureAwait(false);
+        return new(work.Lease.JobId, work.Lease.ItemId, false, true, false) { Stage = work.Lease.Stage };
+    }
 
     private async Task<SourceDiscoveryStep> FolderAsync(SourceDiscoveryWork work, CancellationToken token)
     {
@@ -177,7 +212,7 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
             if (policy.Paused || policy.IsCanceled) { jobs.ReturnJoinedRead(lease); return false; }
             jobs.Fail(lease, code, message, retryable); return true;
         }, CancellationToken.None).ConfigureAwait(false);
-        return new(lease.JobId, lease.ItemId, repair, false, failed);
+        return new(lease.JobId, lease.ItemId, repair, false, failed) { Stage = lease.Stage };
     }
     private async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken, bool faultOnError = false)
     {

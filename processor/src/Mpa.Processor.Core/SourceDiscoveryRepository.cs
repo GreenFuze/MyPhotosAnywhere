@@ -33,24 +33,29 @@ public sealed partial class SourceDiscoveryRepository
     {
         if (jobId == Guid.Empty || sourceId == Guid.Empty || sourceRevision < 1 || accountRevision < 1 || (!Identity(verifiedRootFolderId) || verifiedRootFolderId == "root") ||
             verifiedSharedDriveId is not null && !Identity(verifiedSharedDriveId)) throw new ArgumentException("Invalid captured discovery source.");
+        var scope = CaptureScope(sourceId, sourceRevision, accountRevision);
+        if (scope.RootFolderId != verifiedRootFolderId) throw new StaleLibraryConfigurationException();
+        _jobs.CreateWithInitialItem(jobId, JobKind, ScopeContext(scope), Item(scope, new(verifiedRootFolderId, verifiedSharedDriveId, 0)));
+    }
+    private SourceDiscoveryScope CaptureScope(Guid sourceId, long sourceRevision, long accountRevision)
+    {
+        if (sourceId == Guid.Empty || sourceRevision < 1 || accountRevision < 1) throw new ArgumentException("Invalid captured discovery source.");
         using var command = _database.Connection.CreateCommand();
         command.CommandText = """
-            SELECT s.account_id,s.descendants FROM source_binding s JOIN drive_account a ON a.permission_id=s.account_id
-            WHERE s.id=$id AND s.revision=$sourceRevision AND s.folder_id=$folder AND s.enabled=1 AND a.connected=1 AND a.revision=$accountRevision
+            SELECT s.account_id,s.descendants,s.folder_id FROM source_binding s JOIN drive_account a ON a.permission_id=s.account_id
+            WHERE s.id=$id AND s.revision=$sourceRevision AND s.enabled=1 AND a.connected=1 AND a.revision=$accountRevision
             """;
         command.Parameters.AddWithValue("$id", sourceId.ToString("D")); command.Parameters.AddWithValue("$sourceRevision", sourceRevision);
-        command.Parameters.AddWithValue("$folder", verifiedRootFolderId); command.Parameters.AddWithValue("$accountRevision", accountRevision);
-        SourceDiscoveryScope scope;
-        using (var reader = command.ExecuteReader())
-        {
-            if (!reader.Read()) throw new StaleLibraryConfigurationException();
-            scope = new(sourceId, sourceRevision, reader.GetString(0), accountRevision, verifiedRootFolderId, reader.GetBoolean(1));
-        }
-        var context = _codec.Encode(JsonSerializer.SerializeToUtf8Bytes(new { format = "mpa-source-discovery-1", sourceId = scope.SourceId.ToString("D"),
-            sourceRevision = scope.SourceRevision.ToString(CultureInfo.InvariantCulture), accountId = scope.AccountId,
-            accountRevision = scope.AccountRevision.ToString(CultureInfo.InvariantCulture), rootFolderId = scope.RootFolderId, includeDescendants = scope.IncludeDescendants }));
-        _jobs.CreateWithInitialItem(jobId, JobKind, context, Item(scope, new(verifiedRootFolderId, verifiedSharedDriveId, 0)));
+        command.Parameters.AddWithValue("$accountRevision", accountRevision);
+        using var reader = command.ExecuteReader();
+        if (!reader.Read()) throw new StaleLibraryConfigurationException();
+        var folder = reader.GetString(2);
+        if (!Identity(folder) || folder == "root") throw new InvalidDataException("Persisted source root is not canonical.");
+        return new(sourceId, sourceRevision, reader.GetString(0), accountRevision, folder, reader.GetBoolean(1));
     }
+    private byte[] ScopeContext(SourceDiscoveryScope scope) => _codec.Encode(JsonSerializer.SerializeToUtf8Bytes(new { format = "mpa-source-discovery-1", sourceId = scope.SourceId.ToString("D"),
+        sourceRevision = scope.SourceRevision.ToString(CultureInfo.InvariantCulture), accountId = scope.AccountId,
+        accountRevision = scope.AccountRevision.ToString(CultureInfo.InvariantCulture), rootFolderId = scope.RootFolderId, includeDescendants = scope.IncludeDescendants }));
     public SourceDiscoveryWork? ClaimNext()
     {
         var lease = _jobs.ClaimNext(JobKind, Stage);

@@ -76,6 +76,25 @@ public sealed class CapturedJobItemTests
     private static JobItemSpec Item(Guid id, string context) => new(id, Hash, [new("metadata", Hash, [])], context);
 
     [TestMethod]
+    public void IdempotentJobAdmissionPreservesReceiptsAndRejectsChangedOrNonAtomicExistingJobs()
+    {
+        using var root = new WorkerProcessTests.WorkerTestDirectory(); using var database = new ProcessorStateDatabase(root.Path);
+        var jobs = new DurableJobRepository(database); var job = Guid.NewGuid(); var item = Item(Guid.NewGuid(), "{}");
+        Assert.IsTrue(jobs.EnsureJobWithInitialItem(job, "source-discovery", "{}"u8, item));
+        Assert.IsFalse(jobs.EnsureJobWithInitialItem(job, "source-discovery", "{}"u8, item));
+        jobs.Complete(jobs.ClaimNext()!, "{\"verified\":true}"u8);
+        Assert.IsFalse(jobs.EnsureJobWithInitialItem(job, "source-discovery", "{}"u8, item));
+        Assert.AreEqual(1, jobs.Summary(job).Ready); Assert.AreEqual(1, jobs.PendingReceiptCount());
+        Assert.ThrowsExactly<ConflictingJobItemException>(() => jobs.EnsureJobWithInitialItem(job, "source-discovery", "{\"changed\":true}"u8, item));
+        Assert.ThrowsExactly<ConflictingJobItemException>(() => jobs.EnsureJobWithInitialItem(job, "another-kind", "{}"u8, item));
+        Assert.ThrowsExactly<ConflictingJobItemException>(() => jobs.EnsureJobWithInitialItem(job, "source-discovery", "{}"u8, item with { CapturedContext = "{\"changed\":true}" }));
+        Assert.IsNull(jobs.ClaimNext());
+        var nonAtomic = Guid.NewGuid(); jobs.Create(nonAtomic, "source-discovery", "{}"u8);
+        Assert.ThrowsExactly<InvalidDataException>(() => jobs.EnsureJobWithInitialItem(nonAtomic, "source-discovery", "{}"u8, Item(Guid.NewGuid(), "{}")));
+        Assert.AreEqual(0, jobs.Summary(nonAtomic).Queued);
+    }
+
+    [TestMethod]
     public void ReplayedFolderAdmissionNeverRequeuesReadyWorkAndRejectsReusedIdentitiesWithDifferentRecipes()
     {
         using var root = new WorkerProcessTests.WorkerTestDirectory(); using var database = new ProcessorStateDatabase(root.Path);

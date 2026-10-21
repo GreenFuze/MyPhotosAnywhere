@@ -36,6 +36,27 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
         using var transaction = _database.Connection.BeginTransaction();
         InsertJob(transaction, jobId, kind, canonical); InsertItem(transaction, jobId, prepared); transaction.Commit();
     }
+
+    public bool EnsureJobWithInitialItem(Guid jobId, string kind, ReadOnlySpan<byte> capturedContext, JobItemSpec item)
+    {
+        if (jobId == Guid.Empty || !Identifier(kind)) throw new ArgumentException("Invalid job identity/kind.");
+        var canonical = CanonicalObject(capturedContext); var prepared = Prepare(item); var exists = false;
+        using var transaction = _database.Connection.BeginTransaction();
+        using (var select = Command(transaction, "SELECT kind,captured_context,context_hash FROM job WHERE id=$id", ("$id", Key(jobId))))
+        {
+            using var reader = select.ExecuteReader();
+            if (reader.Read())
+            {
+                exists = true;
+                if (reader.GetString(2) != Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(reader.GetString(1)))))
+                    throw new InvalidDataException("The durable job context no longer matches its integrity record.");
+                if (reader.GetString(0) != kind || reader.GetString(1) != canonical) throw new ConflictingJobItemException();
+            }
+        }
+        if (!exists) { InsertJob(transaction, jobId, kind, canonical); InsertItem(transaction, jobId, prepared); }
+        else if (EnsureItem(transaction, jobId, prepared)) throw new InvalidDataException("A previously admitted atomic job lost its initial item.");
+        transaction.Commit(); return !exists;
+    }
     private void InsertJob(SqliteTransaction? transaction, Guid jobId, string kind, string canonicalContext)
     {
         var context = Encoding.UTF8.GetBytes(canonicalContext);
