@@ -258,6 +258,17 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
         if (command.ExecuteNonQuery() != 1) throw new StaleStageLeaseException();
     }
 
+    /// <summary>Yield a bounded metadata operation only after its actual network/read owner
+    /// has joined. A concurrent pause/cancel retains its durable job policy and checkpoint.</summary>
+    public void ReturnJoinedRead(StageLease lease)
+    {
+        using var command = LeaseCommand(null, lease, """
+            UPDATE item_stage SET state=CASE WHEN (SELECT canceled FROM job WHERE id=$job)=1 THEN 'canceled' ELSE 'queued' END,lease_id=NULL
+            WHERE job_id=$job AND item_id=$item AND name=$stage AND lease_id=$lease AND attempt=$attempt AND state IN('running','canceling')
+            """);
+        if (command.ExecuteNonQuery() != 1) throw new StaleStageLeaseException();
+    }
+
     public void Resume(Guid jobId)
     {
         using var command = Command(null, """

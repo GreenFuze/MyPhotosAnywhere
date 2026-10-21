@@ -115,6 +115,9 @@ public sealed partial class AccountServiceTests
         public bool HoldRead { get; set; }
         public bool HoldDisposal { get; set; }
         public bool FailDisposal { get; set; }
+        public Func<string, CancellationToken, Task<DriveFolder>>? FolderRead { get; set; }
+        public Func<string, string?, string?, CancellationToken, Task<DriveSourcePage>>? SourceRead { get; set; }
+        public Func<string, string?, string, CancellationToken, Task<DriveSourceItem>>? RepairRead { get; set; }
         public int DisposalAttempts { get; private set; }
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Canceled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -139,9 +142,10 @@ public sealed partial class AccountServiceTests
                 owner.Events.Enqueue("refresh-saved"); return new([], null, false);
             }
             public Task<DriveMediaPreview?> ReadMediaPreviewAsync(string fileId, CancellationToken cancellationToken) => throw new InvalidOperationException("Unexpected preview request.");
-            public Task<DriveFolder> ReadFolderAsync(string folderId, CancellationToken cancellationToken) => throw new InvalidOperationException("Unexpected folder request.");
+            public Task<DriveFolder> ReadFolderAsync(string folderId, CancellationToken cancellationToken) => owner.FolderRead?.Invoke(folderId, cancellationToken) ?? throw new InvalidOperationException("Unexpected folder request.");
             public Task<DriveFolderPage> ReadFolderPageAsync(string parentId, string? pageToken, CancellationToken cancellationToken) => throw new InvalidOperationException("Unexpected folder page request.");
-            public Task<DriveSourcePage> ReadSourcePageAsync(string parentId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken) => throw new InvalidOperationException("Unexpected source request.");
+            public Task<DriveSourcePage> ReadSourcePageAsync(string parentId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken) => owner.SourceRead?.Invoke(parentId, sharedDriveId, pageToken, cancellationToken) ?? throw new InvalidOperationException("Unexpected source request.");
+            public Task<DriveSourceItem> ReadSourceItemAsync(string parentId, string? sharedDriveId, string fileId, CancellationToken cancellationToken) => owner.RepairRead?.Invoke(parentId, sharedDriveId, fileId, cancellationToken) ?? throw new InvalidOperationException("Unexpected source repair request.");
             public async ValueTask DisposeAsync()
             {
                 owner.DisposalAttempts++; owner.DisposalStarted.TrySetResult();

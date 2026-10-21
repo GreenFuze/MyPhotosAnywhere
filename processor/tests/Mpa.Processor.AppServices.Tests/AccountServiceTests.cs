@@ -96,6 +96,7 @@ public sealed partial class AccountServiceTests
         public Factory Factory { get; } = new();
         public LibraryFactory Readers { get; } = new();
         public ProcessorAccountService Service { get; }
+        public ProcessorStateCoordinator State => _state;
         public Fixture()
         {
             _database = new ProcessorStateDatabase(_root);

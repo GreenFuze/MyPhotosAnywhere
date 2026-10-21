@@ -8,9 +8,31 @@ public sealed record DriveSourceItem(string Id, long Version, string Name, strin
 public sealed record DriveSourceItemFailure(string? FileId, int PageIndex, string Code);
 public sealed record DriveSourcePage(IReadOnlyList<DriveSourceItem> Items, IReadOnlyList<DriveSourceItemFailure> Failures,
     string? NextPageToken, bool IncompleteSearch);
+public sealed class DriveSourceMetadataException(Exception cause) : IOException("Google returned invalid metadata for the captured item.", cause);
+public sealed class DriveSourceItemUnavailableException() : IOException("The captured item no longer belongs to the captured source folder or shared drive.");
 
 public sealed partial class GoogleAccountConnection
 {
+    private const string SourceFields = "id,name,mimeType,version,size,trashed,parents,driveId,capabilities(canListChildren),modifiedTime,imageMediaMetadata(width,height,time),videoMediaMetadata(width,height)";
+
+    public Task<DriveSourceItem> ReadSourceItemAsync(string parentId, string? sharedDriveId, string fileId, CancellationToken cancellationToken)
+    {
+        if (!ValidIdentity(parentId) || parentId == "root" || !ValidIdentity(fileId) || sharedDriveId is not null && !ValidIdentity(sharedDriveId))
+            throw new ArgumentException("A captured canonical parent, file and optional shared-drive identity are required.");
+        return ExecuteAsync(async token =>
+        {
+            var credential = await MediaCredentialAsync(token).ConfigureAwait(false);
+            var bytes = await MediaGetAsync(credential, new("https://www.googleapis.com/drive/v3/files/" + Uri.EscapeDataString(fileId) +
+                "?supportsAllDrives=true&fields=" + Uri.EscapeDataString(SourceFields)), 32768, token).ConfigureAwait(false);
+            using var document = JsonDocument.Parse(bytes); var file = document.RootElement;
+            if (file.ValueKind != JsonValueKind.Object || !file.TryGetProperty("id", out var identity) || identity.ValueKind != JsonValueKind.String || identity.GetString() != fileId)
+                throw new InvalidDataException("Drive returned a different file for the captured metadata repair.");
+            if (!CapturedParent(file, parentId, sharedDriveId)) throw new DriveSourceItemUnavailableException();
+            try { return SourceItem(file); }
+            catch (Exception error) when (error is InvalidDataException or JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
+            { throw new DriveSourceMetadataException(error); }
+        }, cancellationToken);
+    }
     /// <summary>One bounded metadata-only page within a captured canonical folder. Malformed
     /// items are isolated, while parent/response integrity failures cannot masquerade as an
     /// empty folder. Shortcuts are observed as shortcuts, never followed into new source scope.</summary>
@@ -23,7 +45,7 @@ public sealed partial class GoogleAccountConnection
         {
             var credential = await MediaCredentialAsync(token).ConfigureAwait(false);
             var query = "trashed = false and '" + parentId + "' in parents";
-            const string fields = "nextPageToken,incompleteSearch,files(id,name,mimeType,version,size,trashed,parents,driveId,capabilities(canListChildren),modifiedTime,imageMediaMetadata(width,height,time),videoMediaMetadata(width,height))";
+            const string fields = "nextPageToken,incompleteSearch,files(" + SourceFields + ")";
             var uri = "https://www.googleapis.com/drive/v3/files?pageSize=60&spaces=drive&orderBy=name_natural&includeItemsFromAllDrives=true&supportsAllDrives=true" +
                 "&q=" + Uri.EscapeDataString(query) + "&fields=" + Uri.EscapeDataString(fields) +
                 (sharedDriveId is null ? "&corpora=user" : "&corpora=drive&driveId=" + Uri.EscapeDataString(sharedDriveId)) +
@@ -71,8 +93,10 @@ public sealed partial class GoogleAccountConnection
                 throw new InvalidDataException("Invalid source length.");
             size = length;
         }
-        return new(id, revision, name, mime, size, mime == "application/vnd.google-apps.folder" ? Folder(file) : null,
-            mime.StartsWith("image/", StringComparison.Ordinal) || mime.StartsWith("video/", StringComparison.Ordinal) ? MediaFile(file) : null);
+        var media = mime.StartsWith("image/", StringComparison.Ordinal) || mime.StartsWith("video/", StringComparison.Ordinal) ? MediaFile(file) : null;
+        if (media?.CapturedTime?.Any(char.IsControl) == true || media?.ModifiedTime?.Any(char.IsControl) == true)
+            throw new InvalidDataException("Invalid source timestamp text.");
+        return new(id, revision, name, mime, size, mime == "application/vnd.google-apps.folder" ? Folder(file) : null, media);
     }
     private static bool CapturedParent(JsonElement file, string parentId, string? driveId)
     {

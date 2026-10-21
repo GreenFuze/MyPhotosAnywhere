@@ -71,7 +71,17 @@ public sealed partial class SourceDiscoveryRepository
     }
     public void ValidateCurrent(SourceDiscoveryWork work)
     {
-        ValidateShape(work); ValidateCurrent(work.Scope);
+        ValidateActive(work); ValidateCurrent(work.Scope);
+    }
+
+    public void CompleteFolder(SourceDiscoveryWork work)
+    {
+        ValidateCurrent(work); var checkpoint = Checkpoint(work);
+        if (!checkpoint.Started || checkpoint.NextPageToken is not null) throw new InvalidOperationException("A folder requires a terminal checkpoint before completion.");
+        _jobs.Complete(work.Lease, _codec.Encode(JsonSerializer.SerializeToUtf8Bytes(new { format = "mpa-source-folder-receipt-1",
+            sourceId = work.Scope.SourceId.ToString("D"), folderId = work.Folder.FolderId,
+            observedItems = checkpoint.ObservedItems.ToString(CultureInfo.InvariantCulture),
+            failedItems = checkpoint.FailedItems.ToString(CultureInfo.InvariantCulture), incompleteSearch = checkpoint.IncompleteSearch })));
     }
     private void ValidateCurrent(SourceDiscoveryScope scope)
     {

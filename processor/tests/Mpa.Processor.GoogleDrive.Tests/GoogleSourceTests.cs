@@ -6,7 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Mpa.Processor.GoogleDrive.Tests;
 
 [TestClass]
-public sealed class GoogleSourceTests
+public sealed partial class GoogleSourceTests
 {
     private static readonly string[] CapturedParents = ["folder-A"];
     [TestMethod]

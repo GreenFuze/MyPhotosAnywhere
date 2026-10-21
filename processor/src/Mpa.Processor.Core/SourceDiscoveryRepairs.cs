@@ -39,6 +39,22 @@ public sealed partial class SourceDiscoveryRepository
     {
         ValidateShape(repair); ValidateActive(repair.Lease); ValidateCurrent(repair.Scope);
     }
+    public bool EnqueueChild(SourceDiscoveryRepair parent, string verifiedFolderId, string? verifiedSharedDriveId)
+    {
+        ValidateCurrent(parent);
+        if (!parent.Scope.IncludeDescendants) return false;
+        if (!Identity(verifiedFolderId) || verifiedSharedDriveId is not null && !Identity(verifiedSharedDriveId)) throw new ArgumentException("Invalid verified repair folder.");
+        if (parent.Folder.Depth == 256 || verifiedFolderId == parent.Folder.FolderId || verifiedFolderId == parent.Scope.RootFolderId ||
+            parent.Folder.SharedDriveId is not null && parent.Folder.SharedDriveId != verifiedSharedDriveId)
+            throw new InvalidDataException("Repair traversal cannot escape its captured source or create a cycle.");
+        return _jobs.EnsureItem(parent.Lease.JobId, Item(parent.Scope, new(verifiedFolderId, verifiedSharedDriveId, parent.Folder.Depth + 1)));
+    }
+    public void CompleteRepair(SourceDiscoveryRepair repair)
+    {
+        ValidateCurrent(repair);
+        _jobs.Complete(repair.Lease, _codec.Encode(JsonSerializer.SerializeToUtf8Bytes(new { format = "mpa-source-repair-receipt-1",
+            sourceId = repair.Scope.SourceId.ToString("D"), folderId = repair.Folder.FolderId, fileId = repair.FileId, pageToken = repair.PageToken })));
+    }
     private void ValidateShape(SourceDiscoveryRepair repair)
     {
         ArgumentNullException.ThrowIfNull(repair);
