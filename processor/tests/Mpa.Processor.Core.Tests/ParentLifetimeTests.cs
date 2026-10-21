@@ -91,7 +91,8 @@ public sealed class ParentLifetimeTests
             using var peer = new TcpClient(AddressFamily.InterNetwork);
             await peer.ConnectAsync(IPAddress.Loopback, parent.Configuration.Port, deadline.Token).ConfigureAwait(false);
             if (sentBytes != 0) await peer.GetStream().WriteAsync(new byte[sentBytes], deadline.Token).ConfigureAwait(false);
-            parent.Dispose();
+            if (iteration % 2 == 0) parent.Dispose();
+            else await Task.WhenAll(parent.DisposeAsync().AsTask(), parent.DisposeAsync().AsTask()).ConfigureAwait(false);
             try { await accepting.WaitAsync(deadline.Token).ConfigureAwait(false); Assert.Fail("A partial handshake acquired a worker session."); }
             catch (ObjectDisposedException) { /* Parent closure before/after accept adoption. */ }
             catch (SocketException) { /* Closed acceptor/connection. */ }

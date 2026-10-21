@@ -6,16 +6,18 @@ using Mpa.Processor.WorkerRuntime;
 namespace Mpa.Processor.Core;
 
 /// <summary>Owns the parent's loopback listener/connection. Keep it alive until the child actually
-/// exits; disposing it early intentionally signals loss of the owning controller.</summary>
-public sealed class ParentLifetimeListener : IDisposable
+/// exits; disposing it early intentionally signals loss of the owning controller. Shutdown
+/// joins the actual accept/handshake task before releasing its cancellation/key owner.</summary>
+public sealed class ParentLifetimeListener : IDisposable, IAsyncDisposable
 {
     private readonly TcpListener _listener;
     private readonly Socket _acceptor;
     private readonly byte[] _key = RandomNumberGenerator.GetBytes(32);
     private TcpClient? _client;
-    private TcpClient? _pending;
+    private readonly CancellationTokenSource _stop = new();
     private readonly object _ownershipGate = new();
-    private int _accepting;
+    private Task? _acceptance;
+    private Task? _disposal;
     private int _disposed;
     public ParentLifetimeConfiguration Configuration { get; }
 
@@ -28,14 +30,21 @@ public sealed class ParentLifetimeListener : IDisposable
             _acceptor = _listener.Server;
             Configuration = new(((IPEndPoint)_listener.LocalEndpoint).Port, Convert.ToBase64String(_key));
         }
-        catch { _listener.Stop(); CryptographicOperations.ZeroMemory(_key); throw; }
+        catch { _listener.Stop(); CryptographicOperations.ZeroMemory(_key); _stop.Dispose(); throw; }
     }
 
-    public async Task AcceptAsync(CancellationToken cancellationToken)
+    public Task AcceptAsync(CancellationToken cancellationToken)
     {
-        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-        if (Interlocked.Exchange(ref _accepting, 1) != 0) throw new InvalidOperationException("A parent-lifetime listener accepts one worker session only.");
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        lock (_ownershipGate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            if (_acceptance is not null) throw new InvalidOperationException("A parent-lifetime listener accepts one worker session only.");
+            return _acceptance = AcceptCoreAsync(cancellationToken);
+        }
+    }
+    private async Task AcceptCoreAsync(CancellationToken cancellationToken)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token);
         deadline.CancelAfter(TimeSpan.FromSeconds(5));
         try
         {
@@ -52,7 +61,6 @@ public sealed class ParentLifetimeListener : IDisposable
                     lock (_ownershipGate)
                     {
                         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-                        _pending = candidate;
                     }
                     var accepted = await _acceptor.AcceptAsync(destination, deadline.Token).ConfigureAwait(false);
                     if (!ReferenceEquals(accepted, destination))
@@ -79,14 +87,12 @@ public sealed class ParentLifetimeListener : IDisposable
                     {
                         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
                         _client = candidate;
-                        _pending = null;
                         owned = false;
                     }
                     return;
                 }
                 finally
                 {
-                    lock (_ownershipGate) { if (ReferenceEquals(_pending, candidate)) _pending = null; }
                     if (owned) candidate.Dispose();
                 }
             }
@@ -95,15 +101,31 @@ public sealed class ParentLifetimeListener : IDisposable
         finally { _listener.Stop(); }
     }
 
-    public void Dispose()
+    public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();
+    public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        _listener.Stop();
         lock (_ownershipGate)
         {
-            _pending?.Dispose();
-            _client?.Dispose();
+            _disposed = 1;
+            return new(_disposal ??= StopAsync(_acceptance));
         }
-        CryptographicOperations.ZeroMemory(_key);
+    }
+    private async Task StopAsync(Task? acceptance)
+    {
+        await _stop.CancelAsync().ConfigureAwait(false);
+        _listener.Stop();
+        lock (_ownershipGate) _client?.Dispose();
+        try
+        {
+            if (acceptance is not null)
+            {
+                try { await acceptance.ConfigureAwait(false); }
+                catch (OperationCanceledException) when (_stop.IsCancellationRequested) { /* Joined canceled accept/partial handshake. */ }
+                catch (ObjectDisposedException) when (_stop.IsCancellationRequested) { /* Closed acceptor or admitted stream. */ }
+                catch (SocketException) when (_stop.IsCancellationRequested) { /* Closed native accept/read. */ }
+                catch (IOException) when (_stop.IsCancellationRequested) { /* Partial stream aborted; the returned accept task retains the error. */ }
+            }
+        }
+        finally { CryptographicOperations.ZeroMemory(_key); _stop.Dispose(); }
     }
 }

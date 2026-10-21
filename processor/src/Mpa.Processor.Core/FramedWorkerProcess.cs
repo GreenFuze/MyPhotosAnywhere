@@ -132,7 +132,8 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
                     try { if (started && !process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false); } }
                     finally { process.Dispose(); }
                 }
-                parent?.Dispose(); executable.Dispose();
+                try { if (parent is not null) await parent.DisposeAsync().ConfigureAwait(false); }
+                finally { executable.Dispose(); }
             }
         }
     }
@@ -264,7 +265,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         finally
         {
             if (_processExit.IsCompletedSuccessfully) ReleaseResources();
-            else _parent.Dispose(); // Fail-safe signal, while retaining process/executable ownership.
+            else await _parent.DisposeAsync().ConfigureAwait(false); // Fail-safe signal and joined handshake; process/executable ownership remains retained.
         }
     }
 

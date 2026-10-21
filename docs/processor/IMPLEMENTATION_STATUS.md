@@ -357,3 +357,24 @@ API 29/35/37. Independently downloaded complete native artifacts verify 235 test
 agreeing reported web inventories. Application binaries are absent from these artifacts and
 their reported hashes are not independently verified. The subsequent parent/socket and
 snapshot work still requires current-revision native validation.
+
+## Joined parent acceptance follow-up
+
+Native run 39642356278 on 2f80af3 found the pre-owned socket correction insufficient:
+macOS ARM timed out at peer closure in all three new race cases while 102 other Core
+cases passed. That failed log is retained. A pending accept destination was still being
+disposed before the native operation settled. Underlying runtime causality beyond that
+ownership gap has not been established.
+
+The parent now owns a cancellation source and tracks the actual accept/handshake task.
+Shutdown cancels its linked operation, closes the listener/admitted client, joins acceptance,
+then releases cancellation/key ownership. Only the completed accept loop closes a pending
+destination. Async worker startup and failed-stop paths await this join; synchronous disposal
+uses the same completion. Unexpected internal exceptions remain failures. The race tests
+exercise both synchronous and concurrent asynchronous disposal without changing deadlines
+or treating a peer-read timeout as closure.
+
+Local validation passes all 15 focused parent/worker cases and the complete 105 Core cases,
+including both scale fixtures, followed by a zero-warning/error Desktop rebuild. These
+results supersede the prior local result but do not prove the macOS correction; a new
+immutable cross-platform run is required. No diagnostic exemption was introduced.
