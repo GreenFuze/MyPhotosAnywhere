@@ -28,7 +28,7 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
     public Exception? Failure { get { lock (_gate) return _failure; } }
 
     public Task<int> RecoverInterruptedReadsAfterExclusiveRestartAsync(CancellationToken cancellationToken) => ExecuteAsync(token =>
-        StateAsync(database => new SourceDiscoveryRepository(database).RecoverInterruptedReadsAfterExclusiveRestart(), token), cancellationToken);
+        _state.ExecuteAsync(database => new SourceDiscoveryRepository(database).RecoverInterruptedReadsAfterExclusiveRestart(), token), cancellationToken, reserveWrites: false);
 
     public Task<SourceDiscoverySchedule> EnsureScheduledAsync(Guid sourceId, long expectedSourceRevision, CancellationToken cancellationToken) => ExecuteAsync(token =>
         StateAsync(database =>
@@ -232,7 +232,7 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
         return operation(database);
     }, token);
 
-    private async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken, bool faultOnError = false)
+    private async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken, bool faultOnError = false, bool reserveWrites = true)
     {
         lock (_gate) ObjectDisposedException.ThrowIf(_stopping, this);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token);
@@ -244,7 +244,7 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
                 ObjectDisposedException.ThrowIf(_stopping, this);
                 if (_failure is not null) throw new InvalidOperationException("Source discovery stopped after an internal failure. Inspect its diagnostic before restarting.", _failure);
             }
-            using var reservation = _storage is null ? null : await _state.ExecuteAsync(_ => _storage.Reserve(MetadataStepReservationBytes), linked.Token).ConfigureAwait(false);
+            using var reservation = _storage is null || !reserveWrites ? null : await _state.ExecuteAsync(_ => _storage.Reserve(MetadataStepReservationBytes), linked.Token).ConfigureAwait(false);
             _reservation = reservation;
             try { return await operation(linked.Token).ConfigureAwait(false); }
             finally { _reservation = null; }

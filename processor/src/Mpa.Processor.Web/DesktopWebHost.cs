@@ -29,6 +29,11 @@ public sealed class DesktopWebHost : IAsyncDisposable
     private readonly WebDiagnostics _diagnostics;
     private readonly object _gate = new();
     private Task? _disposal;
+    private int _requests;
+    private bool _stopping;
+    private bool _exitConfirmed;
+    private readonly TaskCompletionSource _requestsDrained = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public bool ExitConfirmed { get { lock (_gate) return _exitConfirmed; } }
     public Uri LocalEndpoint { get; private set; } = null!;
     public Uri? HttpsEndpoint { get; private set; }
     public IReadOnlyList<Uri> ListeningEndpoints { get; private set; } = [];
@@ -101,6 +106,13 @@ public sealed class DesktopWebHost : IAsyncDisposable
     {
         _host.Run(async context =>
         {
+            lock (_gate)
+            {
+                if (_stopping) { context.Response.StatusCode = 503; return; }
+                _requests = checked(_requests + 1);
+            }
+            try
+            {
             context.Response.Headers.CacheControl = "no-store";
             context.Response.Headers.XContentTypeOptions = "nosniff";
             context.Response.Headers["Referrer-Policy"] = "no-referrer";
@@ -149,6 +161,8 @@ public sealed class DesktopWebHost : IAsyncDisposable
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This account and folder are already configured. Update their existing source entry." }, context.RequestAborted).ConfigureAwait(false); }
             catch (ProcessorWorkStateConflictException)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Processing state changed. Refresh Activity before trying again." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (InsufficientStorageBudgetException)
+            { context.Response.StatusCode = 507; await context.Response.WriteAsJsonAsync(new { message = "Free space on the computer running this library, then retry. Existing photos and progress were retained." }, context.RequestAborted).ConfigureAwait(false); }
             catch (TokenResponseException)
             { context.Response.StatusCode = 503; await context.Response.WriteAsJsonAsync(new { message = "Google authorization could not finish. Reconnect or resume account setup on the host computer." }, context.RequestAborted).ConfigureAwait(false); }
             catch (HttpRequestException)
@@ -161,6 +175,11 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 Diagnostic?.Invoke(error);
                 if (context.Response.HasStarted) context.Abort();
                 else { context.Response.StatusCode = 500; await context.Response.WriteAsJsonAsync(new { message = "MPA encountered an unexpected failure. Open host diagnostics; existing photos and saved work were preserved." }, context.RequestAborted).ConfigureAwait(false); }
+            }
+            }
+            finally
+            {
+                lock (_gate) { _requests--; if (_stopping && _requests == 0) _requestsDrained.TrySetResult(); }
             }
         });
     }
@@ -180,6 +199,22 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 await context.Response.WriteAsJsonAsync(await _application.PhotosAsync(RequiredQuery(context, "account"), OptionalQuery(context, "cursor", 4096), token).ConfigureAwait(false), token).ConfigureAwait(false); break;
             case ("GET", "/api/sources"):
                 await context.Response.WriteAsJsonAsync(await _application.SourcesAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("GET", "/api/activity"):
+                var rawCursor = OptionalQuery(context, "cursor", 36); Guid? activityCursor = null;
+                if (rawCursor is not null)
+                {
+                    if (!Guid.TryParseExact(rawCursor, "D", out var parsed) || parsed == Guid.Empty) throw new BadHttpRequestException("Invalid activity cursor.");
+                    activityCursor = parsed;
+                }
+                await context.Response.WriteAsJsonAsync(await _application.ActivityAsync(activityCursor, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("POST", "/api/source-scans"):
+                var scan = await context.Request.ReadFromJsonAsync<SourceScanRequest>(token).ConfigureAwait(false) ?? throw new BadHttpRequestException("A source scan request is required.");
+                if (scan.RequestId == Guid.Empty || scan.SourceId == Guid.Empty || scan.SourceRevision < 1 || scan.AccountRevision < 1) throw new BadHttpRequestException("Invalid captured source scan.");
+                await context.Response.WriteAsJsonAsync(await _application.RequestScanAsync(scan, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("POST", "/api/source-retries"):
+                var retry = await context.Request.ReadFromJsonAsync<SourceRetryRequest>(token).ConfigureAwait(false) ?? throw new BadHttpRequestException("A captured retry request is required.");
+                if (retry.JobId == Guid.Empty || retry.SourceId == Guid.Empty || retry.SourceRevision < 1 || retry.AccountRevision < 1) throw new BadHttpRequestException("Invalid captured source retry.");
+                await context.Response.WriteAsJsonAsync(new { queued = await _application.RetrySourceAsync(retry, token).ConfigureAwait(false) }, token).ConfigureAwait(false); break;
             case ("GET", "/api/folders"):
                 await context.Response.WriteAsJsonAsync(await _application.FoldersAsync(RequiredQuery(context, "account"), RequiredQuery(context, "folder"), OptionalQuery(context, "cursor", 4096), token).ConfigureAwait(false), token).ConfigureAwait(false); break;
             case ("POST", "/api/sources"):
@@ -245,12 +280,27 @@ public sealed class DesktopWebHost : IAsyncDisposable
         SameSite = SameSiteMode.Strict, Path = "/", IsEssential = true };
     public ValueTask DisposeAsync()
     {
-        lock (_gate) return new(_disposal ??= StopAsync());
+        lock (_gate)
+        {
+            _stopping = true; if (_requests == 0) _requestsDrained.TrySetResult();
+            return new(_disposal ??= StopAsync());
+        }
     }
     private async Task StopAsync()
     {
         try { await _host.StopAsync(CancellationToken.None).ConfigureAwait(false); }
-        finally { try { await _host.DisposeAsync().ConfigureAwait(false); } finally { _access.Dispose(); } }
+        finally
+        {
+            try
+            {
+                await _host.DisposeAsync().ConfigureAwait(false);
+                // Host timeout/abort cannot release borrowed accounts while a handler
+                // still owns a real read that ignores or has not joined cancellation.
+                await _requestsDrained.Task.ConfigureAwait(false);
+                lock (_gate) _exitConfirmed = true;
+            }
+            finally { _access.Dispose(); }
+        }
     }
     private sealed record SessionRequest(string Secret);
     private sealed record AccountRequest(string Operation, string? AccountId, Guid? PendingId, long? ExpectedRevision);

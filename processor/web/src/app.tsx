@@ -3,18 +3,20 @@ import { createRoot } from 'react-dom/client';
 import { AuthenticationRequired, DesktopApi } from './api';
 import type { Photo, Snapshot } from './api';
 import { SourceSettings } from './sources';
+import { Activity } from './activity';
 import './app.css';
 
 const api = new DesktopApi();
 type GalleryState = { account: string; photos: Photo[]; cursor: string | null; phase: 'loading' | 'ready' | 'error'; message: string | null };
 const message = (error: unknown): string => error instanceof Error ? error.message : 'MPA encountered an unexpected failure.';
 
-function Icon({ name }: { name: 'photos' | 'settings' | 'close' | 'back' | 'next' | 'pause' | 'play' | 'cloud' }) {
+function Icon({ name }: { name: 'photos' | 'settings' | 'close' | 'back' | 'next' | 'pause' | 'play' | 'cloud' | 'activity' }) {
   const paths = {
     photos: 'M3 3h18v18H3z M3 16l5-5 4 4 3-3 6 6 M8 7h.01',
     settings: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z',
     close: 'M6 6l12 12 M6 18L18 6', back: 'M15 5l-7 7 7 7', next: 'M9 5l7 7-7 7',
-    pause: 'M8 5v14 M16 5v14', play: 'M8 4l12 8-12 8z', cloud: 'M6 18a5 5 0 0 1-1-10 7 7 0 0 1 13-1 5 5 0 0 1 0 11z'
+    pause: 'M8 5v14 M16 5v14', play: 'M8 4l12 8-12 8z', cloud: 'M6 18a5 5 0 0 1-1-10 7 7 0 0 1 13-1 5 5 0 0 1 0 11z',
+    activity: 'M3 12h4l3-8 4 16 3-8h4'
   };
   return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>;
 }
@@ -66,6 +68,7 @@ function App() {
   const [gallery, setGallery] = useState<GalleryState | null>(null);
   const [settings, setSettings] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const generation = useRef(0);
@@ -79,6 +82,17 @@ function App() {
     }).catch(error => { if (!controller.signal.aborted) { setNotice(message(error)); setAccess('locked'); } });
     return () => { controller.abort(); request.current?.abort(); };
   }, []);
+
+  useEffect(() => {
+    if (access !== 'ready' || (!settings && !activityOpen) || busy) return;
+    const controller = new AbortController(); let timer: ReturnType<typeof setTimeout> | undefined;
+    async function poll() {
+      try { const status = await api.status(controller.signal); if (!controller.signal.aborted) setSnapshot(status); }
+      catch (error) { if (!controller.signal.aborted) { setNotice(message(error)); if (error instanceof AuthenticationRequired) setAccess('locked'); } }
+      finally { if (!controller.signal.aborted) timer = setTimeout(() => { void poll(); }, 2500); }
+    }
+    void poll(); return () => { controller.abort(); if (timer !== undefined) clearTimeout(timer); };
+  }, [access, settings, activityOpen, busy]);
 
   useEffect(() => {
     request.current?.abort(); const controller = new AbortController(); request.current = controller;
@@ -132,13 +146,15 @@ function App() {
     <header className="app-bar"><a className="brand" href="/" aria-label="My Photos Anywhere home"><img src="/mpa.svg" alt="" /><span>My Photos Anywhere</span></a>
       <div className="bar-actions">{access === 'ready' && <><label className="account"><span className="visually-hidden">Google Drive account</span><select value={account} onChange={event => setAccount(event.target.value)}>
         {snapshot?.accounts.filter(item => item.connected).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <button className="icon" onClick={() => { setSettings(value => !value); setSourcesOpen(false); }} aria-label="Settings" aria-expanded={settings}><Icon name="settings" /></button></>}</div>
+        <button className="icon" onClick={() => { setActivityOpen(value => !value); setSourcesOpen(false); }} aria-label="Activity" aria-expanded={activityOpen}><Icon name="activity" /></button>
+        <button className="icon" onClick={() => { setSettings(value => !value); setSourcesOpen(false); setActivityOpen(false); }} aria-label="Settings" aria-expanded={settings}><Icon name="settings" /></button></>}</div>
     </header>
     <main>
       {access !== 'ready' ? <section className="welcome"><Icon name="photos" /><h1>{access === 'connecting' ? 'Opening your photos…' : 'Connect to My Photos Anywhere'}</h1>
-        <p>{notice ?? 'Open MPA on the computer running your library to connect this browser.'}</p></section> : sourcesOpen && snapshot ? <SourceSettings api={api} accounts={snapshot.accounts} back={() => setSourcesOpen(false)} /> : settings ?
+        <p>{notice ?? 'Open MPA on the computer running your library to connect this browser.'}</p></section> : activityOpen && snapshot ? <Activity api={api} snapshot={snapshot} busy={busy} pause={pause} back={() => { setActivityOpen(false); setSettings(true); }} /> : sourcesOpen && snapshot ? <SourceSettings api={api} accounts={snapshot.accounts} back={() => setSourcesOpen(false)} /> : settings ?
         <section className="settings"><button className="back" onClick={() => setSettings(false)}><Icon name="back" />Back to Photos</button><h1>Settings</h1>
           <button className="setting-card setting-link" onClick={() => setSourcesOpen(true)}><span><strong>Sources</strong><span>Choose the Drive folders in your library</span></span><span aria-hidden="true">›</span></button>
+          <button className="setting-card setting-link" onClick={() => setActivityOpen(true)}><span><strong>Activity</strong><span>Scan progress, failures, and retry</span></span><span aria-hidden="true">›</span></button>
           <section className="setting-card"><h2>Processing</h2><p>{snapshot?.state === 'paused' ? 'Paused. Your saved jobs are retained.' : 'The engine runs independently of this browser.'}</p>
             <button onClick={pause} disabled={busy}><Icon name={snapshot?.state === 'paused' ? 'play' : 'pause'} />{snapshot?.state === 'paused' ? 'Resume processing' : 'Pause processing'}</button></section>
           <section className="setting-card"><h2>Google Drive</h2>{snapshot?.accounts.map(item => <div className="account-entry" key={item.id}><p>{item.name} · {item.connected ? 'Connected' : 'Disconnected'}</p>

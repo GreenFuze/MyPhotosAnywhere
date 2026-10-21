@@ -1,6 +1,6 @@
 # MPA 0.6.0 implementation ledger
 
-Updated: 2026-10-20. **Stage 0 validation continues; Stage 1 contract integration and Stage 2 foundations are in progress. No 0.6 application or installer is released.**
+Updated: 2026-10-21. **Stage 0 validation continues; Stage 1 contract integration and Stage 2 foundations are in progress. No 0.6 application or installer is released.**
 
 ## Authority and baseline
 

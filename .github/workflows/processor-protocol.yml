@@ -29,7 +29,10 @@ jobs:
       matrix:
         runner: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    # Windows scale-fixture setup alone took 13m16s in run39568011044, with
+    # all84 Core tests passing. Retain every test/diagnostic gate and allow the
+    # remaining suites to finish; this is not a query-latency acceptance waiver.
+    timeout-minutes: 30
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'

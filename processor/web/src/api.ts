@@ -1,11 +1,20 @@
 export interface Account { id: string; name: string; connected: boolean; revision: number }
-export interface Snapshot { libraryId: string; state: string; accounts: Account[]; pending: { id: string; expectedAccountId: string | null }[]; credentialCleanupCount: number }
+export interface StorageBudget { reserveBytes: number; cacheLimitBytes: number; reservedBytes: number; reservableBytes: number }
+export interface Snapshot { libraryId: string; state: string; accounts: Account[]; pending: { id: string; expectedAccountId: string | null }[]; credentialCleanupCount: number; storageAttention: StorageBudget | null }
 export interface Photo { id: string; name: string; mimeType: string; width: number | null; height: number | null; capturedTime: string | null; modifiedTime: string | null }
 export interface PhotoPage { photos: Photo[]; nextCursor: string | null; incompleteSearch: boolean }
 export interface Source { id: string; accountId: string; folderId: string; displayName: string; includeDescendants: boolean; enabled: boolean; revision: number; accountConnected: boolean }
 export interface Sources { revision: number; sources: Source[] }
 export interface Folder { id: string; name: string; canListChildren: boolean }
 export interface FolderLocation { current: Folder; children: Folder[]; nextCursor: string | null; incompleteSearch: boolean }
+export interface SourceScope { sourceId: string; sourceRevision: number; accountId: string; accountRevision: number; rootFolderId: string; includeDescendants: boolean }
+export interface SourceJob {
+  jobId: string; scope: SourceScope; current: boolean;
+  summary: { queued: number; running: number; ready: number; failed: number; unsupported: number; canceled: number; paused: boolean; isCanceled: boolean };
+  problems: { itemId: string; stage: string; code: string; message: string; retryable: boolean }[];
+  moreProblems: boolean; retryableFailures: number;
+}
+export interface ActivityPage { jobs: SourceJob[]; nextCursor: string | null }
 
 export class AuthenticationRequired extends Error {}
 
@@ -39,6 +48,21 @@ export class DesktopApi {
   }
   preview(account: string, file: string): string { return '/api/preview?' + new URLSearchParams({ account, file }); }
   async sources(signal: AbortSignal): Promise<Sources> { return await this.get<Sources>('/api/sources', signal); }
+  async activity(cursor: string | null, signal: AbortSignal): Promise<ActivityPage> {
+    return await this.get<ActivityPage>('/api/activity' + (cursor ? '?' + new URLSearchParams({ cursor }) : ''), signal);
+  }
+  async scanSource(scope: SourceScope, requestId: string): Promise<void> {
+    await this.sourceCommand('/api/source-scans', { requestId, sourceId: scope.sourceId, sourceRevision: scope.sourceRevision, accountRevision: scope.accountRevision });
+  }
+  async retrySource(job: SourceJob): Promise<number> {
+    const result = await this.sourceCommand('/api/source-retries', { jobId: job.jobId, sourceId: job.scope.sourceId, sourceRevision: job.scope.sourceRevision, accountRevision: job.scope.accountRevision });
+    if (typeof result !== 'object' || result === null || !('queued' in result) || typeof result.queued !== 'number' || !Number.isSafeInteger(result.queued) || result.queued < 0) throw new Error('MPA returned an invalid retry count. Refresh Activity to inspect the retained job.');
+    return result.queued;
+  }
+  private async sourceCommand(path: string, body: unknown): Promise<unknown> {
+    const response = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-MPA-CSRF': this.csrf }, body: JSON.stringify(body) });
+    await this.check(response); return await response.json();
+  }
   async folders(account: string, folder: string, cursor: string | null, signal: AbortSignal): Promise<FolderLocation> {
     const query = new URLSearchParams({ account, folder }); if (cursor !== null) query.set('cursor', cursor);
     return await this.get<FolderLocation>('/api/folders?' + query, signal);

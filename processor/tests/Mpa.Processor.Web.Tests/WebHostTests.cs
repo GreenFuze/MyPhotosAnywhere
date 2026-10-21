@@ -95,10 +95,11 @@ public sealed class WebHostTests
         var response = http.GetAsync("api/photos?account=synthetic");
         await engine.Started.Task.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
         var stop = host.DisposeAsync().AsTask();
-        try { Assert.IsFalse(stop.IsCompleted, "Request owner must join before the application can be released."); }
+        try { Assert.IsFalse(stop.IsCompleted, "Request owner must join before the application can be released."); Assert.IsFalse(host.ExitConfirmed); }
         finally { engine.Release.TrySetResult(); }
         using var completed = await response.ConfigureAwait(false); completed.EnsureSuccessStatusCode();
         await stop.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        Assert.IsTrue(host.ExitConfirmed);
         Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
         await host.DisposeAsync().ConfigureAwait(false);
     }
@@ -166,9 +167,52 @@ public sealed class WebHostTests
         Assert.AreEqual(0, diagnostics); Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
     }
 
-    private static async Task<HttpResponseMessage> SourceMutationAsync(HttpClient http, Uri endpoint, HttpMethod method, object body, string? csrf)
+    [TestMethod]
+    public async Task ActivityAndSourceRecoveryRequireAuthenticatedCapturedCommandsAndCsrf()
     {
-        using var request = new HttpRequestMessage(method, "api/sources") { Content = JsonContent.Create(body) };
+        using var assets = new Assets(); var engine = new Engine();
+        await using var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
+        using var http = Client(host.LocalEndpoint);
+        using (var anonymous = await http.GetAsync("api/activity").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false);
+        login.EnsureSuccessStatusCode(); var csrf = (await login.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("csrf").GetString()!;
+        var scan = new Mpa.Processor.Core.SourceScanRequest(Guid.NewGuid(), Guid.NewGuid(), 3, 2);
+        using (var forged = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, scan, null, "api/source-scans").ConfigureAwait(false))
+            Assert.AreEqual(HttpStatusCode.Unauthorized, forged.StatusCode);
+        Assert.IsNull(engine.RequestedScan);
+        using (var invalid = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, scan with { RequestId = Guid.Empty }, csrf, "api/source-scans").ConfigureAwait(false))
+            Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+        using (var created = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, scan, csrf, "api/source-scans").ConfigureAwait(false)) created.EnsureSuccessStatusCode();
+        Assert.AreEqual(scan, engine.RequestedScan);
+        var retry = new Mpa.Processor.Core.SourceRetryRequest(scan.RequestId, scan.SourceId, 3, 2);
+        using (var recovered = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, retry, csrf, "api/source-retries").ConfigureAwait(false)) recovered.EnsureSuccessStatusCode();
+        Assert.AreEqual(retry, engine.RequestedRetry);
+        using (var activity = await http.GetAsync("api/activity").ConfigureAwait(false)) activity.EnsureSuccessStatusCode();
+        using (var invalidCursor = await http.GetAsync("api/activity?cursor=invalid").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.BadRequest, invalidCursor.StatusCode);
+        Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
+    }
+
+    [TestMethod]
+    public async Task StorageAdmissionFailureIsActionableAndDoesNotInvalidateTheBrowserSession()
+    {
+        using var assets = new Assets(); var engine = new Engine { StorageBlocked = true }; var diagnostics = 0;
+        await using var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
+        host.Diagnostic += _ => diagnostics++;
+        using var http = Client(host.LocalEndpoint);
+        using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false);
+        login.EnsureSuccessStatusCode(); var csrf = (await login.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("csrf").GetString()!;
+        using var denied = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post,
+            new Mpa.Processor.Core.SourceScanRequest(Guid.NewGuid(), Guid.NewGuid(), 1, 1), csrf, "api/source-scans").ConfigureAwait(false);
+        Assert.AreEqual(HttpStatusCode.InsufficientStorage, denied.StatusCode);
+        StringAssert.Contains(await denied.Content.ReadAsStringAsync().ConfigureAwait(false), "Free space");
+        Assert.IsNull(engine.RequestedScan);
+        using var status = await http.GetAsync("api/status").ConfigureAwait(false); status.EnsureSuccessStatusCode();
+        Assert.AreEqual(0, diagnostics); Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
+    }
+
+    private static async Task<HttpResponseMessage> SourceMutationAsync(HttpClient http, Uri endpoint, HttpMethod method, object body, string? csrf, string path = "api/sources")
+    {
+        using var request = new HttpRequestMessage(method, path) { Content = JsonContent.Create(body) };
         request.Headers.Add("Origin", endpoint.GetLeftPart(UriPartial.Authority));
         if (csrf is not null) request.Headers.Add("X-MPA-CSRF", csrf);
         return await http.SendAsync(request).ConfigureAwait(false);
@@ -194,6 +238,9 @@ public sealed class WebHostTests
         public bool Unavailable { get; init; }
         public bool ControlConflict { get; init; }
         public DesktopAddSource? AddedSource { get; private set; }
+        public bool StorageBlocked { get; init; }
+        public Mpa.Processor.Core.SourceScanRequest? RequestedScan { get; private set; }
+        public Mpa.Processor.Core.SourceRetryRequest? RequestedRetry { get; private set; }
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<DesktopSnapshot> SnapshotAsync(CancellationToken cancellationToken) => Task.FromResult(new DesktopSnapshot(Guid.NewGuid(), "ready", []));
@@ -212,6 +259,14 @@ public sealed class WebHostTests
         public Task<Mpa.Processor.Core.LibrarySourceSnapshot> AddSourceAsync(DesktopAddSource request, CancellationToken cancellationToken)
         { cancellationToken.ThrowIfCancellationRequested(); AddedSource = request; return Task.FromResult(new Mpa.Processor.Core.LibrarySourceSnapshot(2, [])); }
         public Task<Mpa.Processor.Core.LibrarySourceSnapshot> UpdateSourceAsync(DesktopUpdateSource request, CancellationToken cancellationToken) => throw new Mpa.Processor.Core.StaleLibraryConfigurationException();
+        public Task<Mpa.Processor.Core.SourceDiscoveryActivityPage> ActivityAsync(Guid? cursor, CancellationToken cancellationToken) => Task.FromResult(new Mpa.Processor.Core.SourceDiscoveryActivityPage([], null));
+        public Task<Mpa.Processor.Core.SourceDiscoverySchedule> RequestScanAsync(Mpa.Processor.Core.SourceScanRequest request, CancellationToken cancellationToken)
+        {
+            if (StorageBlocked) throw new Mpa.Processor.Core.InsufficientStorageBudgetException(new(1, 1, 0, 0));
+            RequestedScan = request; return Task.FromResult(new Mpa.Processor.Core.SourceDiscoverySchedule(request.RequestId, true));
+        }
+        public Task<int> RetrySourceAsync(Mpa.Processor.Core.SourceRetryRequest request, CancellationToken cancellationToken)
+        { RequestedRetry = request; return Task.FromResult(1); }
     }
     private sealed class Assets : IDisposable
     {

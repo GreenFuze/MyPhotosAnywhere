@@ -38,6 +38,7 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
     private Task<DesktopWebRuntime>? _webStartup;
     private readonly CancellationTokenSource _stop = new();
     private readonly Button _open = new() { Content = "Open My Photos Anywhere", MinHeight = 48, IsEnabled = false };
+    private IProcessorWorkControl CurrentWork => _web?.Work ?? _work;
 
     public ProcessorApp(Exception? startupError = null, ProcessorStateCoordinator? stateCoordinator = null, Guid installationId = default)
     {
@@ -112,12 +113,13 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
                 () => Dispatcher.UIThread.Post(async () => await RequestExitAsync()));
             _controlMonitor = ObserveControlAsync(_control);
             RefreshReadyStatus();
-            _pause.IsEnabled = true; _trayPause.IsEnabled = true;
             _webStartup = Task.Run(() => DesktopWebRuntime.StartAsync(_stateCoordinator, _installationId, Program.StateDirectory, _work,
                 Path.Combine(AppContext.BaseDirectory, "MPA.Processor.oauth.json"), Path.Combine(AppContext.BaseDirectory, "wwwroot"), enableLan: false, _stop.Token));
             _web = await _webStartup;
             _web.Failed += error => Dispatcher.UIThread.Post(() => ShowFailure("Desktop engine needs attention", error));
             if (_shutdown is not null) return;
+            if (_web.Failure is { } failure) throw new InvalidOperationException("The desktop engine stopped during startup.", failure);
+            _pause.IsEnabled = true; _trayPause.IsEnabled = true;
             _open.IsEnabled = true;
             RefreshReadyStatus();
             if (Program.Background)
@@ -127,28 +129,31 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
             }
             else OpenWeb();
         }
+        catch (DesktopRuntimeStartException error) { _web = error.RetainedOwner; ShowFailure("Processor could not start", error); }
         catch (Exception error) { ShowFailure("Processor could not start", error); }
     }
 
     private async Task TogglePauseAsync()
     {
-        if (_actionPending || _shutdown is not null) return;
+        if (_actionPending || _shutdown is not null || _web is null) return;
         _actionPending = true; _pause.IsEnabled = false; _trayPause.IsEnabled = false;
         try
         {
-            if (_work.State == ProcessorWorkState.Paused) _work.Resume();
-            else { _state.Text = "Pausing…"; await _work.PauseAsync(); }
-            if (_work.State == ProcessorWorkState.Faulted) throw _work.Failure ?? new InvalidOperationException("Processor entered a faulted state.");
-            var paused = _work.State == ProcessorWorkState.Paused;
+            if (CurrentWork.State == ProcessorWorkState.Paused) await CurrentWork.ResumeAsync();
+            else { _state.Text = "Pausing…"; await CurrentWork.PauseAsync(); }
+            if (CurrentWork.State == ProcessorWorkState.Faulted) throw CurrentWork.Failure ?? new InvalidOperationException("Processor entered a faulted state.");
+            var paused = CurrentWork.State == ProcessorWorkState.Paused;
             RefreshReadyStatus();
             _pause.Content = paused ? "Resume processing" : "Pause processing";
             _trayPause.Header = paused ? "Resume processing" : "Pause processing";
         }
-        catch (Exception error) { ShowFailure("Processing stopped", error); }
+        catch (ProcessorWorkStateConflictException) { RefreshReadyStatus(); }
+        catch (ObjectDisposedException) when (CurrentWork.State is ProcessorWorkState.Stopping or ProcessorWorkState.Stopped) { RefreshReadyStatus(); }
+        catch (Exception error) { _web.ReportFailure(error); }
         finally
         {
             _actionPending = false;
-            var usable = _shutdown is null && _work.State is ProcessorWorkState.Ready or ProcessorWorkState.Paused;
+            var usable = !_hasFailure && _shutdown is null && CurrentWork.State is ProcessorWorkState.Ready or ProcessorWorkState.Running or ProcessorWorkState.Paused;
             _pause.IsEnabled = usable; _trayPause.IsEnabled = usable;
         }
     }
@@ -156,9 +161,9 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
     private void RefreshReadyStatus()
     {
         if (_hasFailure || _shutdown is not null) return;
-        if (_work.State == ProcessorWorkState.Paused)
+        if (CurrentWork.State == ProcessorWorkState.Paused)
         { _state.Text = "Processing paused"; _detail.Text = "No processing work will start until you resume."; }
-        else if (_work.State == ProcessorWorkState.Ready)
+        else if (CurrentWork.State is ProcessorWorkState.Ready or ProcessorWorkState.Running)
         {
             _state.Text = _web is null ? "Starting desktop interface…" : "MPA is running";
             _detail.Text = "Open your photo library in the browser. Closing the browser leaves this engine running in the background.";
@@ -193,16 +198,22 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
             catch (OperationCanceledException) when (_stop.IsCancellationRequested) { /* Joined canceled startup released partial owners. */ }
             catch when (_webStartup.IsFaulted && _hasFailure) { /* Startup already released its partial owners and the UI retains the failure. */ }
         }
-        if (_web is not null) await _web.DisposeAsync().ConfigureAwait(false);
-        await _work.DisposeAsync().ConfigureAwait(false);
+        var failures = new List<Exception>();
+        try { if (_web is not null) await _web.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+        // Failure in one owner never bypasses the independently owned native worker.
+        try { await _work.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
         if (_control is not null)
         {
             try { await _control.DisposeAsync().ConfigureAwait(false); }
             catch when (_control.Completion.IsFaulted && _controlMonitor is not null)
             { _hasFailure = true; } // Listener has joined; its observer reports the exact failure and Exit remains unsuccessful.
+            catch (Exception error) { failures.Add(error); }
             if (_controlMonitor is not null) await _controlMonitor.ConfigureAwait(false);
         }
         // Program owns the database until the desktop loop returns, after this work/IPC join.
+        if (failures.Count != 0) throw new AggregateException("Desktop shutdown retained unconfirmed owners.", failures);
     }
 
     private void OpenWeb()
@@ -225,26 +236,28 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
                 if (token.IsCancellationRequested) { result.TrySetCanceled(token); return; }
                 if (_hasFailure && command is LocalProcessorCommand.Pause or LocalProcessorCommand.Resume)
                 { result.TrySetResult(new(false, "faulted", "Processor needs attention; open its status window.")); return; }
+                if (_web is null && command is LocalProcessorCommand.Pause or LocalProcessorCommand.Resume)
+                { result.TrySetResult(new(false, "starting", "The desktop engine is still starting. Try again when it is ready.")); return; }
                 switch (command)
                 {
                     case LocalProcessorCommand.Show: if (_web is not null) OpenWeb(); else ShowWindow(); break;
                     case LocalProcessorCommand.Status: break;
                     case LocalProcessorCommand.Pause:
-                        if (_work.State is ProcessorWorkState.Ready or ProcessorWorkState.Running) await TogglePauseAsync();
+                        if (CurrentWork.State is ProcessorWorkState.Ready or ProcessorWorkState.Running) await TogglePauseAsync();
                         break;
                     case LocalProcessorCommand.Resume:
-                        if (_work.State == ProcessorWorkState.Paused) await TogglePauseAsync();
+                        if (CurrentWork.State == ProcessorWorkState.Paused) await TogglePauseAsync();
                         break;
                     case LocalProcessorCommand.Stop:
                         _pause.IsEnabled = false; _trayPause.IsEnabled = false;
-                        await _work.StopAsync();
+                        if (_web is not null) await _web.StopProcessingAsync(); else await _work.StopAsync();
                         result.TrySetResult(new(true, "stopping", null));
                         return;
                     default: throw new ArgumentOutOfRangeException(nameof(command));
                 }
-                var state = _work.State;
+                var state = CurrentWork.State;
                 var accepted = command switch { LocalProcessorCommand.Show => true, LocalProcessorCommand.Pause => state == ProcessorWorkState.Paused,
-                    LocalProcessorCommand.Resume => state == ProcessorWorkState.Ready, _ => !_hasFailure && state != ProcessorWorkState.Faulted };
+                    LocalProcessorCommand.Resume => state is ProcessorWorkState.Ready or ProcessorWorkState.Running, _ => !_hasFailure && state != ProcessorWorkState.Faulted };
                 result.TrySetResult(new(accepted, _hasFailure ? "faulted" : _web is null ? "starting" : state.ToString().ToLowerInvariant(), accepted ? null : "Processor state did not permit this command; open its status window."));
             }
             catch (Exception error) { ShowFailure("Processor control failed", error); result.TrySetException(error); }
@@ -257,7 +270,11 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
         try { await control.Completion.ConfigureAwait(false); }
         catch (Exception error)
         {
-            try { await _work.StopAsync().ConfigureAwait(false); }
+            try
+            {
+                if (_web is not null) { _web.ReportFailure(error); await _web.StopProcessingAsync().ConfigureAwait(false); }
+                else { await _stop.CancelAsync().ConfigureAwait(false); await _work.StopAsync().ConfigureAwait(false); }
+            }
             catch (Exception cleanup) { error = new AggregateException("Local control failed and work could not stop.", error, cleanup); }
             Dispatcher.UIThread.Post(() => ShowFailure("Local Processor controls stopped", error));
         }

@@ -32,7 +32,7 @@ public sealed class ProcessorWorkGroup(IProcessorWorkControl nativeWork, IProces
         get
         {
             bool pausing;
-            lock (_gate) { if (_failure is not null) return ProcessorWorkState.Faulted; pausing = _pausing; }
+            lock (_gate) { if (_failure is not null) return ProcessorWorkState.Faulted; if (_stopping) return ProcessorWorkState.Stopping; pausing = _pausing; }
             var native = _native.State; var metadata = _discovery.State;
             if (native == ProcessorWorkState.Faulted || metadata == ProcessorWorkState.Faulted) return ProcessorWorkState.Faulted;
             if (native == ProcessorWorkState.Stopped && metadata == ProcessorWorkState.Stopped) return ProcessorWorkState.Stopped;
@@ -52,7 +52,7 @@ public sealed class ProcessorWorkGroup(IProcessorWorkControl nativeWork, IProces
             try { await JoinAsync(_native.PauseAsync, _discovery.PauseAsync).ConfigureAwait(false); }
             catch (Exception error) { lock (_gate) _failure = error; throw; }
             finally { lock (_gate) _pausing = false; }
-            if (State != ProcessorWorkState.Paused)
+            if (_native.State != ProcessorWorkState.Paused || _discovery.State != ProcessorWorkState.Paused)
             {
                 var error = new InvalidOperationException("Work owners acknowledged pause without reaching a joined paused state.", Failure);
                 lock (_gate) _failure = error; throw error;
@@ -66,7 +66,8 @@ public sealed class ProcessorWorkGroup(IProcessorWorkControl nativeWork, IProces
             try
             {
                 await JoinAsync(_native.ResumeAsync, _discovery.ResumeAsync).ConfigureAwait(false);
-                if (State is not (ProcessorWorkState.Ready or ProcessorWorkState.Running))
+                if (_native.State is not (ProcessorWorkState.Ready or ProcessorWorkState.Running) ||
+                    _discovery.State is not (ProcessorWorkState.Ready or ProcessorWorkState.Running))
                     throw new InvalidOperationException("Work owners acknowledged resume without becoming runnable.", Failure);
             }
             catch (Exception error)

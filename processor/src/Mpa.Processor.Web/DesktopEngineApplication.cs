@@ -6,18 +6,19 @@ namespace Mpa.Processor.Web;
 
 /// <summary>Browser adapter borrowing engine-lifetime accounts, read owners, state and work.</summary>
 public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoordinator state, ProcessorAccountService accounts,
-    ProcessorWorkSupervisor work) : IDesktopWebApplication
+    IProcessorWorkControl work, ProcessorSourceRuntime? sources = null) : IDesktopWebApplication
 {
     private readonly Guid _libraryId = libraryId != Guid.Empty ? libraryId : throw new ArgumentException("Library identity is required.", nameof(libraryId));
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly ProcessorAccountService _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
-    private readonly ProcessorWorkSupervisor _work = work ?? throw new ArgumentNullException(nameof(work));
+    private readonly IProcessorWorkControl _work = work ?? throw new ArgumentNullException(nameof(work));
+    private readonly ProcessorSourceRuntime? _sources = sources;
     public async Task<DesktopSnapshot> SnapshotAsync(CancellationToken cancellationToken)
     {
         var snapshot = await _accounts.SnapshotAsync(cancellationToken).ConfigureAwait(false);
         return new(_libraryId, _work.State.ToString().ToLowerInvariant(), snapshot.Accounts.Select(account => new DesktopAccount(account.PermissionId,
             account.DisplayName, account.Connected, account.Revision)).ToArray(),
-            snapshot.Pending.Select(pending => new DesktopPendingAccount(pending.Id, pending.ExpectedPermissionId)).ToArray(), snapshot.Cleanup.Count);
+            snapshot.Pending.Select(pending => new DesktopPendingAccount(pending.Id, pending.ExpectedPermissionId)).ToArray(), snapshot.Cleanup.Count, _sources?.StorageAttention);
     }
     public Task<DesktopPhotoPage> PhotosAsync(string accountId, string? cursor, CancellationToken cancellationToken) => _accounts.ReadDriveAsync(accountId, async (reader, _, token) =>
     {
@@ -31,9 +32,15 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
         return preview is null ? null : new(preview.Bytes, preview.MimeType);
     }, cancellationToken);
     public Task PauseAsync(CancellationToken cancellationToken)
-    { cancellationToken.ThrowIfCancellationRequested(); return _work.PauseAsync(); }
+    { cancellationToken.ThrowIfCancellationRequested(); return ChangeWorkAsync(resume: false); }
     public Task ResumeAsync(CancellationToken cancellationToken)
-    { cancellationToken.ThrowIfCancellationRequested(); if (_work.State != ProcessorWorkState.Ready) _work.Resume(); return Task.CompletedTask; }
+    { cancellationToken.ThrowIfCancellationRequested(); return ChangeWorkAsync(resume: true); }
+    private async Task ChangeWorkAsync(bool resume)
+    {
+        try { if (resume) await _work.ResumeAsync().ConfigureAwait(false); else await _work.PauseAsync().ConfigureAwait(false); }
+        catch (ObjectDisposedException) when (_work.State is ProcessorWorkState.Stopping or ProcessorWorkState.Stopped)
+        { throw new ProcessorWorkStateConflictException(); }
+    }
 
     public async Task AccountAsync(DesktopAccountCommand command, CancellationToken cancellationToken)
     {
@@ -57,9 +64,22 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
             default: throw new ArgumentOutOfRangeException(nameof(command));
         }
         await _accounts.CleanCredentialsAsync(cancellationToken).ConfigureAwait(false);
+        _sources?.NotifySourcesChanged();
     }
 
     public Task<LibrarySourceSnapshot> SourcesAsync(CancellationToken cancellationToken) => _state.ExecuteAsync(database => new LibrarySourceRepository(database).Snapshot(), cancellationToken);
+    public Task<SourceDiscoveryActivityPage> ActivityAsync(Guid? cursor, CancellationToken cancellationToken) =>
+        _state.ExecuteAsync(database => new SourceDiscoveryRepository(database).ReadActivity(cursor), cancellationToken);
+    public Task<SourceDiscoverySchedule> RequestScanAsync(SourceScanRequest request, CancellationToken cancellationToken) =>
+        SourceCommandAsync(sources => sources.RequestScanAsync(request, cancellationToken));
+    public Task<int> RetrySourceAsync(SourceRetryRequest request, CancellationToken cancellationToken) =>
+        SourceCommandAsync(sources => sources.RetryFailedAsync(request, cancellationToken));
+    private async Task<T> SourceCommandAsync<T>(Func<ProcessorSourceRuntime, Task<T>> operation)
+    {
+        try { return await operation(_sources ?? throw new InvalidOperationException("The source engine is not configured.")).ConfigureAwait(false); }
+        catch (ObjectDisposedException) when (_work.State is ProcessorWorkState.Stopping or ProcessorWorkState.Stopped)
+        { throw new ProcessorWorkStateConflictException(); }
+    }
     public Task<DesktopFolderLocation> FoldersAsync(string accountId, string folderId, string? cursor, CancellationToken cancellationToken) => _accounts.ReadDriveAsync(accountId, async (reader, _, token) =>
     {
         var folder = await reader.ReadFolderAsync(folderId, token).ConfigureAwait(false);
@@ -76,13 +96,15 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
             if (!folder.CanListChildren) throw new HttpRequestException("Google does not allow listing this source folder.", null, System.Net.HttpStatusCode.Forbidden);
             return (Folder: folder, AccountRevision: revision);
         }, cancellationToken).ConfigureAwait(false);
-        return await _state.ExecuteAsync(database => new LibrarySourceRepository(database).Add(Guid.NewGuid(), request.AccountId,
+        var result = await _state.ExecuteAsync(database => new LibrarySourceRepository(database).Add(Guid.NewGuid(), request.AccountId,
             captured.AccountRevision, captured.Folder.Id, captured.Folder.Name, request.IncludeDescendants, request.ExpectedRevision), cancellationToken).ConfigureAwait(false);
+        _sources?.NotifySourcesChanged(); return result;
     }
-    public Task<LibrarySourceSnapshot> UpdateSourceAsync(DesktopUpdateSource request, CancellationToken cancellationToken)
+    public async Task<LibrarySourceSnapshot> UpdateSourceAsync(DesktopUpdateSource request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return _state.ExecuteAsync(database => new LibrarySourceRepository(database).Update(request.Id, request.Enabled, request.IncludeDescendants,
-            request.ExpectedSourceRevision, request.ExpectedRevision), cancellationToken);
+        var result = await _state.ExecuteAsync(database => new LibrarySourceRepository(database).Update(request.Id, request.Enabled, request.IncludeDescendants,
+            request.ExpectedSourceRevision, request.ExpectedRevision), cancellationToken).ConfigureAwait(false);
+        _sources?.NotifySourcesChanged(); return result;
     }
 }

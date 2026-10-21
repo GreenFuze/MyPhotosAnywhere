@@ -35,7 +35,7 @@ export function SourceSettings({ api, accounts, back }: { api: DesktopApi; accou
       <label className="switch-row"><span>Include in this library</span><input type="checkbox" checked={source.enabled} disabled={busy} onChange={event => { void update(source, event.target.checked, source.includeDescendants); }} /></label>
       <label className="switch-row"><span>Include subfolders</span><input type="checkbox" checked={source.includeDescendants} disabled={busy} onChange={event => { void update(source, source.enabled, event.target.checked); }} /></label>
     </section>)}
-    <p className="muted">Source settings are saved on the desktop. Drive publication and indexing are being connected.</p>
+    <p className="muted">MPA scans selected folders in the background. Your files keep their names and locations.</p>
     {picker && sources && <FolderPicker api={api} accounts={accounts.filter(account => account.connected)} revision={sources.revision}
       close={() => setPicker(false)} saved={value => { setSources(value); setPicker(false); setNotice('Folder saved on this desktop. Its original files were not changed.'); }} />}
   </section>;
