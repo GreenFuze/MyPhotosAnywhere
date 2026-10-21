@@ -154,6 +154,7 @@ public sealed class DesktopCatalogTests
             public Task<DriveFolderPage> ReadFolderPageAsync(string parentId, string? pageToken, CancellationToken cancellationToken) => throw new InvalidOperationException("Unexpected folder listing.");
             public Task<DriveSourcePage> ReadSourcePageAsync(string parentId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken) => throw new InvalidOperationException("Unexpected source listing.");
             public Task<DriveSourceItem> ReadSourceItemAsync(string parentId, string? sharedDriveId, string fileId, CancellationToken cancellationToken) => throw new InvalidOperationException("Unexpected source read.");
+            public Task<DriveWorkspaceObject> ReadWorkspaceObjectAsync(string folderId, string fileId, long expectedBytes, string expectedSha256, CancellationToken cancellationToken) => throw new InvalidOperationException("Gallery preview must not read metadata workspace objects.");
             public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
     }

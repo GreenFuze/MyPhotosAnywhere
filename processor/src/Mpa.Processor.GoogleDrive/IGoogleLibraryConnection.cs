@@ -12,6 +12,7 @@ public interface IGoogleLibraryConnection : IAsyncDisposable
     Task<DriveFolderPage> ReadFolderPageAsync(string parentId, string? pageToken, CancellationToken cancellationToken);
     Task<DriveSourcePage> ReadSourcePageAsync(string parentId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken);
     Task<DriveSourceItem> ReadSourceItemAsync(string parentId, string? sharedDriveId, string fileId, CancellationToken cancellationToken);
+    Task<DriveWorkspaceObject> ReadWorkspaceObjectAsync(string folderId, string fileId, long expectedBytes, string expectedSha256, CancellationToken cancellationToken);
 }
 
 public interface IGoogleLibraryConnectionFactory

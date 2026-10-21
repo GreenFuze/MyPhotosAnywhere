@@ -230,3 +230,26 @@ the serializer can replace it. The shared independent fixture includes 38 malfor
 and mixed-account Hebrew/unknown-date records; tests also exercise writer byte exhaustion
 below 1,000 records. Full graph validation, publication and activation remain subsequent
 integration work. This leaf does not change either client's database schema.
+
+## Desktop workspace-object transport
+
+The desktop Google adapter now reads a captured workspace/file reference through the same
+serialized, account-bound credential owner used by foreground and background readers.
+Before requesting blob bytes it fetches actual `id`, `parents`, `trashed`, `mimeType`,
+`version`, `size` and `capabilities.canDownload`. Parent membership must match the selected
+workspace; a folder, shortcut, original image/video or Google Workspace document cannot
+be used as a metadata object. Accepted transport MIME types are JSON, gzip and octet-stream.
+References must provide a positive exact byte length of at most 4 MiB and lowercase SHA-256.
+
+Blob content is read with a hard bound even when HTTP omits Content-Length, then checked
+against exact length and SHA-256. A second metadata read must still match the same Drive
+version, MIME, size and workspace membership, with download still allowed and trash false.
+Change, missing authorization, unavailable download, malformed metadata, integrity failure
+and cancellation remain errors; no live generation is switched by this transport. Credentials
+and Google URLs do not leave the connection. Reads never follow a returned executable URL.
+
+This uses Drive's documented [blob download](https://developers.google.com/workspace/drive/api/guides/manage-downloads)
+and [file metadata](https://developers.google.com/workspace/drive/api/reference/rest/v3/files)
+APIs. Exact signed authority, object role, complete graph/coverage and staged activation
+are additional consumer checks. Actual account/Drive publication integration is separate
+from the adapter's synthetic HTTP regression acceptance.

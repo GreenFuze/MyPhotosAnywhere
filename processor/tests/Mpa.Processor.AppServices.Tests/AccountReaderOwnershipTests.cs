@@ -146,6 +146,7 @@ public sealed partial class AccountServiceTests
             public Task<DriveFolderPage> ReadFolderPageAsync(string parentId, string? pageToken, CancellationToken cancellationToken) => throw new InvalidOperationException("Unexpected folder page request.");
             public Task<DriveSourcePage> ReadSourcePageAsync(string parentId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken) => owner.SourceRead?.Invoke(parentId, sharedDriveId, pageToken, cancellationToken) ?? throw new InvalidOperationException("Unexpected source request.");
             public Task<DriveSourceItem> ReadSourceItemAsync(string parentId, string? sharedDriveId, string fileId, CancellationToken cancellationToken) => owner.RepairRead?.Invoke(parentId, sharedDriveId, fileId, cancellationToken) ?? throw new InvalidOperationException("Unexpected source repair request.");
+            public Task<DriveWorkspaceObject> ReadWorkspaceObjectAsync(string folderId, string fileId, long expectedBytes, string expectedSha256, CancellationToken cancellationToken) => throw new InvalidOperationException("Unexpected metadata workspace read.");
             public async ValueTask DisposeAsync()
             {
                 owner.DisposalAttempts++; owner.DisposalStarted.TrySetResult();

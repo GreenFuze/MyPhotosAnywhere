@@ -333,4 +333,27 @@ The latest shared Windows test process measured approximately 0.20s/12.13s for c
 These are concurrent-host-load observations, not UI responsiveness, compression or Drive
 publication acceptance. Complete Desktop strict compilation has zero warnings/errors.
 Initial SQL-separator and test-cleanup mistakes were corrected with their failed evidence
-retained. No schema, source file or live catalog activation was changed.
+retained. No database schema or source media was changed, and no generation was activated.
+
+## Workspace artifact read adapter
+
+The Google connection now has a bounded, account-owned metadata workspace read operation.
+It checks actual folder membership/type/download permission before fetching bytes, verifies
+exact size/SHA-256, and rechecks Drive revision and scope afterward. Original images/videos,
+shortcuts and Google Workspace documents are rejected before blob download. The shared
+reader interface exposes the operation without creating a second credential owner.
+
+All 31 Google adapter tests pass, including explicit expected error classes, moved/replaced
+and restricted objects, corruption/truncation, unknown HTTP lengths, cancellation during
+blob reading and network errors. AppServices 41 and Web 24 regressions also pass; their
+preview fixtures explicitly reject unexpected workspace reads. Complete Desktop strict
+compilation has zero warnings/errors. Test allocation and ValueTask cleanup analyzer
+findings were fixed; no check was suppressed. These HTTP fixtures contain only synthetic
+metadata and do not establish real publication, enrolled trust or active catalog staging.
+
+Shared-facts revision 09db04b has now passed every native contract/desktop target and Android
+API 29/35/37. Independently downloaded complete native artifacts verify 235 tests per target,
+940 total, clean logs, both scale fixtures, lock/source bindings, zero npm audit findings and
+agreeing reported web inventories. Application binaries are absent from these artifacts and
+their reported hashes are not independently verified. The subsequent parent/socket and
+snapshot work still requires current-revision native validation.
