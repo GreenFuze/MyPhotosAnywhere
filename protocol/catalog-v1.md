@@ -195,3 +195,38 @@ between bounded reads, checksum batches and completion. Desktop propagates cance
 through reads/checksums and checks again after canonical validation. These codecs neither
 write originals nor activate a generation. Asset schemas, actual Drive membership, graph
 completeness, authority enrollment and transactional activation remain separate checks.
+
+## Observed Drive facts leaf
+
+`catalog.drive-facts.v1` identifies the matching C#/Kotlin observed-metadata profile.
+Canonical JSON contains `format: "mpa-drive-facts"`, integer `major: 1`, nonzero canonical
+`libraryId`, the exact parent-expected `prefix` and nonempty `assets`. A leaf prefix has
+two, four, six or eight lowercase hexadecimal digits. At most 1,000 records are sorted
+by canonical asset UUID; identities must equal the existing library/account/file-derived
+UUID and belong to this prefix. Equal names or content do not merge distinct identities.
+
+Each record explicitly contains `id`, opaque `accountId`/`fileId`, positive decimal-string
+int64 `driveVersion`, `name`, `mimeType`, nullable integer `width`/`height`, nullable
+`capturedUtc`/`modifiedUtc`, nullable `rawCapture`, and `sources`. Timestamps are signed
+canonical decimal-string UTC milliseconds in the year 1..9999 range. Missing capture
+time remains unknown; valid Drive modification time is a separately identifiable fallback.
+Offsetless raw capture text stays literal. Null fields are explicit rather than omitted.
+Names are nonblank, at most 4,096 UTF-16 units and contain no control characters. MIME
+types start with `image/` or `video/`, contain no controls and have at most 256 units.
+Dimensions, when known, are 1..1,000,000; raw capture text is at most 128 units.
+
+One to 256 captured source memberships contain canonical nonzero UUID `id`, positive
+decimal-string int64 `revision`, and integer folder `depth` in 0..256. Memberships are
+unique and sorted by source UUID. The complete-generation validator must separately bind
+each membership to the correct captured account/source revision and source coverage.
+This syntax parser cannot prove that a source owns a file or a Drive original is available.
+No thumbnail, processing result, original-verification receipt, human edit or embedding
+is smuggled into these observed fields. Those facts retain separate authority and owners.
+
+The desktop writer sorts without modifying its input records and serializes one bounded
+record at a time. It requests a partition split before exceeding either the record count
+or 16 MiB expanded-byte bound; it never truncates records. Invalid Unicode fails before
+the serializer can replace it. The shared independent fixture includes 38 malformed cases
+and mixed-account Hebrew/unknown-date records; tests also exercise writer byte exhaustion
+below 1,000 records. Full graph validation, publication and activation remain subsequent
+integration work. This leaf does not change either client's database schema.

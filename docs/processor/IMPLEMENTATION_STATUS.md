@@ -278,3 +278,19 @@ to the linked token, then completes the vault read and requires cancellation wit
 write. Another holds a write through shutdown and requires joined cancellation without an
 exposed identity. Existing assertions remain. Native revalidation is required; no warning,
 test failure or cancellation was converted to success.
+
+## Shared observed Drive facts
+
+Matching C#/Kotlin `DriveCatalogFacts` readers now validate the same bounded leaf schema,
+including library/account/file-derived identities, source revisions, timestamp provenance,
+unknown dates and literal metadata. An independent fixture contains 38 malformed cases.
+The desktop encoder sorts without modifying input records, rejects invalid Unicode and
+requests a partition split before exceeding count or expanded-byte budgets; it never drops
+rows to fit. Metadata observations are explicitly separate from verified original receipts.
+
+Local acceptance passes all 39 Protocol tests, 20 Android Protocol tests and the complete
+525 Android unit tests (98 suites), with zero failures/skips and zero lint findings. The
+unchanged gate accepts only the already approved exact AGP deprecation. Complete Desktop
+strict builds have zero warnings/errors. `protocol/catalog-v1.md` records the exact profile.
+These are schema/encoder checks; complete graph/source coverage, enrolled authority, real
+Drive publication, transactional activation and Android product integration remain open.
