@@ -315,3 +315,22 @@ with zero, one and 31 handshake bytes. They require both an unsuccessful partial
 and actual peer EOF/reset, and do not accept a read deadline as closure. Existing four
 cases retain their assertions. Complete Core/scale and native matrix validation remain
 required before publication. This private worker IPC is unrelated to phone connectivity.
+
+## Bounded facts snapshot projection
+
+`CatalogFactsSnapshot` now projects the real SQLite discovery data into the portable
+observation models. Its owned read-only WAL snapshot captures library, discovery and
+configuration revisions together. The coordinator opens it briefly; its background reader
+then uses indexed identity ranges and keyset pages of at most 250 assets, with bounded
+source memberships. Imports remain writable. Enabled-source/depth visibility, overlapping
+folders, distinct accounts and retained disconnected metadata follow the existing gallery
+rules. Disposing the main state owner while a snapshot lives still fails fast.
+
+All 105 Core cases pass after the parent-socket correction, including four focused snapshot
+tests and the existing 10k/100k fixtures extended to read every projected identity once.
+The latest shared Windows test process measured approximately 0.20s/12.13s for complete
+10k/100k projection walks, with maximum 250-asset page observations of 8.1ms/74.8ms.
+These are concurrent-host-load observations, not UI responsiveness, compression or Drive
+publication acceptance. Complete Desktop strict compilation has zero warnings/errors.
+Initial SQL-separator and test-cleanup mistakes were corrected with their failed evidence
+retained. No schema, source file or live catalog activation was changed.

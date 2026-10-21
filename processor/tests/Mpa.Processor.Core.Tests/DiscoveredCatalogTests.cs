@@ -174,6 +174,29 @@ public sealed class DiscoveredCatalogTests
         } while (true);
         Assert.AreEqual(count, seen);
         var fullWalkMilliseconds = clock.Elapsed.TotalMilliseconds;
+        // Reuse the already prepared 10k/100k database instead of creating another
+        // large fixture just to measure the portable metadata projection.
+        using (var facts = CatalogFactsSnapshot.Open(fixture.Database))
+        {
+            var factsClock = Stopwatch.StartNew(); long maximumFactsTicks = 0; var factsSeen = 0; Guid? after = null;
+            while (true)
+            {
+                var start = Stopwatch.GetTimestamp(); var factsPage = facts.ReadPage("", after);
+                maximumFactsTicks = Math.Max(maximumFactsTicks, Stopwatch.GetTimestamp() - start);
+                Assert.IsTrue(factsPage.Assets.Count <= 250);
+                foreach (var asset in factsPage.Assets)
+                {
+                    if (after is not null) Assert.IsTrue(StringComparer.Ordinal.Compare(after.Value.ToString("D"), asset.Id.ToString("D")) < 0);
+                    Assert.AreEqual(1, asset.Sources.Count); after = asset.Id; factsSeen++;
+                }
+                if (!factsPage.HasMore) break;
+                Assert.AreEqual(250, factsPage.Assets.Count);
+            }
+            Assert.AreEqual(count, factsSeen);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { catalogFactsFixture = count, walkMs = factsClock.Elapsed.TotalMilliseconds,
+                maxPageMs = maximumFactsTicks * 1000.0 / Stopwatch.Frequency, retainedAssetPageBound = 250,
+                scope = "read-only snapshot projection; compression/publication and concurrent native UI responsiveness remain separate" }));
+        }
         using var sessionDirectory = new WorkerProcessTests.WorkerTestDirectory();
         var selected = fixture.Catalog.ReadPage().Assets[30]; var managedBefore = GC.GetTotalMemory(forceFullCollection: true);
         using var process = Process.GetCurrentProcess(); process.Refresh(); var workingBefore = process.WorkingSet64;
