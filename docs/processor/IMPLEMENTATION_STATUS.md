@@ -378,3 +378,19 @@ Local validation passes all 15 focused parent/worker cases and the complete 105 
 including both scale fixtures, followed by a zero-warning/error Desktop rebuild. These
 results supersede the prior local result but do not prove the macOS correction; a new
 immutable cross-platform run is required. No diagnostic exemption was introduced.
+
+## Actual protected-account workspace read
+
+The manual desktop acceptance probe adds a `--workspace-read` mode restricted to the
+established isolated account state, its single explicitly identified disposable source
+folder and the exact pre-existing 92-byte synthetic JSON. It uses the production native
+credential vault/Google adapter, starts no listener and cannot substitute arbitrary input
+content. CI compiles this mode without account access.
+
+Actual Windows acceptance passed at 2026-10-21 17:20:52 UTC with process exit 0: exact
+fixture bytes/SHA-256, wrong workspace, changed size, changed digest and original-image MIME
+rejections. Connection/vault/state owners joined before the sanitized report was written.
+No original was downloaded, no Drive file changed, no browser/consent flow ran and no account,
+file identity, URL or credential was logged. This uses the synthetic source as a transport
+fixture; it does not establish managed workspace enrollment, a signed generated catalog or
+the actual beyond-seven-day refresh observation, which remains pending.

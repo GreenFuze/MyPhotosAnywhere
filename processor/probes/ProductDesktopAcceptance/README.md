@@ -7,3 +7,12 @@ Arguments, in order: packaged Desktop OAuth configuration; existing `build/deskt
 The selected-source fixture must contain exactly the repository's synthetic `ocr-latin.png`. The probe opens the actual engine with native protected credentials and loopback-only listeners, then verifies the local catalog, frozen viewer identity, a real bounded Drive thumbnail, idempotent browser reopen, independent browser isolation, sign-out and joined index/account shutdown. Credentials, invitation capabilities, cookie/CSRF values and media identities/names/URLs are excluded from reports and normal console output.
 
 A successful report establishes native account/HTTP ownership acceptance only. Chrome rendering, keyboard/touch behavior, large libraries, physical Android acceptance and the final joint release remain separate checks.
+
+The separate `--workspace-read` mode takes five arguments: packaged OAuth configuration,
+the same isolated account state, explicitly authorized disposable source folder, existing
+local `manual-source-fixture.json`, and sanitized report. It accepts only the pinned
+92-byte synthetic JSON already present in that source. It starts no listener and verifies
+the real metadata adapter's exact bytes plus wrong-folder, size, digest and original-MIME
+rejections. Connection, vault and state owners join before the report is written. It does
+not upload anything, process user media, establish publisher trust or activate a catalog.
+CI compiles this mode on every desktop target without account execution.

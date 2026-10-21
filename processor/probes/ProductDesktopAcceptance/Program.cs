@@ -10,6 +10,10 @@ internal static class Program
 {
     public static async Task Main(string[] args)
     {
+        if (args.Length == 6 && args[0] == "--workspace-read")
+        {
+            await WorkspaceReadAcceptance.RunAsync(args[1..]).ConfigureAwait(false); return;
+        }
         if (args.Length != 5) throw new ArgumentException("Expected packaged OAuth configuration, isolated account state, packaged web assets, disposable source folder and sanitized report.");
         var root = Path.GetFullPath(args[1]);
         if (!Path.GetFileName(root).StartsWith("desktop-account-", StringComparison.Ordinal) || Path.GetFileName(Path.GetDirectoryName(root)) != "build" ||
