@@ -151,6 +151,21 @@ public sealed class WebHostTests
         Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
     }
 
+    [TestMethod]
+    public async Task ProcessingStateConflictPreservesTheUsableSessionAndIsNotAnInternalFailure()
+    {
+        using var assets = new Assets(); var engine = new Engine { ControlConflict = true }; var diagnostics = 0;
+        await using var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
+        host.Diagnostic += _ => Interlocked.Increment(ref diagnostics);
+        using var http = Client(host.LocalEndpoint);
+        using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false);
+        login.EnsureSuccessStatusCode(); var csrf = (await login.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("csrf").GetString()!;
+        using var conflict = await MutationAsync(http, "api/pause", host.LocalEndpoint, csrf).ConfigureAwait(false);
+        Assert.AreEqual(HttpStatusCode.Conflict, conflict.StatusCode); StringAssert.Contains(await conflict.Content.ReadAsStringAsync().ConfigureAwait(false), "Refresh Activity");
+        using var status = await http.GetAsync("api/status").ConfigureAwait(false); status.EnsureSuccessStatusCode();
+        Assert.AreEqual(0, diagnostics); Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
+    }
+
     private static async Task<HttpResponseMessage> SourceMutationAsync(HttpClient http, Uri endpoint, HttpMethod method, object body, string? csrf)
     {
         using var request = new HttpRequestMessage(method, "api/sources") { Content = JsonContent.Create(body) };
@@ -177,6 +192,7 @@ public sealed class WebHostTests
         public bool Paused { get; private set; }
         public bool Hold { get; init; }
         public bool Unavailable { get; init; }
+        public bool ControlConflict { get; init; }
         public DesktopAddSource? AddedSource { get; private set; }
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -188,7 +204,7 @@ public sealed class WebHostTests
             return new([new("synthetic-file", "synthetic.jpg", "image/jpeg", 40, 30, null, null)], null, false);
         }
         public Task<DesktopPreview?> PreviewAsync(string accountId, string fileId, CancellationToken cancellationToken) => Task.FromResult<DesktopPreview?>(null);
-        public Task PauseAsync(CancellationToken cancellationToken) { Paused = true; return Task.CompletedTask; }
+        public Task PauseAsync(CancellationToken cancellationToken) { if (ControlConflict) throw new Mpa.Processor.Core.ProcessorWorkStateConflictException(); Paused = true; return Task.CompletedTask; }
         public Task ResumeAsync(CancellationToken cancellationToken) { Paused = false; return Task.CompletedTask; }
         public Task AccountAsync(DesktopAccountCommand command, CancellationToken cancellationToken) => throw new InvalidOperationException("This test must not perform Google account actions.");
         public Task<Mpa.Processor.Core.LibrarySourceSnapshot> SourcesAsync(CancellationToken cancellationToken) => throw new InvalidOperationException("This test does not configure sources.");

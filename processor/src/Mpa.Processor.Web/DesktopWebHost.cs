@@ -147,6 +147,8 @@ public sealed class DesktopWebHost : IAsyncDisposable
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Library settings changed. Refresh Sources before applying this change." }, context.RequestAborted).ConfigureAwait(false); }
             catch (ExistingLibrarySourceException)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This account and folder are already configured. Update their existing source entry." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (ProcessorWorkStateConflictException)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Processing state changed. Refresh Activity before trying again." }, context.RequestAborted).ConfigureAwait(false); }
             catch (TokenResponseException)
             { context.Response.StatusCode = 503; await context.Response.WriteAsJsonAsync(new { message = "Google authorization could not finish. Reconnect or resume account setup on the host computer." }, context.RequestAborted).ConfigureAwait(false); }
             catch (HttpRequestException)

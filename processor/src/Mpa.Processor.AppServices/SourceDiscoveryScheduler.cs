@@ -5,7 +5,7 @@ namespace Mpa.Processor.AppServices;
 /// <summary>Browser-independent metadata dispatcher. It borrows state/runner, owns its loop
 /// and cancellation epochs, and acknowledges pause only after the actual read has joined.
 /// The composition root must stop this owner before disposing runner/accounts/state.</summary>
-public sealed class SourceDiscoveryScheduler : IAsyncDisposable
+public sealed class SourceDiscoveryScheduler : IProcessorWorkControl, IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state;
     private readonly SourceDiscoveryRunner _runner;

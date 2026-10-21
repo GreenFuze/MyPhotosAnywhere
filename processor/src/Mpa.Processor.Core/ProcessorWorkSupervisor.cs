@@ -13,7 +13,7 @@ public abstract class OwnedWorkerOperation : IAsyncDisposable
 
 /// <summary>Single-heavy-worker owner. Durable repositories queue jobs; this owner never creates
 /// an unbounded in-memory backlog. Pause/Exit stop admission and join before acknowledging.</summary>
-public sealed class ProcessorWorkSupervisor : IAsyncDisposable
+public sealed class ProcessorWorkSupervisor : IProcessorWorkControl, IAsyncDisposable
 {
     private readonly object _gate = new();
     private Task? _active;
@@ -65,6 +65,8 @@ public sealed class ProcessorWorkSupervisor : IAsyncDisposable
             _state = ProcessorWorkState.Ready;
         }
     }
+
+    public Task ResumeAsync() { Resume(); return Task.CompletedTask; }
 
     public Task StopAsync()
     {
