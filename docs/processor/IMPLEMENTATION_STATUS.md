@@ -294,3 +294,24 @@ unchanged gate accepts only the already approved exact AGP deprecation. Complete
 strict builds have zero warnings/errors. `protocol/catalog-v1.md` records the exact profile.
 These are schema/encoder checks; complete graph/source coverage, enrolled authority, real
 Drive publication, transactional activation and Android product integration remain open.
+
+## Parent handshake socket ownership
+
+The snapshot scale-suite run exposed an unchanged parent-lifetime test failing at peer
+closure: 101 tests passed and one partial-handshake socket remained readable until its
+deadline. A controlled negative replay of the added race tests against the previous
+09db04b listener reproduced the same peer-closure timeout. Its log/TRX and exact source
+hashes are retained; the corrected source was byte-for-byte restored afterward.
+
+The listener now pre-owns the destination socket before asynchronous accept, using the
+supported [Socket.AcceptAsync destination overload](https://learn.microsoft.com/en-us/dotnet/api/system.net.sockets.socket.acceptasync?view=net-10.0).
+This removes the unowned accept-completion handoff. Acquiring the borrowed NetworkStream
+also shares the shutdown gate; a replay exposed `GetStream` racing `TcpClient.Dispose`
+before that second correction. Reads and acknowledgments reuse the admitted stream.
+Neither a null-reference/argument catch nor a longer deadline was added.
+
+All seven focused parent-lifetime cases pass, including 72 rapid real loopback shutdowns
+with zero, one and 31 handshake bytes. They require both an unsuccessful partial handshake
+and actual peer EOF/reset, and do not accept a read deadline as closure. Existing four
+cases retain their assertions. Complete Core/scale and native matrix validation remain
+required before publication. This private worker IPC is unrelated to phone connectivity.

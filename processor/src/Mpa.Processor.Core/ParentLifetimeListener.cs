@@ -10,6 +10,7 @@ namespace Mpa.Processor.Core;
 public sealed class ParentLifetimeListener : IDisposable
 {
     private readonly TcpListener _listener;
+    private readonly Socket _acceptor;
     private readonly byte[] _key = RandomNumberGenerator.GetBytes(32);
     private TcpClient? _client;
     private TcpClient? _pending;
@@ -24,6 +25,7 @@ public sealed class ParentLifetimeListener : IDisposable
         try
         {
             _listener.Start(1);
+            _acceptor = _listener.Server;
             Configuration = new(((IPEndPoint)_listener.LocalEndpoint).Port, Convert.ToBase64String(_key));
         }
         catch { _listener.Stop(); CryptographicOperations.ZeroMemory(_key); throw; }
@@ -39,7 +41,11 @@ public sealed class ParentLifetimeListener : IDisposable
         {
             for (var attempt = 0; attempt < 8; attempt++)
             {
-                var candidate = await _listener.AcceptTcpClientAsync(deadline.Token).ConfigureAwait(false);
+                // Own the destination socket before starting AcceptAsync. If the
+                // accept completes/faults during shutdown, no runtime-created socket
+                // can sit between completion and this owner's adoption/cleanup.
+                var candidate = new TcpClient(AddressFamily.InterNetwork);
+                var destination = candidate.Client;
                 var owned = true;
                 try
                 {
@@ -48,16 +54,27 @@ public sealed class ParentLifetimeListener : IDisposable
                         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
                         _pending = candidate;
                     }
-                    candidate.NoDelay = true;
+                    var accepted = await _acceptor.AcceptAsync(destination, deadline.Token).ConfigureAwait(false);
+                    if (!ReferenceEquals(accepted, destination))
+                    {
+                        accepted.Dispose();
+                        throw new InvalidOperationException("Parent accept returned a socket outside its pre-established ownership.");
+                    }
+                    NetworkStream stream;
+                    lock (_ownershipGate)
+                    {
+                        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+                        candidate.NoDelay = true; stream = candidate.GetStream();
+                    }
                     var key = new byte[32];
                     try
                     {
-                        await candidate.GetStream().ReadExactlyAsync(key, deadline.Token).ConfigureAwait(false);
+                        await stream.ReadExactlyAsync(key, deadline.Token).ConfigureAwait(false);
                         if (!CryptographicOperations.FixedTimeEquals(_key, key)) continue;
                     }
                     catch (EndOfStreamException) { continue; }
                     finally { CryptographicOperations.ZeroMemory(key); }
-                    await candidate.GetStream().WriteAsync(new byte[] { 0xac }, deadline.Token).ConfigureAwait(false);
+                    await stream.WriteAsync(new byte[] { 0xac }, deadline.Token).ConfigureAwait(false);
                     lock (_ownershipGate)
                     {
                         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);

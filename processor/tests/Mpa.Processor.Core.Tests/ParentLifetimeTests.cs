@@ -77,4 +77,31 @@ public sealed class ParentLifetimeTests
         }
         catch (IOException) { /* OS reset and orderly EOF both prove the peer was closed. */ }
     }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(1)]
+    [DataRow(31)]
+    public async Task RepeatedShutdownAtAcceptAndPartialReadAlwaysClosesThePeer(int sentBytes)
+    {
+        for (var iteration = 0; iteration < 24; iteration++)
+        {
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var parent = new ParentLifetimeListener(); var accepting = parent.AcceptAsync(deadline.Token);
+            using var peer = new TcpClient(AddressFamily.InterNetwork);
+            await peer.ConnectAsync(IPAddress.Loopback, parent.Configuration.Port, deadline.Token).ConfigureAwait(false);
+            if (sentBytes != 0) await peer.GetStream().WriteAsync(new byte[sentBytes], deadline.Token).ConfigureAwait(false);
+            parent.Dispose();
+            try { await accepting.WaitAsync(deadline.Token).ConfigureAwait(false); Assert.Fail("A partial handshake acquired a worker session."); }
+            catch (ObjectDisposedException) { /* Parent closure before/after accept adoption. */ }
+            catch (SocketException) { /* Closed acceptor/connection. */ }
+            catch (IOException) { /* Closing an admitted partial stream aborts its read. */ }
+            catch (OperationCanceledException) when (!deadline.IsCancellationRequested) { /* Closed asynchronous accept. */ }
+            try
+            {
+                Assert.AreEqual(0, await peer.GetStream().ReadAsync(new byte[1], deadline.Token).ConfigureAwait(false), "Parent closure retained its peer.");
+            }
+            catch (IOException) { /* Reset is also an actual peer closure. */ }
+        }
+    }
 }
