@@ -3,6 +3,8 @@ export interface StorageBudget { reserveBytes: number; cacheLimitBytes: number; 
 export interface Snapshot { libraryId: string; state: string; accounts: Account[]; pending: { id: string; expectedAccountId: string | null }[]; credentialCleanupCount: number; storageAttention: StorageBudget | null }
 export interface CatalogPhoto { id: string; accountId: string; name: string; mimeType: string; width: number | null; height: number | null; effectiveUtc: number | null; dateProvenance: 'Unknown' | 'DriveCapture' | 'DriveModification'; rawCapture: string | null }
 export interface CatalogPage { discoveryRevision: number; configurationRevision: number; photos: CatalogPhoto[]; olderCursor: string | null; newerCursor: string | null }
+export interface ViewerEntry { position: number; assetId: string; photo: CatalogPhoto | null }
+export interface ViewerWindow { id: string; count: number; position: number; entries: ViewerEntry[] }
 export interface Source { id: string; accountId: string; folderId: string; displayName: string; includeDescendants: boolean; enabled: boolean; revision: number; accountConnected: boolean }
 export interface Sources { revision: number; sources: Source[] }
 export interface Folder { id: string; name: string; canListChildren: boolean }
@@ -47,6 +49,37 @@ export class DesktopApi {
     return await this.get<CatalogPage>('/api/catalog?' + query, signal);
   }
   catalogPreview(asset: string): string { return '/api/catalog-preview?' + new URLSearchParams({ asset }); }
+  async openViewer(id: string, selectedId: string, accountId: string | null, signal: AbortSignal): Promise<ViewerWindow> {
+    const response = await fetch('/api/viewers', { method: 'POST', credentials: 'same-origin', signal,
+      headers: { 'Content-Type': 'application/json', 'X-MPA-CSRF': this.csrf }, body: JSON.stringify({ id, selectedId, accountId }) });
+    await this.check(response); return this.viewerWindow(await response.json());
+  }
+  async viewer(id: string, position: number, signal: AbortSignal): Promise<ViewerWindow> {
+    return this.viewerWindow(await this.get<unknown>('/api/viewers?' + new URLSearchParams({ viewer: id, position: position.toString() }), signal));
+  }
+  async closeViewer(id: string): Promise<void> {
+    await this.check(await fetch('/api/viewers?' + new URLSearchParams({ viewer: id }), { method: 'DELETE', credentials: 'same-origin', keepalive: true,
+      headers: { 'Content-Type': 'application/json', 'X-MPA-CSRF': this.csrf }, body: '{}' }));
+  }
+  private viewerWindow(value: unknown): ViewerWindow {
+    const identity = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    if (typeof value !== 'object' || value === null || !('id' in value) || typeof value.id !== 'string' ||
+      !identity.test(value.id) ||
+      !('count' in value) || !Number.isSafeInteger(value.count) || (value.count as number) < 1 ||
+      !('position' in value) || !Number.isSafeInteger(value.position) || (value.position as number) < 0 || (value.position as number) >= (value.count as number) ||
+      !('entries' in value) || !Array.isArray(value.entries) || value.entries.length < 1 || value.entries.length > 90)
+      throw new Error('MPA returned an invalid photo sequence. The selected photo was retained.');
+    const entries: unknown[] = value.entries; let previous = -1;
+    for (const entry of entries) {
+      if (typeof entry !== 'object' || entry === null || !('position' in entry) || typeof entry.position !== 'number' || !Number.isSafeInteger(entry.position) ||
+        entry.position <= previous || previous !== -1 && entry.position !== previous + 1 || entry.position >= (value.count as number) || !('assetId' in entry) || typeof entry.assetId !== 'string' || !identity.test(entry.assetId) ||
+        !('photo' in entry) || entry.photo !== null && (typeof entry.photo !== 'object' || !('id' in entry.photo) || entry.photo.id !== entry.assetId))
+        throw new Error('MPA returned a conflicting photo identity. Navigation stopped.');
+      previous = entry.position;
+    }
+    if (!entries.some(entry => (entry as ViewerEntry).position === value.position)) throw new Error('MPA lost the selected position in this sequence.');
+    return value as unknown as ViewerWindow;
+  }
   async sources(signal: AbortSignal): Promise<Sources> { return await this.get<Sources>('/api/sources', signal); }
   async activity(cursor: string | null, signal: AbortSignal): Promise<ActivityPage> {
     return await this.get<ActivityPage>('/api/activity' + (cursor ? '?' + new URLSearchParams({ cursor }) : ''), signal);

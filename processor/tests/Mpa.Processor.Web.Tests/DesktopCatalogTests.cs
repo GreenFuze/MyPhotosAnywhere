@@ -11,6 +11,30 @@ namespace Mpa.Processor.Web.Tests;
 public sealed class DesktopCatalogTests
 {
     [TestMethod]
+    public async Task FrozenViewerResolvesMissingAssetsAsTheirOriginalSlotsWhileNewImportsCannotExtendTheOpenedSequence()
+    {
+        await using var fixture = new Fixture(); await using var vault = new NoCredentials(); var google = new HeldPreviews();
+        await using var accounts = new ProcessorAccountService(fixture.State, vault, google, google); await using var work = new ProcessorWorkSupervisor();
+        await using var viewers = new CatalogViewerSessions(fixture.State, fixture.DirectoryPath, fixture.InstallationId, new(new CatalogSpace()));
+        var application = new DesktopEngineApplication(Guid.NewGuid(), fixture.State, accounts, work, viewers: viewers);
+        await fixture.State.ExecuteAsync(database => new DiscoveredCatalogRepository(database).ApplyBatch(fixture.SourceA, 1, 1,
+            [Fact("first", 3), Fact("second", 2), Fact("third", 1)]), CancellationToken.None).ConfigureAwait(false);
+        var page = await application.CatalogAsync(null, null, false, null, CancellationToken.None).ConfigureAwait(false); var browser = Guid.NewGuid(); var id = Guid.NewGuid();
+        var opened = await application.OpenViewerAsync(browser, new(id, page.Photos[1].Id, null), CancellationToken.None).ConfigureAwait(false);
+        Assert.AreEqual(3L, opened.Count); Assert.AreEqual(1L, opened.Position);
+        await fixture.State.ExecuteAsync(database =>
+        {
+            new DiscoveredCatalogRepository(database).ApplyBatch(fixture.SourceA, 1, 1, [Fact("newer", 999)]);
+            var sources = new LibrarySourceRepository(database); sources.Update(fixture.SourceA, false, true, 1, sources.Snapshot().Revision); return true;
+        }, CancellationToken.None).ConfigureAwait(false);
+        var unavailable = await application.ReadViewerAsync(browser, id, 2, CancellationToken.None).ConfigureAwait(false);
+        Assert.AreEqual(3L, unavailable.Count); CollectionAssert.AreEqual(opened.Entries.Select(entry => entry.AssetId).ToArray(), unavailable.Entries.Select(entry => entry.AssetId).ToArray());
+        Assert.IsTrue(unavailable.Entries.All(entry => entry.Photo is null)); Assert.AreEqual(0, google.Reads);
+        await Assert.ThrowsExactlyAsync<CatalogViewerUnavailableException>(() => application.ReadViewerAsync(Guid.NewGuid(), id, 1, CancellationToken.None)).ConfigureAwait(false);
+        await application.CloseBrowserViewersAsync(browser, CancellationToken.None).ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<CatalogViewerUnavailableException>(() => application.ReadViewerAsync(browser, id, 1, CancellationToken.None)).ConfigureAwait(false);
+    }
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public async Task PreviewResolvesOnlyVisibleCanonicalIdentitiesAndRejectsLateSourceOrRevisionChanges(bool replaceRevision)
@@ -101,6 +125,8 @@ public sealed class DesktopCatalogTests
         Assert.IsNotNull(await fixture.Reader.ResolveAsync(page.Photos[0].Id, CancellationToken.None).ConfigureAwait(false));
     }
     private static DiscoveredDriveAsset Fact(string file, long? date) => new(file, 1, file + ".jpg", "image/jpeg", 40, 30, date, null, null, 0);
+    private sealed class CatalogSpace : IStorageSpaceReader
+    { public StorageSpaceSnapshot Read() => new(100 * StorageBudgetManager.Gibibyte, 50 * StorageBudgetManager.Gibibyte, 0); }
     private sealed class NoCredentials : ICredentialVault
     {
         public Task<SecretLease?> ReadAsync(string key, CancellationToken cancellationToken) => throw new InvalidOperationException("No Google credential is needed by this fixture.");
@@ -139,6 +165,8 @@ public sealed class DesktopCatalogTests
         public DesktopCatalogReader Reader { get; }
         public Guid SourceA { get; }
         public Guid SourceB { get; }
+        public string DirectoryPath => _path;
+        public Guid InstallationId => _database.InstallationId;
         public Fixture()
         {
             _database = new(_path); State = new(_database); Reader = new(State);

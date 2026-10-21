@@ -29,9 +29,7 @@ public sealed class DesktopCatalogReader(ProcessorStateCoordinator state)
             var first = page.Assets.Count == 0 ? null : page.Assets[0]; var last = page.Assets.Count == 0 ? null : page.Assets[^1];
             var older = last is not null && repository.ReadPage(Key(last), limit: 1, accountId: accountId).Assets.Count != 0 ? Encode(Key(last), accountId) : null;
             var newerPosition = first is not null && repository.ReadPage(Key(first), limit: 1, before: true, accountId: accountId).Assets.Count != 0 ? Encode(Key(first), accountId) : null;
-            return new DesktopCatalogPage(page.DiscoveryRevision, page.ConfigurationRevision, page.Assets.Select(asset => new DesktopCatalogPhoto(asset.Id,
-                asset.AccountId, asset.Facts.Name, asset.Facts.MimeType, asset.Facts.Width, asset.Facts.Height, asset.EffectiveUtc,
-                asset.DateProvenance.ToString(), asset.Facts.RawCapture)).ToArray(), older, newerPosition);
+            return new DesktopCatalogPage(page.DiscoveryRevision, page.ConfigurationRevision, page.Assets.Select(Photo).ToArray(), older, newerPosition);
         }, cancellationToken);
     }
     public Task<CatalogAsset?> ResolveAsync(Guid id, CancellationToken cancellationToken)
@@ -40,6 +38,8 @@ public sealed class DesktopCatalogReader(ProcessorStateCoordinator state)
         return _state.ExecuteAsync(database => new DiscoveredCatalogRepository(database).ResolveVisible(id), cancellationToken);
     }
     private static CatalogCursor Key(CatalogAsset asset) => new(asset.EffectiveUtc, asset.Id);
+    internal static DesktopCatalogPhoto Photo(CatalogAsset asset) => new(asset.Id, asset.AccountId, asset.Facts.Name, asset.Facts.MimeType,
+        asset.Facts.Width, asset.Facts.Height, asset.EffectiveUtc, asset.DateProvenance.ToString(), asset.Facts.RawCapture);
     private static string Encode(CatalogCursor cursor, string? accountId) => string.Join('|', "1", accountId ?? "*",
         cursor.EffectiveUtc?.ToString(CultureInfo.InvariantCulture) ?? "unknown", cursor.Id.ToString("D"));
     private static CatalogCursor Decode(string value, string? accountId)

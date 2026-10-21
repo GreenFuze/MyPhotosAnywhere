@@ -14,6 +14,42 @@ namespace Mpa.Processor.Web.Tests;
 public sealed class WebHostTests
 {
     [TestMethod]
+    public async Task ViewerMutationsRequireCsrfAndUseAuthenticatedBrowserIdentityInsteadOfCallerSuppliedOwnership()
+    {
+        using var assets = new Assets(); var engine = new Engine();
+        await using var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
+        using var http = Client(host.LocalEndpoint); var diagnostics = new List<Exception>(); host.Diagnostic += diagnostics.Add;
+        using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false); login.EnsureSuccessStatusCode();
+        var session = await login.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false); var csrf = session.GetProperty("csrf").GetString(); var id = Guid.NewGuid();
+        using (var denied = await MutationAsync(http, "api/viewers", host.LocalEndpoint, null).ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Unauthorized, denied.StatusCode);
+        Assert.AreEqual(0, engine.ViewerCalls.Count);
+        async Task<HttpResponseMessage> OpenAsync(HttpClient client, string token)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "api/viewers") { Content = JsonContent.Create(new Mpa.Processor.Core.CatalogViewerRequest(id, Guid.NewGuid(), null)) };
+            request.Headers.Add("Origin", host.LocalEndpoint.GetLeftPart(UriPartial.Authority)); request.Headers.Add("X-MPA-CSRF", token); return await client.SendAsync(request).ConfigureAwait(false);
+        }
+        using (var created = await OpenAsync(http, csrf!).ConfigureAwait(false))
+        { created.EnsureSuccessStatusCode(); Assert.AreEqual(id, (await created.Content.ReadFromJsonAsync<DesktopViewerWindow>().ConfigureAwait(false))!.Id); }
+        var owner = engine.ViewerCalls.Single().Owner; Assert.AreNotEqual(Guid.Empty, owner);
+        using var other = Client(host.LocalEndpoint); using var otherLogin = await LoginAsync(other, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false); otherLogin.EnsureSuccessStatusCode();
+        var otherSession = await otherLogin.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false);
+        using (var independent = await OpenAsync(other, otherSession.GetProperty("csrf").GetString()!).ConfigureAwait(false)) independent.EnsureSuccessStatusCode();
+        Assert.AreNotEqual(owner, engine.ViewerCalls[1].Owner);
+        using (var invalid = await http.GetAsync("api/viewers?viewer=" + id.ToString("D") + "&position=01").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+        using (var gone = await http.GetAsync("api/viewers?viewer=" + id.ToString("D") + "&position=0").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.NotFound, gone.StatusCode);
+        using var close = new HttpRequestMessage(HttpMethod.Delete, "api/viewers?viewer=" + id.ToString("D")) { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+        close.Headers.Add("Origin", host.LocalEndpoint.GetLeftPart(UriPartial.Authority)); close.Headers.Add("X-MPA-CSRF", csrf);
+        using (var closed = await http.SendAsync(close).ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.NoContent, closed.StatusCode);
+        Assert.AreEqual(("close", owner), engine.ViewerCalls[^1]);
+        using var signOut = new HttpRequestMessage(HttpMethod.Delete, "api/session") { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+        signOut.Headers.Add("Origin", host.LocalEndpoint.GetLeftPart(UriPartial.Authority)); signOut.Headers.Add("X-MPA-CSRF", csrf);
+        using (var signedOut = await http.SendAsync(signOut).ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.NoContent, signedOut.StatusCode);
+        Assert.AreEqual(("close-browser", owner), engine.ViewerCalls[^1]);
+        using (var locked = await http.GetAsync("api/status").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Unauthorized, locked.StatusCode);
+        using (var otherStillConnected = await other.GetAsync("api/status").ConfigureAwait(false)) otherStillConnected.EnsureSuccessStatusCode();
+        Assert.AreEqual(0, diagnostics.Count); Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
+    }
+    [TestMethod]
     public async Task CatalogRequiresBrowserAuthenticationAndRejectsMalformedPositionsWithoutFaultingTheEngine()
     {
         using var assets = new Assets(); var engine = new Engine();
@@ -249,6 +285,7 @@ public sealed class WebHostTests
     }
     private sealed class Engine : IDesktopWebApplication
     {
+        public List<(string Action, Guid Owner)> ViewerCalls { get; } = [];
         public bool Paused { get; private set; }
         public bool Hold { get; init; }
         public bool Unavailable { get; init; }
@@ -269,6 +306,11 @@ public sealed class WebHostTests
                 "synthetic.jpg", "image/jpeg", 40, 30, null, "Unknown", null)], null, null);
         }
         public Task<DesktopPreview?> CatalogPreviewAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<DesktopPreview?>(null);
+        public Task<DesktopViewerWindow> OpenViewerAsync(Guid browser, Mpa.Processor.Core.CatalogViewerRequest request, CancellationToken cancellationToken)
+        { ViewerCalls.Add(("open", browser)); return Task.FromResult(new DesktopViewerWindow(request.Id, 1, 0, [new(0, request.SelectedId, null)])); }
+        public Task<DesktopViewerWindow> ReadViewerAsync(Guid browser, Guid id, long position, CancellationToken cancellationToken) => throw new Mpa.Processor.Core.CatalogViewerUnavailableException();
+        public Task CloseViewerAsync(Guid browser, Guid id, CancellationToken cancellationToken) { ViewerCalls.Add(("close", browser)); return Task.CompletedTask; }
+        public Task CloseBrowserViewersAsync(Guid browser, CancellationToken cancellationToken) { ViewerCalls.Add(("close-browser", browser)); return Task.CompletedTask; }
         public Task PauseAsync(CancellationToken cancellationToken) { if (ControlConflict) throw new Mpa.Processor.Core.ProcessorWorkStateConflictException(); Paused = true; return Task.CompletedTask; }
         public Task ResumeAsync(CancellationToken cancellationToken) { Paused = false; return Task.CompletedTask; }
         public Task AccountAsync(DesktopAccountCommand command, CancellationToken cancellationToken) => throw new InvalidOperationException("This test must not perform Google account actions.");

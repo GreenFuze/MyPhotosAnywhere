@@ -10,6 +10,32 @@ public sealed class BrowserSessionTests
     private static readonly Uri Remote = new("https://mpa-synthetic.local:12346/");
 
     [TestMethod]
+    public void ReopeningTheSameBrowserPreservesItsCsrfAndViewerOwnerButDoesNotReuseDifferentAccess()
+    {
+        using var access = new BrowserSessionAuthority(); var first = access.Exchange(access.Invite(Local, true).Secret, Local);
+        var invitation = access.Invite(Local, true); var reopened = access.Exchange(invitation.Secret, Local, first.Cookie);
+        Assert.AreEqual(first.Id, reopened.Id); Assert.AreEqual(first.Cookie, reopened.Cookie); Assert.AreEqual(first.Csrf, reopened.Csrf);
+        Assert.AreEqual(first.Id, access.Authenticate(first.Cookie, Local, first.Csrf, true).Id);
+        Assert.ThrowsExactly<BrowserAuthenticationException>(() => access.Exchange(invitation.Secret, Local, first.Cookie));
+        var differentAccess = access.Exchange(access.Invite(Local, false).Secret, Local, first.Cookie);
+        Assert.AreNotEqual(first.Id, differentAccess.Id); Assert.IsFalse(access.Authenticate(differentAccess.Cookie, Local, differentAccess.Csrf, true).HostOwner);
+        var remote = access.Exchange(access.Invite(Remote, false).Secret, Remote, first.Cookie); Assert.AreNotEqual(first.Id, remote.Id);
+        Assert.ThrowsExactly<BrowserAuthenticationException>(() => access.Authenticate(first.Cookie, Remote, first.Csrf, false));
+    }
+
+    [TestMethod]
+    public void BrowserReopenCannotExtendItsOriginalAbsoluteExpiryOrReviveAnExpiredCookie()
+    {
+        var clock = new Clock(); using var access = new BrowserSessionAuthority(clock); var first = access.Exchange(access.Invite(Local, true).Secret, Local);
+        for (var step = 0; step < 47; step++)
+        {
+            clock.Advance(TimeSpan.FromMinutes(10)); var reopened = access.Exchange(access.Invite(Local, true).Secret, Local, first.Cookie); Assert.AreEqual(first.Id, reopened.Id);
+        }
+        clock.Advance(TimeSpan.FromMinutes(10)); var fresh = access.Exchange(access.Invite(Local, true).Secret, Local, first.Cookie);
+        Assert.AreNotEqual(first.Id, fresh.Id); Assert.ThrowsExactly<BrowserAuthenticationException>(() => access.Authenticate(first.Cookie, Local, null, false));
+    }
+
+    [TestMethod]
     public void SingleUseInviteBindsTheEndpointAndNeverSerializesItsCapability()
     {
         using var access = new BrowserSessionAuthority();

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AuthenticationRequired, type CatalogPage, type CatalogPhoto, type DesktopApi } from './api';
+import { AuthenticationRequired, type CatalogPage, type CatalogPhoto, type DesktopApi, type ViewerWindow } from './api';
 
 type Query = { account: string | null; cursor: string | null; newer: boolean; date: number | null };
 type GalleryPage = { query: Query; page: CatalogPage };
@@ -20,25 +20,51 @@ function PhotoTile({ api, photo, open }: { api: DesktopApi; photo: CatalogPhoto;
   </button>;
 }
 
-function CatalogViewer({ api, photos, selected, close }: { api: DesktopApi; photos: readonly CatalogPhoto[]; selected: number; close: () => void }) {
-  const [index, setIndex] = useState(selected), [details, setDetails] = useState(false), [failed, setFailed] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null); const photo = photos[index];
+function CatalogViewer({ api, photos, selected, account, close, report }: { api: DesktopApi; photos: readonly CatalogPhoto[]; selected: number; account: string | null; close: () => void; report: (error: unknown) => void }) {
+  const initial = photos[selected]; if (!initial) throw new Error('The selected gallery identity is missing.');
+  const [sequence, setSequence] = useState<ViewerWindow | null>(null), [position, setPosition] = useState(0);
+  const [details, setDetails] = useState(false), [failed, setFailed] = useState(false), [failure, setFailure] = useState<string | null>(null), [pending, setPending] = useState(false);
+  const sessionId = useRef(crypto.randomUUID()), dialog = useRef<HTMLDialogElement>(null), navigation = useRef<AbortController | null>(null);
+  const reportCurrent = useRef(report); reportCurrent.current = report;
+  const entry = sequence?.entries.find(item => item.position === position);
+  const photo = sequence ? entry?.photo ?? null : initial;
   useEffect(() => { const current = dialog.current; current?.showModal(); return () => current?.close(); }, []);
   useEffect(() => {
+    const controller = new AbortController(); const id = sessionId.current;
+    api.openViewer(id, initial.id, account, controller.signal).then(sequence => {
+      if (sequence.id !== id || sequence.entries.find(item => item.position === sequence.position)?.assetId !== initial.id) throw new Error('MPA returned a different selected identity. Photo navigation stopped.');
+      if (!controller.signal.aborted) { setSequence(sequence); setPosition(sequence.position); }
+    }).catch(error => { if (!controller.signal.aborted) setFailure(failureMessage(error)); });
+    return () => { controller.abort(); navigation.current?.abort(); void api.closeViewer(id).catch(error => reportCurrent.current(error)); };
+  }, [api, initial.id, account]);
+  async function move(target: number) {
+    if (!sequence || target < 0 || target >= sequence.count || navigation.current) return;
+    if (sequence.entries.some(item => item.position === target)) { setPosition(target); setFailure(null); return; }
+    const controller = new AbortController(); navigation.current = controller; setPending(true); setFailure(null);
+    try {
+      const next = await api.viewer(sessionId.current, target, controller.signal);
+      if (next.id !== sessionId.current || next.position !== target || next.count !== sequence.count) throw new Error('The frozen photo sequence changed unexpectedly. Navigation stopped.');
+      if (!controller.signal.aborted) { setSequence(next); setPosition(target); }
+    } catch (error) { if (!controller.signal.aborted) setFailure(failureMessage(error)); }
+    finally { if (navigation.current === controller) { navigation.current = null; setPending(false); } }
+  }
+  useEffect(() => {
     function key(event: KeyboardEvent) {
-      if (event.key === 'ArrowLeft') { event.preventDefault(); setIndex(value => Math.max(0, value - 1)); }
-      if (event.key === 'ArrowRight') { event.preventDefault(); setIndex(value => Math.min(photos.length - 1, value + 1)); }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); void move(position - 1); }
+      if (event.key === 'ArrowRight') { event.preventDefault(); void move(position + 1); }
     }
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
-  }, [photos.length]);
-  useEffect(() => setFailed(false), [index]);
-  if (!photo) throw new Error('The opened gallery sequence lost its selected identity.');
+  }, [sequence, position]);
+  useEffect(() => setFailed(false), [photo?.id]);
   return <dialog ref={dialog} className="viewer" aria-label="Photo viewer" onCancel={close}>
-    <header><button className="icon" onClick={close} aria-label="Close photo"><ViewerIcon name="close" /></button><span dir="auto">{photo.name}</span><button onClick={() => setDetails(value => !value)} aria-expanded={details}>Details</button></header>
-    <div className="viewer-media"><button className="icon previous" disabled={index === 0} onClick={() => setIndex(value => value - 1)} aria-label="Previous photo"><ViewerIcon name="previous" /></button>
-      {failed ? <p role="status">This preview is unavailable. Your place in the gallery is retained.</p> : <img key={photo.id} src={api.catalogPreview(photo.id)} alt={photo.name} onError={() => setFailed(true)} />}
-      <button className="icon next" disabled={index === photos.length - 1} onClick={() => setIndex(value => value + 1)} aria-label="Next photo"><ViewerIcon name="next" /></button></div>
-    {details && <aside className="details"><h2>Details</h2><dl><dt>File</dt><dd dir="auto">{photo.name}</dd><dt>Preview</dt><dd>Google Drive thumbnail · original has not been downloaded</dd>
+    <header><button className="icon" onClick={close} aria-label="Close photo"><ViewerIcon name="close" /></button><span dir="auto">{photo?.name ?? 'Photo unavailable'}</span><button disabled={!photo} onClick={() => setDetails(value => !value)} aria-expanded={details}>Details</button></header>
+    {failure && <p className="viewer-message" role="alert">{failure}</p>}
+    {!sequence && !failure && <p className="viewer-message" role="status">Preparing photo navigation…</p>}
+    {pending && <p className="viewer-message" role="status">Loading nearby photos…</p>}
+    <div className="viewer-media"><button className="icon previous" disabled={!sequence || position === 0 || pending} onClick={() => { void move(position - 1); }} aria-label="Previous photo"><ViewerIcon name="previous" /></button>
+      {!photo || failed ? <p role="status">This preview is unavailable. Your place in the gallery is retained.</p> : <img key={photo.id} src={api.catalogPreview(photo.id)} alt={photo.name} onError={() => setFailed(true)} />}
+      <button className="icon next" disabled={!sequence || position === sequence.count - 1 || pending} onClick={() => { void move(position + 1); }} aria-label="Next photo"><ViewerIcon name="next" /></button></div>
+    {details && photo && <aside className="details"><h2>Details</h2><dl><dt>File</dt><dd dir="auto">{photo.name}</dd><dt>Preview</dt><dd>Google Drive thumbnail · original has not been downloaded</dd>
       {photo.width && photo.height && <><dt>Dimensions</dt><dd>{photo.width} × {photo.height}</dd></>}
       <dt>{photo.dateProvenance === 'DriveCapture' ? 'Capture time reported by Drive' : photo.dateProvenance === 'DriveModification' ? 'Drive modification time' : 'Date'}</dt><dd>{photo.effectiveUtc === null ? 'Unknown date' : new Date(photo.effectiveUtc).toLocaleString()}</dd>
       {photo.rawCapture && photo.dateProvenance !== 'DriveCapture' && <><dt>Original capture text</dt><dd>{photo.rawCapture}</dd></>}
@@ -88,6 +114,6 @@ export function CatalogGallery({ api, account, sources, locked }: { api: Desktop
       {query.cursor || query.date !== null ? <button disabled={loading} onClick={() => navigate(null, false)}>Latest photos</button> : null}
     </div>
     {loading && page && <p className="loading" role="status">Loading photos…</p>}
-    {viewer && <CatalogViewer api={api} photos={viewer.photos} selected={viewer.index} close={() => setViewer(null)} />}
+    {viewer && <CatalogViewer api={api} photos={viewer.photos} selected={viewer.index} account={account || null} close={() => setViewer(null)} report={error => { setFailure(failureMessage(error)); if (error instanceof AuthenticationRequired) locked(); }} />}
   </section>;
 }

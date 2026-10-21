@@ -21,8 +21,10 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
     private LanIdentityOwner? _identity;
     private DesktopWebHost? _host;
     private ProcessorSourceRuntime? _sources;
+    private CatalogViewerSessions? _viewers;
     private readonly object _gate = new();
     private Task? _processingStop;
+    private Task? _failureStop;
     private Task? _disposal;
     private Exception? _failure;
     private bool _hostClosed;
@@ -52,10 +54,11 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
             await owner._identity.InitializeAsync(cancellationToken).ConfigureAwait(false);
             owner._accounts = new ProcessorAccountService(state, owner._vault, new GoogleAccountConnectionFactory(configuration, owner._vault),
                 new GoogleLibraryConnectionFactory(configuration, owner._vault));
-            owner._sources = await ProcessorSourceRuntime.CreatePausedAsync(state, owner._accounts, work,
-                new(new ProcessorStateStorageReader(stateDirectory)), cancellationToken).ConfigureAwait(false);
+            var storage = new StorageBudgetManager(new ProcessorStateStorageReader(stateDirectory));
+            owner._sources = await ProcessorSourceRuntime.CreatePausedAsync(state, owner._accounts, work, storage, cancellationToken).ConfigureAwait(false);
             owner._sources.Failed += owner.OnFailure;
-            var application = new DesktopEngineApplication(library, state, owner._accounts, owner._sources.Work, owner._sources);
+            owner._viewers = new(state, stateDirectory, installationId, storage);
+            var application = new DesktopEngineApplication(library, state, owner._accounts, owner._sources.Work, owner._sources, owner._viewers);
             owner._host = await DesktopWebHost.StartAsync(application, assetsDirectory, enableLan ? owner._identity.Identity : null, cancellationToken).ConfigureAwait(false);
             owner._host.Diagnostic += owner.ReportFailure;
             await owner._sources.ActivateAsync(cancellationToken).ConfigureAwait(false);
@@ -75,7 +78,15 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
         else OnFailure(error);
     }
     private void OnFailure(Exception error)
-    { Retain(error); Failed?.Invoke(error); }
+    {
+        Retain(error);
+        lock (_gate) _failureStop ??= Task.Run(async () =>
+        {
+            try { await StopProcessingAsync().ConfigureAwait(false); }
+            catch (Exception shutdown) { Retain(shutdown); }
+        }, CancellationToken.None);
+        Failed?.Invoke(error);
+    }
     private void Retain(Exception error)
     { lock (_gate) _failure = _failure is null ? error : ReferenceEquals(_failure, error) ? _failure : new AggregateException(_failure, error); }
 
@@ -92,7 +103,8 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
         static async Task StopSourcesAsync(ProcessorSourceRuntime? sources)
         { if (sources is not null) await sources.DisposeAsync().ConfigureAwait(false); }
         static async Task StopNativeAsync(ProcessorWorkSupervisor native) => await native.StopAsync().ConfigureAwait(false);
-        var joined = Task.WhenAll(StopSourcesAsync(_sources), StopNativeAsync(_native));
+        static async Task StopViewersAsync(CatalogViewerSessions? viewers) { if (viewers is not null) await viewers.DisposeAsync().ConfigureAwait(false); }
+        var joined = Task.WhenAll(StopSourcesAsync(_sources), StopNativeAsync(_native), StopViewersAsync(_viewers));
         try { await joined.ConfigureAwait(false); }
         catch { if (joined.Exception is not null) throw joined.Exception; throw; }
     }
@@ -115,7 +127,7 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
         // A listener failure cannot bypass independent background-work shutdown.
         try { await StopProcessingAsync().ConfigureAwait(false); }
         catch (Exception error) { Retain(error); }
-        if (!_hostClosed || _sources is { ExitConfirmed: false } || _native.State != ProcessorWorkState.Stopped)
+        if (!_hostClosed || _sources is { ExitConfirmed: false } || _viewers is { ExitConfirmed: false } || _native.State != ProcessorWorkState.Stopped)
             throw new InvalidOperationException("Desktop requests or processing resources have not joined; account/vault/state ownership is retained.", Failure);
         if (!_accountsClosed) { if (_accounts is not null) await _accounts.DisposeAsync().ConfigureAwait(false); _accountsClosed = true; }
         if (!_identityClosed) { if (_identity is not null) await _identity.DisposeAsync().ConfigureAwait(false); _identityClosed = true; }

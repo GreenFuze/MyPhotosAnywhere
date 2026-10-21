@@ -11,10 +11,24 @@ public sealed class ProcessorStateDatabase : IDisposable
     private const int ApplicationId = 0x4d504130;
     private readonly FileStream _instanceLease;
     private readonly SqliteConnection _connection;
+    private readonly object _snapshotGate = new();
+    private readonly HashSet<ProcessorStateReadSnapshot> _snapshots = [];
     private bool _disposed;
     internal SqliteConnection Connection => !_disposed ? _connection : throw new ObjectDisposedException(nameof(ProcessorStateDatabase));
     public string SqliteVersion { get; }
     public Guid InstallationId { get; }
+
+    public ProcessorStateReadSnapshot OpenReadSnapshot()
+    {
+        lock (_snapshotGate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var snapshot = ProcessorStateReadSnapshot.Open(_connection.DataSource, ReleaseSnapshot);
+            _snapshots.Add(snapshot); return snapshot;
+        }
+    }
+    private void ReleaseSnapshot(ProcessorStateReadSnapshot snapshot)
+    { lock (_snapshotGate) { if (!_snapshots.Remove(snapshot)) throw new InvalidOperationException("Read snapshot released without ownership."); } }
 
     public ProcessorStateDatabase(string stateDirectory)
     {
@@ -211,9 +225,11 @@ public sealed class ProcessorStateDatabase : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
-        try { _connection.Dispose(); }
-        finally { _instanceLease.Dispose(); }
+        lock (_snapshotGate)
+        {
+            if (_disposed) return;
+            if (_snapshots.Count != 0) throw new InvalidOperationException("Read snapshots must join before state ownership is released.");
+            _connection.Dispose(); _instanceLease.Dispose(); _disposed = true;
+        }
     }
 }

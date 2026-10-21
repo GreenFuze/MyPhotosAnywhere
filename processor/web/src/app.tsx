@@ -71,7 +71,7 @@ function App() {
   return <>
     <header className="app-bar"><a className="brand" href="/" aria-label="My Photos Anywhere home"><img src="/mpa.svg" alt="" /><span>My Photos Anywhere</span></a>
       <div className="bar-actions">{access === 'ready' && <><label className="account"><span className="visually-hidden">Google Drive account</span><select value={account} onChange={event => setAccount(event.target.value)}>
-        <option value="">All accounts</option>{snapshot?.accounts.map(item => <option key={item.id} value={item.id}>{item.name}{item.connected ? '' : ' · Disconnected'}</option>)}</select></label>
+        <option value="">All accounts</option>{snapshot?.accounts.map(item => <option key={item.id} value={item.id}>{item.name}{item.connected ? '' : ' Â· Disconnected'}</option>)}</select></label>
         <button className="icon" onClick={() => { setActivityOpen(value => !value); setSourcesOpen(false); }} aria-label="Activity" aria-expanded={activityOpen}><Icon name="activity" /></button>
         <button className="icon" onClick={() => { setSettings(value => !value); setSourcesOpen(false); setActivityOpen(false); }} aria-label="Settings" aria-expanded={settings}><Icon name="settings" /></button></>}</div>
     </header>

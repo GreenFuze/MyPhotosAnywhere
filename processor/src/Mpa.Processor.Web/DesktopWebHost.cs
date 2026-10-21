@@ -128,7 +128,7 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 if (path == "/api/session" && context.Request.Method == "POST")
                 {
                     var body = await context.Request.ReadFromJsonAsync<SessionRequest>(context.RequestAborted).ConfigureAwait(false);
-                    var grant = _access.Exchange(body?.Secret ?? "", endpoint);
+                    var grant = _access.Exchange(body?.Secret ?? "", endpoint, context.Request.Cookies[CookieName]);
                     context.Response.Cookies.Append(CookieName, grant.Cookie, CookieOptions(endpoint));
                     var approved = _access.Authenticate(grant.Cookie, endpoint, null, false);
                     await context.Response.WriteAsJsonAsync(new { csrf = grant.Csrf, hostOwner = approved.HostOwner }, context.RequestAborted).ConfigureAwait(false); return;
@@ -163,6 +163,12 @@ public sealed class DesktopWebHost : IAsyncDisposable
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Processing state changed. Refresh Activity before trying again." }, context.RequestAborted).ConfigureAwait(false); }
             catch (InvalidDesktopCatalogQueryException error)
             { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
+            catch (CatalogSessionSelectionUnavailableException error)
+            { context.Response.StatusCode = 404; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
+            catch (CatalogViewerUnavailableException error)
+            { context.Response.StatusCode = 404; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
+            catch (CatalogViewerCapacityException error)
+            { context.Response.StatusCode = 429; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
             catch (InsufficientStorageBudgetException)
             { context.Response.StatusCode = 507; await context.Response.WriteAsJsonAsync(new { message = "Free space on the computer running this library, then retry. Existing photos and progress were retained." }, context.RequestAborted).ConfigureAwait(false); }
             catch (TokenResponseException)
@@ -194,7 +200,8 @@ public sealed class DesktopWebHost : IAsyncDisposable
             case ("GET", "/api/session"):
                 await context.Response.WriteAsJsonAsync(new { csrf = session.Csrf, hostOwner = session.HostOwner }, token).ConfigureAwait(false); break;
             case ("DELETE", "/api/session"):
-                _access.Revoke(session.Id); context.Response.Cookies.Delete(CookieName, CookieOptions(RequestEndpoint(context)!)); context.Response.StatusCode = 204; break;
+                _access.Revoke(session.Id); await _application.CloseBrowserViewersAsync(session.Id, CancellationToken.None).ConfigureAwait(false);
+                context.Response.Cookies.Delete(CookieName, CookieOptions(RequestEndpoint(context)!)); context.Response.StatusCode = 204; break;
             case ("GET", "/api/status"):
                 await context.Response.WriteAsJsonAsync(await _application.SnapshotAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
             case ("GET", "/api/catalog"):
@@ -213,6 +220,26 @@ public sealed class DesktopWebHost : IAsyncDisposable
             case ("GET", "/api/catalog-preview"):
                 if (!Guid.TryParseExact(RequiredQuery(context, "asset"), "D", out var assetId) || assetId == Guid.Empty) throw new BadHttpRequestException("Invalid media identity.");
                 await WritePreviewAsync(context, await _application.CatalogPreviewAsync(assetId, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("POST", "/api/viewers"):
+                var viewer = await context.Request.ReadFromJsonAsync<CatalogViewerRequest>(token).ConfigureAwait(false) ?? throw new BadHttpRequestException("A captured viewer request is required.");
+                if (viewer.Id == Guid.Empty || viewer.SelectedId == Guid.Empty || viewer.AccountId is not null && !Identity(viewer.AccountId)) throw new BadHttpRequestException("Invalid viewer context.");
+                _access.Authenticate(context.Request.Cookies[CookieName], RequestEndpoint(context)!, context.Request.Headers["X-MPA-CSRF"], mutation: true);
+                var opened = await _application.OpenViewerAsync(session.Id, viewer, token).ConfigureAwait(false);
+                try { _access.Authenticate(context.Request.Cookies[CookieName], RequestEndpoint(context)!, null, mutation: false); }
+                catch (BrowserAuthenticationException)
+                {
+                    try { await _application.CloseViewerAsync(session.Id, viewer.Id, CancellationToken.None).ConfigureAwait(false); }
+                    catch (Exception cleanup) { Diagnostic?.Invoke(cleanup); }
+                    throw;
+                }
+                await context.Response.WriteAsJsonAsync(opened, token).ConfigureAwait(false); break;
+            case ("GET", "/api/viewers"):
+                var viewerId = ViewerId(context); var rawPosition = RequiredQuery(context, "position");
+                if (!long.TryParse(rawPosition, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var position) || position.ToString(System.Globalization.CultureInfo.InvariantCulture) != rawPosition)
+                    throw new BadHttpRequestException("Invalid viewer position.");
+                await context.Response.WriteAsJsonAsync(await _application.ReadViewerAsync(session.Id, viewerId, position, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("DELETE", "/api/viewers"):
+                await _application.CloseViewerAsync(session.Id, ViewerId(context), token).ConfigureAwait(false); context.Response.StatusCode = 204; break;
             case ("GET", "/api/sources"):
                 await context.Response.WriteAsJsonAsync(await _application.SourcesAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
             case ("GET", "/api/activity"):
@@ -269,6 +296,7 @@ public sealed class DesktopWebHost : IAsyncDisposable
         context.Response.ContentType = preview.MimeType; await context.Response.Body.WriteAsync(preview.Bytes, cancellationToken).ConfigureAwait(false);
     }
     private static bool Identity(string? value) => value is { Length: > 0 and <= 256 } && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
+    private static Guid ViewerId(HttpContext context) => Guid.TryParseExact(RequiredQuery(context, "viewer"), "D", out var id) && id != Guid.Empty ? id : throw new BadHttpRequestException("Invalid viewer session identity.");
     private static string RequiredQuery(HttpContext context, string key) => OptionalQuery(context, key, 256) is { } value && Identity(value) ? value : throw new BadHttpRequestException("Invalid query identity.");
     private static string? OptionalQuery(HttpContext context, string key, int maximum)
     {

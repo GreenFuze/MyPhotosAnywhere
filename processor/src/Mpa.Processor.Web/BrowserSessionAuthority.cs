@@ -53,7 +53,7 @@ public sealed class BrowserSessionAuthority(TimeProvider? time = null) : IDispos
         }
     }
 
-    public BrowserSessionGrant Exchange(string secret, Uri endpoint)
+    public BrowserSessionGrant Exchange(string secret, Uri endpoint, string? currentCookie = null)
     {
         ValidateEndpoint(endpoint);
         lock (_gate)
@@ -66,6 +66,15 @@ public sealed class BrowserSessionAuthority(TimeProvider? time = null) : IDispos
             var digest = Digest(secret);
             if (!_invitations.TryGetValue(digest, out var invitation) || invitation.Endpoint != endpoint.GetLeftPart(UriPartial.Authority))
                 throw new BrowserAuthenticationException();
+            if (Token(currentCookie) && _sessions.TryGetValue(Digest(currentCookie!), out var existing) &&
+                existing.Endpoint == invitation.Endpoint && existing.HostOwner == invitation.HostOwner)
+            {
+                // Tabs share this endpoint's HttpOnly cookie. Reopening MPA must not
+                // strand existing tabs with a different CSRF or viewer-owner identity.
+                // Prune already enforced idle/absolute limits; Created is unchanged.
+                _sessions[Digest(currentCookie!)] = existing with { Touched = now }; _invitations.Remove(digest);
+                return new(existing.Id, currentCookie!, existing.Csrf);
+            }
             if (_sessions.Count >= 32) throw new InvalidOperationException("Maximum connected browser count reached. Disconnect an existing session first.");
             var cookie = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
             var csrf = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)); var id = Guid.NewGuid();

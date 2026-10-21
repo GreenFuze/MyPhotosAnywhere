@@ -1,5 +1,18 @@
 import { build, formatMessages } from 'esbuild';
-import { mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, copyFile, readFile, writeFile, readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+
+async function verifySourceEncoding(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) await verifySourceEncoding(path);
+    else if (entry.isFile()) {
+      try { new TextDecoder('utf-8', { fatal: true }).decode(await readFile(path)); }
+      catch (error) { throw new Error('Invalid UTF-8 web source: ' + path, { cause: error }); }
+    } else throw new Error('Unexpected non-regular web source: ' + path);
+  }
+}
+await verifySourceEncoding('src');
 
 await mkdir('dist', { recursive: true });
 const result = await build({ entryPoints: ['src/app.tsx'], bundle: true, minify: true, sourcemap: false,

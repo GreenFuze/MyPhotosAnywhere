@@ -11,6 +11,8 @@ public sealed record DesktopFolder(string Id, string Name, bool CanListChildren)
 public sealed record DesktopFolderLocation(DesktopFolder Current, IReadOnlyList<DesktopFolder> Children, string? NextCursor, bool IncompleteSearch);
 public sealed record DesktopAddSource(string AccountId, string FolderId, bool IncludeDescendants, long ExpectedRevision);
 public sealed record DesktopUpdateSource(Guid Id, bool Enabled, bool IncludeDescendants, long ExpectedSourceRevision, long ExpectedRevision);
+public sealed record DesktopViewerEntry(long Position, Guid AssetId, DesktopCatalogPhoto? Photo);
+public sealed record DesktopViewerWindow(Guid Id, long Count, long Position, IReadOnlyList<DesktopViewerEntry> Entries);
 
 /// <summary>UI-independent bounded operations. Requests may cancel reads; admitted durable
 /// jobs are owned by the engine and expose captured IDs/status through separate operations.</summary>
@@ -19,6 +21,10 @@ public interface IDesktopWebApplication
     Task<DesktopSnapshot> SnapshotAsync(CancellationToken cancellationToken);
     Task<DesktopCatalogPage> CatalogAsync(string? accountId, string? position, bool newer, long? dateUtc, CancellationToken cancellationToken);
     Task<DesktopPreview?> CatalogPreviewAsync(Guid id, CancellationToken cancellationToken);
+    Task<DesktopViewerWindow> OpenViewerAsync(Guid browser, Mpa.Processor.Core.CatalogViewerRequest request, CancellationToken cancellationToken);
+    Task<DesktopViewerWindow> ReadViewerAsync(Guid browser, Guid id, long position, CancellationToken cancellationToken);
+    Task CloseViewerAsync(Guid browser, Guid id, CancellationToken cancellationToken);
+    Task CloseBrowserViewersAsync(Guid browser, CancellationToken cancellationToken);
     Task PauseAsync(CancellationToken cancellationToken);
     Task ResumeAsync(CancellationToken cancellationToken);
     Task AccountAsync(DesktopAccountCommand command, CancellationToken cancellationToken);

@@ -30,7 +30,7 @@ public sealed class DiscoveredCatalogRepository
         (SELECT min(m.depth) FROM source_asset m JOIN source_binding s ON s.id=m.source_id
           WHERE m.asset_id=a.id AND s.enabled=1 AND (s.descendants=1 OR m.depth=0))
         """;
-    private const string Visible = """
+    internal const string Visible = """
         EXISTS (SELECT 1 FROM source_asset m JOIN source_binding s ON s.id=m.source_id
           WHERE m.asset_id=a.id AND s.enabled=1 AND (s.descendants=1 OR m.depth=0))
         """;

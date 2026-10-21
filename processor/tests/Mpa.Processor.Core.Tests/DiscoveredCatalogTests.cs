@@ -173,9 +173,27 @@ public sealed class DiscoveredCatalogTests
             Assert.AreEqual(60, page.Assets.Count); var next = Cursor(page.Assets[^1]); Assert.AreNotEqual(cursor, next); cursor = next;
         } while (true);
         Assert.AreEqual(count, seen);
+        var fullWalkMilliseconds = clock.Elapsed.TotalMilliseconds;
+        using var sessionDirectory = new WorkerProcessTests.WorkerTestDirectory();
+        var selected = fixture.Catalog.ReadPage().Assets[30]; var managedBefore = GC.GetTotalMemory(forceFullCollection: true);
+        using var process = Process.GetCurrentProcess(); process.Refresh(); var workingBefore = process.WorkingSet64;
+        var allocated = GC.GetTotalAllocatedBytes(precise: true); var snapshotClock = Stopwatch.StartNew();
+        using var viewer = CatalogViewerSessionIndex.Capture(fixture.Database, Path.Combine(sessionDirectory.Path, "viewer.sqlite"), selected.Id, null,
+            new(new ViewerScaleSpace()), CancellationToken.None);
+        var snapshotElapsed = snapshotClock.Elapsed; var captureAllocated = GC.GetTotalAllocatedBytes(precise: true) - allocated;
+        var managedAfter = GC.GetTotalMemory(forceFullCollection: true); process.Refresh(); var workingAfter = process.WorkingSet64;
+        Assert.AreEqual((long)count, viewer.Count); var window = viewer.ReadWindow(count / 2, 44, 45); Assert.AreEqual(90, window.Count);
+        Assert.AreEqual(90, window.Select(entry => entry.AssetId).Distinct().Count());
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => viewer.ReadWindow(0, 45, 45));
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { viewerFixture = count, snapshotMs = snapshotElapsed.TotalMilliseconds,
+            cumulativeManagedAllocationBytes = captureAllocated, managedBeforeBytes = managedBefore, managedAfterBytes = managedAfter,
+            processWorkingSetBeforeBytes = workingBefore, processWorkingSetAfterBytes = workingAfter, indexBytes = new FileInfo(Path.Combine(sessionDirectory.Path, "viewer.sqlite")).Length, windowBound = 90,
+            scope = "single shared-test-process memory observations; native UI/import responsiveness and dedicated process benchmarks remain separate" }));
         Console.WriteLine(JsonSerializerForMetrics(count, preparation.TotalMilliseconds, seek.TotalMilliseconds,
-            maximumQueryTicks * 1000.0 / Stopwatch.Frequency, clock.Elapsed.TotalMilliseconds));
+            maximumQueryTicks * 1000.0 / Stopwatch.Frequency, fullWalkMilliseconds));
     }
+    private sealed class ViewerScaleSpace : IStorageSpaceReader
+    { public StorageSpaceSnapshot Read() => new(100 * StorageBudgetManager.Gibibyte, 50 * StorageBudgetManager.Gibibyte, 0); }
     private static string JsonSerializerForMetrics(int count, double preparation, double seek, double maxPage, double fullWalk)
         => System.Text.Json.JsonSerializer.Serialize(new { fixture = count, preparationMs = preparation, seekMs = seek, maxPageMs = maxPage,
             fullWalkMs = fullWalk, retainedPageBound = 60, scope = "local discovery projection only; publication, import and native UI responsiveness remain separate" });

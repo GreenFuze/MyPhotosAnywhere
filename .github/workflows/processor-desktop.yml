@@ -76,6 +76,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Get-Content build/desktop-checks/media-probe-restore.log; exit $LASTEXITCODE }
           dotnet build probes/ProductMediaAcceptance/ProductMediaAcceptance.csproj --no-restore -c Release *> build/desktop-checks/media-probe-build.log
           if ($LASTEXITCODE -ne 0) { Get-Content build/desktop-checks/media-probe-build.log; exit $LASTEXITCODE }
+          dotnet restore probes/ProductDesktopAcceptance/ProductDesktopAcceptance.csproj --locked-mode *> build/desktop-checks/desktop-probe-restore.log
+          if ($LASTEXITCODE -ne 0) { Get-Content build/desktop-checks/desktop-probe-restore.log; exit $LASTEXITCODE }
+          dotnet build probes/ProductDesktopAcceptance/ProductDesktopAcceptance.csproj --no-restore -c Release *> build/desktop-checks/desktop-probe-build.log
+          if ($LASTEXITCODE -ne 0) { Get-Content build/desktop-checks/desktop-probe-build.log; exit $LASTEXITCODE }
           $mpaDiagnostic = Get-ChildItem build/desktop-checks/*.log | Get-Content | Where-Object { $_ -notmatch '^\s*0 (Warning|Error)\(s\)\s*$' } | Select-String -Pattern '\bwarning\b|\berror\b'
           if ($mpaDiagnostic) { $mpaDiagnostic; throw 'Desktop diagnostics are blocking.' }
           @{ Source = '${{ github.sha }}'; Runner = '${{ matrix.runner }}'; Scope = 'strict native desktop build only; UI/install acceptance separate';

@@ -6,7 +6,7 @@ namespace Mpa.Processor.Web;
 
 /// <summary>Browser adapter borrowing engine-lifetime accounts, read owners, state and work.</summary>
 public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoordinator state, ProcessorAccountService accounts,
-    IProcessorWorkControl work, ProcessorSourceRuntime? sources = null) : IDesktopWebApplication
+    IProcessorWorkControl work, ProcessorSourceRuntime? sources = null, CatalogViewerSessions? viewers = null) : IDesktopWebApplication
 {
     private readonly Guid _libraryId = libraryId != Guid.Empty ? libraryId : throw new ArgumentException("Library identity is required.", nameof(libraryId));
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
@@ -14,6 +14,28 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
     private readonly IProcessorWorkControl _work = work ?? throw new ArgumentNullException(nameof(work));
     private readonly ProcessorSourceRuntime? _sources = sources;
     private readonly DesktopCatalogReader _catalog = new(state);
+    private readonly CatalogViewerSessions? _viewers = viewers;
+    private CatalogViewerSessions Viewers => _viewers ?? throw new InvalidOperationException("The viewer session owner has not been configured.");
+    public async Task<DesktopViewerWindow> OpenViewerAsync(Guid browser, CatalogViewerRequest request, CancellationToken cancellationToken) =>
+        await ResolveWindowAsync(await ViewerCommandAsync(() => Viewers.OpenAsync(browser, request, cancellationToken)).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+    public async Task<DesktopViewerWindow> ReadViewerAsync(Guid browser, Guid id, long position, CancellationToken cancellationToken) =>
+        await ResolveWindowAsync(await ViewerCommandAsync(() => Viewers.ReadAsync(browser, id, position, cancellationToken)).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+    public Task CloseViewerAsync(Guid browser, Guid id, CancellationToken cancellationToken) => Viewers.CloseAsync(browser, id, cancellationToken);
+    public Task CloseBrowserViewersAsync(Guid browser, CancellationToken cancellationToken) => Viewers.CloseBrowserAsync(browser, cancellationToken);
+    private async Task<T> ViewerCommandAsync<T>(Func<Task<T>> operation)
+    {
+        try { return await operation().ConfigureAwait(false); }
+        catch (ObjectDisposedException) when (_work.State is ProcessorWorkState.Stopping or ProcessorWorkState.Stopped or ProcessorWorkState.Faulted)
+        { throw new CatalogViewerUnavailableException(); }
+    }
+    private Task<DesktopViewerWindow> ResolveWindowAsync(CatalogViewerWindow window, CancellationToken cancellationToken) => _state.ExecuteAsync(database =>
+    {
+        var catalog = new DiscoveredCatalogRepository(database);
+        return new DesktopViewerWindow(window.Id, window.Count, window.Position, window.Entries.Select(entry =>
+        {
+            var photo = catalog.ResolveVisible(entry.AssetId); return new DesktopViewerEntry(entry.Position, entry.AssetId, photo is null ? null : DesktopCatalogReader.Photo(photo));
+        }).ToArray());
+    }, cancellationToken);
     public Task<DesktopCatalogPage> CatalogAsync(string? accountId, string? position, bool newer, long? dateUtc, CancellationToken cancellationToken) =>
         _catalog.ReadAsync(accountId, position, newer, dateUtc, cancellationToken);
     public async Task<DesktopPreview?> CatalogPreviewAsync(Guid id, CancellationToken cancellationToken)
