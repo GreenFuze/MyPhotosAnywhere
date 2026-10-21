@@ -12,7 +12,6 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
 {
     private NativeCredentialVault? _vault;
     private ProcessorAccountService? _accounts;
-    private DesktopEngineApplication? _application;
     private LanIdentityOwner? _identity;
     private DesktopWebHost? _host;
     private readonly object _gate = new();
@@ -34,9 +33,10 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
             var library = await state.ExecuteAsync(database => new ProcessorLibraryRepository(database).GetOrCreateIdentity(), cancellationToken).ConfigureAwait(false);
             owner._identity = new LanIdentityOwner(owner._vault, library, installationId);
             await owner._identity.InitializeAsync(cancellationToken).ConfigureAwait(false);
-            owner._accounts = new ProcessorAccountService(state, owner._vault, new GoogleAccountConnectionFactory(configuration, owner._vault));
-            owner._application = new DesktopEngineApplication(library, state, owner._accounts, configuration, owner._vault, work);
-            owner._host = await DesktopWebHost.StartAsync(owner._application, assetsDirectory, enableLan ? owner._identity.Identity : null, cancellationToken).ConfigureAwait(false);
+            owner._accounts = new ProcessorAccountService(state, owner._vault, new GoogleAccountConnectionFactory(configuration, owner._vault),
+                new GoogleLibraryConnectionFactory(configuration, owner._vault));
+            var application = new DesktopEngineApplication(library, state, owner._accounts, work);
+            owner._host = await DesktopWebHost.StartAsync(application, assetsDirectory, enableLan ? owner._identity.Identity : null, cancellationToken).ConfigureAwait(false);
             owner._host.Diagnostic += error => { owner.Failure = error; owner.Failed?.Invoke(error); };
             return owner;
         }
@@ -49,7 +49,6 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
     private async Task StopAsync()
     {
         if (_host is not null) await _host.DisposeAsync().ConfigureAwait(false);
-        if (_application is not null) await _application.DisposeAsync().ConfigureAwait(false);
         if (_accounts is not null) await _accounts.DisposeAsync().ConfigureAwait(false);
         if (_identity is not null) await _identity.DisposeAsync().ConfigureAwait(false);
         if (_vault is not null) await _vault.DisposeAsync().ConfigureAwait(false);

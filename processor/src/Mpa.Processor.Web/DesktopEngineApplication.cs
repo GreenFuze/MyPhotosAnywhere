@@ -1,28 +1,17 @@
 using Mpa.Processor.AppServices;
 using Mpa.Processor.Core;
-using Mpa.Processor.Credentials;
 using Mpa.Processor.GoogleDrive;
 
 namespace Mpa.Processor.Web;
 
-/// <summary>Application adapter shared by browser sessions. It owns bounded read connections,
-/// borrows durable state/accounts/work, and joins every active Google call before Exit.</summary>
+/// <summary>Browser adapter borrowing engine-lifetime accounts, read owners, state and work.</summary>
 public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoordinator state, ProcessorAccountService accounts,
-    DesktopOAuthConfiguration configuration, ICredentialVault vault, ProcessorWorkSupervisor work) : IDesktopWebApplication, IAsyncDisposable
+    ProcessorWorkSupervisor work) : IDesktopWebApplication
 {
     private readonly Guid _libraryId = libraryId != Guid.Empty ? libraryId : throw new ArgumentException("Library identity is required.", nameof(libraryId));
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly ProcessorAccountService _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
-    private readonly DesktopOAuthConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-    private readonly ICredentialVault _vault = vault ?? throw new ArgumentNullException(nameof(vault));
     private readonly ProcessorWorkSupervisor _work = work ?? throw new ArgumentNullException(nameof(work));
-    private readonly Dictionary<string, (long Revision, GoogleAccountConnection Connection)> _readers = new(StringComparer.Ordinal);
-    private readonly SemaphoreSlim _serial = new(1, 1);
-    private readonly CancellationTokenSource _stop = new();
-    private readonly object _gate = new();
-    private Task? _disposal;
-    private bool _stopping;
-
     public async Task<DesktopSnapshot> SnapshotAsync(CancellationToken cancellationToken)
     {
         var snapshot = await _accounts.SnapshotAsync(cancellationToken).ConfigureAwait(false);
@@ -30,13 +19,13 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
             account.DisplayName, account.Connected, account.Revision)).ToArray(),
             snapshot.Pending.Select(pending => new DesktopPendingAccount(pending.Id, pending.ExpectedPermissionId)).ToArray(), snapshot.Cleanup.Count);
     }
-    public Task<DesktopPhotoPage> PhotosAsync(string accountId, string? cursor, CancellationToken cancellationToken) => ReadAsync(accountId, async (reader, _, token) =>
+    public Task<DesktopPhotoPage> PhotosAsync(string accountId, string? cursor, CancellationToken cancellationToken) => _accounts.ReadDriveAsync(accountId, async (reader, _, token) =>
     {
         var page = await reader.ReadMediaPageAsync(cursor, token).ConfigureAwait(false);
         return new DesktopPhotoPage(page.Files.Select(file => new DesktopPhoto(file.Id, file.Name, file.MimeType, file.Width, file.Height,
             file.CapturedTime, file.ModifiedTime)).ToArray(), page.NextPageToken, page.IncompleteSearch);
     }, cancellationToken);
-    public Task<DesktopPreview?> PreviewAsync(string accountId, string fileId, CancellationToken cancellationToken) => ReadAsync<DesktopPreview?>(accountId, async (reader, _, token) =>
+    public Task<DesktopPreview?> PreviewAsync(string accountId, string fileId, CancellationToken cancellationToken) => _accounts.ReadDriveAsync<DesktopPreview?>(accountId, async (reader, _, token) =>
     {
         var preview = await reader.ReadMediaPreviewAsync(fileId, token).ConfigureAwait(false);
         return preview is null ? null : new(preview.Bytes, preview.MimeType);
@@ -71,7 +60,7 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
     }
 
     public Task<LibrarySourceSnapshot> SourcesAsync(CancellationToken cancellationToken) => _state.ExecuteAsync(database => new LibrarySourceRepository(database).Snapshot(), cancellationToken);
-    public Task<DesktopFolderLocation> FoldersAsync(string accountId, string folderId, string? cursor, CancellationToken cancellationToken) => ReadAsync(accountId, async (reader, _, token) =>
+    public Task<DesktopFolderLocation> FoldersAsync(string accountId, string folderId, string? cursor, CancellationToken cancellationToken) => _accounts.ReadDriveAsync(accountId, async (reader, _, token) =>
     {
         var folder = await reader.ReadFolderAsync(folderId, token).ConfigureAwait(false);
         if (!folder.CanListChildren) throw new HttpRequestException("Google does not allow listing this folder.", null, System.Net.HttpStatusCode.Forbidden);
@@ -81,7 +70,7 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
     public async Task<LibrarySourceSnapshot> AddSourceAsync(DesktopAddSource request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var captured = await ReadAsync(request.AccountId, async (reader, revision, token) =>
+        var captured = await _accounts.ReadDriveAsync(request.AccountId, async (reader, revision, token) =>
         {
             var folder = await reader.ReadFolderAsync(request.FolderId, token).ConfigureAwait(false);
             if (!folder.CanListChildren) throw new HttpRequestException("Google does not allow listing this source folder.", null, System.Net.HttpStatusCode.Forbidden);
@@ -95,41 +84,5 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
         ArgumentNullException.ThrowIfNull(request);
         return _state.ExecuteAsync(database => new LibrarySourceRepository(database).Update(request.Id, request.Enabled, request.IncludeDescendants,
             request.ExpectedSourceRevision, request.ExpectedRevision), cancellationToken);
-    }
-
-    private async Task<T> ReadAsync<T>(string accountId, Func<GoogleAccountConnection, long, CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
-    {
-        lock (_gate) ObjectDisposedException.ThrowIf(_stopping, this);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token);
-        await _serial.WaitAsync(linked.Token).ConfigureAwait(false);
-        try
-        {
-            lock (_gate) ObjectDisposedException.ThrowIf(_stopping, this);
-            var account = await _state.ExecuteAsync(database => new DriveAccountRepository(database).Accounts().SingleOrDefault(account => account.PermissionId == accountId && account.Connected), linked.Token).ConfigureAwait(false)
-                ?? throw new HttpRequestException("The selected Google account is disconnected.", null, System.Net.HttpStatusCode.Unauthorized);
-            if (!_readers.TryGetValue(accountId, out var current) || current.Revision != account.Revision)
-            {
-                if (current.Connection is not null) { await current.Connection.DisposeAsync().ConfigureAwait(false); _readers.Remove(accountId); }
-                current = (account.Revision, new GoogleAccountConnection(_configuration, _vault, account.ConnectionId, account.PermissionId));
-                _readers.Add(accountId, current);
-            }
-            return await operation(current.Connection, account.Revision, linked.Token).ConfigureAwait(false);
-        }
-        finally { _serial.Release(); }
-    }
-    public ValueTask DisposeAsync()
-    {
-        lock (_gate) { _stopping = true; return new(_disposal ??= StopAsync()); }
-    }
-    private async Task StopAsync()
-    {
-        await _stop.CancelAsync().ConfigureAwait(false);
-        await _serial.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            var owned = Task.WhenAll(_readers.Values.Select(reader => reader.Connection.DisposeAsync().AsTask()));
-            await owned.ConfigureAwait(false); _readers.Clear();
-        }
-        finally { _serial.Release(); _stop.Dispose(); }
     }
 }

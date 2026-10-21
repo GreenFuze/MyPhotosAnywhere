@@ -28,7 +28,7 @@ public sealed class GoogleAccountConnectionFactory(DesktopOAuthConfiguration con
 
 /// <summary>Owns one connection's SDK flow, browser callback and bounded read-only identity
 /// requests. No caller receives a raw UserCredential or token. The vault is borrowed.</summary>
-public sealed partial class GoogleAccountConnection : IGoogleAccountConnection
+public sealed partial class GoogleAccountConnection : IGoogleAccountConnection, IGoogleLibraryConnection
 {
     private readonly Guid _connectionId;
     private readonly string? _expectedPermissionId;

@@ -10,11 +10,12 @@ public sealed record ProcessorAccountSnapshot(IReadOnlyList<DriveAccountRecord> 
 /// <summary>Serial account setup owner shared by desktop/headless hosts. It borrows state/vault,
 /// owns each active Google connection and joins it before acknowledging cancellation or Exit.</summary>
 public sealed class ProcessorAccountService(ProcessorStateCoordinator state, ICredentialVault vault,
-    IGoogleAccountConnectionFactory connections) : IAsyncDisposable
+    IGoogleAccountConnectionFactory connections, IGoogleLibraryConnectionFactory readers) : IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly ICredentialVault _vault = vault ?? throw new ArgumentNullException(nameof(vault));
     private readonly IGoogleAccountConnectionFactory _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+    private readonly ProcessorDriveReaders _readers = new(state, readers);
     private readonly SemaphoreSlim _serial = new(1, 1);
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
@@ -81,6 +82,7 @@ public sealed class ProcessorAccountService(ProcessorStateCoordinator state, ICr
         var removed = 0;
         foreach (var record in pending)
         {
+            await _readers.RetireAsync(record.ConnectionId, token).ConfigureAwait(false);
             await _state.ExecuteAsync(database => { new DriveAccountRepository(database).AssertCleanupAllowed(record.ConnectionId); return true; }, token).ConfigureAwait(false);
             var store = new GoogleCredentialDataStore(_vault, record.ConnectionId, () => token);
             await store.ClearAsync().ConfigureAwait(false);
@@ -89,6 +91,12 @@ public sealed class ProcessorAccountService(ProcessorStateCoordinator state, ICr
         }
         return removed;
     }, cancellationToken);
+
+    public Task<T> ReadDriveAsync<T>(string accountId, Func<IGoogleLibraryConnection, long, CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
+    {
+        lock (_gate) ObjectDisposedException.ThrowIf(_stopping, this);
+        return _readers.ReadAsync(accountId, operation, cancellationToken);
+    }
 
     private async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
     {
@@ -114,7 +122,7 @@ public sealed class ProcessorAccountService(ProcessorStateCoordinator state, ICr
     {
         await _stop.CancelAsync().ConfigureAwait(false);
         await _serial.WaitAsync().ConfigureAwait(false);
-        _serial.Release();
-        _stop.Dispose();
+        try { await _readers.DisposeAsync().ConfigureAwait(false); }
+        finally { _serial.Release(); _stop.Dispose(); }
     }
 }

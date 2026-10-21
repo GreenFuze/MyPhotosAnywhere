@@ -6,7 +6,7 @@ using Mpa.Processor.GoogleDrive;
 namespace Mpa.Processor.AppServices.Tests;
 
 [TestClass]
-public sealed class AccountServiceTests
+public sealed partial class AccountServiceTests
 {
     [TestMethod]
     public async Task PromotionAndReconnectDisposeEveryOwnerAndCleanOnlyRetiredCredential()
@@ -94,15 +94,18 @@ public sealed class AccountServiceTests
         private readonly ProcessorStateCoordinator _state;
         public FakeVault Vault { get; } = new();
         public Factory Factory { get; } = new();
+        public LibraryFactory Readers { get; } = new();
         public ProcessorAccountService Service { get; }
         public Fixture()
         {
             _database = new ProcessorStateDatabase(_root);
             _state = new ProcessorStateCoordinator(_database);
-            Service = new(_state, Vault, Factory);
+            Vault.OnDelete = _ => Readers.Events.Enqueue("credential-deleted");
+            Service = new(_state, Vault, Factory, Readers);
         }
         public async ValueTask DisposeAsync()
         {
+            Factory.Release.TrySetResult(); Readers.ReleaseRead.TrySetResult(); Readers.ReleaseDisposal.TrySetResult(); Readers.FailDisposal = false;
             await Service.DisposeAsync().ConfigureAwait(false);
             await _state.DisposeAsync().ConfigureAwait(false);
             _database.Dispose();
@@ -113,13 +116,14 @@ public sealed class AccountServiceTests
     {
         public List<string> Deleted { get; } = [];
         public bool FailDelete { get; set; }
+        public Action<string>? OnDelete { get; set; }
         public Task<SecretLease?> ReadAsync(string key, CancellationToken cancellationToken) => throw new InvalidOperationException("Not used by this fixture.");
         public Task WriteAsync(string key, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken) => throw new InvalidOperationException("Not used by this fixture.");
         public Task DeleteAsync(string key, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (FailDelete) throw new CredentialVaultException("Synthetic locked keyring");
-            Deleted.Add(key); return Task.CompletedTask;
+            OnDelete?.Invoke(key); Deleted.Add(key); return Task.CompletedTask;
         }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
