@@ -253,3 +253,41 @@ and [file metadata](https://developers.google.com/workspace/drive/api/reference/
 APIs. Exact signed authority, object role, complete graph/coverage and staged activation
 are additional consumer checks. Actual account/Drive publication integration is separate
 from the adapter's synthetic HTTP regression acceptance.
+
+## Sequential facts-tree traversal into staging
+
+Matching C#/Kotlin `CatalogFactsTraversal` readers now walk the facts tree from an already
+verified, approved catalog commit. Its library must match the locally captured namespace
+and its required capabilities must include both `catalog.generations.v1` and
+`catalog.drive-facts.v1`. The existing typed manifest/index/leaf readers retain their bounds.
+The transport adapter must separately enforce actual account/workspace membership; the
+traversal verifies every index length/SHA-256 and every chunk's compressed/expanded checks
+before parsing its facts. It never accepts a URL or credential as a transport reference.
+
+Traversal reserves unique Drive file IDs across branches and document roles. The source
+coverage root and predecessor are reserved roles even though this walk does not read them.
+Aliases, cycles and role reuse fail. A consumer budget defaults to at most 65,536 referenced
+objects, including those reserved roles, and can be smaller; exceeding it is an explicit
+resource-limit failure. This consumer budget is additional to the wire's existing index
+node/depth limits. It never truncates the walk. Four prefix levels bound the depth-first
+pending stack independently of total library size.
+
+Leaves are emitted in prefix/identity order, not display chronology. Consumers build their
+chronological indexes while staging. There is no implicit leaf prefetch/buffer: stopping
+after the first leaf does not request the second. Android moves parsing/checksums to its
+background dispatcher without introducing a buffered flow boundary. Cancellation propagates
+from reads, parsing completion and collection; no unavailable object becomes an empty tree.
+
+A valid earlier leaf can precede a corrupt or missing later leaf. Only normal completion
+proves that this facts walk finished. A caller must retain staging state until complete
+source coverage, signed predecessor/authority agreement, policy fences and every required
+dependency have also validated, then atomically switch generations. This reader does not
+activate or discard a live catalog. Even an empty root requires a verified hash and valid
+canonical index; full source-coverage validation is still necessary before declaring an
+empty library.
+
+Independent Python fixtures cover 21 malformed, unavailable and over-budget graphs,
+including a failure after earlier leaves, cross-branch aliasing, cycles and foreign facts.
+Real signature tests alter syntactically valid settings JSON and require rejection before
+the first object read. The shared coverage placeholder is deliberately absent from fixture
+transport, preventing these tree-only tests from claiming complete-generation acceptance.

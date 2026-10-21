@@ -394,3 +394,24 @@ No original was downloaded, no Drive file changed, no browser/consent flow ran a
 file identity, URL or credential was logged. This uses the synthetic source as a transport
 fixture; it does not establish managed workspace enrollment, a signed generated catalog or
 the actual beyond-seven-day refresh observation, which remains pending.
+
+## Sequential verified facts-tree traversal
+
+Matching C#/Kotlin traversal readers now stream bounded identity partitions from a
+previously approved signed manifest. Every index/chunk hash and leaf identity is checked;
+object reuse/cycles, foreign workspace/account references and consumer-budget exhaustion
+fail explicitly. Reads are sequential without buffered leaf prefetch. Android parsing
+and checksums run off the main thread. A later failure remains a failed traversal even
+after earlier valid leaves were emitted into staging; it is never empty/ready success.
+
+Independent Python fixtures exercise 21 malformed/late-failed/over-budget graphs. Real
+signature tests tamper with valid settings JSON and require rejection before object reads.
+Local acceptance passes all 43 Protocol tests, 24 focused Android Protocol tests and all
+529 Android unit tests in 99 suites, with zero failures/skips and zero lint findings.
+Complete Desktop strict compilation has zero warnings/errors. Repeated test-array analyzer
+findings were fixed through shared fields, not suppression. The unchanged Gradle gate
+accepts only the previously approved exact AGP deprecation.
+
+This completes facts-tree traversal, not complete-generation activation: coverage, signed
+ancestry/authority agreement, policy fences, durable staging and the active-pointer switch
+remain required. No live catalog, persisted schema or Android product behavior changed.
