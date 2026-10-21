@@ -235,3 +235,12 @@ The next local contract candidate adds matching C#/Kotlin catalog manifest/index
 
 
 Existing model/codec feasibility evidence was also independently downloaded and checked: all four desktop targets on ecd4262 executed YuNet, normalized SFace and YOLOX with exact expected hashes, nonempty outputs and clean complete logs; native JPEG feasibility passed. Linux f98d083 passed its restricted FFmpeg synthetic rawvideo probe. These are native feasibility observations, not face/object quality, full media-format acceptance, installer payload verification or codec redistribution closure. The codec report explicitly retains `redistributionClosureAccepted: false`.
+
+
+## Joined local-control shutdown correction
+
+Contract run 39601550164 on dc4e20d exposed a macOS ARM null reference inside the runtime's Unix `WaitForConnectionAsync` during shutdown. The MPA owner canceled and disposed the pipe before awaiting its actual server task. It now cancels the asynchronous accept/read/write token, joins `Completion`, then disposes the transport and cancellation owner. Microsoft documents cancellation support for pipes configured with `PipeOptions.Asynchronous`, which this endpoint already uses: [WaitForConnectionAsync](https://learn.microsoft.com/en-us/dotnet/api/system.io.pipes.namedpipeserverstream.waitforconnectionasync?view=net-10.0). No null-reference catch or warning exception was added.
+
+All eight focused control tests pass locally. New coverage holds a real admitted handler after cancellation and verifies that the peer does not receive premature EOF, then releases it and verifies joined closure. Forty idle accept/shutdown cycles reuse the same pipe identity after actual completion. Existing malformed/disconnected-client, partial-frame, concurrent disposal and unexpected-handler-failure assertions remain. Native macOS and complete matrix revalidation are required for the correction; the failed earlier run is retained.
+
+The same dc4e20d Android build and all API29/35/37 device jobs passed. Its enhanced restricted Linux codec probe also passed actual synthetic H.264 frame decoding. Independent compressed-codec report review remains separate; codec redistribution, other formats/platforms and the complete joint product remain open.

@@ -150,8 +150,10 @@ public sealed class LocalProcessorControl : IAsyncDisposable
     private async Task DisposeCoreAsync()
     {
         await _stop.CancelAsync().ConfigureAwait(false);
-        _pipe.Dispose();
+        // All accepts/reads/writes use the asynchronous pipe's cancellation token.
+        // Join that actual operation before disposing the transport: Unix accept can
+        // still access its shared server instance after cancellation is requested.
         try { await Completion.ConfigureAwait(false); }
-        finally { _stop.Dispose(); }
+        finally { try { _pipe.Dispose(); } finally { _stop.Dispose(); } }
     }
 }
