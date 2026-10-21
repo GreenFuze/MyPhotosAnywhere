@@ -57,9 +57,36 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
         if (jobId == Guid.Empty) throw new ArgumentException("Job identity is required.", nameof(jobId));
         var prepared = Prepare(item);
         using var transaction = _database.Connection.BeginTransaction();
+        var created = EnsureItem(transaction, jobId, prepared);
+        transaction.Commit(); return created;
+    }
+
+    /// <summary>Record a failed observation without briefly admitting it as runnable work.
+    /// Replays preserve its current retry/ready state instead of resetting successful work.</summary>
+    public bool EnsureFailedItem(Guid jobId, JobItemSpec item, string code, string message)
+    {
+        if (jobId == Guid.Empty || !Identifier(code) || string.IsNullOrWhiteSpace(message) || message.Length > 2048)
+            throw new ArgumentException("Invalid failed item classification.");
+        var prepared = Prepare(item);
+        if (prepared.Stages.Length != 1 || prepared.Stages[0].Dependencies.Count != 0)
+            throw new ArgumentException("A failed observation requires one independent repair stage.", nameof(item));
+        using var transaction = _database.Connection.BeginTransaction();
+        var created = EnsureItem(transaction, jobId, prepared);
+        if (created)
+        {
+            using var fail = Command(transaction, """
+                UPDATE item_stage SET state='failed',error_code=$code,error_message=$message,retryable=1
+                WHERE job_id=$job AND item_id=$item AND name=$stage AND state='queued' AND attempt=0
+                """, ("$job", Key(jobId)), ("$item", Key(item.Id)), ("$stage", prepared.Stages[0].Name), ("$code", code), ("$message", message));
+            if (fail.ExecuteNonQuery() != 1) throw new InvalidOperationException("Failed observation was not admitted atomically.");
+        }
+        transaction.Commit(); return created;
+    }
+    private bool EnsureItem(SqliteTransaction transaction, Guid jobId, PreparedItem prepared)
+    {
         var exists = false;
         using (var select = Command(transaction, "SELECT input_fingerprint,captured_context FROM job_item WHERE job_id=$job AND id=$item",
-            ("$job", Key(jobId)), ("$item", Key(item.Id))))
+            ("$job", Key(jobId)), ("$item", Key(prepared.Id))))
         {
             using var reader = select.ExecuteReader();
             if (reader.Read())
@@ -80,12 +107,12 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
                 SELECT s.name,s.recipe_hash,d.depends_on FROM item_stage s LEFT JOIN stage_dependency d
                   ON d.job_id=s.job_id AND d.item_id=s.item_id AND d.stage_name=s.name
                 WHERE s.job_id=$job AND s.item_id=$item ORDER BY s.name,d.depends_on LIMIT 1025
-                """, ("$job", Key(jobId)), ("$item", Key(item.Id)));
+                """, ("$job", Key(jobId)), ("$item", Key(prepared.Id)));
             using var reader = graph.ExecuteReader();
             while (reader.Read()) actual.Add((reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)));
             if (!expected.SequenceEqual(actual)) throw new ConflictingJobItemException();
         }
-        transaction.Commit(); return !exists;
+        return !exists;
     }
     private PreparedItem Prepare(JobItemSpec item)
     {
@@ -117,19 +144,20 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
     }
     private sealed record PreparedItem(Guid Id, string InputFingerprint, JobStageSpec[] Stages, string Context);
 
-    public StageLease? ClaimNext(string? kind = null)
+    public StageLease? ClaimNext(string? kind = null, string? stage = null)
     {
         if (kind is not null && !Identifier(kind)) throw new ArgumentException("Invalid admitted job kind.", nameof(kind));
+        if (stage is not null && !Identifier(stage)) throw new ArgumentException("Invalid admitted stage.", nameof(stage));
         using var transaction = _database.Connection.BeginTransaction();
         using var select = Command(transaction, """
             SELECT s.job_id,s.item_id,s.name,s.attempt,j.captured_context,s.checkpoint,i.captured_context
             FROM item_stage s JOIN job j ON j.id=s.job_id JOIN job_item i ON i.job_id=s.job_id AND i.id=s.item_id
-            WHERE s.state='queued' AND j.paused=0 AND j.canceled=0 AND ($kind IS NULL OR j.kind=$kind)
+            WHERE s.state='queued' AND j.paused=0 AND j.canceled=0 AND ($kind IS NULL OR j.kind=$kind) AND ($stage IS NULL OR s.name=$stage)
               AND NOT EXISTS(SELECT 1 FROM stage_dependency d JOIN item_stage parent
                 ON parent.job_id=d.job_id AND parent.item_id=d.item_id AND parent.name=d.depends_on
                 WHERE d.job_id=s.job_id AND d.item_id=s.item_id AND d.stage_name=s.name AND parent.state!='ready')
             ORDER BY s.job_id,s.item_id,s.name LIMIT 1
-            """, ("$kind", kind is null ? DBNull.Value : kind));
+            """, ("$kind", kind is null ? DBNull.Value : kind), ("$stage", stage is null ? DBNull.Value : stage));
         Guid job; Guid item; string name; int attempt; string context; string? checkpoint; string itemContext;
         using (var reader = select.ExecuteReader())
         {

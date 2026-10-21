@@ -22,3 +22,11 @@ All62 Core tests passed after adding ten discovery cases (eight functional cases
 |100,000|214,581ms|11.9ms|75.4ms|17,864ms|
 
 These are single observations on a concurrently loaded Windows computer, not latency guarantees. Preparation cost requires continued measurement as scanning is integrated. Each test walk retained one returned page; actual process memory, import responsiveness, publication snapshots, Android staging and physical-device performance are not established by this test. Full logs/TRX/JSON measurements remain in private preflight evidence. No warning gate or assertion was reduced.
+
+## Durable discovery admission and failed observations
+
+SourceDiscoveryRepository captures source/account revisions, canonical root/shared-drive scope, descendant policy and each folder's immutable identity/depth in schema5 jobs. Page checkpoints survive restart and reject stale attempts, late pages and repeated current tokens. Idempotent child admission retains completed work; source changes fence old work without silently retargeting it.
+
+A malformed observation creates an atomic failed repair item in the same job, so healthy folder work can continue. A known file identity retries that exact metadata GET. If Google omitted a usable identity, the repair captures the metadata-page cursor; it never assigns the old position to a different photo. RetryFailed admits only failed repairs and leaves successful folders/items ready. Replaying the observation preserves an already queued or completed repair. Folder and repair claims have separate stage filters. This is metadata-only scheduling; runtime scanner/repair execution and user-facing progress are still pending.
+
+All14 focused captured-input/discovery tests pass locally, including four repair cases. No schema or Android Room change beyond the already introduced schema5 item context is needed for these records. Full affected/native regression remains separate.
