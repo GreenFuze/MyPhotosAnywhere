@@ -415,3 +415,49 @@ accepts only the previously approved exact AGP deprecation.
 This completes facts-tree traversal, not complete-generation activation: coverage, signed
 ancestry/authority agreement, policy fences, durable staging and the active-pointer switch
 remain required. No live catalog, persisted schema or Android product behavior changed.
+
+## API 29 startup mismatch and bounded XMP output
+
+The native/Desktop runs for `645441e7a59140678565f3da07388a8a93b56ca2`
+passed on all four desktop targets. Independently downloaded reports contain 996
+passing tests (249 per target), no failed/skipped tests and no warning findings;
+reported web inventories agree and npm audits report zero vulnerabilities. These
+artifacts do not contain application binaries, so their binary hashes are not
+independently verified. Android build passed, but API 29 device acceptance failed:
+two thumbnail quality assertions returned 724 instead of 768 pixels, and optional
+XMP serialization exhausted a 16 MiB runtime heap. API 35/37 were canceled.
+
+The preserved boot log shows the 64-bit zygote starting with `-Xmx16m` before
+qemu-props delivered the AVD's existing `dalvik.vm.heapsize=576m`; the 32-bit
+zygote subsequently received 576m. Compiler heap arguments in the same log are
+distinct from the runtime heap. The CI preparation now checks the actual primary
+64-bit startup arguments. Only that exact API 29/16m-versus-576m mismatch permits
+a framework restart before tests, followed by a new PID and matching heap check.
+It changes neither heap configuration nor assertions, never clears logs and
+rejects physical devices, other images and unexplained mismatches. Six Python
+tests pass, including failed repair and physical-device rejection. Actual CI
+reinitialization remains unverified until the new device run finishes.
+
+XMP encoding now checks a minimum UTF-8 catalogue budget before constructing its
+DOM and uses a byte-bounded serialization stream for escaped and retained external
+XML. Overflow remains an actionable `IllegalArgumentException`, not a swallowed
+OOM, and the existing optional-XMP import recovery contract is preserved. Fourteen
+focused tests pass, including early rejection, escaping, external annotations and
+supplementary Unicode. Full Android unit/lint and device acceptance remain pending.
+Thumbnail memory limits and all existing quality/recovery assertions are unchanged.
+
+## Borrowed workspace transport integration
+
+`CatalogWorkspaceObjectSource` implements the catalog traversal's transport using the
+existing engine-wide `ProcessorAccountService` reader owner. It rejects foreign or
+unbounded references before borrowing a reader, carries the selected account revision,
+checks actual returned object identity and rechecks connected/revision state before
+returning bytes. Connection replacement or disconnection cannot promote late results.
+It neither owns credentials nor starts a second connection/worker/listener.
+
+All six focused transport tests and all 47 AppServices tests pass, including credential
+retirement waiting for a held read, joined Exit, late cancellation, wrong identity,
+reconnection and scope rejection. Complete Desktop compilation passes with zero warnings
+and errors. The native Google object reader previously passed actual synthetic Drive
+acceptance; this new application-service bridge currently has synthetic integration
+coverage. Complete-generation validation, durable staging and activation remain separate.
