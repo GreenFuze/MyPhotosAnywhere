@@ -126,3 +126,49 @@ revocation and durable replay journal, validates current source and actual desti
 membership, verifies conditional-write behavior, and writes only the approved operation.
 If Drive cannot enforce a required precondition safely, that action remains blocked.
 Generated catalog/human annotation operations never imply permission to change originals.
+
+
+## Implemented manifest/index field encoding
+
+`CatalogPublicationReader` has matching C# and Kotlin typed readers and shared synthetic
+fixtures. This is bounded schema validation after the existing approved-actor signature
+reader, not an activated publisher, trusted enrollment flow or complete tree consumer.
+Actual Drive parent membership, every referenced object's hash, graph ancestry and full
+staging completeness remain required before a local generation can become active.
+
+Every object reference contains string fields `accountId`, `fileId`, `workspaceId`,
+`bytes`, `sha256`. Identity fields use opaque Drive IDs (1..256 ASCII letters/digits,
+`-`, `_`), never an email, path or URL. Account/workspace must match the previously
+selected metadata workspace; the file cannot be the workspace folder itself. `bytes`
+is a positive canonical int64 string, and `sha256` is exactly 64 lowercase hex digits.
+Index, source-coverage page/root and parent-commit objects are at most 256 KiB each.
+They are distinct object roles, with distinct Drive file IDs. Source coverage is paged;
+its page schema is subsequent implementation, not an unbounded list in this commit.
+
+A `catalog-commit` explicitly requires `catalog.generations.v1`. Its canonical payload
+contains nonzero lowercase UUID `generationId`; nullable object reference `parent`;
+object references `rootIndex` and `sourceCoverage`; canonical nonnegative decimal-string
+`settingsRevision`; and positive decimal-string `minimumHistoryGeneration`. The last is
+the minimum retained sequence in this publisher/authority-epoch stream, and cannot exceed
+the enclosing signed stream sequence. Sequence 1 alone has a null parent; later commits
+must retain a parent reference. Full ancestor verification still belongs to the consumer.
+
+Canonical index JSON has `format: "mpa-catalog-index"`, integer `major: 1`, `prefix`
+and `children`. A node prefix is zero, two, four or six lowercase hex digits and must
+match the partition expected by its parent. Each of at most 256 children has `edge`
+(two lowercase hex digits), `kind` (`index` or `chunk`), object reference `object`, and
+`expanded`. Edges are unique and ordinally sorted. Child Drive objects cannot alias.
+An index child requires `expanded: null`; a chunk child requires an object containing
+positive canonical decimal-string `bytes` and lowercase `sha256` for expanded bytes.
+Compressed chunks are at most 4 MiB and expanded bytes at most 16 MiB. At prefix length
+six a child must be a chunk, giving at most four two-digit partition levels. Only the
+root can have no children, representing a genuinely empty generation. An empty internal
+branch, unknown child kind or mismatched prefix is malformed, never empty-success.
+
+Canonical encodings are checked before schema parsing. Unknown optional fields remain
+covered by canonical hashes/signatures; changed semantics require a declared capability.
+The shared fixture contains 18 malformed commit and 21 malformed index cases, including
+cross-workspace/account references, duplicate roles/partitions, wrong types, counter
+bounds, transport/expanded bounds and depth. Fixture reference digests are synthetic
+schema inputs, not evidence of any uploaded or hash-verified publication. Shared signature
+tests separately exercise the approved actor boundary before the typed manifest parser.
