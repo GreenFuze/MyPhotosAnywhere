@@ -24,8 +24,11 @@ public sealed class SourceDiscoveryScheduler : IProcessorWorkControl, IAsyncDisp
     private bool _stopping;
     private bool _stopped;
     private Exception? _failure;
+    private StorageBudgetStatus? _storageAttention;
     public Task Completion => _loop;
     public Exception? Failure { get { lock (_gate) return _failure; } }
+    public StorageBudgetStatus? StorageAttention { get { lock (_gate) return _storageAttention; } }
+    public bool ExitConfirmed { get { lock (_gate) return _stopped; } }
     public ProcessorWorkState State
     {
         get
@@ -113,7 +116,7 @@ public sealed class SourceDiscoveryScheduler : IProcessorWorkControl, IAsyncDisp
                         }
                     }
                     var step = await _runner.RunNextAsync(linked.Token).ConfigureAwait(false);
-                    lock (_gate) _active = false;
+                    lock (_gate) { _active = false; _storageAttention = null; }
                     if (step is null)
                     {
                         if (!await _wake.WaitAsync(_pollInterval, linked.Token).ConfigureAwait(false)) lock (_gate) _reconcile = true;
@@ -121,6 +124,12 @@ public sealed class SourceDiscoveryScheduler : IProcessorWorkControl, IAsyncDisp
                 }
                 catch (OperationCanceledException) when (linked.IsCancellationRequested)
                 { lock (_gate) _reconcile = true; /* Resume rechecks any partially scheduled source list. */ }
+                catch (InsufficientStorageBudgetException error)
+                {
+                    lock (_gate) { _storageAttention = error.Status; _reconcile = true; _active = false; }
+                    try { await _wake.WaitAsync(_pollInterval, linked.Token).ConfigureAwait(false); }
+                    catch (OperationCanceledException) when (linked.IsCancellationRequested) { /* Pause/Exit joins this bounded wait. */ }
+                }
                 finally { lock (_gate) _active = false; }
             }
         }

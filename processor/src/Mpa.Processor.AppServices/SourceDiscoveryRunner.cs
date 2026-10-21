@@ -10,23 +10,28 @@ public sealed record SourceDiscoveryStep(Guid JobId, Guid ItemId, bool Repair, b
 /// <summary>Owns one bounded metadata step at a time, independent from any browser. It borrows
 /// the engine account/state owners, never reads original bytes, and joins reads before yielding
 /// their durable leases. This runner does not itself start a timer or admit unselected sources.</summary>
-public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, ProcessorAccountService accounts) : IAsyncDisposable
+public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, ProcessorAccountService accounts, StorageBudgetManager? storage = null) : IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly ProcessorAccountService _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
+    private readonly StorageBudgetManager? _storage = storage;
+    // One bounded metadata page has at most 60 entries / 512 KiB. Reserve additional
+    // SQLite index/WAL/checkpoint headroom; no original bytes are admitted by this lease.
+    public const long MetadataStepReservationBytes = 16L * 1024 * 1024;
     private readonly SemaphoreSlim _serial = new(1, 1);
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
     private bool _stopping;
     private Task? _disposal;
     private Exception? _failure;
+    private StorageReservation? _reservation;
     public Exception? Failure { get { lock (_gate) return _failure; } }
 
     public Task<int> RecoverInterruptedReadsAfterExclusiveRestartAsync(CancellationToken cancellationToken) => ExecuteAsync(token =>
-        _state.ExecuteAsync(database => new SourceDiscoveryRepository(database).RecoverInterruptedReadsAfterExclusiveRestart(), token), cancellationToken);
+        StateAsync(database => new SourceDiscoveryRepository(database).RecoverInterruptedReadsAfterExclusiveRestart(), token), cancellationToken);
 
     public Task<SourceDiscoverySchedule> EnsureScheduledAsync(Guid sourceId, long expectedSourceRevision, CancellationToken cancellationToken) => ExecuteAsync(token =>
-        _state.ExecuteAsync(database =>
+        StateAsync(database =>
         {
             var source = new LibrarySourceRepository(database).Snapshot().Sources.SingleOrDefault(source => source.Id == sourceId && source.Revision == expectedSourceRevision && source.Enabled && source.AccountConnected)
                 ?? throw new StaleLibraryConfigurationException();
@@ -36,7 +41,7 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
 
     public Task<Guid> ScheduleAsync(Guid sourceId, long expectedSourceRevision, CancellationToken cancellationToken) => ExecuteAsync(async token =>
     {
-        var captured = await _state.ExecuteAsync(database =>
+        var captured = await StateAsync(database =>
         {
             var source = new LibrarySourceRepository(database).Snapshot().Sources.SingleOrDefault(source => source.Id == sourceId && source.Revision == expectedSourceRevision && source.Enabled && source.AccountConnected)
                 ?? throw new StaleLibraryConfigurationException();
@@ -50,7 +55,7 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
         }, token).ConfigureAwait(false);
         if (!root.CanListChildren) throw new HttpRequestException("Google does not allow reading the selected source folder.", null, HttpStatusCode.Forbidden);
         var job = Guid.NewGuid();
-        await _state.ExecuteAsync(database =>
+        await StateAsync(database =>
         {
             new SourceDiscoveryRepository(database).Create(job, sourceId, expectedSourceRevision, captured.AccountRevision, root.Id, root.SharedDriveId); return true;
         }, token).ConfigureAwait(false);
@@ -59,7 +64,7 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
 
     public Task<SourceDiscoveryStep?> RunNextAsync(CancellationToken cancellationToken) => ExecuteAsync<SourceDiscoveryStep?>(async token =>
     {
-        var captured = await _state.ExecuteAsync(database =>
+        var captured = await StateAsync(database =>
         {
             var repository = new SourceDiscoveryRepository(database);
             var verification = repository.ClaimVerification();
@@ -75,6 +80,8 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
                 await RepairAsync(captured.Repair!, token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
+        { await ReturnAsync(lease).ConfigureAwait(false); throw; }
+        catch (InsufficientStorageBudgetException)
         { await ReturnAsync(lease).ConfigureAwait(false); throw; }
         catch (StaleStageLeaseException)
         {
@@ -111,7 +118,7 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
 
     private async Task<SourceDiscoveryStep> VerifyAsync(SourceDiscoveryVerification work, CancellationToken token)
     {
-        var accepted = await _state.ExecuteAsync(database =>
+        var accepted = await StateAsync(database =>
         {
             var repository = new SourceDiscoveryRepository(database); repository.ValidateCurrent(work); return repository.VerifiedRoot(work);
         }, token).ConfigureAwait(false);
@@ -123,25 +130,25 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
                 return reader.ReadFolderAsync(work.Scope.RootFolderId, readToken);
             }, token).ConfigureAwait(false);
             if (!root.CanListChildren) throw new HttpRequestException("Google does not allow reading the captured source folder.", null, HttpStatusCode.Forbidden);
-            work = await _state.ExecuteAsync(database => new SourceDiscoveryRepository(database).SaveVerifiedRoot(work, root.Id, root.SharedDriveId), token).ConfigureAwait(false);
+            work = await StateAsync(database => new SourceDiscoveryRepository(database).SaveVerifiedRoot(work, root.Id, root.SharedDriveId), token).ConfigureAwait(false);
         }
-        await _state.ExecuteAsync(database => { new SourceDiscoveryRepository(database).CompleteVerification(work); return true; }, token).ConfigureAwait(false);
+        await StateAsync(database => { new SourceDiscoveryRepository(database).CompleteVerification(work); return true; }, token).ConfigureAwait(false);
         return new(work.Lease.JobId, work.Lease.ItemId, false, true, false) { Stage = work.Lease.Stage };
     }
 
     private async Task<SourceDiscoveryStep> FolderAsync(SourceDiscoveryWork work, CancellationToken token)
     {
-        var checkpoint = await _state.ExecuteAsync(database =>
+        var checkpoint = await StateAsync(database =>
         {
             var repository = new SourceDiscoveryRepository(database); repository.ValidateCurrent(work); return repository.Checkpoint(work);
         }, token).ConfigureAwait(false);
         if (checkpoint.Started && checkpoint.NextPageToken is null)
         {
-            await _state.ExecuteAsync(database => { new SourceDiscoveryRepository(database).CompleteFolder(work); return true; }, token).ConfigureAwait(false);
+            await StateAsync(database => { new SourceDiscoveryRepository(database).CompleteFolder(work); return true; }, token).ConfigureAwait(false);
             return new(work.Lease.JobId, work.Lease.ItemId, false, true, false);
         }
         var page = await ReadPageAsync(work.Scope, work.Folder, checkpoint.NextPageToken, token).ConfigureAwait(false);
-        return await _state.ExecuteAsync(database =>
+        return await StateAsync(database =>
         {
             var repository = new SourceDiscoveryRepository(database); repository.ValidateCurrent(work);
             var failures = page.Failures.Select(failure => failure.FileId).ToList();
@@ -163,14 +170,14 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
 
     private async Task<SourceDiscoveryStep> RepairAsync(SourceDiscoveryRepair repair, CancellationToken token)
     {
-        await _state.ExecuteAsync(database => { new SourceDiscoveryRepository(database).ValidateCurrent(repair); return true; }, token).ConfigureAwait(false);
+        await StateAsync(database => { new SourceDiscoveryRepository(database).ValidateCurrent(repair); return true; }, token).ConfigureAwait(false);
         var page = repair.FileId is null ? await ReadPageAsync(repair.Scope, repair.Folder, repair.PageToken, token).ConfigureAwait(false) :
             new DriveSourcePage([await _accounts.ReadDriveAsync(repair.Scope.AccountId, (reader, revision, readToken) =>
             {
                 if (revision != repair.Scope.AccountRevision) throw new StaleLibraryConfigurationException();
                 return reader.ReadSourceItemAsync(repair.Folder.FolderId, repair.Folder.SharedDriveId, repair.FileId, readToken);
             }, token).ConfigureAwait(false)], [], null, false);
-        return await _state.ExecuteAsync(database =>
+        return await StateAsync(database =>
         {
             var repository = new SourceDiscoveryRepository(database); repository.ValidateCurrent(repair);
             var inaccessible = false;
@@ -206,14 +213,25 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
     private Task<bool> ReturnAsync(StageLease lease) => _state.ExecuteAsync(database => { new DurableJobRepository(database).ReturnJoinedRead(lease); return true; }, CancellationToken.None);
     private async Task<SourceDiscoveryStep> FailAsync(StageLease lease, bool repair, string code, string message, bool retryable)
     {
-        var failed = await _state.ExecuteAsync(database =>
+        try
         {
-            var jobs = new DurableJobRepository(database); var policy = jobs.Summary(lease.JobId);
-            if (policy.Paused || policy.IsCanceled) { jobs.ReturnJoinedRead(lease); return false; }
-            jobs.Fail(lease, code, message, retryable); return true;
-        }, CancellationToken.None).ConfigureAwait(false);
-        return new(lease.JobId, lease.ItemId, repair, false, failed) { Stage = lease.Stage };
+            var failed = await StateAsync(database =>
+            {
+                var jobs = new DurableJobRepository(database); var policy = jobs.Summary(lease.JobId);
+                if (policy.Paused || policy.IsCanceled) { jobs.ReturnJoinedRead(lease); return false; }
+                jobs.Fail(lease, code, message, retryable); return true;
+            }, CancellationToken.None).ConfigureAwait(false);
+            return new(lease.JobId, lease.ItemId, repair, false, failed) { Stage = lease.Stage };
+        }
+        catch (InsufficientStorageBudgetException)
+        { await ReturnAsync(lease).ConfigureAwait(false); throw; }
     }
+    private Task<T> StateAsync<T>(Func<ProcessorStateDatabase, T> operation, CancellationToken token) => _state.ExecuteAsync(database =>
+    {
+        _reservation?.RecheckBeforeWrite(MetadataStepReservationBytes);
+        return operation(database);
+    }, token);
+
     private async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken, bool faultOnError = false)
     {
         lock (_gate) ObjectDisposedException.ThrowIf(_stopping, this);
@@ -226,9 +244,12 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
                 ObjectDisposedException.ThrowIf(_stopping, this);
                 if (_failure is not null) throw new InvalidOperationException("Source discovery stopped after an internal failure. Inspect its diagnostic before restarting.", _failure);
             }
-            return await operation(linked.Token).ConfigureAwait(false);
+            using var reservation = _storage is null ? null : await _state.ExecuteAsync(_ => _storage.Reserve(MetadataStepReservationBytes), linked.Token).ConfigureAwait(false);
+            _reservation = reservation;
+            try { return await operation(linked.Token).ConfigureAwait(false); }
+            finally { _reservation = null; }
         }
-        catch (Exception error) when (faultOnError && !(error is OperationCanceledException && linked.IsCancellationRequested))
+        catch (Exception error) when (faultOnError && error is not InsufficientStorageBudgetException && !(error is OperationCanceledException && linked.IsCancellationRequested))
         { lock (_gate) _failure ??= error; throw; }
         finally { _serial.Release(); }
     }
