@@ -677,7 +677,7 @@ installation/library identities, source bindings, journals and local originals. 
 Room remains schema 12. Older migration fixtures explicitly remove the new table when
 constructing historical databases; their original data-preservation assertions remain.
 
-The journal captures library/actor/generation, account and credential revision, workspace,
+The journal captures library/actor/actor epoch/generation, account and credential revision, workspace,
 configuration revision, authority digest, role, MIME and owned payload bytes. A canonical
 context hash binds immutable fields to the payload hash. ID assignment precedes create
 and cannot replace another allocated ID, alias a different operation in the same account

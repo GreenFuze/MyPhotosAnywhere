@@ -136,7 +136,7 @@ public sealed partial class AccountServiceTests
     {
         var account = await fixture.Service.ConnectAsync(null, new NoBrowser(), CancellationToken.None).ConfigureAwait(false);
         return await fixture.State.ExecuteAsync(database => new WorkspacePublicationRepository(database, budget).Prepare(Guid.NewGuid(),
-            new(new ProcessorLibraryRepository(database).GetOrCreateIdentity(), Guid.NewGuid(), Guid.NewGuid(), account.PermissionId, account.Revision, "workspace-A", 1, new string('a', 64)),
+            new(new ProcessorLibraryRepository(database).GetOrCreateIdentity(), Guid.NewGuid(), 1, Guid.NewGuid(), account.PermissionId, account.Revision, "workspace-A", 1, new string('a', 64)),
             "facts-index", "application/json", "{}"u8), CancellationToken.None).ConfigureAwait(false);
     }
     private static Task<WorkspacePublicationRecord> PublicationRead(Fixture fixture, StorageBudgetManager budget, Guid id) =>

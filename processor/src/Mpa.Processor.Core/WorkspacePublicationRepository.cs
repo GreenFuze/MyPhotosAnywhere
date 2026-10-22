@@ -6,7 +6,7 @@ using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.Core;
 
-public sealed record WorkspacePublicationScope(Guid LibraryId, Guid ActorId, Guid GenerationId, string AccountId,
+public sealed record WorkspacePublicationScope(Guid LibraryId, Guid ActorId, long ActorEpoch, Guid GenerationId, string AccountId,
     long AccountRevision, string FolderId, long ConfigurationRevision, string AuthoritySha256);
 public sealed record WorkspacePublicationRecord(Guid Id, WorkspacePublicationScope Scope, string Role, string MimeType,
     string Sha256, string? FileId, long? VerifiedVersion, ReadOnlyMemory<byte> Payload);
@@ -153,7 +153,7 @@ public sealed class WorkspacePublicationRepository(ProcessorStateDatabase databa
     private static void ValidateScope(WorkspacePublicationScope scope)
     {
         ArgumentNullException.ThrowIfNull(scope);
-        if (scope.LibraryId == Guid.Empty || scope.ActorId == Guid.Empty || scope.GenerationId == Guid.Empty || !Identity(scope.AccountId) ||
+        if (scope.LibraryId == Guid.Empty || scope.ActorId == Guid.Empty || scope.ActorEpoch < 1 || scope.GenerationId == Guid.Empty || !Identity(scope.AccountId) ||
             !Identity(scope.FolderId) || scope.FolderId == "root" || scope.AccountRevision < 1 || scope.ConfigurationRevision < 1 || !Digest(scope.AuthoritySha256))
             throw new ArgumentException("An immutable library/actor/generation, account/workspace and authority revision/digest are required.", nameof(scope));
     }

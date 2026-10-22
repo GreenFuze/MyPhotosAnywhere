@@ -451,7 +451,7 @@ and captured content references remain the admission authorities. See Google's
 ### Durable publication owner integration
 
 Before allocating an object ID, the local journal persists exact bytes, role/type, their
-digest and captured library/publisher/generation/account/workspace/configuration authority.
+digest and captured library/publisher/actor epoch/generation/account/workspace/configuration authority.
 It binds those immutable fields with a canonical context digest. Before create, it
 persists the allocated ID; retry cannot mint a replacement or retarget a captured job.
 Account/configuration revisions fence uploads and receipt admission. A reconnect does

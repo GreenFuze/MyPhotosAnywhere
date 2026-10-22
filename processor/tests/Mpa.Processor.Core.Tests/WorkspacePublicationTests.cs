@@ -45,7 +45,7 @@ public sealed class WorkspacePublicationTests
         var record = fixture.Journal.Prepare(id, scope, "facts-index", "application/json", Payload);
         var conflicts = new[] { scope with { AccountId = "account-B" }, scope with { FolderId = "other-workspace" }, scope with { AccountRevision = 2 },
             scope with { ConfigurationRevision = 2 }, scope with { LibraryId = Guid.NewGuid() }, scope with { ActorId = Guid.NewGuid() },
-            scope with { GenerationId = Guid.NewGuid() }, scope with { AuthoritySha256 = new string('b', 64) } };
+            scope with { GenerationId = Guid.NewGuid() }, scope with { ActorEpoch = 2 }, scope with { AuthoritySha256 = new string('b', 64) } };
         foreach (var changed in conflicts)
             Assert.ThrowsExactly<WorkspacePublicationConflictException>(() => fixture.Journal.Prepare(id, changed, "facts-index", "application/json", Payload));
         Assert.ThrowsExactly<WorkspacePublicationConflictException>(() => fixture.Journal.Prepare(id, scope, "catalog-commit", "application/json", Payload));
@@ -136,6 +136,7 @@ public sealed class WorkspacePublicationTests
         Assert.ThrowsExactly<ArgumentException>(() => fixture.Journal.Prepare(Guid.NewGuid(), fixture.Scope, "facts-index", "application/json", new byte[WorkspacePublicationRepository.MaximumPayloadBytes + 1]));
         Assert.ThrowsExactly<ArgumentException>(() => fixture.Journal.Prepare(Guid.NewGuid(), fixture.Scope, "original-upload", "image/jpeg", Payload));
         Assert.ThrowsExactly<ArgumentException>(() => fixture.Journal.Prepare(Guid.NewGuid(), fixture.Scope with { FolderId = "root" }, "facts-index", "application/json", Payload));
+        Assert.ThrowsExactly<ArgumentException>(() => fixture.Journal.Prepare(Guid.NewGuid(), fixture.Scope with { ActorEpoch = 0 }, "facts-index", "application/json", Payload));
         var maximum = new byte[WorkspacePublicationRepository.MaximumPayloadBytes]; RandomNumberGenerator.Fill(maximum);
         var large = fixture.Journal.Prepare(Guid.NewGuid(), fixture.Scope, "facts-chunk", "application/gzip", maximum);
         CollectionAssert.AreEqual(maximum, fixture.Journal.Read(large.Id)!.Payload.ToArray());
@@ -184,7 +185,7 @@ public sealed class WorkspacePublicationTests
             _path = path;
             Database = new(path); var accounts = new DriveAccountRepository(Database);
             if (accounts.Accounts().Count == 0) { var pending = accounts.Begin(Guid.NewGuid()); accounts.Promote(pending.Id, "account-A", "Synthetic", null); }
-            Scope = new(new ProcessorLibraryRepository(Database).GetOrCreateIdentity(), Guid.NewGuid(), Guid.NewGuid(), "account-A", 1, "workspace", 1, new string('a', 64));
+            Scope = new(new ProcessorLibraryRepository(Database).GetOrCreateIdentity(), Guid.NewGuid(), 1, Guid.NewGuid(), "account-A", 1, "workspace", 1, new string('a', 64));
             Budget = new(Space); Journal = new(Database, Budget);
         }
         public void Sql(string text) { using var connection = Open(_path); using var command = connection.CreateCommand(); command.CommandText = text; command.ExecuteNonQuery(); }
