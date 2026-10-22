@@ -65,6 +65,48 @@ class EmulatorHeapProfileTest(unittest.TestCase):
                 owner.verify()
             self.assertFalse(any(command[0] == "root" for command in owner.commands))
 
+    def test_primary_identity_uses_init_parent_and_matches_current_named_processes(self):
+        processes = "PID PPID NAME\n1 0 init\n123 1 zygote64\n456 123 zygote64\n789 1 zygote\n"
+        self.assertEqual("123", EmulatorHeapProfile.primary_pid(processes, "456 123"))
+        self.assertEqual("123", EmulatorHeapProfile.primary_pid(processes, "123"))
+
+    def test_ambiguous_missing_or_malformed_primary_evidence_remains_blocking(self):
+        for processes, named in (("PID PPID NAME\n123 1 zygote64\n456 1 zygote64", "123 456"),
+                ("PID PPID NAME\n123 9 zygote64", "123"), ("PID PPID NAME\n123 1 zygote64", "456"),
+                ("PID NAME\n123 zygote64", "123"), ("PID PPID NAME\n123 1 zygote64\n123 1 zygote64", "123"),
+                ("PID PPID NAME\n123 1 zygote64", "123 invalid"), ("PID PPID NAME\n123 1 zygote64", "123 123")):
+            with self.subTest(processes=processes, named=named), self.assertRaises(ValueError):
+                EmulatorHeapProfile.primary_pid(processes, named)
+
+    def test_snapshot_saves_identity_and_runtime_logs_before_rejecting_ambiguity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            owner = InventoryOwner(directory, "PID PPID NAME\n123 1 zygote64\n456 1 zygote64")
+            with self.assertRaises(ValueError):
+                owner.snapshot("heap-before")
+            evidence = json.loads((Path(directory) / "heap-before-identity.json").read_text())
+            self.assertEqual("456 123", evidence["namedPids"])
+            self.assertIn("456 1 zygote64", evidence["processes"])
+            self.assertEqual(self.log() + "\n", (Path(directory) / "heap-before.log").read_text())
+            valid = InventoryOwner(directory, "PID PPID NAME\n123 1 zygote64\n456 123 zygote64")
+            self.assertEqual("576m", valid.snapshot("heap-valid")["runtimeHeap"])
+
+
+class InventoryOwner(EmulatorHeapOwner):
+    def __init__(self, directory, processes):
+        super().__init__(directory)
+        self.processes = processes
+
+    def adb(self, *arguments):
+        if arguments == ("shell", "getprop", "ro.build.version.sdk"):
+            return "29"
+        if arguments == ("shell", "pidof", "zygote64"):
+            return "456 123"
+        if arguments == ("shell", "ps", "-A", "-o", "PID,PPID,NAME"):
+            return self.processes
+        if arguments == ("logcat", "-b", "main", "-d", "-v", "threadtime"):
+            return EmulatorHeapProfileTest.log()
+        return "576m"
+
 
 class FakeOwner(EmulatorHeapOwner):
     def __init__(self, directory, heap, serial="emulator-5554", repair=True, sdk="29"):

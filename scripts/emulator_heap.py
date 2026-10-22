@@ -10,6 +10,31 @@ import time
 class EmulatorHeapProfile:
     option = re.compile(r"^\S+\s+\S+\s+(\d+)\s+\d+\s+[A-Z]\s+zygote64\s*:\s+option\[(\d+)\]=(.*)$")
 
+    @staticmethod
+    def primary_pid(processes, named_pids):
+        # During boot a freshly forked child can still share the zygote name.
+        # The primary init-owned process must independently match both inventories.
+        pids = named_pids.split()
+        if (not pids or len(pids) > 256 or len(set(pids)) != len(pids)
+                or any(not re.fullmatch(r"[1-9][0-9]*", pid) for pid in pids)):
+            raise ValueError("Invalid named 64-bit zygote process inventory.")
+        lines = processes.splitlines()
+        if not lines or lines[0].split() != ["PID", "PPID", "NAME"]:
+            raise ValueError("Missing primary zygote parent identity evidence.")
+        primary = []
+        seen = set()
+        for line in lines[1:]:
+            fields = line.split(maxsplit=2)
+            if (len(fields) != 3 or not re.fullmatch(r"[1-9][0-9]*", fields[0])
+                    or not re.fullmatch(r"0|[1-9][0-9]*", fields[1]) or fields[0] in seen):
+                raise ValueError("Invalid primary zygote process inventory.")
+            seen.add(fields[0])
+            if fields[1:] == ["1", "zygote64"]:
+                primary.append(fields[0])
+        if len(primary) != 1 or primary[0] not in pids:
+            raise ValueError("Expected exactly one matching init-owned 64-bit zygote.")
+        return primary[0]
+
     @classmethod
     def runtime_heap(cls, log, pid):
         arguments = []
@@ -50,11 +75,13 @@ class EmulatorHeapOwner:
 
     def snapshot(self, name):
         sdk = self.adb("shell", "getprop", "ro.build.version.sdk")
-        pid = self.adb("shell", "pidof", "zygote64")
-        if not re.fullmatch(r"[1-9][0-9]*", pid):
-            raise ValueError("Expected exactly one primary 64-bit zygote.")
+        named_pids = self.adb("shell", "pidof", "zygote64")
+        processes = self.adb("shell", "ps", "-A", "-o", "PID,PPID,NAME")
         log = self.adb("logcat", "-b", "main", "-d", "-v", "threadtime")
+        (self.directory / (name + "-identity.json")).write_text(json.dumps(
+            {"sdk": sdk, "namedPids": named_pids, "processes": processes}, indent=2) + "\n", encoding="utf-8")
         (self.directory / (name + ".log")).write_text(log + "\n", encoding="utf-8")
+        pid = EmulatorHeapProfile.primary_pid(processes, named_pids)
         return {"sdk": sdk, "pid": pid,
                 "configuredHeap": self.adb("shell", "getprop", "dalvik.vm.heapsize"),
                 "growthLimit": self.adb("shell", "getprop", "dalvik.vm.heapgrowthlimit"),

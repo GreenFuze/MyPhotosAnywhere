@@ -1065,3 +1065,23 @@ does not assert production publisher authorization. Initial fixture capability o
 and strict analyzer findings were fixed without weakening checks. Core's preceding full
 197-test run passed; the new scalar partition query is exercised by these service cases.
 Immutable validation for the complete increment is pending; schemas remain unchanged.
+
+## API 29 pre-test identity diagnostic
+
+The `e46e4b0` Desktop, Protocol and Android build workflows passed. Its device matrix
+stopped before MPA installation/instrumentation: the API 29 heap checker rejected the
+unrecorded `pidof zygote64` response. Fail-fast canceled the other two device jobs. The
+downloaded diagnostic log shows zygote PID 1687 starting with `-Xzygote` and `-Xmx576m`.
+It does not establish the raw identity response or the exact reason for its rejection.
+The expected AGP deprecation was separately accepted by its unchanged exact warning gate.
+
+The checker now saves raw named-process IDs, the PID/PPID/name inventory and complete
+runtime log before identity admission. It requires exactly one init-owned (`PPID=1`)
+64-bit zygote also present in the current named inventory, then checks that actual PID's
+complete startup arguments. Non-primary processes sharing a transient name do not define
+the runtime heap. Missing/ambiguous/malformed evidence still fails. The existing physical
+device guard, configured heap, known-mismatch-only restart and app assertions are intact.
+
+All nine Python checker tests pass, including the six existing cases. Actual emulator
+validation of this change is pending. This is no exception or passing native-test claim;
+the final immutable revision still requires the complete API 29/35/37 acceptance matrix.
