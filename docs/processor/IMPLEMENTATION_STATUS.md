@@ -993,3 +993,44 @@ corrupt hashes and overlap with original observations remain blocking. Strict De
 Release compilation has zero warnings/errors. An initial new fixture used a nonexistent
 claim method; it was corrected to the established `ClaimNext` API without changing the
 assertions. Processor schema 8 and Android Room 12 remain unchanged.
+
+## Frozen catalog preparation and joined lifecycle
+
+Catalog preparation now copies the selected facts and coverage from one live WAL
+observation into a private bounded-cache SQLite file, then releases that observation
+before its awaited consumer begins compression or network work. Canonical per-photo
+facts retain identity and a checked digest. Paging stays bounded at 250 records; all
+identities, membership, dates and coverage remain fixed during later source/import changes.
+No original content or protected credentials enter the generated copy.
+
+A dedicated marked/leased directory permits two private captures, verifies its complete
+bounded recovery inventory before removing stale files, and refuses unmarked directories,
+links or unknown files. Storage is reserved conservatively before writing and retained
+until the generated file actually closes and is removed. Cancellation, low storage,
+corruption and cleanup uncertainty have explicit failure paths and retained owners.
+
+The engine-lifetime preparation service serializes captures and awaited consumers.
+Desktop shutdown cancels and joins it before account/vault/state release. Its tests keep
+an actual consumer running after cancellation and verify that files remain owned until
+the consumer joins. Other cases prove real WAL release, subsequent captures after source
+changes, safe recovery, corruption rejection and idempotent cleanup. Publication scheduling,
+authority/high-water reconciliation and activation remain separate prerequisites; no
+new publication route is exposed by this increment.
+
+Local validation passes 197 Core, 90 AppServices and 25 Web tests and strict Desktop
+Release compilation with zero warnings/errors. Compiler/analyzer findings in new test
+code and explicit throws inside cleanup clauses were resolved without suppressions;
+cleanup preserves primary failures and independently retains unclosed resources. The
+initial corruption test exposed inconsistent exception classification; the implementation
+now reports invalid stored facts explicitly while preserving rejection assertions.
+
+The 10,000/100,000-photo fixtures measured approximately 665/14,298 ms to capture,
+12/11 ms to read the first page, and 8/26 ms for an import write interleaved with capture.
+Their generated metadata files were 6,385,664/63,819,776 bytes. Cumulative managed allocation
+was approximately 187 MB/1.87 GB; after-GC retained managed memory increased by 10,552 bytes
+in each shared-test-process observation. These loaded-host measurements establish private
+metadata preparation behavior. Native UI, compression/network responsiveness and dedicated
+process measurements remain part of final acceptance. Processor schema 8 and Room 12 are
+unchanged. All three preceding `5c7c13e` device jobs report success; GitHub's run-level
+status was still stale/in-progress at the last observation and is not counted as a
+completed passing workflow.
