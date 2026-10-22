@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Security.Cryptography;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Mpa.Processor.Protocol.Tests;
@@ -11,7 +12,7 @@ public sealed class SignedProtocolDocumentTests
     private static readonly Guid Library = Guid.Parse("94a81164-e980-4ec1-a566-cec36475b839");
     private static readonly Guid Actor = Guid.Parse("6c803c09-3b11-49cb-a3dc-1d42c3dc6f30");
     private static readonly string[] Kinds = ["user-operation"];
-    private static JsonDocument Fixture() => JsonDocument.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "signed-document.json")));
+    private static JsonDocument Fixture(string name = "signed-document") => JsonDocument.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", name + ".json")));
     private static TrustedProtocolActor Authority(JsonElement fixture, Guid? library = null, Guid? actor = null, long epoch = 1, string[]? kinds = null) =>
         new(library ?? Library, actor ?? Actor, epoch, Convert.FromBase64String(fixture.GetProperty("publicKeySpki").GetString()!), kinds ?? Kinds);
     private static DocumentSignature Signature(JsonElement fixture)
@@ -29,6 +30,21 @@ public sealed class SignedProtocolDocumentTests
         var verified = codec.VerifyAndRead(expected, Authority(root));
         Assert.AreEqual(Library, verified.LibraryId); Assert.AreEqual(Actor, verified.ActorId); Assert.AreEqual(1L, verified.Sequence);
         using var payload = JsonDocument.Parse(verified.CanonicalPayload); Assert.AreEqual("שלום 📷", payload.RootElement.GetProperty("caption").GetString());
+    }
+
+    [TestMethod]
+    public void BoundedUnicodePayloadsDoNotGrowThroughIntermediateJsonEscaping()
+    {
+        using var fixture = Fixture("signed-document-unicode"); var root = fixture.RootElement; var codec = new SignedProtocolDocuments([]);
+        var repeated = string.Concat(Enumerable.Repeat(root.GetProperty("repeatedScalar").GetString()!, root.GetProperty("repeatCount").GetInt32()));
+        var body = Encoding.UTF8.GetBytes(root.GetProperty("bodyTemplate").GetString()!.Replace("__MPA_REPEAT__", repeated, StringComparison.Ordinal));
+        var envelope = Encoding.UTF8.GetBytes(root.GetProperty("envelopeTemplate").GetString()!.Replace("__MPA_REPEAT__", repeated, StringComparison.Ordinal));
+        Assert.AreEqual(root.GetProperty("bodySha256").GetString(), Convert.ToHexStringLower(SHA256.HashData(body)));
+        Assert.AreEqual(root.GetProperty("envelopeSha256").GetString(), Convert.ToHexStringLower(SHA256.HashData(envelope)));
+        Assert.IsTrue(envelope.Length < ProtocolDocumentReader.MaximumDocumentBytes);
+        CollectionAssert.AreEqual(envelope, codec.Encode(body, Signature(root)));
+        var verified = codec.VerifyAndRead(envelope, Authority(root)); using var payload = JsonDocument.Parse(verified.CanonicalPayload);
+        Assert.AreEqual(20000, payload.RootElement.GetProperty("caption").GetString()!.Length);
     }
 
     [TestMethod]

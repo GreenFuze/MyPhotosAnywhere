@@ -93,6 +93,16 @@ class CanonicalProtocolJson(private val documentLimit: Int = MAX_DOCUMENT_BYTES)
         if (bytes.remaining() > limit) throw ProcessorProtocolException("Protocol string exceeds its byte bound.")
     }
 
+    /** Extract only a subtree of a containing document already fully validated by
+     * encode(). This is not an untrusted DOM boundary: it avoids serializer expansion
+     * of valid Unicode. Names, numbers, depth and string bounds came from that document. */
+    internal fun encodeVerifiedSubtree(value: JsonElement): ByteArray {
+        val output = StringBuilder(); write(value, output)
+        return output.toString().toByteArray(StandardCharsets.UTF_8).also {
+            if (it.isEmpty() || it.size > documentLimit) throw ProcessorProtocolException("Canonical subtree exceeds its byte bound.")
+        }
+    }
+
     private fun write(value: JsonElement, output: StringBuilder) {
         when {
             value.isJsonObject -> {

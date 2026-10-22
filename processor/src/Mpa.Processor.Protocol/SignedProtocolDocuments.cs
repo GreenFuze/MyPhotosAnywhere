@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 
 namespace Mpa.Processor.Protocol;
@@ -17,8 +18,16 @@ public sealed class SignedProtocolDocuments(IEnumerable<string> supportedCapabil
         if (!canonicalDocument.SequenceEqual(body)) throw new ProtocolFormatException("Signed document input must already be canonical JSON.");
         using var document = JsonDocument.Parse(body);
         if (document.RootElement.ValueKind != JsonValueKind.Object) throw new ProtocolFormatException("Signed document must be an object.");
-        return _codec.Encode(JsonSerializer.SerializeToUtf8Bytes(new { format = "mpa-signed-document", major = 1,
-            document = document.RootElement, signature = new { algorithm = signature.Algorithm, keyId = signature.KeyId, value = signature.Value } }));
+        // Body is already canonical. Both interpolated fields have validated ASCII-only
+        // alphabets, so no serializer may expand Unicode body bytes before the wire cap.
+        ReadOnlySpan<byte> prefix = "{\"document\":"u8;
+        var tail = Encoding.UTF8.GetBytes(",\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"" +
+            signature.KeyId + "\",\"value\":\"" + signature.Value + "\"}}");
+        if (body.Length > ProtocolDocumentReader.MaximumDocumentBytes - prefix.Length - tail.Length)
+            throw new ProtocolFormatException("Signed envelope exceeds its total wire byte bound.");
+        var envelope = new byte[prefix.Length + body.Length + tail.Length];
+        prefix.CopyTo(envelope); body.CopyTo(envelope, prefix.Length); tail.CopyTo(envelope, prefix.Length + body.Length);
+        return _codec.Encode(envelope); // Includes total nesting/structure validation.
     }
 
     public VerifiedProtocolDocument VerifyAndRead(ReadOnlySpan<byte> canonicalEnvelope, TrustedProtocolActor authority)
@@ -37,7 +46,7 @@ public sealed class SignedProtocolDocuments(IEnumerable<string> supportedCapabil
         var signature = root.GetProperty("signature"); Fields(signature, "algorithm", "keyId", "value");
         var captured = new DocumentSignature(Text(signature, "algorithm"), Text(signature, "keyId"), Text(signature, "value"));
         ValidateSignature(captured);
-        return _reader.VerifyAndRead(JsonSerializer.SerializeToUtf8Bytes(body), captured, authority);
+        return _reader.VerifyAndRead(Encoding.UTF8.GetBytes(body.GetRawText()), captured, authority);
     }
 
     private static void ValidateSignature(DocumentSignature signature)

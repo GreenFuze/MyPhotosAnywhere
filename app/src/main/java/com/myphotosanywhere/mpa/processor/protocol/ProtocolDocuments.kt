@@ -73,7 +73,7 @@ class ProtocolDocumentReader(supportedCapabilities: Set<String>) {
         val payload = property(root, "payload")
         if (!payload.isJsonObject) throw ProcessorProtocolException("Document payload must be an object.")
         return VerifiedProtocolDocument(library, actor, epoch, sequence, kind, minor, names.toList(),
-            codec.encode(payload.toString().toByteArray(Charsets.UTF_8)).toString(Charsets.UTF_8))
+            codec.encodeVerifiedSubtree(payload).toString(Charsets.UTF_8))
     }
 
     private fun property(root: JsonObject, name: String): JsonElement = root[name]

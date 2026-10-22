@@ -32,6 +32,12 @@ lowercase hyphenated UUID `libraryId`, `actorId`, positive decimal-string `epoch
 object `payload`. The signed envelope bound is 256 KiB. Payload-specific original
 action fields will use a closed schema before any mutation is enabled.
 
+Envelope assembly preserves the already canonical document bytes. Intermediate JSON
+serializers must not expand Unicode escapes and reject a document whose actual wire
+bytes fit the limit. The shared compact Unicode fixture expands to a 240,528-byte
+signed envelope and checks independently calculated body/envelope hashes and signature
+in both implementations. All existing byte, string and nesting limits still apply.
+
 JSON limits: 16 MiB expanded per catalog chunk, 256 KiB per signed document, 64 KiB
 per string, 128 UTF-8 bytes per property name, 256 members per object, 1,000 entries
 per array, nesting depth 32. Catalog chunks additionally have a 4 MiB compressed

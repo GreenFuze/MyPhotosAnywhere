@@ -11,6 +11,7 @@ import com.myphotosanywhere.mpa.processor.protocol.ProtocolDocumentReader
 import com.myphotosanywhere.mpa.processor.protocol.SignedProtocolDocuments
 import com.myphotosanywhere.mpa.processor.protocol.TrustedProtocolActor
 import java.util.Base64
+import java.security.MessageDigest
 import java.util.UUID
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -21,7 +22,7 @@ import org.junit.Test
 class ProcessorProtocolSignedDocumentTest {
     private val library = UUID.fromString("94a81164-e980-4ec1-a566-cec36475b839")
     private val actor = UUID.fromString("6c803c09-3b11-49cb-a3dc-1d42c3dc6f30")
-    private fun fixture() = checkNotNull(javaClass.classLoader?.getResourceAsStream("v1/signed-document.json"))
+    private fun fixture(name: String = "signed-document") = checkNotNull(javaClass.classLoader?.getResourceAsStream("v1/$name.json"))
         .bufferedReader(Charsets.UTF_8).use { JsonParser.parseReader(it).asJsonObject }
     private fun authority(root: JsonObject, libraryId: UUID = library, actorId: UUID = actor, epoch: Long = 1, kinds: Set<String> = setOf("user-operation")) =
         TrustedProtocolActor(libraryId, actorId, epoch, Base64.getDecoder().decode(root["publicKeySpki"].asString), kinds)
@@ -37,6 +38,19 @@ class ProcessorProtocolSignedDocumentTest {
         val verified = codec.verifyAndRead(expected, authority(root))
         assertEquals(library, verified.libraryId); assertEquals(actor, verified.actorId); assertEquals(1L, verified.sequence)
         assertEquals("שלום 📷", JsonParser.parseString(verified.canonicalPayload).asJsonObject["caption"].asString)
+    }
+
+    @Test fun boundedUnicodePayloadsDoNotGrowThroughIntermediateJsonEscaping() {
+        val root = fixture("signed-document-unicode"); val codec = SignedProtocolDocuments(emptySet())
+        val repeated = root["repeatedScalar"].asString.repeat(root["repeatCount"].asInt)
+        val body = root["bodyTemplate"].asString.replace("__MPA_REPEAT__", repeated).toByteArray(Charsets.UTF_8)
+        val envelope = root["envelopeTemplate"].asString.replace("__MPA_REPEAT__", repeated).toByteArray(Charsets.UTF_8)
+        assertEquals(root["bodySha256"].asString, MessageDigest.getInstance("SHA-256").digest(body).joinToString("") { "%02x".format(it) })
+        assertEquals(root["envelopeSha256"].asString, MessageDigest.getInstance("SHA-256").digest(envelope).joinToString("") { "%02x".format(it) })
+        assertTrue(envelope.size < ProtocolDocumentReader.MAX_DOCUMENT_BYTES)
+        assertArrayEquals(envelope, codec.encode(body, signature(root)))
+        val verified = codec.verifyAndRead(envelope, authority(root))
+        assertEquals(20000, JsonParser.parseString(verified.canonicalPayload).asJsonObject["caption"].asString.length)
     }
 
     @Test fun bothConsumersRejectEveryMalformedUntrustedAndAlteredEnvelope() {

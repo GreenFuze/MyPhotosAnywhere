@@ -15,13 +15,17 @@ class SignedProtocolDocuments(supportedCapabilities: Set<String>) {
         if (!canonicalDocument.contentEquals(body)) throw ProcessorProtocolException("Signed document input must already be canonical JSON.")
         val document = JsonParser.parseString(body.toString(Charsets.UTF_8))
         if (!document.isJsonObject) throw ProcessorProtocolException("Signed document must be an object.")
-        val root = JsonObject().apply {
-            addProperty("format", "mpa-signed-document"); addProperty("major", 1); add("document", document)
-            add("signature", JsonObject().apply {
-                addProperty("algorithm", signature.algorithm); addProperty("keyId", signature.keyId); addProperty("value", signature.value)
-            })
+        // The body is canonical and the only interpolated values are validated ASCII
+        // signature fields. Do not expand Unicode through another JSON serializer.
+        val prefix = "{\"document\":".toByteArray(Charsets.UTF_8)
+        val tail = (",\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"" +
+            signature.keyId + "\",\"value\":\"" + signature.value + "\"}}").toByteArray(Charsets.UTF_8)
+        if (body.size > ProtocolDocumentReader.MAX_DOCUMENT_BYTES - prefix.size - tail.size)
+            throw ProcessorProtocolException("Signed envelope exceeds its total wire byte bound.")
+        val envelope = ByteArray(prefix.size + body.size + tail.size).also { envelope ->
+            prefix.copyInto(envelope); body.copyInto(envelope, prefix.size); tail.copyInto(envelope, prefix.size + body.size)
         }
-        return codec.encode(root.toString().toByteArray(Charsets.UTF_8))
+        return codec.encode(envelope) // Includes total nesting/structure validation.
     }
 
     fun verifyAndRead(canonicalEnvelope: ByteArray, authority: TrustedProtocolActor): VerifiedProtocolDocument {
@@ -38,7 +42,7 @@ class SignedProtocolDocuments(supportedCapabilities: Set<String>) {
         val signature = fields(root["signature"], setOf("algorithm", "keyId", "value"))
         val captured = DocumentSignature(text(signature, "algorithm"), text(signature, "keyId"), text(signature, "value"))
         validateSignature(captured)
-        return reader.verifyAndRead(codec.encode(body.toString().toByteArray(Charsets.UTF_8)), captured, authority)
+        return reader.verifyAndRead(codec.encodeVerifiedSubtree(body), captured, authority)
     }
 
     private fun validateSignature(signature: DocumentSignature) {
