@@ -528,5 +528,20 @@ endpoint; no clean audit result was assumed. An independent fresh audit of the u
 lockfile returned zero vulnerabilities. Retrying the failed CI job then produced a clean
 four-target Desktop run. The original failure remains recorded; its preceding bulk-request
 failure cause is not independently established. Audit severity, dependencies and checks
-were not relaxed. Protocol contracts passed all four targets on `8194f0c`; the device run
-is still in progress at this update.
+were not relaxed. Independent reports verify 1,052 native tests (263 per target) and all
+four Desktop builds on `8194f0c`. No application binaries were included in these reports.
+
+API 29/35 passed on that revision, but API 37 never reached MPA tests. The SDK CLI printed
+`No url ... Ignoring` for pinned system image revision 6 while returning success. The
+emulator reported a broken system path; cleanup then blocked in device-waiting logcat
+until the 35-minute job cancellation. The full logs and small artifact remain preserved.
+This is neither an application-test pass nor an identified MPA crash/ANR.
+
+Google's current primary repository lists stable API 37.0/google_apis/x86_64 revision 8
+(channel 0); that exact image pin replaces 6. SDK setup now verifies every requested
+installed package's exact identity/revision, stable status and required nonempty payload
+files and archives a metadata-hash inventory. A skipped package fails before compilation
+or emulator startup. Six SDK verification tests pass and run in CI. Emulator startup also
+checks image files; boot probes and failure diagnostics have bounded ADB waits. Existing
+test assertions, native counts and acceptance requirements are unchanged. Actual new-image
+CI execution remains pending.
