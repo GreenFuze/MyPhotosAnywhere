@@ -973,3 +973,23 @@ were fixed without suppressions. Processor schema remains 8 and Android Room 12.
 Before catalog publication, the coverage reader still needs explicit handling and
 regression coverage for intentional metadata-workspace exclusion receipts from the same
 WAL snapshot. No catalog publication or activation route is enabled by this increment.
+
+## Workspace exclusions in captured coverage
+
+The coverage reader now recognizes intentional exclusion receipts against the pinned
+controller captured in its own WAL transaction. It cannot consult newer writable state
+to reinterpret an earlier observation. Common root decoding verifies the same canonical
+pin, digest, library and public-key identity. Lost/corrupt authority fails explicitly.
+
+Excluded repairs do not add a photo observation. Receipt source/folder/reason must match
+their captured context and the actual reserved workspace. A folder repair additionally
+requires its zero-observation parent checkpoint. Previously completed workspace reads
+that observed originals block publication with those facts preserved for reconciliation.
+
+All 186 Core, 86 AppServices and 25 Web tests pass, including nine new coverage cases
+and end-to-end coverage assertions in four existing discovery/repair tests. Earlier WAL
+observations remain stable while setup and work finish. Altered receipts, missing pins,
+corrupt hashes and overlap with original observations remain blocking. Strict Desktop
+Release compilation has zero warnings/errors. An initial new fixture used a nonexistent
+claim method; it was corrected to the established `ClaimNext` API without changing the
+assertions. Processor schema 8 and Android Room 12 remain unchanged.

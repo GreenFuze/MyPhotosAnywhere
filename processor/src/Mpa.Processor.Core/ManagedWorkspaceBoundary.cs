@@ -15,6 +15,8 @@ public sealed class ManagedWorkspaceBoundary
     public static ManagedWorkspaceBoundary Capture(ProcessorStateDatabase database) => Capture(database, null);
     internal static ManagedWorkspaceBoundary Capture(ProcessorStateDatabase database, SqliteTransaction? transaction) =>
         new(new LibraryAuthorityRepository(database).Controller(transaction));
+    internal static ManagedWorkspaceBoundary Capture(ProcessorStateReadSnapshot snapshot, Guid library) =>
+        new(LibraryAuthorityRepository.SnapshotController(snapshot, library));
     // A shared Google Drive folder retains the same ID through another authorized
     // account. Credential choice must not turn this reserved workspace into photos.
     public bool ContainsRoot(string folderId) => _controller is not null && string.Equals(folderId, _controller.FolderId, StringComparison.Ordinal);

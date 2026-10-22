@@ -126,11 +126,16 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
                 throw new InvalidDataException("Accepted publisher state has lost its pinned controller; never bootstrap a replacement.");
             return null;
         }
+        return DecodeControllerPin(text, hash, LibraryId(transaction));
+    }
+
+    internal static LibraryControllerPin DecodeControllerPin(string? text, string? hash, Guid library)
+    {
         if (text is null || hash is null || hash != Hash(Encoding.UTF8.GetBytes(text))) throw new InvalidDataException("Pinned library controller is incomplete or corrupt.");
         try
         {
             var pin = JsonSerializer.Deserialize<LibraryControllerPin>(text) ?? throw new InvalidDataException("Pinned library controller is missing.");
-            if (pin.LibraryId != LibraryId(transaction) || pin.ActorId == Guid.Empty || pin.Epoch < 1 || pin.AccountId is null ||
+            if (pin.LibraryId != library || pin.ActorId == Guid.Empty || pin.Epoch < 1 || pin.AccountId is null ||
                 pin.FolderId is null or "root" || pin.KeyId is not { Length: 64 } || EncodePin(pin) != text)
                 throw new InvalidDataException("Pinned controller does not match this library or its canonical encoding.");
             _ = new CatalogWorkspace(pin.AccountId, pin.FolderId);

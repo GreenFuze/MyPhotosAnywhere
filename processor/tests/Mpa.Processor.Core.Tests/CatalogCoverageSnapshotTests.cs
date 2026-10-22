@@ -5,7 +5,7 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.Core.Tests;
 
 [TestClass]
-public sealed class CatalogCoverageSnapshotTests
+public sealed partial class CatalogCoverageSnapshotTests
 {
     [TestMethod]
     public void FactsAndCoverageRetainOneObservationWhileImportsAndSelectionAdvance()

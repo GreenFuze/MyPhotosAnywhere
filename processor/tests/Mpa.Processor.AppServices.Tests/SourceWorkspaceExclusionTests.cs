@@ -24,6 +24,7 @@ public sealed partial class AccountServiceTests
         while (await runner.RunNextAsync(CancellationToken.None).ConfigureAwait(false) is not null) { }
         CollectionAssert.AreEqual(WorkspaceExpectedReadOrder, reads);
         Assert.AreEqual(2, (await CatalogAsync(fixture).ConfigureAwait(false)).Assets.Count); Assert.AreEqual(0, (await SummaryAsync(fixture, job).ConfigureAwait(false)).Failed);
+        Assert.AreEqual("complete", (await WorkspaceCoverageAsync(fixture).ConfigureAwait(false)).State);
     }
 
     [TestMethod]
@@ -38,6 +39,7 @@ public sealed partial class AccountServiceTests
         Assert.IsTrue((await runner.RunNextAsync(CancellationToken.None).ConfigureAwait(false))!.Complete);
         Assert.IsNull(await runner.RunNextAsync(CancellationToken.None).ConfigureAwait(false));
         Assert.AreEqual(0, (await CatalogAsync(fixture).ConfigureAwait(false)).Assets.Count); Assert.AreEqual(0, (await SummaryAsync(fixture, job).ConfigureAwait(false)).Failed);
+        var coverage = await WorkspaceCoverageAsync(fixture).ConfigureAwait(false); Assert.AreEqual("complete", coverage.State); Assert.AreEqual(1L, coverage.Checkpoint!.ObservedItems);
     }
 
     [TestMethod]
@@ -54,6 +56,7 @@ public sealed partial class AccountServiceTests
         await runner.RunNextAsync(CancellationToken.None).ConfigureAwait(false); Assert.IsTrue((await runner.RunNextAsync(CancellationToken.None).ConfigureAwait(false))!.Complete);
         Assert.AreEqual(1, metadataReads); Assert.AreEqual(0, (await CatalogAsync(fixture).ConfigureAwait(false)).Assets.Count);
         Assert.IsNull(await runner.RunNextAsync(CancellationToken.None).ConfigureAwait(false)); Assert.IsNull(runner.Failure);
+        var coverage = await WorkspaceCoverageAsync(fixture).ConfigureAwait(false); Assert.AreEqual("complete", coverage.State); Assert.AreEqual(1L, coverage.Checkpoint!.ObservedItems);
     }
 
     [TestMethod]
@@ -69,6 +72,7 @@ public sealed partial class AccountServiceTests
         while (await runner.RunNextAsync(CancellationToken.None).ConfigureAwait(false) is not null) { }
         CollectionAssert.AreEqual(WorkspaceExpectedRepairOrder, repaired); Assert.AreEqual(1, (await CatalogAsync(fixture).ConfigureAwait(false)).Assets.Count);
         Assert.AreEqual(0, (await SummaryAsync(fixture, job).ConfigureAwait(false)).Failed);
+        var coverage = await WorkspaceCoverageAsync(fixture).ConfigureAwait(false); Assert.AreEqual("complete", coverage.State); Assert.AreEqual(1L, coverage.Checkpoint!.ObservedItems);
     }
 
     [TestMethod]
@@ -94,6 +98,9 @@ public sealed partial class AccountServiceTests
         await Assert.ThrowsExactlyAsync<InvalidDataException>(() => runner.RunNextAsync(CancellationToken.None)).ConfigureAwait(false);
         Assert.AreEqual(1, (await CatalogAsync(fixture).ConfigureAwait(false)).Assets.Count); Assert.IsNotNull(runner.Failure);
     }
+
+    private static Task<Mpa.Processor.Protocol.CatalogSourceCoverage> WorkspaceCoverageAsync(Fixture fixture) => fixture.State.ExecuteAsync(database =>
+    { using var snapshot = CatalogFactsSnapshot.Open(database); return snapshot.ReadCoverageSources().Single(); }, CancellationToken.None);
 
     private static Task<LibraryControllerPin> PinDiscoveryWorkspaceAsync(Fixture fixture) => fixture.State.ExecuteAsync(database =>
     {

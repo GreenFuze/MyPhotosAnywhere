@@ -103,11 +103,11 @@ public sealed partial class CatalogFactsSnapshot
                     verified = state == "ready";
                     break;
                 case "repair-metadata":
-                    ValidateRepair(journal, context, receipt, scope, item, identity, state == "ready");
+                    var observedRepair = ValidateRepair(journal, context, receipt, scope, item, identity, source.Job.Value, state == "ready");
                     if (checkpoint is not null) throw new InvalidDataException("Metadata repair has an unsupported checkpoint.");
                     // A repaired item is an accepted observation; historical folder failure
                     // counters remain history and cannot keep a successful retry failed.
-                    if (state == "ready") observed = checked(observed + 1);
+                    if (observedRepair) observed = checked(observed + 1);
                     repairs = checked(repairs + 1);
                     break;
                 default: throw new InvalidDataException("Unknown scan stage cannot claim source coverage.");
@@ -132,9 +132,16 @@ public sealed partial class CatalogFactsSnapshot
             incomplete, Convert.ToHexStringLower(digest.GetHashAndReset())));
     }
 
-    private static void ValidateFolderReceipt(SourceDiscoveryJournalCodec journal, string receipt, SourceDiscoveryScope scope,
+    private void ValidateFolderReceipt(SourceDiscoveryJournalCodec journal, string receipt, SourceDiscoveryScope scope,
         SourceDiscoveryFolder folder, SourceDiscoveryCheckpoint progress)
     {
+        if (_workspace.ContainsRoot(folder.FolderId) && progress.ObservedItems != 0)
+            throw new InvalidDataException("The reserved workspace overlaps earlier source observations. Reconcile before publication.");
+        if (WorkspaceExclusion(journal, receipt, scope, folder, null))
+        {
+            if (progress.ObservedItems != 0) throw new InvalidDataException("Excluded workspace contradicts earlier photo observations.");
+            return;
+        }
         using var document = journal.Object(receipt, 6, "mpa-source-folder-receipt-1"); var root = document.RootElement;
         if (!progress.Started || progress.NextPageToken is not null || root.GetProperty("sourceId").GetString() != scope.SourceId.ToString("D") ||
             root.GetProperty("folderId").GetString() != folder.FolderId ||
@@ -165,8 +172,8 @@ public sealed partial class CatalogFactsSnapshot
             throw new InvalidDataException("Completed verification lost its accepted root.");
     }
 
-    private static void ValidateRepair(SourceDiscoveryJournalCodec journal, string context, string? receipt, SourceDiscoveryScope scope,
-        Guid item, DriveAssetIdentity identity, bool ready)
+    private bool ValidateRepair(SourceDiscoveryJournalCodec journal, string context, string? receipt, SourceDiscoveryScope scope,
+        Guid item, DriveAssetIdentity identity, Guid job, bool ready)
     {
         using var document = journal.Object(context, 4, "mpa-source-repair-1"); var root = document.RootElement;
         var folder = journal.Folder(root.GetProperty("folder").GetRawText()); CheckFolder(scope, folder);
@@ -174,11 +181,39 @@ public sealed partial class CatalogFactsSnapshot
         if (file is not null && (!SourceDiscoveryJournalCodec.Identity(file) || token is not null) ||
             token is not null && (token.Length is < 1 or > 4096 || token.Any(char.IsControl)) || item != identity.Derive(scope.AccountId, "repair-" + Digest(context)))
             throw new InvalidDataException("Captured repair changed its file/page identity.");
-        if (!ready) return;
+        if (!ready) return false;
+        if (WorkspaceExclusion(journal, receipt!, scope, folder, file))
+        {
+            if (_workspace.ContainsRoot(folder.FolderId))
+            {
+                using var parent = Command("SELECT length(checkpoint),checkpoint FROM item_stage WHERE job_id=$job AND item_id=$item AND name='list-metadata'");
+                parent.Parameters.AddWithValue("$job", job.ToString("D")); parent.Parameters.AddWithValue("$item", identity.Derive(scope.AccountId, folder.FolderId).ToString("D"));
+                using var progress = parent.ExecuteReader();
+                if (!progress.Read() || !progress.IsDBNull(0) && progress.GetInt64(0) > 32768 ||
+                    journal.Checkpoint(progress.IsDBNull(1) ? null : progress.GetString(1)).ObservedItems != 0)
+                    throw new InvalidDataException("Excluded workspace repair lost its zero-observation parent checkpoint.");
+            }
+            return false;
+        }
+        if (_workspace.ContainsRoot(folder.FolderId) || _workspace.ContainsRoot(file ?? ""))
+            throw new InvalidDataException("Earlier workspace repairs need reconciliation before publication.");
         using var completed = journal.Object(receipt!, 5, "mpa-source-repair-receipt-1"); var accepted = completed.RootElement;
         if (accepted.GetProperty("sourceId").GetString() != scope.SourceId.ToString("D") || accepted.GetProperty("folderId").GetString() != folder.FolderId ||
             accepted.GetProperty("fileId").GetString() != file || accepted.GetProperty("pageToken").GetString() != token)
             throw new InvalidDataException("Completed repair changed its captured file/page.");
+        return true;
+    }
+
+    private bool WorkspaceExclusion(SourceDiscoveryJournalCodec journal, string receipt, SourceDiscoveryScope scope, SourceDiscoveryFolder folder, string? file)
+    {
+        using var shape = JsonDocument.Parse(receipt);
+        if (!shape.RootElement.TryGetProperty("format", out var format) || format.GetString() != "mpa-source-excluded-workspace-1") return false;
+        using var document = journal.Object(receipt, 4, "mpa-source-excluded-workspace-1"); var root = document.RootElement;
+        if (root.GetProperty("sourceId").GetString() != scope.SourceId.ToString("D") || root.GetProperty("folderId").GetString() != folder.FolderId ||
+            root.GetProperty("reason").GetString() != "managed-metadata-workspace" ||
+            !_workspace.ContainsRoot(folder.FolderId) && !_workspace.ContainsRoot(file ?? "") || _workspace.ContainsRoot(scope.RootFolderId))
+            throw new InvalidDataException("Workspace exclusion does not match this captured library, folder or repair.");
+        return true;
     }
     private static void CheckFolder(SourceDiscoveryScope scope, SourceDiscoveryFolder folder)
     {

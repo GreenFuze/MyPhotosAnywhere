@@ -13,6 +13,7 @@ public sealed record CatalogFactsPage(ReadOnlyCollection<DriveCatalogAsset> Asse
 public sealed partial class CatalogFactsSnapshot : IDisposable
 {
     private readonly ProcessorStateReadSnapshot _snapshot;
+    private readonly ManagedWorkspaceBoundary _workspace;
     private bool _closed;
     public Guid LibraryId { get; }
     public long DiscoveryRevision { get; }
@@ -29,6 +30,7 @@ public sealed partial class CatalogFactsSnapshot : IDisposable
             reader.GetString(0) != library.ToString("D") || reader.GetInt64(1) < 1 || reader.GetInt64(2) < 1)
             throw new InvalidDataException("A catalog publication requires an established library and captured revisions.");
         LibraryId = library; DiscoveryRevision = reader.GetInt64(1); ConfigurationRevision = reader.GetInt64(2);
+        reader.Close(); _workspace = ManagedWorkspaceBoundary.Capture(snapshot, LibraryId);
     }
 
     public static CatalogFactsSnapshot Open(ProcessorStateDatabase database)
