@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using Mpa.Processor.AppServices;
 using Mpa.Processor.Core;
 using Mpa.Processor.Credentials;
 using Mpa.Processor.GoogleDrive;
@@ -51,8 +52,8 @@ internal static class WorkspaceReadAcceptance
             if (!verified.Bytes.Span.SequenceEqual(expected) || verified.AccountId != scope.PermissionId || verified.FileId != fixture.Id || verified.FolderId != folder.Id)
                 throw new InvalidDataException("The actual workspace read changed its captured identity or fixture bytes.");
             if (folder.Parents.Count != 1) throw new InvalidDataException("The synthetic source needs its established distinct parent for a wrong-workspace check.");
-            var documents = await connection.ReadWorkspaceDocumentsAsync(folder.Id, folder.SharedDriveId, null, deadline.Token).ConfigureAwait(false);
-            if (documents.NextPageToken is not null || documents.IncompleteSearch) throw new InvalidDataException("The actual synthetic document inventory is incomplete.");
+            var inventoryReader = new WorkspaceDocumentInventoryReader(connection, connection, scope.PermissionId, folder.Id, folder.SharedDriveId);
+            var documents = await inventoryReader.CaptureAsync(Array.Empty<string>(), deadline.Token).ConfigureAwait(false);
             var candidate = documents.Documents.Single(item => item.FileId == fixture.Id);
             var candidateRead = await connection.ReadWorkspaceDocumentAsync(folder.Id, candidate, deadline.Token).ConfigureAwait(false);
             if (!candidateRead.Bytes.Span.SequenceEqual(expected) || candidateRead.AccountId != scope.PermissionId || candidateRead.FileId != fixture.Id ||
@@ -65,6 +66,7 @@ internal static class WorkspaceReadAcceptance
             await ExpectAsync<InvalidDataException>(() => connection.ReadWorkspaceObjectAsync(folder.Id, fixture.Id, expected.Length, new string('0', 64), deadline.Token)).ConfigureAwait(false);
             var image = page.Items.Single(item => item.Name == "ocr-latin.png" && item.MimeType == "image/png" && item.Size is > 0 and <= GoogleAccountConnection.MaximumWorkspaceObjectBytes);
             await ExpectAsync<InvalidDataException>(() => connection.ReadWorkspaceObjectAsync(folder.Id, image.Id, image.Size!.Value, new string('0', 64), deadline.Token)).ConfigureAwait(false);
+            _ = await inventoryReader.CheckUnchangedAsync(documents, deadline.Token).ConfigureAwait(false);
         }
         // All actual connection/vault/state owners above have completed disposal before
         // this evidence is written. No pending refresh or local instance lease remains.
@@ -74,7 +76,7 @@ internal static class WorkspaceReadAcceptance
             wrongWorkspaceRejected = true, changedSizeRejected = true, changedDigestRejected = true, originalMediaReferenceRejected = true,
             actualSetupInspectionVerified = true, nonemptyWorkspaceRecognized = true,
             actualDocumentInventoryVerified = true, actualCandidateTransportVerified = true, staleCandidateVersionRejected = true,
-            actualChangeStartCursorVerified = true, accountChangesEnumerated = false,
+            actualChangeStartCursorVerified = true, accountChangesEnumerated = true, boundedChangeWindowDrained = true, finalInventoryChangeCheckPassed = true,
             nativeOwnersJoined = true, listenerStarted = false, driveWritesPerformed = false, originalDownloaded = false, newConsentOccurred = false,
             scope = "Actual protected-account metadata transport acceptance on a pinned synthetic source only; signed generation and final release acceptance remain separate"
         }), deadline.Token).ConfigureAwait(false);

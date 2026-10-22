@@ -108,7 +108,7 @@ public sealed partial class AccountServiceTests
         await reader.ReadMediaPageAsync(null, token).ConfigureAwait(false); return revision;
     }, CancellationToken.None);
 
-    private sealed class LibraryFactory : IGoogleLibraryConnectionFactory
+    private sealed partial class LibraryFactory : IGoogleLibraryConnectionFactory
     {
         public ConcurrentQueue<string> Events { get; } = new();
         public List<Guid> Opened { get; } = [];
@@ -132,7 +132,7 @@ public sealed partial class AccountServiceTests
         {
             Assert.AreEqual("permission-A", permissionId); Opened.Add(connectionId); return new Connection(this);
         }
-        private sealed class Connection(LibraryFactory owner) : IGoogleLibraryConnection, IGoogleWorkspacePublication, IGoogleWorkspaceSetup
+        private sealed partial class Connection(LibraryFactory owner) : IGoogleLibraryConnection, IGoogleWorkspacePublication, IGoogleWorkspaceSetup
         {
             public async Task<DriveMediaPage> ReadMediaPageAsync(string? pageToken, CancellationToken cancellationToken)
             {

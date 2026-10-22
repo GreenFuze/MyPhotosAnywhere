@@ -1179,3 +1179,39 @@ local dirty-tree diagnostic is not final release, signature or publication accep
 Transport semantics follow Google's primary changes/getStartPageToken, changes/list and
 changes reference documentation. Complete workspace reconciliation, signed authority,
 high-water and durable cursor/observation admission remain separate required steps.
+
+## Change-bracketed workspace inventory and account integration
+
+WorkspaceDocumentInventoryReader captures its account/shared-drive cursor before listing
+bounded ordinary JSON candidates, then drains the intervening feed. A relevant changed
+ID, new JSON candidate, missing corpus/workspace access, incomplete search, repeated
+continuation or unsupported bound rejects this observation explicitly. Both previous
+IDs and current folder membership matter, including moved, trashed, removed and
+MIME-changed documents. Missing previous IDs are retained separately and never reset
+accepted policies or counters. A later change check brackets candidate verification.
+Limits are 4,096 candidates/previous IDs and 128 pages per traversal; exceeding them
+requires reconciliation rather than truncation. Empty/partial pages never prove authority.
+
+CatalogWorkspaceDocumentSource runs those operations and bounded versioned document
+reads through the existing account owner. Captured access revisions are checked before
+reads and current connected state again afterward. It rejects late disconnected,
+reconnected, canceled or substituted results. ProcessorDriveReaders now serializes
+result admission against its own shutdown gate as well, retaining actual joined cleanup.
+These classes expose no route, scheduling, signed-head or publication authority. Their
+inventories are neither an atomic Drive snapshot nor signed evidence; durable policy,
+observation/high-water, native-key and predecessor admission remain required.
+
+All 116 AppServices and 25 Web cases pass, including twelve new inventory/account tests.
+Desktop Release and native probe builds have zero warnings/errors. Tests cover known-ID
+loss/moves, new policies, scope replacement, inventory/feed loops and bounds, original
+non-download, held operations, cancellation, account replacement and credential cleanup.
+The first focused compilation found CA1861 allocations in new tests; static fixtures
+resolve them without suppression. Existing assertions and strict diagnostics remain.
+
+The protected native no-write probe now brackets the same pinned synthetic workspace
+inventory with actual change-feed reads, verifies candidate bytes/version and prior
+scope/integrity rejections, then performs a final change check. It logs no account-feed
+contents or opaque cursor. All owners join; no listener, new consent, original download
+or Drive write occurs. Evidence: workspace-inventory-*.log/TRX, local-results.json and
+actual-workspace-inventory-native.json under the private preflight evidence directory.
+This dirty-tree diagnostic is not final immutable release acceptance. Schemas 8/12 remain.

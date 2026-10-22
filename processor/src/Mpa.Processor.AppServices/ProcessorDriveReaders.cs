@@ -62,7 +62,13 @@ internal sealed class ProcessorDriveReaders(ProcessorStateCoordinator state, IGo
         try
         {
             lock (_gate) ObjectDisposedException.ThrowIf(_stopping, this);
-            return await operation(linked.Token).ConfigureAwait(false);
+            var result = await operation(linked.Token).ConfigureAwait(false);
+            lock (_gate)
+            {
+                if (_stopping) throw new OperationCanceledException("The account reader owner stopped before admitting this result.", _stop.Token);
+                linked.Token.ThrowIfCancellationRequested();
+                return result;
+            }
         }
         finally { _serial.Release(); }
     }
