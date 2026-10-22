@@ -1215,3 +1215,31 @@ contents or opaque cursor. All owners join; no listener, new consent, original d
 or Drive write occurs. Evidence: workspace-inventory-*.log/TRX, local-results.json and
 actual-workspace-inventory-native.json under the private preflight evidence directory.
 This dirty-tree diagnostic is not final immutable release acceptance. Schemas 8/12 remain.
+
+## Native possession and retained cloud signing-history fences
+
+The ready native signing owner now compares both controller and publisher public roles,
+keys/epochs, library and pinned workspace against records captured from local authority.
+Uninitialized/stopped keys, substituted publisher/controller roles or workspace identities
+fail explicitly. This check does not mint signatures, write keys or infer cloud authority.
+
+ProtocolSigningJournal can now verify one cloud envelope against an already registered
+local actor and require the exact corresponding sealed intent. A valid remote sequence
+beyond the complete local journal, or an observed locally unsealed intent, requires
+explicit recovery; counters are never advanced, recreated or sealed from Drive alone.
+Conflicting bodies or distinct valid signatures for the same body cannot replace the
+retained immutable envelope. Invalid signatures, foreign roles and incomplete/corrupt
+local histories fail before accepting an observation. This read-only check also works
+without free write space and does not change the database schema.
+
+Five new Core cases and two native-owner cases pass. Full strict regression passes
+207 Core, 118 AppServices and 25 Web tests; Desktop Release has zero warnings/errors.
+The signature variation case deterministically uses the distinct valid ECDSA (r,n-s)
+form, verifies it, then requires the outbox's exact original envelope. No random retry,
+conditional test skip, warning suppression or automatic history repair is used.
+
+These are components of publication admission, not a complete permission grant. The
+owner must reconcile ALL cloud history under the independently pinned current policies,
+retain failed-observation barriers, verify predecessor/dependencies and exclusively admit
+one head before live scheduling/publication. Empty/subset inventories cannot prove that
+work safe. No live publication route is enabled. Processor schema 8 and Room 12 remain.

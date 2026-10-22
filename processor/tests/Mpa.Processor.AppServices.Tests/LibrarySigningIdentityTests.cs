@@ -15,6 +15,32 @@ public sealed class LibrarySigningIdentityTests
     private static LibrarySigningIdentityOwner Owner(Vault vault, LibraryControllerPin? pin = null) => new(vault, Library, Installation, pin);
     private static LibraryControllerPin Pin(LibrarySigningPublicIdentity identity) => new(identity.LibraryId, identity.ControllerId, identity.ControllerEpoch,
         "workspace-account", "workspace-folder", identity.ControllerPublicKeySpki, identity.ControllerKeyId);
+    private static LocalCatalogPublicationAuthority Publication(LibrarySigningPublicIdentity identity) => new(identity.LibraryId, identity.PublisherId,
+        identity.PublisherEpoch, "workspace-account", 1, "workspace-folder", 1, identity.PublisherKeyId, new string('a', 64));
+
+    [TestMethod]
+    public async Task PublicationPossessionRequiresBothExactReadyNativeRolesAndPinnedWorkspace()
+    {
+        await using var vault = new Vault(); await using var owner = Owner(vault); await owner.InitializeAsync(CancellationToken.None).ConfigureAwait(false);
+        var identity = owner.PublicIdentity; var pin = Pin(identity); var publication = Publication(identity); owner.AssertPublicationIdentity(pin, publication);
+        foreach (var wrong in new[] { publication with { LibraryId = Guid.NewGuid() }, publication with { ActorId = identity.ControllerId },
+            publication with { ActorEpoch = 2 }, publication with { PublisherKeyId = identity.ControllerKeyId }, publication with { AccountId = "other" }, publication with { FolderId = "other" } })
+            Assert.ThrowsExactly<InvalidDataException>(() => owner.AssertPublicationIdentity(pin, wrong));
+        foreach (var wrong in new[] { pin with { ActorId = identity.PublisherId }, pin with { Epoch = 2 }, pin with { KeyId = identity.PublisherKeyId }, pin with { PublicKeySpki = identity.PublisherPublicKeySpki } })
+            Assert.ThrowsExactly<InvalidDataException>(() => owner.AssertPublicationIdentity(wrong, publication));
+        Assert.AreEqual(1, vault.Writes); Assert.AreEqual(identity, owner.PublicIdentity);
+    }
+
+    [TestMethod]
+    public async Task PublicationPossessionNeverBecomesReadyBeforeVaultReadbackOrAfterExit()
+    {
+        await using var vault = new Vault(); await using var owner = Owner(vault);
+        await using var referenceVault = new Vault(); await using var reference = Owner(referenceVault); await reference.InitializeAsync(CancellationToken.None).ConfigureAwait(false);
+        Assert.ThrowsExactly<InvalidOperationException>(() => owner.AssertPublicationIdentity(Pin(reference.PublicIdentity), Publication(reference.PublicIdentity)));
+        await owner.InitializeAsync(CancellationToken.None).ConfigureAwait(false); var identity = owner.PublicIdentity;
+        await owner.DisposeAsync().ConfigureAwait(false);
+        Assert.ThrowsExactly<ObjectDisposedException>(() => owner.AssertPublicationIdentity(Pin(identity), Publication(identity)));
+    }
     private static byte[] Body(LibrarySigningPublicIdentity identity, bool controller, string? kind = null, Guid? library = null) =>
         new CanonicalJson().Encode(JsonSerializer.SerializeToUtf8Bytes(new { format = "mpa", major = 1, minor = 0, libraryId = (library ?? identity.LibraryId).ToString("D"),
             actorId = (controller ? identity.ControllerId : identity.PublisherId).ToString("D"), epoch = (controller ? identity.ControllerEpoch : identity.PublisherEpoch).ToString(System.Globalization.CultureInfo.InvariantCulture),

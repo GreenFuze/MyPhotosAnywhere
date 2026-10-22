@@ -17,7 +17,7 @@ public sealed class ProtocolSigningConflictException() : InvalidOperationExcepti
 /// bytes before Drive allocation. Never re-register a missing actor or reset its counter.
 /// Restore/cloud high-water reconciliation and catalog predecessor admission remain the
 /// generation owner's mandatory responsibilities before any live publication.</summary>
-public sealed class ProtocolSigningJournal(ProcessorStateDatabase database, StorageBudgetManager budget)
+public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase database, StorageBudgetManager budget)
 {
     public const int MaximumBodyBytes = ProtocolDocumentReader.MaximumDocumentBytes - 1024;
     private readonly ProcessorStateDatabase _database = database ?? throw new ArgumentNullException(nameof(database));

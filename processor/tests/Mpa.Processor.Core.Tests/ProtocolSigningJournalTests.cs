@@ -7,7 +7,7 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.Core.Tests;
 
 [TestClass]
-public sealed class ProtocolSigningJournalTests
+public sealed partial class ProtocolSigningJournalTests
 {
     [TestMethod]
     public void FreshBootstrapRegistersBothActorsAtomicallyAndNeverReinitializesAMissingCounter()

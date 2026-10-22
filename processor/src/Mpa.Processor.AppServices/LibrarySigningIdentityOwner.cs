@@ -36,6 +36,22 @@ public sealed class LibrarySigningIdentityOwner : IAsyncDisposable
     public DocumentSignature SignControllerDocument(ReadOnlySpan<byte> canonicalDocument) { lock (_gate) return Ready().Sign(true, canonicalDocument); }
     public DocumentSignature SignCatalogDocument(ReadOnlySpan<byte> canonicalDocument) { lock (_gate) return Ready().Sign(false, canonicalDocument); }
 
+    /// <summary>Possession fence only. Its caller obtains both records from the serial
+    /// local authority store and separately proves cloud history and head admission.</summary>
+    public void AssertPublicationIdentity(LibraryControllerPin controller, LocalCatalogPublicationAuthority authority)
+    {
+        ArgumentNullException.ThrowIfNull(controller); ArgumentNullException.ThrowIfNull(authority);
+        lock (_gate)
+        {
+            var identity = Ready().Public;
+            if (controller.LibraryId != identity.LibraryId || controller.ActorId != identity.ControllerId || controller.Epoch != identity.ControllerEpoch ||
+                controller.KeyId != identity.ControllerKeyId || controller.PublicKeySpki != identity.ControllerPublicKeySpki ||
+                authority.LibraryId != identity.LibraryId || authority.ActorId != identity.PublisherId || authority.ActorEpoch != identity.PublisherEpoch ||
+                authority.PublisherKeyId != identity.PublisherKeyId || authority.AccountId != controller.AccountId || authority.FolderId != controller.FolderId)
+                throw new InvalidDataException("Current publication authority does not match the ready native controller/publisher identity.");
+        }
+    }
+
     public Task InitializeAsync(CancellationToken cancellationToken)
     {
         lock (_gate)
