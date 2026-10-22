@@ -143,7 +143,16 @@ public sealed partial class GoogleAccountConnection : IGoogleAccountConnection, 
         {
             lock (_gate) ObjectDisposedException.ThrowIf(_stopping, this);
             _activeCancellation = deadline.Token;
-            return await operation(deadline.Token).ConfigureAwait(false);
+            var result = await operation(deadline.Token).ConfigureAwait(false);
+            // CancelAsync may still be dispatching linked-token callbacks when a
+            // transport completes. Serialize result admission against shutdown,
+            // rather than treating callback completion as the ownership boundary.
+            lock (_gate)
+            {
+                if (_stopping) throw new OperationCanceledException("The account owner stopped before admitting this result.", _stop.Token);
+                deadline.Token.ThrowIfCancellationRequested();
+                return result;
+            }
         }
         finally { _activeCancellation = default; _serial.Release(); }
     }

@@ -1141,3 +1141,17 @@ records one init-owned zygote PID 1687 matching its named inventory and actual s
 `-Xmx576m`, with no framework restart. It does not recover the earlier `e46e4b0` raw
 identity response or prove that earlier failure's exact cause. Independent full-artifact
 inspection and final-revision acceptance remain separate requirements.
+
+## Account shutdown result-admission race
+
+The f2e4444 protocol matrix exposed a real ownership race on macOS Intel: the held
+workspace inventory request could finish after DisposeAsync began but before asynchronous
+linked cancellation reached that request. The unchanged shutdown regression expected
+cancellation and failed (52/53 Google cases passed); this is not an accepted diagnostic.
+GoogleAccountConnection now admits completed results under the same gate that starts
+shutdown, checks cancellation there, and still joins the actual operation before disposing
+its native owners. Once stopping wins that gate, a late transport success is canceled.
+The existing inventory and change-feed shutdown assertions remain intact.
+
+Local strict regression after this fix passes 58 Google, 104 AppServices and 25 Web
+tests; Desktop Release has zero warnings/errors. Cross-platform CI must verify the fix.
