@@ -38,6 +38,9 @@ internal static class WorkspaceReadAcceptance
             await using var vault = new NativeCredentialVault(database.InstallationId, Path.Combine(root, "credentials"));
             await using var connection = new GoogleAccountConnection(DesktopOAuthConfiguration.Load(args[0]), vault, scope.ConnectionId, scope.PermissionId);
             var folder = await connection.ReadFolderAsync(args[2], deadline.Token).ConfigureAwait(false);
+            var access = await connection.InspectWorkspaceAsync(folder.Id, deadline.Token).ConfigureAwait(false);
+            if (access.AccountId != scope.PermissionId || access.FolderId != folder.Id || access.VerifiedEmpty || access.DriveVersion < 1)
+                throw new InvalidDataException("The actual setup inspection failed to retain the captured nonempty synthetic folder scope.");
             var page = await connection.ReadSourcePageAsync(folder.Id, folder.SharedDriveId, null, deadline.Token).ConfigureAwait(false);
             if (page.Failures.Count != 0 || page.NextPageToken is not null || page.IncompleteSearch) throw new InvalidDataException("The bounded synthetic source fixture is incomplete.");
             var fixture = page.Items.Single(item => item.Name == "manual-source-fixture.json" && item.MimeType is "application/json" or "application/octet-stream" && item.Size == expected.Length);
@@ -57,6 +60,7 @@ internal static class WorkspaceReadAcceptance
         {
             observedAtUtc = DateTimeOffset.UtcNow, actualWorkspaceReadVerified = true, fixtureBytes = expected.Length, fixtureSha256 = FixtureSha256,
             wrongWorkspaceRejected = true, changedSizeRejected = true, changedDigestRejected = true, originalMediaReferenceRejected = true,
+            actualSetupInspectionVerified = true, nonemptyWorkspaceRecognized = true,
             nativeOwnersJoined = true, listenerStarted = false, driveWritesPerformed = false, originalDownloaded = false, newConsentOccurred = false,
             scope = "Actual protected-account metadata transport acceptance on a pinned synthetic source only; signed generation and final release acceptance remain separate"
         }), deadline.Token).ConfigureAwait(false);

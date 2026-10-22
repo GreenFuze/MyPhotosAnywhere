@@ -16,3 +16,7 @@ the real metadata adapter's exact bytes plus wrong-folder, size, digest and orig
 rejections. Connection, vault and state owners join before the report is written. It does
 not upload anything, process user media, establish publisher trust or activate a catalog.
 CI compiles this mode on every desktop target without account execution.
+
+The same read-only mode also verifies actual setup inspection (canonical folder identity,
+read/write capabilities, sharing metadata, revision and a bounded child listing). Its
+pinned synthetic folder is nonempty and must never be reported empty for fresh bootstrap.

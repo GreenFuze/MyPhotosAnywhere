@@ -23,6 +23,18 @@ public sealed partial class AccountServiceTests
     }
 
     [TestMethod]
+    public async Task FreshBootstrapRequiresVerifiedEmptyWorkspaceButExistingPinReplaysDoNotRequireAnEmptyPublishedLibrary()
+    {
+        await using var fixture = await SetupFixture.CreateAsync().ConfigureAwait(false);
+        var preview = await fixture.Setup.InspectAsync("permission-A", "metadata", CancellationToken.None).ConfigureAwait(false); var approval = Approval(preview);
+        fixture.Empty = false;
+        await Assert.ThrowsExactlyAsync<LibraryWorkspaceApprovalException>(() => fixture.Setup.ApproveAsync(approval, CancellationToken.None)).ConfigureAwait(false);
+        Assert.IsNull(await fixture.Setup.CurrentAsync(CancellationToken.None).ConfigureAwait(false));
+        fixture.Empty = true; var pin = await fixture.Setup.ApproveAsync(approval, CancellationToken.None).ConfigureAwait(false);
+        fixture.Empty = false; Assert.AreEqual(pin, await fixture.Setup.ApproveAsync(approval, CancellationToken.None).ConfigureAwait(false));
+    }
+
+    [TestMethod]
     public async Task SharedWorkspaceRequiresAcknowledgmentAndSourcesRequireExplicitAssociation()
     {
         await using var fixture = await SetupFixture.CreateAsync().ConfigureAwait(false); fixture.Shared = true;
@@ -68,7 +80,7 @@ public sealed partial class AccountServiceTests
         fixture.Accounts.Readers.WorkspaceInspect = async (folder, _) =>
         {
             await fixture.Accounts.Service.DisconnectAsync("permission-A", 1, CancellationToken.None).ConfigureAwait(false);
-            return new("permission-A", folder, "Metadata", 7, false);
+            return new("permission-A", folder, "Metadata", 7, false, true);
         };
         await Assert.ThrowsExactlyAsync<StaleDriveConnectionException>(() => fixture.Setup.InspectAsync("permission-A", "metadata", CancellationToken.None)).ConfigureAwait(false);
         Assert.IsNull(await fixture.Setup.CurrentAsync(CancellationToken.None).ConfigureAwait(false));
@@ -81,7 +93,7 @@ public sealed partial class AccountServiceTests
         using var caller = new CancellationTokenSource(); var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         fixture.Accounts.Readers.WorkspaceInspect = async (folder, _) =>
-        { entered.TrySetResult(); await release.Task.ConfigureAwait(false); return new("permission-A", folder, "Metadata", 7, false); };
+        { entered.TrySetResult(); await release.Task.ConfigureAwait(false); return new("permission-A", folder, "Metadata", 7, false, true); };
         var reading = fixture.Setup.InspectAsync("permission-A", "metadata", caller.Token);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); await caller.CancelAsync().ConfigureAwait(false);
         try { Assert.IsFalse(reading.IsCompleted); } finally { release.TrySetResult(); }
@@ -99,6 +111,7 @@ public sealed partial class AccountServiceTests
         public LibraryWorkspaceSetup Setup { get; private set; } = null!;
         public long Version { get; set; } = 7;
         public bool Shared { get; set; }
+        public bool Empty { get; set; } = true;
         public static async Task<SetupFixture> CreateAsync()
         {
             var fixture = new SetupFixture();
@@ -108,7 +121,7 @@ public sealed partial class AccountServiceTests
                 var identity = await fixture.Accounts.State.ExecuteAsync(database => (Library: new ProcessorLibraryRepository(database).GetOrCreateIdentity(), database.InstallationId), CancellationToken.None).ConfigureAwait(false);
                 fixture.Keys = new(fixture._vault, identity.Library, identity.InstallationId, null); await fixture.Keys.InitializeAsync(CancellationToken.None).ConfigureAwait(false);
                 fixture.Setup = new(fixture.Accounts.State, fixture.Accounts.Service, fixture.Keys, new(new SetupSpace()));
-                fixture.Accounts.Readers.WorkspaceInspect = (folder, token) => { token.ThrowIfCancellationRequested(); return Task.FromResult(new DriveWorkspaceAccess("permission-A", folder, "Metadata", fixture.Version, fixture.Shared)); };
+                fixture.Accounts.Readers.WorkspaceInspect = (folder, token) => { token.ThrowIfCancellationRequested(); return Task.FromResult(new DriveWorkspaceAccess("permission-A", folder, "Metadata", fixture.Version, fixture.Shared, fixture.Empty)); };
                 return fixture;
             }
             catch { await fixture.DisposeAsync().ConfigureAwait(false); throw; }

@@ -19,8 +19,8 @@ public sealed class GoogleWorkspaceSetupTests
             await using var fixture = await Fixture.CreateAsync(root.ToJsonString()).ConfigureAwait(false);
             Assert.IsInstanceOfType<IGoogleWorkspaceSetup>(fixture.Connection);
             var result = await fixture.Connection.InspectWorkspaceAsync("workspace", CancellationToken.None).ConfigureAwait(false);
-            Assert.AreEqual(new DriveWorkspaceAccess("account-A", "workspace", "MPA metadata", 7, team), result);
-            Assert.AreEqual(3, fixture.Calls);
+            Assert.AreEqual(new DriveWorkspaceAccess("account-A", "workspace", "MPA metadata", 7, team, true), result);
+            Assert.AreEqual(4, fixture.Calls);
         }
     }
 
@@ -69,6 +69,23 @@ public sealed class GoogleWorkspaceSetupTests
     }
 
     [TestMethod]
+    public async Task ExistingOrIncompleteListingsNeverPretendTheWorkspaceIsEmpty()
+    {
+        foreach (var listing in new[] { "{\"files\":[{\"id\":\"existing-original\"}],\"incompleteSearch\":false}",
+            "{\"files\":[],\"nextPageToken\":\"next\",\"incompleteSearch\":false}", "{\"files\":[],\"incompleteSearch\":true}" })
+        {
+            await using var fixture = await Fixture.CreateAsync(Valid).ConfigureAwait(false); fixture.ChildrenResponse = listing;
+            Assert.IsFalse((await fixture.Connection.InspectWorkspaceAsync("workspace", CancellationToken.None).ConfigureAwait(false)).VerifiedEmpty);
+        }
+        foreach (var malformed in new[] { "{\"files\":[],\"incompleteSearch\":\"false\"}", "{\"files\":[{\"id\":\"one\"},{\"id\":\"two\"}],\"incompleteSearch\":false}",
+            "{\"files\":[],\"incompleteSearch\":false,\"nextPageToken\":null}", "{\"files\":[{}],\"incompleteSearch\":false}" })
+        {
+            await using var fixture = await Fixture.CreateAsync(Valid).ConfigureAwait(false); fixture.ChildrenResponse = malformed;
+            await Assert.ThrowsExactlyAsync<InvalidDataException>(() => fixture.Connection.InspectWorkspaceAsync("workspace", CancellationToken.None)).ConfigureAwait(false);
+        }
+    }
+
+    [TestMethod]
     public async Task RootAliasesAndQueryInjectionFailBeforeAuthenticationOrNetwork()
     {
         await using var fixture = await Fixture.CreateAsync(Valid).ConfigureAwait(false);
@@ -83,6 +100,7 @@ public sealed class GoogleWorkspaceSetupTests
         private readonly string _response;
         public GoogleAccountConnection Connection { get; private set; } = null!;
         public int Calls { get; private set; }
+        public string ChildrenResponse { get; set; } = "{\"files\":[],\"incompleteSearch\":false}";
         private Fixture(string response) => _response = response;
         public static async Task<Fixture> CreateAsync(string response)
         {
@@ -103,6 +121,11 @@ public sealed class GoogleWorkspaceSetupTests
             token.ThrowIfCancellationRequested(); Calls++; Assert.AreEqual(HttpMethod.Get, request.Method); Assert.AreEqual("www.googleapis.com", request.RequestUri!.Host);
             if (request.RequestUri.AbsolutePath == "/drive/v3/files/root")
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"canonical-root\"}", Encoding.UTF8, "application/json") });
+            if (request.RequestUri.AbsolutePath == "/drive/v3/files")
+            {
+                var query = Uri.UnescapeDataString(request.RequestUri.Query); StringAssert.Contains(query, "'workspace' in parents"); StringAssert.Contains(query, "pageSize=1");
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(ChildrenResponse, Encoding.UTF8, "application/json") });
+            }
             var body = request.RequestUri.AbsolutePath == "/drive/v3/about" ? "{\"user\":{\"permissionId\":\"account-A\",\"displayName\":\"Synthetic\"}}" : _response;
             if (request.RequestUri.AbsolutePath != "/drive/v3/about") Assert.AreEqual("/drive/v3/files/workspace", request.RequestUri.AbsolutePath);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") });

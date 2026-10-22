@@ -52,6 +52,8 @@ public sealed class LibraryWorkspaceSetup(ProcessorStateCoordinator state, Proce
         if (!approval.AssociateSelectedSources || approval.AccountRevision < 1 || approval.FolderVersion < 1 || approval.ConfigurationRevision < 1)
             throw new LibraryWorkspaceApprovalException("Review and approve the workspace and selected source association first.");
         var observed = await InspectAsync(approval.AccountId, approval.FolderId, token).ConfigureAwait(false);
+        if (observed.Controller is null && !observed.Workspace.VerifiedEmpty)
+            throw new LibraryWorkspaceApprovalException("Choose an empty metadata folder for a new library. Existing folder contents were preserved.");
         if (observed.Workspace.Shared && !approval.AcceptSharedWorkspace)
             throw new LibraryWorkspaceApprovalException("This folder is shared. Approve storing private metadata and previews there, or choose another folder.");
         if (observed.AccountRevision != approval.AccountRevision || observed.Workspace.DriveVersion != approval.FolderVersion ||

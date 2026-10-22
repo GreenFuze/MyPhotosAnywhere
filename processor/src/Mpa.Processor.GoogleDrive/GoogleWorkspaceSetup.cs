@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace Mpa.Processor.GoogleDrive;
 
-public sealed record DriveWorkspaceAccess(string AccountId, string FolderId, string Name, long DriveVersion, bool Shared);
+public sealed record DriveWorkspaceAccess(string AccountId, string FolderId, string Name, long DriveVersion, bool Shared, bool VerifiedEmpty);
 public sealed class DriveWorkspaceSelectionException() : IOException("Choose a dedicated metadata folder, rather than a Google Drive root.");
 
 /// <summary>Read-only setup inspection. This is neither an authority grant nor a folder
@@ -60,7 +60,21 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceSetup
                 var shared = root.TryGetProperty("shared", out _) ? Flag(root, "shared") :
                     teamDrive ? true : throw new InvalidDataException("My Drive workspace sharing state is missing.");
                 shared |= teamDrive;
-                token.ThrowIfCancellationRequested(); return new DriveWorkspaceAccess(account, folderId, name, number, shared);
+                var children = await MediaGetAsync(credential, new("https://www.googleapis.com/drive/v3/files?pageSize=1&spaces=drive&includeItemsFromAllDrives=true&supportsAllDrives=true&q=" +
+                    Uri.EscapeDataString("trashed = false and '" + folderId + "' in parents") + "&fields=" + Uri.EscapeDataString("files(id),nextPageToken,incompleteSearch")), 8192, token).ConfigureAwait(false);
+                using var listing = JsonDocument.Parse(children); var page = listing.RootElement; var files = page.GetProperty("files");
+                if (files.ValueKind != JsonValueKind.Array || files.GetArrayLength() > 1 || files.EnumerateArray().Any(file =>
+                    file.ValueKind != JsonValueKind.Object || !file.TryGetProperty("id", out var fileId) || fileId.ValueKind != JsonValueKind.String || !ValidIdentity(fileId.GetString())))
+                    throw new InvalidDataException("Invalid bounded workspace contents inspection.");
+                var incomplete = Flag(page, "incompleteSearch"); var hasNext = page.TryGetProperty("nextPageToken", out var next);
+                if (hasNext)
+                {
+                    if (next.ValueKind != JsonValueKind.String) throw new InvalidDataException("Invalid workspace contents continuation.");
+                    var nextText = next.GetString();
+                    if (nextText is not { Length: > 0 and <= 4096 } || nextText.Any(char.IsControl)) throw new InvalidDataException("Invalid workspace contents continuation.");
+                }
+                token.ThrowIfCancellationRequested(); return new DriveWorkspaceAccess(account, folderId, name, number, shared,
+                    files.GetArrayLength() == 0 && !hasNext && !incomplete);
             }
             catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException)
             { throw new InvalidDataException("Google returned malformed metadata workspace access information.", error); }

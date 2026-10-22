@@ -320,7 +320,7 @@ public sealed class WebHostTests
         public Exception? WorkspaceFailure { get; set; }
         public Task<Mpa.Processor.Core.LibraryControllerPin?> LibraryAsync(CancellationToken cancellationToken) => Task.FromResult<Mpa.Processor.Core.LibraryControllerPin?>(null);
         public Task<Mpa.Processor.AppServices.LibraryWorkspaceInspection> InspectWorkspaceAsync(string accountId, string folderId, CancellationToken cancellationToken) => Task.FromResult(
-            new Mpa.Processor.AppServices.LibraryWorkspaceInspection(new(accountId, folderId, "Metadata", 7, false), 1, new(1, []),
+            new Mpa.Processor.AppServices.LibraryWorkspaceInspection(new(accountId, folderId, "Metadata", 7, false, true), 1, new(1, []),
                 new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, "synthetic-public-controller", new string('a', 64), Guid.NewGuid(), 1, "synthetic-public-publisher", new string('b', 64)), null));
         public Task<Mpa.Processor.Core.LibraryControllerPin> ApproveWorkspaceAsync(Mpa.Processor.AppServices.ApproveLibraryWorkspace request, CancellationToken cancellationToken)
         {

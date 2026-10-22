@@ -11,7 +11,7 @@ export interface Folder { id: string; name: string; canListChildren: boolean }
 export interface FolderLocation { current: Folder; children: Folder[]; nextCursor: string | null; incompleteSearch: boolean }
 export interface LibraryController { libraryId: string; actorId: string; epoch: number; accountId: string; folderId: string; publicKeySpki: string; keyId: string }
 export interface WorkspaceInspection {
-  workspace: { accountId: string; folderId: string; name: string; driveVersion: number; shared: boolean };
+  workspace: { accountId: string; folderId: string; name: string; driveVersion: number; shared: boolean; verifiedEmpty: boolean };
   accountRevision: number; sources: Sources;
   identity: { controllerKeyId: string }; controller: LibraryController | null;
 }

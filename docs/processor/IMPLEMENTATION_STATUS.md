@@ -886,3 +886,15 @@ No Drive file was changed or new workspace approved during these checks. Complet
 library discovery/enrollment, managed-workspace traversal exclusion, signed publication,
 restore/high-water reconciliation and phone activation remain mandatory before enabling
 the first shared catalog. This local setup screen is not the completed joint release.
+
+Fresh local approval additionally requires a positively verified empty workspace. A
+one-item bounded child query checks actual membership; nonempty, incomplete or continued
+listings are never guessed empty. Malformed results fail explicitly. Existing approved
+library replays remain valid after publication makes their workspace nonempty. Unit
+coverage now passes all 46 Google, 75 AppServices and 25 Web tests; frontend and strict
+Desktop compilation pass. A no-write native acceptance run against the exact authorized
+synthetic source also verifies actual permission/revision/contents inspection and the
+existing hash/size/parent/original-MIME rejection checks. All owners joined, no listener
+started, no original was downloaded, and no Drive file changed. This local diagnostic is
+provisional until tied to the final immutable release revision. Existing-library discovery
+and source-consent persistence remain prerequisites for complete setup/publication.
