@@ -14,6 +14,31 @@ namespace Mpa.Processor.Web.Tests;
 public sealed class WebHostTests
 {
     [TestMethod]
+    public async Task WorkspaceApprovalRequiresHostSessionCsrfAndReviewedCapturedFields()
+    {
+        using var assets = new Assets(); var engine = new Engine();
+        await using var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
+        using var http = Client(host.LocalEndpoint); var diagnostics = new List<Exception>(); host.Diagnostic += diagnostics.Add;
+        using (var anonymous = await http.GetAsync("api/library").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false);
+        login.EnsureSuccessStatusCode(); var csrf = (await login.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("csrf").GetString()!;
+        using (var current = await http.GetAsync("api/library").ConfigureAwait(false)) { current.EnsureSuccessStatusCode(); Assert.AreEqual(JsonValueKind.Null, (await current.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("controller").ValueKind); }
+        using (var inspected = await http.GetAsync("api/workspace-inspection?account=account&folder=metadata").ConfigureAwait(false)) inspected.EnsureSuccessStatusCode();
+        var approval = new Mpa.Processor.AppServices.ApproveLibraryWorkspace("account", "metadata", 1, 7, 1, new string('a', 64), false, true);
+        using (var forged = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, approval, null, "api/library").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Unauthorized, forged.StatusCode);
+        using (var invalid = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, approval with { FolderId = "root" }, csrf, "api/library").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+        Assert.IsNull(engine.WorkspaceApproval);
+        using (var saved = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, approval, csrf, "api/library").ConfigureAwait(false)) saved.EnsureSuccessStatusCode();
+        Assert.AreEqual(approval, engine.WorkspaceApproval);
+        engine.RejectWorkspace = true;
+        using (var changed = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, approval, csrf, "api/library").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Conflict, changed.StatusCode);
+        engine.RejectWorkspace = false; engine.WorkspaceFailure = new Mpa.Processor.GoogleDrive.DriveWorkspaceSelectionException();
+        using (var root = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, approval, csrf, "api/library").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.BadRequest, root.StatusCode);
+        engine.WorkspaceFailure = new Mpa.Processor.GoogleDrive.DriveWorkspaceObjectChangedException();
+        using (var moved = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, approval, csrf, "api/library").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Conflict, moved.StatusCode);
+        Assert.AreEqual(0, diagnostics.Count); Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
+    }
+    [TestMethod]
     public async Task ViewerMutationsRequireCsrfAndUseAuthenticatedBrowserIdentityInsteadOfCallerSuppliedOwnership()
     {
         using var assets = new Assets(); var engine = new Engine();
@@ -91,6 +116,11 @@ public sealed class WebHostTests
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/accounts") { Content = JsonContent.Create(new { operation = "connect" }) };
         request.Headers.Add("Origin", host.HttpsEndpoint.GetLeftPart(UriPartial.Authority)); request.Headers.Add("X-MPA-CSRF", session.GetProperty("csrf").GetString());
         using var denied = await http.SendAsync(request).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+        foreach (var path in new[] { "api/library", "api/workspace-inspection?account=account&folder=metadata" })
+        { using var setup = await http.GetAsync(path).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, setup.StatusCode); }
+        var approval = new Mpa.Processor.AppServices.ApproveLibraryWorkspace("account", "metadata", 1, 7, 1, new string('a', 64), false, true);
+        using (var setup = await SourceMutationAsync(http, host.HttpsEndpoint, HttpMethod.Post, approval, session.GetProperty("csrf").GetString(), "api/library").ConfigureAwait(false))
+            Assert.AreEqual(HttpStatusCode.Forbidden, setup.StatusCode);
         using var status = await http.GetAsync("api/status").ConfigureAwait(false); status.EnsureSuccessStatusCode();
         Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
     }
@@ -285,6 +315,19 @@ public sealed class WebHostTests
     }
     private sealed class Engine : IDesktopWebApplication
     {
+        public Mpa.Processor.AppServices.ApproveLibraryWorkspace? WorkspaceApproval { get; private set; }
+        public bool RejectWorkspace { get; set; }
+        public Exception? WorkspaceFailure { get; set; }
+        public Task<Mpa.Processor.Core.LibraryControllerPin?> LibraryAsync(CancellationToken cancellationToken) => Task.FromResult<Mpa.Processor.Core.LibraryControllerPin?>(null);
+        public Task<Mpa.Processor.AppServices.LibraryWorkspaceInspection> InspectWorkspaceAsync(string accountId, string folderId, CancellationToken cancellationToken) => Task.FromResult(
+            new Mpa.Processor.AppServices.LibraryWorkspaceInspection(new(accountId, folderId, "Metadata", 7, false), 1, new(1, []),
+                new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, "synthetic-public-controller", new string('a', 64), Guid.NewGuid(), 1, "synthetic-public-publisher", new string('b', 64)), null));
+        public Task<Mpa.Processor.Core.LibraryControllerPin> ApproveWorkspaceAsync(Mpa.Processor.AppServices.ApproveLibraryWorkspace request, CancellationToken cancellationToken)
+        {
+            if (RejectWorkspace) throw new Mpa.Processor.AppServices.LibraryWorkspaceApprovalException("Settings changed. Review them again.");
+            if (WorkspaceFailure is not null) throw WorkspaceFailure;
+            WorkspaceApproval = request; return Task.FromResult(new Mpa.Processor.Core.LibraryControllerPin(Guid.NewGuid(), Guid.NewGuid(), 1, request.AccountId, request.FolderId, "synthetic-public-controller", request.ControllerKeyId));
+        }
         public List<(string Action, Guid Owner)> ViewerCalls { get; } = [];
         public bool Paused { get; private set; }
         public bool Hold { get; init; }

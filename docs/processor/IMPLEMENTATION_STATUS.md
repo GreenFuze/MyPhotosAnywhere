@@ -13,9 +13,9 @@ Baseline: `6c9ead7b1d4446dc819dee71974aa7b68614f232` (0.5.33 publication revisio
 | Stage | State | Evidence / remaining work |
 | --- | --- | --- |
 | 0: feasibility/baseline | In progress | Production OAuth, full desktop grant, fresh-process refresh, bounded synthetic Drive round trip passed. Manual post-consent source discovery, actual-expiry refresh and injected lost-completion reconciliation passed. Four-target two-model/decoder native matrix passed on 67607b1; expanded object model matrix is running on 9bae0a3. Actual cross-client/crash/multiple-account/duration and remaining codec/OCR/package gates stay open. |
-| 1: contracts | In progress | Matching signatures/identity/facts-tree/source-coverage fixtures pass: 47 C# Protocol tests and 28 focused Android tests; all 537 Android unit tests and zero-findings lint passed for the coverage slice. Stable-patch revalidation and complete integration/scale acceptance remain. |
+| 1: contracts | In progress | Matching identity/facts-tree/coverage/source-policy/publisher/signature fixtures pass: 67 C# Protocol and 557 Android unit tests with zero-findings lint. Complete live publication/activation and operation integration remain. |
 | 2: core/plugins | In progress | Local SQLite ownership, durable stage/checkpoint/receipt outbox and failed-only retry foundation under test. Resource reservations, actual process ownership/recovery, complete plugins and tray/Exit remain. |
-| 3: accounts/coordination | In progress | Production protected account/refresh and authenticated loopback web host implemented. Browser LAN onboarding and Drive-only mobile enrollment/acknowledged controls remain. No phone LAN connection is permitted. |
+| 3: accounts/coordination | In progress | Production protected account/refresh, native signing ownership, authenticated loopback web host and reviewed local workspace setup implemented. Cloud library discovery, browser LAN onboarding and Drive-only mobile enrollment/acknowledged controls remain. No phone LAN connection is permitted. |
 | 4: catalog | In progress | Bounded WAL facts snapshots, verified immutable objects/tree traversal and source coverage are implemented. Publishing, approved-configuration/ancestry agreement, staged phone activation and human synchronization remain. |
 | 5: imports/previews | Pending | All three Takeout paths, per-stage retry, previews/video. |
 | 6: recognition | Pending | People/object/OCR workers, consent, quality and native coverage. |
@@ -851,3 +851,38 @@ target), four clean Desktop build/audit reports and all 477 device tests with co
 traced runtime capture and valid PNG evidence. Artifacts contain reports rather than
 release binaries; no independent binary-signature claim is made. Revision `0bcb814`
 also passed all four push workflows; independent artifact inspection remains pending.
+
+## Host-owned workspace setup
+
+The desktop runtime now owns the controller/publisher key owner alongside its existing
+account/vault owners. Startup verifies protected persistence; shutdown joins browser
+requests before retiring keys and vault. Host-only authenticated/CSRF-protected endpoints
+provide read-only folder review and explicit local workspace approval. The React Settings
+screen reuses the bounded Drive picker, explains source association and shared-folder
+privacy, and keeps approval distinct from the pending first shared catalog.
+
+Approval rechecks actual folder identity, read/write capability, Drive revision, native
+controller fingerprint, connected account revision and selected-source revision before
+atomic pin/counter bootstrap. Source folders cannot become their own metadata workspace.
+Canonical My Drive/shared-drive root IDs are rejected as well as the root alias. The
+picker also disables root selection. Shared-drive items correctly require shared-folder
+approval when Google's documented `shared` field is omitted; missing My Drive sharing
+state is not guessed private. See the [Drive files reference](https://developers.google.com/workspace/drive/api/reference/rest/v3/files).
+
+Local checks pass all 45 Google, 74 AppServices and 25 Web tests, TypeScript compilation,
+zero-vulnerability web audit and strict Desktop Release compilation with zero warnings
+or errors. Tests retain assertions for canonical roots, permission denial, shared-folder
+acknowledgment, source/account races, cancellation, host-only access and operational-error
+recovery. An initial test fixture used the wrong protected credential format; it now uses
+the established credential-store fixture. A root-selection exception was initially caught
+as malformed data; the corrected operational type preserves the explicit recoverable
+error. No assertion or warning check was weakened.
+
+Chrome review against the authorized isolated Windows profile confirms native startup,
+real Drive browsing, rejection of a selected photo source, and disabled root selection.
+The final valid-folder review also passes against real Drive, with approval disabled
+until explicit source association and no workspace approved during the review.
+No Drive file was changed or new workspace approved during these checks. Complete cloud
+library discovery/enrollment, managed-workspace traversal exclusion, signed publication,
+restore/high-water reconciliation and phone activation remain mandatory before enabling
+the first shared catalog. This local setup screen is not the completed joint release.

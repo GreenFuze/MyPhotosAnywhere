@@ -5,6 +5,7 @@ import type { Snapshot } from './api';
 import { CatalogGallery } from './gallery';
 import { SourceSettings } from './sources';
 import { Activity } from './activity';
+import { LibrarySettings } from './library';
 import './app.css';
 
 const api = new DesktopApi();
@@ -29,6 +30,7 @@ function App() {
   const [settings, setSettings] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -73,12 +75,13 @@ function App() {
       <div className="bar-actions">{access === 'ready' && <><label className="account"><span className="visually-hidden">Google Drive account</span><select value={account} onChange={event => setAccount(event.target.value)}>
         <option value="">All accounts</option>{snapshot?.accounts.map(item => <option key={item.id} value={item.id}>{item.name}{item.connected ? '' : ' · Disconnected'}</option>)}</select></label>
         <button className="icon" onClick={() => { setActivityOpen(value => !value); setSourcesOpen(false); }} aria-label="Activity" aria-expanded={activityOpen}><Icon name="activity" /></button>
-        <button className="icon" onClick={() => { setSettings(value => !value); setSourcesOpen(false); setActivityOpen(false); }} aria-label="Settings" aria-expanded={settings}><Icon name="settings" /></button></>}</div>
+        <button className="icon" onClick={() => { setSettings(value => !value); setSourcesOpen(false); setActivityOpen(false); setLibraryOpen(false); }} aria-label="Settings" aria-expanded={settings}><Icon name="settings" /></button></>}</div>
     </header>
     <main>
       {access !== 'ready' ? <section className="welcome"><Icon name="photos" /><h1>{access === 'connecting' ? 'Opening your photos…' : 'Connect to My Photos Anywhere'}</h1>
-        <p>{notice ?? 'Open MPA on the computer running your library to connect this browser.'}</p></section> : activityOpen && snapshot ? <Activity api={api} snapshot={snapshot} busy={busy} pause={pause} back={() => { setActivityOpen(false); setSettings(true); }} /> : sourcesOpen && snapshot ? <SourceSettings api={api} accounts={snapshot.accounts} back={() => setSourcesOpen(false)} /> : settings ?
+        <p>{notice ?? 'Open MPA on the computer running your library to connect this browser.'}</p></section> : libraryOpen && snapshot ? <LibrarySettings api={api} accounts={snapshot.accounts} back={() => setLibraryOpen(false)} /> : activityOpen && snapshot ? <Activity api={api} snapshot={snapshot} busy={busy} pause={pause} back={() => { setActivityOpen(false); setSettings(true); }} /> : sourcesOpen && snapshot ? <SourceSettings api={api} accounts={snapshot.accounts} back={() => setSourcesOpen(false)} /> : settings ?
         <section className="settings"><button className="back" onClick={() => setSettings(false)}><Icon name="back" />Back to Photos</button><h1>Settings</h1>
+          {api.hostOwner && <button className="setting-card setting-link" onClick={() => setLibraryOpen(true)}><span><strong>Library workspace</strong><span>Choose where metadata and previews are stored</span></span><span aria-hidden="true">›</span></button>}
           <button className="setting-card setting-link" onClick={() => setSourcesOpen(true)}><span><strong>Sources</strong><span>Choose the Drive folders in your library</span></span><span aria-hidden="true">›</span></button>
           <button className="setting-card setting-link" onClick={() => setActivityOpen(true)}><span><strong>Activity</strong><span>Scan progress, failures, and retry</span></span><span aria-hidden="true">›</span></button>
           <section className="setting-card"><h2>Processing</h2><p>{snapshot?.state === 'paused' ? 'Paused. Your saved jobs are retained.' : 'The engine runs independently of this browser.'}</p>
@@ -95,7 +98,7 @@ function App() {
             </> : <p>Manage Google authorization on the host computer.</p>}</section>
           <section className="setting-card"><h2>This browser</h2><p>Signing out leaves processing and other connected devices running.</p><button onClick={() => { void api.signOut().then(() => { setAccess('locked'); setNotice(null); }).catch(error => setNotice(message(error))); }}>Sign out</button></section>
         </section> : null}
-      {access === 'ready' && <div hidden={settings || sourcesOpen || activityOpen}><CatalogGallery api={api} account={account}
+      {access === 'ready' && <div hidden={settings || sourcesOpen || activityOpen || libraryOpen}><CatalogGallery api={api} account={account}
         sources={() => { setSettings(true); setSourcesOpen(true); }} locked={() => { setAccess('locked'); setNotice('Open MPA on the host computer to connect this browser.'); }} /></div>}
       {notice && access === 'ready' && <p className="notice" role="alert">{notice}</p>}
     </main>

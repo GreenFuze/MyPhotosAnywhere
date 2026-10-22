@@ -19,6 +19,7 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
     private NativeCredentialVault? _vault;
     private ProcessorAccountService? _accounts;
     private LanIdentityOwner? _identity;
+    private LibrarySigningIdentityOwner? _signing;
     private DesktopWebHost? _host;
     private ProcessorSourceRuntime? _sources;
     private CatalogViewerSessions? _viewers;
@@ -30,6 +31,7 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
     private bool _hostClosed;
     private bool _accountsClosed;
     private bool _identityClosed;
+    private bool _signingClosed;
     private bool _vaultClosed;
     private bool _exitConfirmed;
     public Exception? Failure { get { lock (_gate) return _sources?.Failure ?? _failure ?? _native.Failure; } }
@@ -55,10 +57,14 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
             owner._accounts = new ProcessorAccountService(state, owner._vault, new GoogleAccountConnectionFactory(configuration, owner._vault),
                 new GoogleLibraryConnectionFactory(configuration, owner._vault));
             var storage = new StorageBudgetManager(new ProcessorStateStorageReader(stateDirectory));
+            var pin = await state.ExecuteAsync(database => new LibraryAuthorityRepository(database, storage).Controller(), cancellationToken).ConfigureAwait(false);
+            owner._signing = new LibrarySigningIdentityOwner(owner._vault, library, installationId, pin);
+            await owner._signing.InitializeAsync(cancellationToken).ConfigureAwait(false);
             owner._sources = await ProcessorSourceRuntime.CreatePausedAsync(state, owner._accounts, work, storage, cancellationToken).ConfigureAwait(false);
             owner._sources.Failed += owner.OnFailure;
             owner._viewers = new(state, stateDirectory, installationId, storage);
-            var application = new DesktopEngineApplication(library, state, owner._accounts, owner._sources.Work, owner._sources, owner._viewers);
+            var setup = new LibraryWorkspaceSetup(state, owner._accounts, owner._signing, storage);
+            var application = new DesktopEngineApplication(library, state, owner._accounts, owner._sources.Work, owner._sources, owner._viewers, setup);
             owner._host = await DesktopWebHost.StartAsync(application, assetsDirectory, enableLan ? owner._identity.Identity : null, cancellationToken).ConfigureAwait(false);
             owner._host.Diagnostic += owner.ReportFailure;
             await owner._sources.ActivateAsync(cancellationToken).ConfigureAwait(false);
@@ -131,6 +137,7 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
             throw new InvalidOperationException("Desktop requests or processing resources have not joined; account/vault/state ownership is retained.", Failure);
         if (!_accountsClosed) { if (_accounts is not null) await _accounts.DisposeAsync().ConfigureAwait(false); _accountsClosed = true; }
         if (!_identityClosed) { if (_identity is not null) await _identity.DisposeAsync().ConfigureAwait(false); _identityClosed = true; }
+        if (!_signingClosed) { if (_signing is not null) await _signing.DisposeAsync().ConfigureAwait(false); _signingClosed = true; }
         if (!_vaultClosed) { if (_vault is not null) await _vault.DisposeAsync().ConfigureAwait(false); _vaultClosed = true; }
         lock (_gate) _exitConfirmed = true;
         // Confirmed joined failures remain sticky and force an unsuccessful app exit.

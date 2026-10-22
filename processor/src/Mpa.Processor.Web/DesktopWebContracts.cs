@@ -19,6 +19,9 @@ public sealed record DesktopViewerWindow(Guid Id, long Count, long Position, IRe
 public interface IDesktopWebApplication
 {
     Task<DesktopSnapshot> SnapshotAsync(CancellationToken cancellationToken);
+    Task<Mpa.Processor.Core.LibraryControllerPin?> LibraryAsync(CancellationToken cancellationToken);
+    Task<Mpa.Processor.AppServices.LibraryWorkspaceInspection> InspectWorkspaceAsync(string accountId, string folderId, CancellationToken cancellationToken);
+    Task<Mpa.Processor.Core.LibraryControllerPin> ApproveWorkspaceAsync(Mpa.Processor.AppServices.ApproveLibraryWorkspace request, CancellationToken cancellationToken);
     Task<DesktopCatalogPage> CatalogAsync(string? accountId, string? position, bool newer, long? dateUtc, CancellationToken cancellationToken);
     Task<DesktopPreview?> CatalogPreviewAsync(Guid id, CancellationToken cancellationToken);
     Task<DesktopViewerWindow> OpenViewerAsync(Guid browser, Mpa.Processor.Core.CatalogViewerRequest request, CancellationToken cancellationToken);

@@ -6,7 +6,7 @@ namespace Mpa.Processor.Web;
 
 /// <summary>Browser adapter borrowing engine-lifetime accounts, read owners, state and work.</summary>
 public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoordinator state, ProcessorAccountService accounts,
-    IProcessorWorkControl work, ProcessorSourceRuntime? sources = null, CatalogViewerSessions? viewers = null) : IDesktopWebApplication
+    IProcessorWorkControl work, ProcessorSourceRuntime? sources = null, CatalogViewerSessions? viewers = null, LibraryWorkspaceSetup? setup = null) : IDesktopWebApplication
 {
     private readonly Guid _libraryId = libraryId != Guid.Empty ? libraryId : throw new ArgumentException("Library identity is required.", nameof(libraryId));
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
@@ -15,6 +15,11 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
     private readonly ProcessorSourceRuntime? _sources = sources;
     private readonly DesktopCatalogReader _catalog = new(state);
     private readonly CatalogViewerSessions? _viewers = viewers;
+    private readonly LibraryWorkspaceSetup? _setup = setup;
+    private LibraryWorkspaceSetup Setup => _setup ?? throw new InvalidOperationException("The native library setup owner has not been configured.");
+    public Task<LibraryControllerPin?> LibraryAsync(CancellationToken cancellationToken) => Setup.CurrentAsync(cancellationToken);
+    public Task<LibraryWorkspaceInspection> InspectWorkspaceAsync(string accountId, string folderId, CancellationToken cancellationToken) => Setup.InspectAsync(accountId, folderId, cancellationToken);
+    public Task<LibraryControllerPin> ApproveWorkspaceAsync(ApproveLibraryWorkspace request, CancellationToken cancellationToken) => Setup.ApproveAsync(request, cancellationToken);
     private CatalogViewerSessions Viewers => _viewers ?? throw new InvalidOperationException("The viewer session owner has not been configured.");
     public async Task<DesktopViewerWindow> OpenViewerAsync(Guid browser, CatalogViewerRequest request, CancellationToken cancellationToken) =>
         await ResolveWindowAsync(await ViewerCommandAsync(() => Viewers.OpenAsync(browser, request, cancellationToken)).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);

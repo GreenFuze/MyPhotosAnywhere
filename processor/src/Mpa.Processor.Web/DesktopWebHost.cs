@@ -1,5 +1,7 @@
 using System.Net;
 using System.Security.Authentication;
+using Mpa.Processor.AppServices;
+using Mpa.Processor.GoogleDrive;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -159,6 +161,14 @@ public sealed class DesktopWebHost : IAsyncDisposable
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Library settings changed. Refresh Sources before applying this change." }, context.RequestAborted).ConfigureAwait(false); }
             catch (ExistingLibrarySourceException)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This account and folder are already configured. Update their existing source entry." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (LibraryWorkspaceApprovalException error)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
+            catch (DriveWorkspaceSelectionException error)
+            { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
+            catch (DriveWorkspaceObjectChangedException)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "The metadata folder changed or is no longer available. Choose it again; saved work was retained." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (ControllerAuthorityConflictException)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This desktop already has a different approved library workspace. Its saved identity was retained." }, context.RequestAborted).ConfigureAwait(false); }
             catch (ProcessorWorkStateConflictException)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Processing state changed. Refresh Activity before trying again." }, context.RequestAborted).ConfigureAwait(false); }
             catch (InvalidDesktopCatalogQueryException error)
@@ -242,6 +252,21 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 await _application.CloseViewerAsync(session.Id, ViewerId(context), token).ConfigureAwait(false); context.Response.StatusCode = 204; break;
             case ("GET", "/api/sources"):
                 await context.Response.WriteAsJsonAsync(await _application.SourcesAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("GET", "/api/library"):
+                if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
+                await context.Response.WriteAsJsonAsync(new { controller = await _application.LibraryAsync(token).ConfigureAwait(false) }, token).ConfigureAwait(false); break;
+            case ("GET", "/api/workspace-inspection"):
+                if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
+                var workspaceAccount = RequiredQuery(context, "account"); var workspaceFolder = RequiredQuery(context, "folder");
+                if (!Identity(workspaceAccount) || !Identity(workspaceFolder) || workspaceFolder == "root") throw new BadHttpRequestException("Choose a dedicated metadata workspace by its actual folder identity.");
+                await context.Response.WriteAsJsonAsync(await _application.InspectWorkspaceAsync(workspaceAccount, workspaceFolder, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("POST", "/api/library"):
+                if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
+                var approval = await context.Request.ReadFromJsonAsync<ApproveLibraryWorkspace>(token).ConfigureAwait(false) ?? throw new BadHttpRequestException("Workspace approval is required.");
+                if (!Identity(approval.AccountId) || !Identity(approval.FolderId) || approval.FolderId == "root" || approval.AccountRevision < 1 || approval.FolderVersion < 1 ||
+                    approval.ConfigurationRevision < 1 || approval.ControllerKeyId is not { Length: 64 } || approval.ControllerKeyId.Any(c => c is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+                    throw new BadHttpRequestException("Invalid reviewed workspace approval.");
+                await context.Response.WriteAsJsonAsync(new { controller = await _application.ApproveWorkspaceAsync(approval, token).ConfigureAwait(false) }, token).ConfigureAwait(false); break;
             case ("GET", "/api/activity"):
                 var rawCursor = OptionalQuery(context, "cursor", 36); Guid? activityCursor = null;
                 if (rawCursor is not null)

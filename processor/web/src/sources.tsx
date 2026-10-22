@@ -36,12 +36,17 @@ export function SourceSettings({ api, accounts, back }: { api: DesktopApi; accou
       <label className="switch-row"><span>Include subfolders</span><input type="checkbox" checked={source.includeDescendants} disabled={busy} onChange={event => { void update(source, source.enabled, event.target.checked); }} /></label>
     </section>)}
     <p className="muted">MPA scans selected folders in the background. Your files keep their names and locations.</p>
-    {picker && sources && <FolderPicker api={api} accounts={accounts.filter(account => account.connected)} revision={sources.revision}
+    {picker && sources && <FolderPicker mode="source" api={api} accounts={accounts.filter(account => account.connected)} revision={sources.revision}
       close={() => setPicker(false)} saved={value => { setSources(value); setPicker(false); setNotice('Folder saved on this desktop. Its original files were not changed.'); }} />}
   </section>;
 }
 
-function FolderPicker({ api, accounts, revision, close, saved }: { api: DesktopApi; accounts: Account[]; revision: number; close: () => void; saved: (value: Sources) => void }) {
+type FolderPickerProps = { api: DesktopApi; accounts: Account[]; close: () => void } & (
+  { mode: 'source'; revision: number; saved: (value: Sources) => void } |
+  { mode: 'workspace'; picked: (account: string, folder: Folder) => Promise<void> }
+);
+export function FolderPicker(props: FolderPickerProps) {
+  const { api, accounts, close } = props;
   const [account, setAccount] = useState(accounts[0]?.id ?? '');
   const [location, setLocation] = useState<FolderLocation | null>(null);
   const [path, setPath] = useState<Folder[]>([]);
@@ -74,11 +79,14 @@ function FolderPicker({ api, accounts, revision, close, saved }: { api: DesktopA
   }
   async function add() {
     if (!location || saving) return; setSaving(true); setNotice(null);
-    try { saved(await api.addSource(account, location.current.id, descendants, revision)); }
+    try {
+      if (props.mode === 'workspace') await props.picked(account, location.current);
+      else props.saved(await api.addSource(account, location.current.id, descendants, props.revision));
+    }
     catch (error) { setNotice(errorText(error)); } finally { setSaving(false); }
   }
   return <dialog ref={dialog} className="folder-picker" aria-labelledby="folder-picker-title" onCancel={event => { if (saving) event.preventDefault(); else close(); }}>
-    <header><h2 id="folder-picker-title">Choose a source folder</h2><button onClick={close} disabled={saving} aria-label="Close folder picker">✕</button></header>
+    <header><h2 id="folder-picker-title">{props.mode === 'workspace' ? 'Choose a metadata workspace' : 'Choose a source folder'}</h2><button onClick={close} disabled={saving} aria-label="Close folder picker">✕</button></header>
     <label className="picker-account">Google Drive account<select value={account} disabled={saving} onChange={event => setAccount(event.target.value)}>{accounts.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
     <nav className="breadcrumbs" aria-label="Folder path">{path.map((folder, index) => <button key={folder.id} disabled={loading || saving} onClick={() => { void navigate(folder.id, path.slice(0, index), null, []); }} dir="auto">{folder.name}</button>)}</nav>
     <div className="folder-list" aria-busy={loading}>{location?.children.map(folder => <button key={folder.id} className="folder-row" disabled={loading || saving || !folder.canListChildren} onClick={() => { void navigate(folder.id, path, null, []); }}>
@@ -88,7 +96,7 @@ function FolderPicker({ api, accounts, revision, close, saved }: { api: DesktopA
     <div className="row-actions">{previous.length > 0 && location && <button disabled={loading || saving} onClick={() => { void navigate(location.current.id, path.slice(0, -1), previous[previous.length - 1] ?? null, previous.slice(0, -1)); }}>Previous page</button>}
       {location?.nextCursor && <button disabled={loading || saving} onClick={() => { void navigate(location.current.id, path.slice(0, -1), location.nextCursor, [...previous, cursor]); }}>Next page</button>}</div>
     {notice && <p role="alert">{notice}</p>}
-    <footer><label className="switch-row"><span>Include subfolders</span><input type="checkbox" checked={descendants} disabled={saving} onChange={event => setDescendants(event.target.checked)} /></label>
-      <button className="primary" disabled={loading || saving || !location?.current.canListChildren} onClick={() => { void add(); }}>{saving ? 'Saving folder…' : 'Use this folder'}</button></footer>
+    <footer>{props.mode === 'source' && <label className="switch-row"><span>Include subfolders</span><input type="checkbox" checked={descendants} disabled={saving} onChange={event => setDescendants(event.target.checked)} /></label>}
+      <button className="primary" disabled={loading || saving || !location?.current.canListChildren || props.mode === 'workspace' && path.length <= 1} onClick={() => { void add(); }}>{saving ? props.mode === 'workspace' ? 'Checking folder…' : 'Saving folder…' : 'Use this folder'}</button></footer>
   </dialog>;
 }

@@ -9,6 +9,16 @@ export interface Source { id: string; accountId: string; folderId: string; displ
 export interface Sources { revision: number; sources: Source[] }
 export interface Folder { id: string; name: string; canListChildren: boolean }
 export interface FolderLocation { current: Folder; children: Folder[]; nextCursor: string | null; incompleteSearch: boolean }
+export interface LibraryController { libraryId: string; actorId: string; epoch: number; accountId: string; folderId: string; publicKeySpki: string; keyId: string }
+export interface WorkspaceInspection {
+  workspace: { accountId: string; folderId: string; name: string; driveVersion: number; shared: boolean };
+  accountRevision: number; sources: Sources;
+  identity: { controllerKeyId: string }; controller: LibraryController | null;
+}
+export interface WorkspaceApproval {
+  accountId: string; folderId: string; accountRevision: number; folderVersion: number; configurationRevision: number;
+  controllerKeyId: string; acceptSharedWorkspace: boolean; associateSelectedSources: boolean;
+}
 export interface SourceScope { sourceId: string; sourceRevision: number; accountId: string; accountRevision: number; rootFolderId: string; includeDescendants: boolean }
 export interface SourceJob {
   jobId: string; scope: SourceScope; current: boolean;
@@ -81,6 +91,15 @@ export class DesktopApi {
     return value as unknown as ViewerWindow;
   }
   async sources(signal: AbortSignal): Promise<Sources> { return await this.get<Sources>('/api/sources', signal); }
+  async library(signal: AbortSignal): Promise<{ controller: LibraryController | null }> { return await this.get('/api/library', signal); }
+  async inspectWorkspace(account: string, folder: string, signal: AbortSignal): Promise<WorkspaceInspection> {
+    return await this.get('/api/workspace-inspection?' + new URLSearchParams({ account, folder }), signal);
+  }
+  async approveWorkspace(approval: WorkspaceApproval): Promise<{ controller: LibraryController }> {
+    const response = await fetch('/api/library', { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-MPA-CSRF': this.csrf }, body: JSON.stringify(approval) });
+    await this.check(response); return await response.json() as { controller: LibraryController };
+  }
   async activity(cursor: string | null, signal: AbortSignal): Promise<ActivityPage> {
     return await this.get<ActivityPage>('/api/activity' + (cursor ? '?' + new URLSearchParams({ cursor }) : ''), signal);
   }
