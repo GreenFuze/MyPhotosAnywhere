@@ -9,8 +9,8 @@ public sealed record CatalogFactsPage(ReadOnlyCollection<DriveCatalogAsset> Asse
 /// <summary>Owns a read-only WAL snapshot for bounded portable-facts projection. Open under
 /// the serial coordinator, then read on a background owner outside that coordinator.
 /// Source imports remain writable; dispose this owner before releasing the state database.
-/// This is observation capture, not source coverage, a publication or active generation.</summary>
-public sealed class CatalogFactsSnapshot : IDisposable
+/// Facts and source coverage share this observation; it is not a publication or active generation.</summary>
+public sealed partial class CatalogFactsSnapshot : IDisposable
 {
     private readonly ProcessorStateReadSnapshot _snapshot;
     private bool _closed;

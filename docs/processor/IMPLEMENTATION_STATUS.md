@@ -545,3 +545,35 @@ or emulator startup. Six SDK verification tests pass and run in CI. Emulator sta
 checks image files; boot probes and failure diagnostics have bounded ADB waits. Existing
 test assertions, native counts and acceptance requirements are unchanged. Actual new-image
 CI execution remains pending.
+
+## Captured coverage and scan-selection validation (2026-10-22)
+
+The trusted push checks on `63b19e3` passed Android build/unit/lint, the four-target
+Protocol/Core/Google/AppServices/LAN/Web matrix, and the four-target Desktop matrix.
+Independent downloaded reports verify 270 native tests per target (1,080 total),
+complete clean logs, 10,000/100,000-item fixtures and agreeing reported web inventories.
+Application binaries are absent from those report artifacts; their binary hashes are
+not independently verified. API 29/35/37 native execution is still in progress. The
+new exact API 37 revision-8 SDK installation check passed; that is not yet a device-test pass.
+
+`CatalogFactsSnapshot.ReadCoverageSources` captures source coverage using the same
+owned read-only WAL transaction as portable photo facts. It reads at most 256 source
+bindings, then streams selected scan stages without buffering library-sized journals.
+No writable discovery repository or network operation is constructed inside the snapshot.
+Source selection, policy, account availability, immutable scope, recipes, item identities,
+bounded checkpoints and accepted completion receipts are validated. Missing/corrupt work
+fails explicitly instead of claiming empty or complete coverage. Shared journal decoding
+retains the existing discovery semantics with an explicit 32-KiB input byte bound.
+
+Current failed stages determine outstanding failures; historical folder failure counters
+cannot keep an accepted repair permanently failed. Counts describe processing observations
+and steps, not unique photos. Incomplete Drive searches remain partial. Disabled,
+disconnected, obsolete-scope, pending, scanning, access-lost, offline, partial and complete
+states retain their distinct meanings. A framed journal SHA records observation provenance;
+raw pagination tokens, error messages and local paths are not exported. Facts/coverage stay
+stable while live imports, retries, account changes and new scan selections continue.
+
+Twenty-one focused snapshot tests pass locally, including failed-only repair, terminal
+receipts, cancellation/disposal, policy/account changes, missing journals and the source
+bound. The complete local Core suite passes 133 tests, AppServices passes 47 and Web passes 24; Desktop compilation reports zero warnings/errors. This read-only export is not
+an approved configuration, signed generation, publication, staging activation or release.
