@@ -602,3 +602,14 @@ established for these exact records. API 29's close warning belongs to com.andro
 API 37 also reports a Google Play services ANR and resource warnings in other system apps.
 The bundled face detector prints its tensor-137 diagnostic on each API. Old version-specific
 exceptions are not treated as approval for 0.6, and passing tests do not erase these records.
+
+The instrumentation-only `MpaDiagnosticTestRunner` enables the supported
+[`detectLeakedClosableObjects`](https://developer.android.com/reference/android/os/StrictMode.VmPolicy.Builder#detectLeakedClosableObjects())
+VM policy before constructing the application, preserving existing VM checks and logging
+violations through teardown. No hidden-API exemption or production hook is added.
+The runtime-capture gate requires an early matching allocation-tracing marker for every
+actual test process, including later isolated stages; missing, late and wrong-process
+markers fail. Nine verifier tests pass. The test APK builds, zero-findings lint passes,
+and independent aapt2 inspection confirms the actual runner/target package. Native traced
+execution and allocation ownership conclusions remain pending. Explicit legacy inspection
+mode applies only to archived pre-runner evidence; the CI entry point always requires tracing.
