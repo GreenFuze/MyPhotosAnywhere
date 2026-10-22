@@ -32,7 +32,21 @@ public sealed class CatalogFactsTraversal
         if (objectBudget is < 1 or > MaximumObjectBudget) throw new ArgumentOutOfRangeException(nameof(objectBudget));
         _budget = objectBudget;
     }
-    public async IAsyncEnumerable<CatalogFactsLeaf> ReadLeavesAsync(VerifiedProtocolDocument verified, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<CatalogFactsLeaf> ReadLeavesAsync(VerifiedProtocolDocument verified, CancellationToken cancellationToken = default)
+        => ReadAsync(verified, null, cancellationToken);
+
+    /// <summary>Validate complete bounded coverage before reading photo facts. The owning
+    /// generation must compare the supplied source/account policies against its enrolled
+    /// approved configuration in the required callback. Normal enumeration is still only
+    /// a staging read, not authority/ancestry verification or an active-generation switch.</summary>
+    public IAsyncEnumerable<CatalogFactsLeaf> ReadCoveredLeavesAsync(VerifiedProtocolDocument verified,
+        Func<CatalogSourceCoverageSet, CancellationToken, Task> validateConfiguration, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(validateConfiguration);
+        return ReadAsync(verified, validateConfiguration, cancellationToken);
+    }
+    private async IAsyncEnumerable<CatalogFactsLeaf> ReadAsync(VerifiedProtocolDocument verified,
+        Func<CatalogSourceCoverageSet, CancellationToken, Task>? validateConfiguration, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(verified); cancellationToken.ThrowIfCancellationRequested();
         if (verified.LibraryId != _library || !verified.RequiredCapabilities.Contains(DriveCatalogFacts.Capability, StringComparer.Ordinal))
@@ -47,6 +61,21 @@ public sealed class CatalogFactsTraversal
         // These roles belong to the enclosing generation but cannot be reused as tree nodes.
         Reserve(commit.SourceCoverage); if (commit.Parent is not null) Reserve(commit.Parent);
         Reserve(commit.RootIndex);
+        CatalogSourceCoverageSet? coverage = null;
+        if (validateConfiguration is not null)
+        {
+            var root = _schema.ReadCoverageRoot(await ReadMetadataAsync(commit.SourceCoverage, cancellationToken).ConfigureAwait(false), _library);
+            foreach (var descriptor in root.Pages) Reserve(descriptor.Reference);
+            var pages = new List<CatalogCoveragePage>();
+            foreach (var descriptor in root.Pages)
+            {
+                var bytes = await ReadMetadataAsync(descriptor.Reference, cancellationToken).ConfigureAwait(false);
+                pages.Add(_schema.ReadCoveragePage(bytes, root, descriptor));
+            }
+            coverage = new(root, pages); cancellationToken.ThrowIfCancellationRequested();
+            await validateConfiguration(coverage, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
         var pending = new Stack<Pending>(); pending.Push(new("", commit.RootIndex, null));
         while (pending.TryPop(out var entry))
         {
@@ -54,6 +83,7 @@ public sealed class CatalogFactsTraversal
             if (entry.Chunk is not null)
             {
                 var facts = await ReadChunkAsync(entry.Chunk, entry.Prefix, cancellationToken).ConfigureAwait(false);
+                if (coverage is not null) foreach (var asset in facts.Assets) coverage.ValidateAsset(asset);
                 cancellationToken.ThrowIfCancellationRequested(); yield return new(entry.Prefix, entry.Chunk, facts);
             }
             else
@@ -72,13 +102,18 @@ public sealed class CatalogFactsTraversal
     }
     private async Task<CatalogIndexNode> ReadIndexAsync(CatalogObjectReference reference, string prefix, CancellationToken token)
     {
+        var owned = await ReadMetadataAsync(reference, token).ConfigureAwait(false);
+        var node = _schema.ReadIndex(owned, prefix); token.ThrowIfCancellationRequested(); return node;
+    }
+    private async Task<byte[]> ReadMetadataAsync(CatalogObjectReference reference, CancellationToken token)
+    {
         var borrowed = await _source.ReadAsync(reference, token).ConfigureAwait(false); token.ThrowIfCancellationRequested();
         if (borrowed.Length != reference.Bytes || borrowed.Length > CatalogPublicationReader.MaximumIndexBytes)
-            throw new ProtocolFormatException("Catalog index does not match its bounded immutable length.");
+            throw new ProtocolFormatException("Catalog metadata does not match its bounded immutable length.");
         var owned = borrowed.ToArray();
         if (!CryptographicOperations.FixedTimeEquals(SHA256.HashData(owned), Convert.FromHexString(reference.Sha256)))
-            throw new ProtocolFormatException("Catalog index does not match its immutable SHA-256.");
-        var node = _schema.ReadIndex(owned, prefix); token.ThrowIfCancellationRequested(); return node;
+            throw new ProtocolFormatException("Catalog metadata does not match its immutable SHA-256.");
+        token.ThrowIfCancellationRequested(); return owned;
     }
     private async Task<DriveCatalogChunk> ReadChunkAsync(CatalogChunkReference reference, string prefix, CancellationToken token)
     {

@@ -344,3 +344,38 @@ Matching C#/Kotlin readers and the shared independently generated coverage fixtu
 all states, empty and 256-source libraries, 44 malformed graphs and source-membership
 conflicts. These readers do not perform authority enrollment, predecessor agreement,
 durable staging or the active-generation switch; those checks remain mandatory.
+
+## Covered observed-facts traversal
+
+`CatalogFactsTraversal.ReadCoveredLeavesAsync` (C#) and `readCoveredLeaves` (Kotlin)
+combine the bounded coverage and observed-facts readers. Their enclosing signed commit
+must already have passed signature, actor, library and capability verification. The
+read-only transport must verify actual selected-workspace membership for each object.
+
+The reader checks the coverage root's captured length/SHA before parsing it, reserves
+every page in the same object-role/budget ledger as coverage root, predecessor, indexes
+and chunks, and validates all pages before reading the photo tree. Cross-role aliases
+and object-budget exhaustion fail explicitly. At most 256 coverage records remain in
+memory; photo leaves retain the existing sequential bounded traversal.
+
+A required asynchronous configuration-admission callback receives the bounded complete
+coverage set and its immutable ordered `Sources` list. The generation owner must compare
+those source/account policies to its enrolled authority's approved configuration; matching
+self-reported revisions alone cannot authorize them. The callback executes once, including
+for a truly empty catalog, before the first photo-tree read. Rejection or cancellation
+propagates; neither is converted into an empty successful result. Every emitted leaf's
+asset memberships must agree with that captured coverage. Partial/offline/disconnected
+sources can retain facts; absence still never implies deletion.
+
+Later object/membership failures can follow already emitted staging leaves. Only normal
+full enumeration proves this covered walk finished. Signed predecessor/epoch agreement,
+remaining policy/consent checks and an atomic active-generation switch are still separate
+mandatory generation-owner responsibilities. The older facts-only walk remains available
+for isolated tree validation and cannot by itself validate a generation.
+
+The independently generated shared `catalog-covered-traversal.json` fixture combines
+partial, offline and disconnected sources with the actual bounded facts tree, an empty
+catalog and 22 invalid graphs. Matching consumers cover corrupted/missing metadata,
+revision changes, page/index/chunk/predecessor aliases, source/account/revision/depth
+conflicts, whole-graph budgets, late failures, configuration rejection, cancellation and
+abandoned enumeration.

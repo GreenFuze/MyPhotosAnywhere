@@ -553,8 +553,11 @@ Protocol/Core/Google/AppServices/LAN/Web matrix, and the four-target Desktop mat
 Independent downloaded reports verify 270 native tests per target (1,080 total),
 complete clean logs, 10,000/100,000-item fixtures and agreeing reported web inventories.
 Application binaries are absent from those report artifacts; their binary hashes are
-not independently verified. API 29/35/37 native execution is still in progress. The
-new exact API 37 revision-8 SDK installation check passed; that is not yet a device-test pass.
+not independently verified. Independently downloaded API 29/35/37 reports and complete
+runtime invocation records verify 159 passing tests per API (477 total). The captured
+API 37 inventory verifies the stable revision-8 system image. API 29's actual initial
+heap is 576 MiB; the conditional repair branch was not exercised. This establishes a
+passing device-test matrix, not a completed runtime-warning review or S23 acceptance.
 
 `CatalogFactsSnapshot.ReadCoverageSources` captures source coverage using the same
 owned read-only WAL transaction as portable photo facts. It reads at most 256 source
@@ -575,5 +578,27 @@ stable while live imports, retries, account changes and new scan selections cont
 
 Twenty-one focused snapshot tests pass locally, including failed-only repair, terminal
 receipts, cancellation/disposal, policy/account changes, missing journals and the source
-bound. The complete local Core suite passes 133 tests, AppServices passes 47 and Web passes 24; Desktop compilation reports zero warnings/errors. This read-only export is not
+bound. The complete local Core suite passes 133 tests, AppServices passes 47 and Web passes 24;
+Desktop compilation reports zero warnings/errors. This read-only export is not
 an approved configuration, signed generation, publication, staging activation or release.
+
+The matching C#/Kotlin covered traversal now verifies complete coverage before admitting
+photo facts. Coverage pages share the complete tree's role/budget ledger; a required
+configuration-admission callback receives the immutable ordered source policies before
+any photo-tree read. Every leaf checks its memberships against that captured map.
+An empty catalog still requires configuration admission; rejection, cancellation and late
+failures remain explicit. The older facts-only traversal retains its isolated validation
+semantics. Source enrollment, actual approved policy comparison, ancestry and transactional
+activation remain mandatory integration work. The shared fixture has 22 invalid graphs.
+All 52 C# Protocol tests and all 542 Android unit tests across 102 suites pass locally;
+lint contains zero findings and Desktop compilation reports zero warnings/errors.
+The unchanged gate accepts only the exact existing AGP deprecation. The first local Android
+invocation lacked ANDROID_HOME and stopped before compilation; the corrected explicit-SDK
+invocation produced the reported clean result.
+
+The `63b19e3` runtime review remains open. One MPA-process resource-release warning occurs
+on each of API 35 and 37 without an allocation stack; framework ownership has not been
+established for these exact records. API 29's close warning belongs to com.android.phone.
+API 37 also reports a Google Play services ANR and resource warnings in other system apps.
+The bundled face detector prints its tensor-137 diagnostic on each API. Old version-specific
+exceptions are not treated as approval for 0.6, and passing tests do not erase these records.

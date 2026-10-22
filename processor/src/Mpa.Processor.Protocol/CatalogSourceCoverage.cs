@@ -112,6 +112,7 @@ public sealed class CatalogSourceCoverageSet
 {
     private readonly Dictionary<Guid, CatalogSourceCoverage> _sources = [];
     public CatalogCoverageRoot Root { get; }
+    public ReadOnlyCollection<CatalogSourceCoverage> Sources { get; }
     public CatalogSourceCoverageSet(CatalogCoverageRoot root, IEnumerable<CatalogCoveragePage> pages)
     {
         Root = root ?? throw new ArgumentNullException(nameof(root)); ArgumentNullException.ThrowIfNull(pages);
@@ -131,6 +132,7 @@ public sealed class CatalogSourceCoverageSet
         }
         if (seen.Count != root.Pages.Count || _sources.Count != root.SourceCount)
             throw new ProtocolFormatException("All declared source coverage pages must validate before accepting facts.");
+        Sources = _sources.Values.OrderBy(source => source.Id.ToString("D"), StringComparer.Ordinal).ToList().AsReadOnly();
     }
     public void ValidateAsset(DriveCatalogAsset asset)
     {
