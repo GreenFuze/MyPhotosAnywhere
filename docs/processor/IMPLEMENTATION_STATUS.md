@@ -634,3 +634,16 @@ The complete `a7862d0` trusted push matrix passed. Independent native/Desktop re
 1,184 tests (296 per target), clean complete logs and agreeing reported web inventories.
 Application binary hashes remain outside those report artifacts. Its device job passed
 API 29/35/37; independent artifact/runtime verification and its warning review are pending.
+
+## Windows desktop source-build entry points
+
+The owner's requested root `build_desktop.bat` runs the locked frontend install/build,
+dependency audit, locked .NET restore and Release build beneath the pinned SDK directory.
+`build_and_run_desktop.bat` launches only after build success and forwards native arguments.
+Neither changes firewall/security settings or selects a private acceptance profile.
+The real build passes with zero warnings/errors from outside the repository. The launch
+helper forwards `--status` and a profile path containing spaces to the real application;
+an intentionally unconfigured profile returns the expected unavailable status/exit 3
+without starting a listener. Both helpers propagate an injected npm failure as exit 23
+and skip launching, including when the scripts' own path contains spaces. This validates
+development helpers, not GUI/install acceptance. Batch line endings are explicit in Git.

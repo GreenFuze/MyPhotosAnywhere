@@ -6,6 +6,10 @@ app/schemas/** text eol=lf
 # Shell scripts must also run directly on Linux CI.
 *.sh text eol=lf
 
+# Windows desktop entry points keep native batch line endings.
+build_desktop.bat text eol=crlf
+build_and_run_desktop.bat text eol=crlf
+
 # Cross-platform Processor source/protocol evidence must retain native LF.
 .gitattributes text eol=lf
 processor/** text=auto eol=lf
