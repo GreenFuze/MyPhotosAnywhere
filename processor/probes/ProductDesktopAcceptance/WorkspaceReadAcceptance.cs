@@ -48,6 +48,15 @@ internal static class WorkspaceReadAcceptance
             if (!verified.Bytes.Span.SequenceEqual(expected) || verified.AccountId != scope.PermissionId || verified.FileId != fixture.Id || verified.FolderId != folder.Id)
                 throw new InvalidDataException("The actual workspace read changed its captured identity or fixture bytes.");
             if (folder.Parents.Count != 1) throw new InvalidDataException("The synthetic source needs its established distinct parent for a wrong-workspace check.");
+            var documents = await connection.ReadWorkspaceDocumentsAsync(folder.Id, folder.SharedDriveId, null, deadline.Token).ConfigureAwait(false);
+            if (documents.NextPageToken is not null || documents.IncompleteSearch) throw new InvalidDataException("The actual synthetic document inventory is incomplete.");
+            var candidate = documents.Documents.Single(item => item.FileId == fixture.Id);
+            var candidateRead = await connection.ReadWorkspaceDocumentAsync(folder.Id, candidate, deadline.Token).ConfigureAwait(false);
+            if (!candidateRead.Bytes.Span.SequenceEqual(expected) || candidateRead.AccountId != scope.PermissionId || candidateRead.FileId != fixture.Id ||
+                candidateRead.FolderId != folder.Id || candidateRead.DriveVersion != candidate.Version || candidate.Version != verified.DriveVersion)
+                throw new InvalidDataException("Actual metadata document discovery changed its captured scope, revision or fixture bytes.");
+            await ExpectAsync<DriveWorkspaceObjectChangedException>(() => connection.ReadWorkspaceDocumentAsync(folder.Id,
+                candidate with { Version = checked(candidate.Version + 1) }, deadline.Token)).ConfigureAwait(false);
             await ExpectAsync<DriveWorkspaceObjectChangedException>(() => connection.ReadWorkspaceObjectAsync(folder.Parents[0], fixture.Id, expected.Length, FixtureSha256, deadline.Token)).ConfigureAwait(false);
             await ExpectAsync<DriveWorkspaceObjectChangedException>(() => connection.ReadWorkspaceObjectAsync(folder.Id, fixture.Id, expected.Length + 1, FixtureSha256, deadline.Token)).ConfigureAwait(false);
             await ExpectAsync<InvalidDataException>(() => connection.ReadWorkspaceObjectAsync(folder.Id, fixture.Id, expected.Length, new string('0', 64), deadline.Token)).ConfigureAwait(false);
@@ -61,6 +70,7 @@ internal static class WorkspaceReadAcceptance
             observedAtUtc = DateTimeOffset.UtcNow, actualWorkspaceReadVerified = true, fixtureBytes = expected.Length, fixtureSha256 = FixtureSha256,
             wrongWorkspaceRejected = true, changedSizeRejected = true, changedDigestRejected = true, originalMediaReferenceRejected = true,
             actualSetupInspectionVerified = true, nonemptyWorkspaceRecognized = true,
+            actualDocumentInventoryVerified = true, actualCandidateTransportVerified = true, staleCandidateVersionRejected = true,
             nativeOwnersJoined = true, listenerStarted = false, driveWritesPerformed = false, originalDownloaded = false, newConsentOccurred = false,
             scope = "Actual protected-account metadata transport acceptance on a pinned synthetic source only; signed generation and final release acceptance remain separate"
         }), deadline.Token).ConfigureAwait(false);

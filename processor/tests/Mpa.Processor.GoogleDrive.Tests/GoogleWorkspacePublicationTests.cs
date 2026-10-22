@@ -8,7 +8,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Mpa.Processor.GoogleDrive.Tests;
 
 [TestClass]
-public sealed class GoogleWorkspacePublicationTests
+public sealed partial class GoogleWorkspacePublicationTests
 {
     private static readonly byte[] Content = "{\"ok\":true}"u8.ToArray();
     private static readonly string Digest = Convert.ToHexStringLower(SHA256.HashData(Content));
@@ -136,7 +136,7 @@ public sealed class GoogleWorkspacePublicationTests
         await dispose.ConfigureAwait(false); Assert.IsTrue(fixture.Responses.All(content => content.Disposed)); Assert.AreEqual(0, fixture.MetadataReads);
     }
 
-    private sealed class Fixture : HttpMessageHandler
+    private sealed partial class Fixture : HttpMessageHandler
     {
         private readonly TestCredentialVault _vault = new();
         public string AllocationBody { get; init; } = "{\"space\":\"drive\",\"ids\":[\"allocated-file\"]}";
@@ -200,6 +200,12 @@ public sealed class GoogleWorkspacePublicationTests
                 return Response(CreateStatus, "{\"id\":\"allocated-file\"}");
             }
             Assert.AreEqual(HttpMethod.Get, request.Method);
+            if (request.RequestUri.AbsolutePath == "/drive/v3/files")
+            {
+                DocumentQueries.Add(Uri.UnescapeDataString(request.RequestUri.Query)); DocumentsEntered.TrySetResult();
+                if (BlockDocuments) await DocumentsRelease.Task.ConfigureAwait(false);
+                return Response(HttpStatusCode.OK, DocumentsBody);
+            }
             if (request.RequestUri.AbsolutePath == "/drive/v3/files/generateIds")
             { Allocations++; StringAssert.Contains(request.RequestUri.Query, "count=1&space=drive&type=files"); return Response(HttpStatusCode.OK, AllocationBody); }
             StringAssert.Contains(request.RequestUri.Query, "supportsAllDrives=true");

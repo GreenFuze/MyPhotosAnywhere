@@ -54,30 +54,34 @@ public sealed partial class GoogleAccountConnection
         try
         {
             using var document = JsonDocument.Parse(bytes); var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object || root.GetProperty("id").GetString() != fileId)
-                throw new InvalidDataException("Google returned a different metadata workspace identity.");
-            var parents = root.GetProperty("parents");
-            if (parents.ValueKind != JsonValueKind.Array || parents.GetArrayLength() is < 1 or > 16 ||
-                root.GetProperty("trashed").ValueKind != JsonValueKind.False)
-                throw new DriveWorkspaceObjectChangedException();
-            var memberships = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var parent in parents.EnumerateArray())
-            {
-                if (parent.ValueKind != JsonValueKind.String || !ValidIdentity(parent.GetString()) || !memberships.Add(parent.GetString()!))
-                    throw new InvalidDataException("Invalid actual Drive metadata workspace parent memberships.");
-            }
-            if (!memberships.Contains(folderId)) throw new DriveWorkspaceObjectChangedException();
-            var mime = root.GetProperty("mimeType").GetString();
-            if (mime is not ("application/json" or "application/gzip" or "application/octet-stream"))
-                throw new InvalidDataException("A metadata workspace reference cannot read originals, shortcuts, folders or Google Workspace documents.");
-            if (root.GetProperty("capabilities").GetProperty("canDownload").ValueKind != JsonValueKind.True)
-                throw new DriveWorkspaceDownloadDeniedException();
-            var version = WorkspacePositive(root, "version");
-            if (WorkspacePositive(root, "size") != expectedBytes) throw new DriveWorkspaceObjectChangedException();
-            return new(version, mime);
+            return ParseWorkspaceMetadata(root, folderId, fileId, expectedBytes);
         }
         catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or FormatException)
         { throw new InvalidDataException("Google returned malformed metadata workspace file properties.", error); }
+    }
+    private static WorkspaceMetadata ParseWorkspaceMetadata(JsonElement root, string folderId, string fileId, long expectedBytes)
+    {
+        if (root.ValueKind != JsonValueKind.Object || root.GetProperty("id").GetString() != fileId)
+            throw new InvalidDataException("Google returned a different metadata workspace identity.");
+        var parents = root.GetProperty("parents");
+        if (parents.ValueKind != JsonValueKind.Array || parents.GetArrayLength() is < 1 or > 16 ||
+            root.GetProperty("trashed").ValueKind != JsonValueKind.False)
+            throw new DriveWorkspaceObjectChangedException();
+        var memberships = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var parent in parents.EnumerateArray())
+        {
+            if (parent.ValueKind != JsonValueKind.String || !ValidIdentity(parent.GetString()) || !memberships.Add(parent.GetString()!))
+                throw new InvalidDataException("Invalid actual Drive metadata workspace parent memberships.");
+        }
+        if (!memberships.Contains(folderId)) throw new DriveWorkspaceObjectChangedException();
+        var mime = root.GetProperty("mimeType").GetString();
+        if (mime is not ("application/json" or "application/gzip" or "application/octet-stream"))
+            throw new InvalidDataException("A metadata workspace reference cannot read originals, shortcuts, folders or Google Workspace documents.");
+        if (root.GetProperty("capabilities").GetProperty("canDownload").ValueKind != JsonValueKind.True)
+            throw new DriveWorkspaceDownloadDeniedException();
+        var version = WorkspacePositive(root, "version");
+        if (WorkspacePositive(root, "size") != expectedBytes) throw new DriveWorkspaceObjectChangedException();
+        return new(version, mime);
     }
     private static long WorkspacePositive(JsonElement root, string name)
     {

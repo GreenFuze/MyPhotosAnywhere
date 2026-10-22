@@ -1106,3 +1106,38 @@ policies that could not be persisted, a verified predecessor or exclusive head a
 It cannot be used as a stand-alone production publication authority. Those prerequisites
 and the immutable pending-upload access-reconciliation path must be connected before
 enabling live generation publication, scheduling or phone activation.
+
+## Bounded read-only workspace document discovery
+
+The existing protected Google connection now lists ordinary JSON candidates in a captured
+workspace through bounded 100-item/512 KiB pages, retaining continuations and incomplete
+state. It does not use names or `mpaRole` properties as authority. Candidates require
+actual parent membership, downloadable JSON type, canonical version/size and the separate
+256 KiB signed-document bound. Reading one candidate rechecks its captured version/type,
+exact byte length and parent/revision before and after the actual joined download.
+Malformed, duplicate, moved, trashed or denied candidates remain explicit errors.
+
+Candidate bytes remain untrusted: signature/library verification, complete change-cursor
+reconciliation and high-water admission are still required. These read operations mutate
+no source and confer no enrollment/publication authority. The shared workspace property
+parser retains existing original/shortcut/Google-Doc rejection for immutable reads and
+create-only publication verification.
+
+All 53 Google, 104 AppServices and 25 Web tests pass; strict Desktop Release and native
+acceptance-probe compilation have zero warnings/errors. Seven new Google cases cover
+bounded inventory, real scope/revision checks, stale/malformed/denied metadata, input
+admission and shutdown joining an actual held inventory read. An initial target-typed
+return could not infer its async generic; its explicit page type fixes compilation.
+
+A native no-write probe against the already authorized exact 92-byte synthetic fixture
+also verifies actual inventory, candidate transport, stale-version rejection and existing
+hash/size/parent/original-MIME rejection. All protected owners joined. No listener, new
+consent, original download or Drive write occurred. This dirty-tree local diagnostic is
+not final immutable release acceptance or signature/enrollment proof. Schema 8 and Room
+12 remain unchanged.
+
+The `b728101` native device workflow passed all three APIs. Downloaded API 29 evidence
+records one init-owned zygote PID 1687 matching its named inventory and actual startup
+`-Xmx576m`, with no framework restart. It does not recover the earlier `e46e4b0` raw
+identity response or prove that earlier failure's exact cause. Independent full-artifact
+inspection and final-revision acceptance remain separate requirements.
