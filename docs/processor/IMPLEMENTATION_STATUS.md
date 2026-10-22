@@ -787,3 +787,21 @@ The setup owner must independently approve/pin the public controller and bind th
 publisher policy. Signing callers still must reserve durable sequences, reconcile cloud
 history after restore and journal exact signed envelopes before publication; this private
 key owner does not authorize a counter reset or activation of a generation.
+
+## Screenshot completion repair after API 37 evidence rejection
+
+Authority revision `41e2fef` passed all 159 API 37 test assertions and complete runtime
+event/tracing verification, but correctly failed screenshot acceptance. One Takeout RTL
+PNG had four complete IDAT chunks and no IEND. Its 32,877-byte device file and both host
+copies had identical hashes, establishing that transport did not introduce truncation.
+The original encoder/provider cause is not proven; all original failure evidence remains.
+
+The test helper now encodes the single captured bitmap fully in bounded memory before
+creating its MediaStore artifact, checks PNG completion, writes a pending row through one
+owned descriptor, flushes/syncs/closes it, reads back exact bytes and then publishes it.
+It neither captures a replacement UI state nor retries assertions. Existing UI assertions
+and the full independent PNG/CRC/pixel-stream verifier remain unchanged. Local test-APK
+compilation and lint pass with zero findings; all eight existing Python PNG/transport tests
+pass. Their first local invocation was blocked by sandbox temporary-directory permissions;
+using a task-owned workspace temp directory passes without changing test code. Full native
+matrix validation of the repaired capture path remains required before acceptance.
