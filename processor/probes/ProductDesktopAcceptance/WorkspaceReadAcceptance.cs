@@ -38,6 +38,9 @@ internal static class WorkspaceReadAcceptance
             await using var vault = new NativeCredentialVault(database.InstallationId, Path.Combine(root, "credentials"));
             await using var connection = new GoogleAccountConnection(DesktopOAuthConfiguration.Load(args[0]), vault, scope.ConnectionId, scope.PermissionId);
             var folder = await connection.ReadFolderAsync(args[2], deadline.Token).ConfigureAwait(false);
+            var changeCursor = await connection.GetChangeCursorAsync(folder.SharedDriveId, deadline.Token).ConfigureAwait(false);
+            if (changeCursor.AccountId != scope.PermissionId || changeCursor.SharedDriveId != folder.SharedDriveId || string.IsNullOrEmpty(changeCursor.Token))
+                throw new InvalidDataException("The actual change cursor lost its captured account/drive scope.");
             var access = await connection.InspectWorkspaceAsync(folder.Id, deadline.Token).ConfigureAwait(false);
             if (access.AccountId != scope.PermissionId || access.FolderId != folder.Id || access.VerifiedEmpty || access.DriveVersion < 1)
                 throw new InvalidDataException("The actual setup inspection failed to retain the captured nonempty synthetic folder scope.");
@@ -71,6 +74,7 @@ internal static class WorkspaceReadAcceptance
             wrongWorkspaceRejected = true, changedSizeRejected = true, changedDigestRejected = true, originalMediaReferenceRejected = true,
             actualSetupInspectionVerified = true, nonemptyWorkspaceRecognized = true,
             actualDocumentInventoryVerified = true, actualCandidateTransportVerified = true, staleCandidateVersionRejected = true,
+            actualChangeStartCursorVerified = true, accountChangesEnumerated = false,
             nativeOwnersJoined = true, listenerStarted = false, driveWritesPerformed = false, originalDownloaded = false, newConsentOccurred = false,
             scope = "Actual protected-account metadata transport acceptance on a pinned synthetic source only; signed generation and final release acceptance remain separate"
         }), deadline.Token).ConfigureAwait(false);

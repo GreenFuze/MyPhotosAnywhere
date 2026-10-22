@@ -200,6 +200,14 @@ public sealed partial class GoogleWorkspacePublicationTests
                 return Response(CreateStatus, "{\"id\":\"allocated-file\"}");
             }
             Assert.AreEqual(HttpMethod.Get, request.Method);
+            if (request.RequestUri.AbsolutePath == "/drive/v3/changes/startPageToken")
+            { ChangeQueries.Add(Uri.UnescapeDataString(request.RequestUri.Query)); return Response(HttpStatusCode.OK, ChangeStartBody); }
+            if (request.RequestUri.AbsolutePath == "/drive/v3/changes")
+            {
+                ChangeQueries.Add(Uri.UnescapeDataString(request.RequestUri.Query)); ChangesEntered.TrySetResult();
+                if (BlockChanges) await ChangesRelease.Task.ConfigureAwait(false);
+                return Response(HttpStatusCode.OK, ChangeBody);
+            }
             if (request.RequestUri.AbsolutePath == "/drive/v3/files")
             {
                 DocumentQueries.Add(Uri.UnescapeDataString(request.RequestUri.Query)); DocumentsEntered.TrySetResult();

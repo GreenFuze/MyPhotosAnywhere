@@ -1155,3 +1155,27 @@ The existing inventory and change-feed shutdown assertions remain intact.
 
 Local strict regression after this fix passes 58 Google, 104 AppServices and 25 Web
 tests; Desktop Release has zero warnings/errors. Cross-platform CI must verify the fix.
+
+## Scoped Drive change-feed transport
+
+The existing account-owned connection now supports bounded account/shared-drive change
+cursors and explicit partial/end markers. Tokens remain opaque and scoped; invalid or
+foreign cursors fail before network work. Changes preserve removals, corpus/access loss,
+current parent membership, MIME, version and optional size/downloadability. This is an
+account feed, not a folder-filtered or atomic snapshot. An observation never instructs
+MPA to delete an original. No cursor is persisted by this transport.
+
+All 58 Google, 104 AppServices and 25 Web tests pass locally; Desktop Release and the
+native acceptance probe compile with zero warnings/errors. Five new Google methods test
+scoping/encoding, removals, malformed/missing/ambiguous markers, canceled actual request
+joining and response disposal. No checks or warning severities were reduced.
+
+The protected-account native no-write probe also obtains an actual start cursor for its
+captured account/drive, then repeats the pinned synthetic metadata read and integrity
+rejections. It does not enumerate the account's change history or log its opaque token.
+All owners join; no listener, new consent, original download or Drive write occurs. This
+local dirty-tree diagnostic is not final release, signature or publication acceptance.
+
+Transport semantics follow Google's primary changes/getStartPageToken, changes/list and
+changes reference documentation. Complete workspace reconciliation, signed authority,
+high-water and durable cursor/observation admission remain separate required steps.
