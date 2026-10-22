@@ -805,3 +805,33 @@ compilation and lint pass with zero findings; all eight existing Python PNG/tran
 pass. Their first local invocation was blocked by sandbox temporary-directory permissions;
 using a task-owned workspace temp directory passes without changing test code. Full native
 matrix validation of the repaired capture path remains required before acceptance.
+
+## Canonical Unicode envelopes and durable signing intents
+
+Revision `d5114c3` subsequently passed all four push workflows, including the complete
+device matrix. Independent artifact verification is in progress; a green workflow is
+not a claim that every runtime warning has been resolved.
+
+Both envelope implementations now preserve canonical body bytes during assembly and
+extraction. A shared independently signed Unicode fixture reproduces intermediate
+serializer expansion that rejected valid bounded wire data. Local validation passes
+67 Protocol tests, 557 Android unit tests and zero-findings lint without increasing any
+wire/string/nesting limit.
+
+Processor schema 8 adds signing actors and captured document intents; Android Room
+remains 12. Fresh independently approved controller bootstrap registers its separate
+publisher in the same transaction. The journal reserves canonical body/identity/sequence
+before native signing and seals exact signature bytes before Drive allocation. Replays
+retain their sequence and envelope; changed bytes, missing counters, corrupt history or
+unknown keys fail instead of resetting or replacing identities. Controller document
+kinds share one counter while the publisher has a separate stream. Low-space and SQL
+failures roll back both document and counter. All 160 local Core tests pass, including
+11 new restart, role, corruption and rollback cases. The first focused run exposed an
+absent-versus-empty nullable buffer defect; the fix retains the original assertions.
+
+This journal does not activate publication. The generation owner still must reconcile
+cloud high-water marks and restored state, ensure current approved configuration and
+publisher policy (including pending revocations), verify dependencies/predecessors,
+serialize catalog heads and join real Drive work. Existing schema-7 trust records with
+no signing history cannot silently acquire reset counters. No live setup or publisher
+route is enabled by this increment.

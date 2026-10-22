@@ -63,7 +63,7 @@ public sealed class ProcessorStateDatabase : IDisposable
                 var objects = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
                 if (application != ApplicationId && !(application == 0 && version == 0 && objects == 0))
                     throw new InvalidDataException("Unknown database identity; preserve it and choose an empty Processor state directory.");
-                if (version is not (0 or 1 or 2 or 3 or 4 or 5 or 6 or 7)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
+                if (version is not (0 or 1 or 2 or 3 or 4 or 5 or 6 or 7 or 8)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
                 command.CommandText = "PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;";
                 command.ExecuteNonQuery();
                 command.CommandText = "PRAGMA journal_mode=WAL";
@@ -219,6 +219,32 @@ public sealed class ProcessorStateDatabase : IDisposable
                         ) STRICT;
                         CREATE INDEX pending_workspace_publication ON workspace_publication(verified_version,id);
                         PRAGMA user_version=7;
+                        """;
+                    migration.ExecuteNonQuery(); transaction.Commit();
+                }
+            }
+            using (var migration = connection.CreateCommand())
+            {
+                migration.CommandText = "PRAGMA user_version";
+                if (Convert.ToInt32(migration.ExecuteScalar(), CultureInfo.InvariantCulture) < 8)
+                {
+                    using var transaction = connection.BeginTransaction(); migration.Transaction = transaction;
+                    migration.CommandText = """
+                        CREATE TABLE signing_actor(
+                          actor_id TEXT NOT NULL, epoch INTEGER NOT NULL CHECK(epoch>0), library_id TEXT NOT NULL,
+                          role TEXT NOT NULL CHECK(role IN('controller','publisher')), key_id TEXT NOT NULL UNIQUE,
+                          public_key BLOB NOT NULL CHECK(length(public_key) BETWEEN 1 AND 512),
+                          sequence INTEGER NOT NULL DEFAULT 0 CHECK(sequence>=0), PRIMARY KEY(actor_id,epoch)
+                        ) STRICT;
+                        CREATE TABLE signing_intent(
+                          id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, epoch INTEGER NOT NULL,
+                          sequence INTEGER NOT NULL CHECK(sequence>0), kind TEXT NOT NULL,
+                          body BLOB NOT NULL CHECK(length(body) BETWEEN 1 AND 261120), body_hash TEXT NOT NULL,
+                          envelope BLOB CHECK(length(envelope) BETWEEN 1 AND 262144), envelope_hash TEXT,
+                          CHECK((envelope IS NULL)=(envelope_hash IS NULL)), UNIQUE(actor_id,epoch,sequence),
+                          FOREIGN KEY(actor_id,epoch) REFERENCES signing_actor(actor_id,epoch)
+                        ) STRICT;
+                        PRAGMA user_version=8;
                         """;
                     migration.ExecuteNonQuery(); transaction.Commit();
                 }

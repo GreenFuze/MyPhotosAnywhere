@@ -52,6 +52,19 @@ public sealed class ProtocolDocumentReader
         ArgumentNullException.ThrowIfNull(authority);
         using var verifier = new ProtocolDocumentVerifier(authority.PublicKey, MaximumDocumentBytes);
         if (!verifier.Verify(body, signature)) throw new ProtocolFormatException("Document signature does not match the approved actor.");
+        return ReadBody(body, authority);
+    }
+
+    /// <summary>Validate an owned outgoing body before reserving/signing it. Returns no
+    /// verified document and grants no incoming authority; admission still verifies its signature.</summary>
+    public void ValidateForSigning(ReadOnlySpan<byte> body, TrustedProtocolActor ownedIdentity)
+    {
+        ArgumentNullException.ThrowIfNull(ownedIdentity);
+        _ = ReadBody(body, ownedIdentity);
+    }
+
+    private VerifiedProtocolDocument ReadBody(ReadOnlySpan<byte> body, TrustedProtocolActor authority)
+    {
         var canonical = new CanonicalJson(MaximumDocumentBytes).Encode(body);
         using var document = JsonDocument.Parse(canonical);
         var root = document.RootElement;

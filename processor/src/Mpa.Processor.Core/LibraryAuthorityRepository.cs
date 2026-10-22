@@ -25,7 +25,7 @@ public sealed class LibraryAuthorityRepository(ProcessorStateDatabase database, 
     public LibraryControllerPin? Controller() => ReadPin(null);
 
     public LibraryControllerPin Bootstrap(Guid actorId, long epoch, CatalogWorkspace selectedWorkspace,
-        long expectedAccountRevision, ReadOnlySpan<byte> persistedNativePublicKey)
+        long expectedAccountRevision, ReadOnlySpan<byte> persistedNativePublicKey, PublisherSigningRegistration? signingRegistration = null)
     {
         ArgumentNullException.ThrowIfNull(selectedWorkspace);
         if (actorId == Guid.Empty || epoch < 1 || expectedAccountRevision < 1 || selectedWorkspace.FolderId == "root")
@@ -38,6 +38,7 @@ public sealed class LibraryAuthorityRepository(ProcessorStateDatabase database, 
         if (existing is not null)
         {
             if (candidate != existing) throw new ControllerAuthorityConflictException();
+            if (signingRegistration is not null) new ProtocolSigningJournal(_database, _budget).AssertBootstrapActors(transaction, existing, signingRegistration);
             transaction.Commit(); return existing;
         }
         using (var account = Command(transaction, "SELECT 1 FROM drive_account WHERE permission_id=$account AND connected=1 AND revision=$revision",
@@ -45,6 +46,7 @@ public sealed class LibraryAuthorityRepository(ProcessorStateDatabase database, 
             if (account.ExecuteScalar() is null) throw new StaleLibraryConfigurationException();
         var encoded = EncodePin(candidate); using var reservation = _budget.Reserve(65536); reservation.RecheckBeforeWrite(reservation.Bytes);
         Insert(transaction, PinKey, encoded); Insert(transaction, PinKey + ":sha256", Hash(Encoding.UTF8.GetBytes(encoded)));
+        if (signingRegistration is not null) new ProtocolSigningJournal(_database, _budget).InitializeBootstrapActors(transaction, candidate, signingRegistration);
         transaction.Commit(); return candidate;
     }
 
