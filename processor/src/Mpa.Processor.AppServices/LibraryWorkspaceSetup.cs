@@ -68,7 +68,8 @@ public sealed class LibraryWorkspaceSetup(ProcessorStateCoordinator state, Proce
             if (identity != observed.Identity) throw new InvalidDataException("Native signing identity changed during library approval.");
             return new LibraryAuthorityRepository(database, _budget).Bootstrap(identity.ControllerId, identity.ControllerEpoch,
                 new(approval.AccountId, approval.FolderId), approval.AccountRevision, Convert.FromBase64String(identity.ControllerPublicKeySpki),
-                new(identity.PublisherId, identity.PublisherEpoch, identity.PublisherPublicKeySpki, identity.PublisherKeyId));
+                new(identity.PublisherId, identity.PublisherEpoch, identity.PublisherPublicKeySpki, identity.PublisherKeyId),
+                new(approval.ConfigurationRevision, observed.Workspace.Shared && approval.AcceptSharedWorkspace));
         }, token).ConfigureAwait(false);
     }
 

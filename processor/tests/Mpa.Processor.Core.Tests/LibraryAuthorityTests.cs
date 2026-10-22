@@ -7,7 +7,7 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.Core.Tests;
 
 [TestClass]
-public sealed class LibraryAuthorityTests
+public sealed partial class LibraryAuthorityTests
 {
     [TestMethod]
     public void IndependentlyBootstrappedPublicRootAndRevocationSurviveRestart()
@@ -143,7 +143,7 @@ public sealed class LibraryAuthorityTests
             var accounts = new DriveAccountRepository(Database); var pending = accounts.Begin(Guid.NewGuid()); accounts.Promote(pending.Id, Workspace.AccountId, "Synthetic", null);
             Budget = new(Space); Store = new(Database, Budget);
         }
-        public LibraryControllerPin Bootstrap() => Store.Bootstrap(ActorId, 1, Workspace, 1, Controller.ExportSubjectPublicKeyInfo());
+        public LibraryControllerPin Bootstrap(LibraryBootstrapApproval? approval = null) => Store.Bootstrap(ActorId, 1, Workspace, 1, Controller.ExportSubjectPublicKeyInfo(), sourceApproval: approval);
         public byte[] Policy(long sequence, bool revoked = false, ECDsa? signer = null, string? folder = null)
         {
             var publicKey = Publisher.ExportSubjectPublicKeyInfo();

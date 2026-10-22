@@ -14,7 +14,7 @@ public sealed class ControllerAuthorityConflictException() : InvalidOperationExc
 /// independently approved host/device setup, never a received Drive descriptor. Native
 /// private-key persistence/possession must be established by that setup owner first.
 /// No key replacement, source permission, original mutation or catalog activation occurs here.</summary>
-public sealed class LibraryAuthorityRepository(ProcessorStateDatabase database, StorageBudgetManager budget)
+public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase database, StorageBudgetManager budget)
 {
     private const string PinKey = "library_controller_v1";
     private const string SelectedKey = "current_publisher_policy_v1";
@@ -25,7 +25,7 @@ public sealed class LibraryAuthorityRepository(ProcessorStateDatabase database, 
     public LibraryControllerPin? Controller() => ReadPin(null);
 
     public LibraryControllerPin Bootstrap(Guid actorId, long epoch, CatalogWorkspace selectedWorkspace,
-        long expectedAccountRevision, ReadOnlySpan<byte> persistedNativePublicKey, PublisherSigningRegistration? signingRegistration = null)
+        long expectedAccountRevision, ReadOnlySpan<byte> persistedNativePublicKey, PublisherSigningRegistration? signingRegistration = null, LibraryBootstrapApproval? sourceApproval = null)
     {
         ArgumentNullException.ThrowIfNull(selectedWorkspace);
         if (actorId == Guid.Empty || epoch < 1 || expectedAccountRevision < 1 || selectedWorkspace.FolderId == "root")
@@ -39,6 +39,7 @@ public sealed class LibraryAuthorityRepository(ProcessorStateDatabase database, 
         {
             if (candidate != existing) throw new ControllerAuthorityConflictException();
             if (signingRegistration is not null) new ProtocolSigningJournal(_database, _budget).AssertBootstrapActors(transaction, existing, signingRegistration);
+            using var sourceReservation = sourceApproval is null ? null : StoreBootstrapSources(transaction, existing, sourceApproval);
             transaction.Commit(); return existing;
         }
         using (var account = Command(transaction, "SELECT 1 FROM drive_account WHERE permission_id=$account AND connected=1 AND revision=$revision",
@@ -47,6 +48,7 @@ public sealed class LibraryAuthorityRepository(ProcessorStateDatabase database, 
         var encoded = EncodePin(candidate); using var reservation = _budget.Reserve(65536); reservation.RecheckBeforeWrite(reservation.Bytes);
         Insert(transaction, PinKey, encoded); Insert(transaction, PinKey + ":sha256", Hash(Encoding.UTF8.GetBytes(encoded)));
         if (signingRegistration is not null) new ProtocolSigningJournal(_database, _budget).InitializeBootstrapActors(transaction, candidate, signingRegistration);
+        using var bootstrapSourceReservation = sourceApproval is null ? null : StoreBootstrapSources(transaction, candidate, sourceApproval);
         transaction.Commit(); return candidate;
     }
 
@@ -114,7 +116,7 @@ public sealed class LibraryAuthorityRepository(ProcessorStateDatabase database, 
         var text = ReadMeta(transaction, PinKey, 4096); var hash = ReadMeta(transaction, PinKey + ":sha256", 64);
         if (text is null && hash is null)
         {
-            if (ReadMeta(transaction, SelectedKey, 19) is not null || HasPublisherHistory(transaction))
+            if (ReadMeta(transaction, SelectedKey, 19) is not null || HasPublisherHistory(transaction) || HasBootstrapSources(transaction))
                 throw new InvalidDataException("Accepted publisher state has lost its pinned controller; never bootstrap a replacement.");
             return null;
         }

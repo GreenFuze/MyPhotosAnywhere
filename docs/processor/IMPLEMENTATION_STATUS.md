@@ -898,3 +898,27 @@ existing hash/size/parent/original-MIME rejection checks. All owners joined, no 
 started, no original was downloaded, and no Drive file changed. This local diagnostic is
 provisional until tied to the final immutable release revision. Existing-library discovery
 and source-consent persistence remain prerequisites for complete setup/publication.
+
+## Durable initial source association
+
+Explicit workspace setup now captures the original reviewed source IDs, account/folder
+bindings, flags, revisions and shared-metadata acknowledgment in the same transaction as
+controller/actor bootstrap. Its canonical snapshot and digest are immutable and survive
+restart. Display labels and credential-connected state are excluded: reconnecting an
+account neither grants new source permission nor invalidates that existing association.
+Missing approval is not inferred from a pinned key or connected account. A source change
+requires its separately reviewed later policy; setup replay cannot replace initial consent.
+
+Readers validate canonical bytes, digest, controller/workspace scope, identities, ordering
+and bounds. Missing/corrupt proof or a lost controller fails rather than recapturing current
+settings. A storage reservation remains owned through actual commit. A failed source-proof
+checkpoint rolls back root, actors and approval together. Processor schema remains 8 and
+Android Room 12; no source or original is modified.
+
+All 166 Core, 75 AppServices and 25 Web tests pass; strict Desktop Release compilation
+has zero warnings/errors. All 14 authority cases also pass after the reservation-lifetime
+review. These checks include restart, corruption, atomic rollback, low-storage replay,
+source/privacy changes and preservation across disconnect. The private initial snapshot
+is not a remote signature, recognition consent or permission to mutate originals. Signed
+source-policy publication, subsequent reviewed operations, cloud reconciliation and
+managed-workspace traversal exclusion still must be connected before catalog activation.

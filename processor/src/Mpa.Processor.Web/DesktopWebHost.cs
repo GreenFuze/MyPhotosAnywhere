@@ -169,6 +169,8 @@ public sealed class DesktopWebHost : IAsyncDisposable
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "The metadata folder changed or is no longer available. Choose it again; saved work was retained." }, context.RequestAborted).ConfigureAwait(false); }
             catch (ControllerAuthorityConflictException)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This desktop already has a different approved library workspace. Its saved identity was retained." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (LibraryBootstrapApprovalConflictException)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "The original source approval was retained. Review later changes in Sources." }, context.RequestAborted).ConfigureAwait(false); }
             catch (ProcessorWorkStateConflictException)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Processing state changed. Refresh Activity before trying again." }, context.RequestAborted).ConfigureAwait(false); }
             catch (InvalidDesktopCatalogQueryException error)

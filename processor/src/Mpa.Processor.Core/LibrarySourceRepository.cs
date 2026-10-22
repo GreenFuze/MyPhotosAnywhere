@@ -20,11 +20,12 @@ public sealed class ExistingLibrarySourceException() : InvalidOperationException
 public sealed class LibrarySourceRepository(ProcessorStateDatabase database)
 {
     private readonly ProcessorStateDatabase _database = database ?? throw new ArgumentNullException(nameof(database));
-    public LibrarySourceSnapshot Snapshot()
+    public LibrarySourceSnapshot Snapshot() => Snapshot(null);
+    internal LibrarySourceSnapshot Snapshot(SqliteTransaction? transaction)
     {
-        using var revision = Command(null, "SELECT revision FROM library_configuration WHERE id=1");
+        using var revision = Command(transaction, "SELECT revision FROM library_configuration WHERE id=1");
         var value = revision.ExecuteScalar() ?? throw new InvalidDataException("The library configuration revision is missing.");
-        return new(Convert.ToInt64(value, CultureInfo.InvariantCulture), Sources(null));
+        return new(Convert.ToInt64(value, CultureInfo.InvariantCulture), Sources(transaction));
     }
 
     public LibrarySourceSnapshot Add(Guid id, string accountId, long expectedAccountRevision, string verifiedFolderId,

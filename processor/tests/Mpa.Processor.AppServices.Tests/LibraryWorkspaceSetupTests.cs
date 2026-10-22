@@ -18,6 +18,8 @@ public sealed partial class AccountServiceTests
         Assert.AreEqual(preview.Identity.ControllerId, pin.ActorId); Assert.AreEqual(preview.Identity.ControllerKeyId, pin.KeyId);
         Assert.AreEqual(pin, await fixture.Setup.ApproveAsync(approval, CancellationToken.None).ConfigureAwait(false));
         Assert.AreEqual(pin, await fixture.Setup.CurrentAsync(CancellationToken.None).ConfigureAwait(false));
+        var approvedSources = await fixture.Accounts.State.ExecuteAsync(database => new LibraryAuthorityRepository(database, new(new SetupSpace())).AssertBootstrapSourcesCurrent(), CancellationToken.None).ConfigureAwait(false);
+        Assert.AreEqual(preview.Sources.Revision, approvedSources.ConfigurationRevision); Assert.IsFalse(approvedSources.AllowSharedMetadata);
         await Assert.ThrowsExactlyAsync<ControllerAuthorityConflictException>(() => fixture.Setup.ApproveAsync(approval with { FolderId = "another-workspace" }, CancellationToken.None)).ConfigureAwait(false);
         Assert.AreEqual(pin, await fixture.Setup.CurrentAsync(CancellationToken.None).ConfigureAwait(false));
     }
@@ -44,6 +46,7 @@ public sealed partial class AccountServiceTests
         await Assert.ThrowsExactlyAsync<LibraryWorkspaceApprovalException>(() => fixture.Setup.ApproveAsync(approval with { AcceptSharedWorkspace = true, AssociateSelectedSources = false }, CancellationToken.None)).ConfigureAwait(false);
         Assert.IsNull(await fixture.Setup.CurrentAsync(CancellationToken.None).ConfigureAwait(false));
         Assert.IsNotNull(await fixture.Setup.ApproveAsync(approval with { AcceptSharedWorkspace = true }, CancellationToken.None).ConfigureAwait(false));
+        Assert.IsTrue((await fixture.Accounts.State.ExecuteAsync(database => new LibraryAuthorityRepository(database, new(new SetupSpace())).AssertBootstrapSourcesCurrent(), CancellationToken.None).ConfigureAwait(false)).AllowSharedMetadata);
     }
 
     [TestMethod]

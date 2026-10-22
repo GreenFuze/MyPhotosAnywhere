@@ -36,6 +36,8 @@ public sealed class WebHostTests
         using (var root = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, approval, csrf, "api/library").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.BadRequest, root.StatusCode);
         engine.WorkspaceFailure = new Mpa.Processor.GoogleDrive.DriveWorkspaceObjectChangedException();
         using (var moved = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, approval, csrf, "api/library").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Conflict, moved.StatusCode);
+        engine.WorkspaceFailure = new Mpa.Processor.Core.LibraryBootstrapApprovalConflictException();
+        using (var retained = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, approval, csrf, "api/library").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Conflict, retained.StatusCode);
         Assert.AreEqual(0, diagnostics.Count); Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
     }
     [TestMethod]
