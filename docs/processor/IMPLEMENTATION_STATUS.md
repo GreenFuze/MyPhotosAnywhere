@@ -732,3 +732,33 @@ a catalog genesis commit, and a denied user operation. Shared vectors include 26
 invalid/overbroad policies. All 66 C# Protocol and 556 Android unit tests pass; lint has
 zero findings and Desktop Release compilation has zero warnings/errors. No live enrollment
 or publishing is enabled.
+
+## Durable local controller and publisher selection
+
+The local authority repository records one independently approved controller/workspace
+public-key pin, then verifies and atomically retains signed publisher-policy history.
+Bootstrap is reserved for trusted setup after native private-key persistence; received
+Drive files cannot bootstrap or replace that root. A missing/corrupt root, policy hash,
+history record or selected sequence fails explicitly. Selection must equal the highest
+accepted publisher sequence, so rewinding a pointer cannot reactivate a revoked key.
+Delayed/repeated earlier policies return the current selection; conflicting bytes at the
+same sequence preserve agreed state and report a conflict. Duplicate accepted replays do
+not require a new storage reservation.
+
+All 149 Core, 53 AppServices and 24 Web tests pass locally, including eight new tests for
+restart, revocation, delayed/repeated policies, root replacement, corrupt/missing state,
+low storage and failed SQLite writes. Desktop Release compilation has zero warnings/errors.
+Processor schema remains 7; the public authority records use existing local metadata.
+Originals, jobs and human captions remain preserved. Native-key ownership, bootstrap UI,
+source-policy selection, cross-kind controller counters and generation activation remain
+pending; this repository does not enable publishing.
+
+If a newly observed revocation cannot be persisted, the repository throws and retains
+last agreed state. The generation/authority owner must halt publishing until that pending
+policy is reconciled and saved; it must not continue using an older policy after such an
+error. This owner integration remains required before live publishing is enabled.
+
+The signed-file revision's first macOS ARM build failed because npm's fallback audit
+endpoint returned HTTP 400. The unchanged lockfile independently audited with zero
+vulnerabilities, and the failed/canceled jobs passed on one retry at the same application
+revision. Original failure evidence is retained; no audit check or dependency was changed.

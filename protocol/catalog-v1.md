@@ -47,6 +47,19 @@ all their selected policies. No enrollment UI or persistent current-policy selec
 implied by these codecs. Independent vectors include 26 correctly signed but invalid or
 overbroad policies, revocation, and a publisher signature that is denied for user operations.
 
+The local authority store retains an independently approved public controller/workspace
+pin and signed publisher-policy history in one serialized state owner. It verifies the
+selected sequence against the highest accepted history; missing or rewound selection is
+corruption, never an instruction to reactivate an older policy. Older valid policy
+arrivals may be retained without changing the current selection. An exact earlier replay
+returns the current policy; the same sequence with different bytes is a conflict. Setup
+cannot silently replace a missing or different root over accepted history.
+
+Native private keys remain with the setup/signing owner. Trust-store persistence does
+not prove private-key possession or permission to activate a generation. If a newly
+observed authority change cannot be saved, the generation owner must stop publishing
+until reconciliation succeeds, preserving the last complete gallery for browsing.
+
 Publisher authority uses a controller-signed `library-publisher-authorization` envelope
 with capability `library.publishers.v1`. Its payload has exactly `workspace` and
 `publisher`. The workspace must match independently selected account/folder IDs. An
