@@ -24,7 +24,7 @@ public sealed record CatalogIndexNode(string Prefix, ReadOnlyCollection<CatalogI
 /// <summary>Bounded portable publication schemas. Signature/approved actor verification must
 /// precede ReadCommit. Actual Drive parent membership, referenced bytes/hashes, ancestry and
 /// complete-tree validation remain the owning consumer's responsibility before activation.</summary>
-public sealed class CatalogPublicationReader(CatalogWorkspace workspace)
+public sealed partial class CatalogPublicationReader(CatalogWorkspace workspace)
 {
     public const string Capability = "catalog.generations.v1";
     public const int MaximumIndexBytes = 256 * 1024;

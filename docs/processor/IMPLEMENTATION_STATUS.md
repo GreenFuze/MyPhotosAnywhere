@@ -435,15 +435,19 @@ distinct from the runtime heap. The CI preparation now checks the actual primary
 a framework restart before tests, followed by a new PID and matching heap check.
 It changes neither heap configuration nor assertions, never clears logs and
 rejects physical devices, other images and unexplained mismatches. Six Python
-tests pass, including failed repair and physical-device rejection. Actual CI
-reinitialization remains unverified until the new device run finishes.
+tests pass, including failed repair and physical-device rejection. The next immutable
+run on `bcae057bbb3ea45282d83b9a9e8af372e977ee00` passed all three API targets.
+Independent verification confirms 477 passing tests and all matching runtime start/finish
+events/report hashes. API 29's actual initial runtime heap was already 576m, so no
+framework restart occurred; the repair branch remains isolated-test coverage only.
 
 XMP encoding now checks a minimum UTF-8 catalogue budget before constructing its
 DOM and uses a byte-bounded serialization stream for escaped and retained external
 XML. Overflow remains an actionable `IllegalArgumentException`, not a swallowed
 OOM, and the existing optional-XMP import recovery contract is preserved. Fourteen
 focused tests pass, including early rejection, escaping, external annotations and
-supplementary Unicode. Full Android unit/lint and device acceptance remain pending.
+supplementary Unicode. All 533 Android unit tests and zero-findings lint passed locally;
+Android CI build and API 29/35/37 device suites passed on the same pushed revision.
 Thumbnail memory limits and all existing quality/recovery assertions are unchanged.
 
 ## Borrowed workspace transport integration
@@ -461,3 +465,30 @@ reconnection and scope rejection. Complete Desktop compilation passes with zero 
 and errors. The native Google object reader previously passed actual synthetic Drive
 acceptance; this new application-service bridge currently has synthetic integration
 coverage. Complete-generation validation, durable staging and activation remain separate.
+
+Independent four-target verification on `bcae057` confirms 259 tests per target,
+1,036 total, complete clean test/build logs, captured 10k/100k measurements and matching
+reported web inventories; npm audits remain zero. These report artifacts contain no
+application binaries. Device runtime diagnostics still require final 0.6 review; passing
+test reports alone do not establish a warning-free release or S23 acceptance.
+
+## Bounded source coverage and membership validation
+
+C#/Kotlin readers now validate immutable coverage roots/pages and assemble a bounded
+mapping of at most 256 sources. Captured configuration/discovery/account/source revisions,
+ordered ranges, exact page bytes/hashes, complete page inclusion and unique bindings are
+checked explicitly. Stale/incomplete scans cannot claim complete coverage; asset source
+memberships must match current captured account/policy/depth. Retained facts from honestly
+partial/offline/disconnected sources remain valid; missing observations never imply deletion.
+
+The independent shared fixture exercises all eight states, empty and 256-source libraries,
+and 44 malformed graphs/membership cases. All 47 C# Protocol tests, 28 focused Android
+Protocol tests and all 537 Android unit tests across 101 suites pass. Lint contains zero
+findings and strict complete Desktop compilation has zero warnings/errors. The Gradle
+gate accepts only the unchanged exact AGP exception. An analyzer finding prompted a real selected-workspace check in page reading;
+the new foreign-reader regression passes. No severity/suppression change was made.
+
+This establishes portable validation, not live publication/activation. Capturing actual
+current scan coverage from the same durable snapshot as facts, complete graph-role and
+predecessor/authority validation, journals, dirty-prefix publication and transactionally
+staged activation remain. No persisted schema or product UI behavior changed in this slice.

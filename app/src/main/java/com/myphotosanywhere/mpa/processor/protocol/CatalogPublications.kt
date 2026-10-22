@@ -4,6 +4,7 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.util.UUID
+import java.security.MessageDigest
 
 /** Selected locally/enrolled; a received reference cannot select its own workspace. */
 data class CatalogWorkspace(val accountId: String, val folderId: String) {
@@ -76,6 +77,80 @@ class CatalogPublicationReader(private val workspace: CatalogWorkspace) {
         return CatalogIndexNode(expectedPrefix, entries.toList())
     }
 
+    fun readCoverageRoot(canonicalBytes: ByteArray,library: UUID): CatalogCoverageRoot {
+        require(library!=UUID(0,0)) { "An established library is required." }
+        val root=canonical(canonicalBytes);coverageHeader(root,"mpa-source-coverage-root",library)
+        val total=decimal(root,"sourceCount",allowZero=true);val rows=property(root,"pages")
+        if(total>256 || !rows.isJsonArray || rows.asJsonArray.size()>16)
+            throw ProcessorProtocolException("Source coverage exceeds its bounded source/page count.")
+        val pages=mutableListOf<CatalogCoveragePageReference>();val ids=mutableSetOf<String>();var previous: UUID?=null;var count=0
+        for(row in rows.asJsonArray) {
+            val first=uuid(row,"firstId");val last=uuid(row,"lastId");val size=decimal(row,"count")
+            val ref=reference(property(row,"reference"),MAX_INDEX_BYTES)
+            if(size>16 || first.toString()>last.toString() || (size==1L)!=(first==last) ||
+                previous?.let { it.toString()>=first.toString() }==true || !ids.add(ref.fileId))
+                throw ProcessorProtocolException("Source coverage pages overlap, alias or exceed their range/count bounds.")
+            pages.add(CatalogCoveragePageReference(first,last,size.toInt(),ref));count+=size.toInt();previous=last
+        }
+        if(count.toLong()!=total) throw ProcessorProtocolException("Coverage pages do not account for the declared source count.")
+        return CatalogCoverageRoot(library,decimal(root,"configurationRevision"),decimal(root,"discoveryRevision"),count,pages.toList())
+    }
+    fun readCoveragePage(canonicalBytes: ByteArray,root: CatalogCoverageRoot,descriptor: CatalogCoveragePageReference): CatalogCoveragePage {
+        if(descriptor !in root.pages || descriptor.reference.accountId!=workspace.accountId || descriptor.reference.workspaceId!=workspace.folderId)
+            throw ProcessorProtocolException("Source page was not captured by this root and selected workspace.")
+        if(canonicalBytes.size>MAX_INDEX_BYTES || canonicalBytes.size.toLong()!=descriptor.reference.bytes ||
+            MessageDigest.getInstance("SHA-256").digest(canonicalBytes).joinToString("") { "%02x".format(it) }!=descriptor.reference.sha256)
+            throw ProcessorProtocolException("Source page does not match its captured immutable bytes.")
+        val value=canonical(canonicalBytes);coverageHeader(value,"mpa-source-coverage-page",root.libraryId)
+        if(decimal(value,"configurationRevision")!=root.configurationRevision || decimal(value,"discoveryRevision")!=root.discoveryRevision)
+            throw ProcessorProtocolException("Source page revisions do not match the captured root.")
+        val rows=property(value,"sources")
+        if(!rows.isJsonArray || rows.asJsonArray.size() !in 1..16 || rows.asJsonArray.size()!=descriptor.count)
+            throw ProcessorProtocolException("Source page does not match its captured count.")
+        val sources=mutableListOf<CatalogSourceCoverage>();val bindings=mutableSetOf<Pair<String,String>>();var previous: UUID?=null
+        for(row in rows.asJsonArray) {
+            val id=uuid(row,"id");val account=text(row,"accountId");val folder=text(row,"folderId")
+            checkOpaque(account);checkOpaque(folder)
+            if(folder=="root" || !bindings.add(account to folder) || previous?.let { it.toString()>=id.toString() }==true)
+                throw ProcessorProtocolException("Source coverage requires unique ordered identities and canonical bindings.")
+            val revision=decimal(row,"revision");val accountRevision=decimal(row,"accountRevision")
+            val descendants=coverageFlag(row,"includeDescendants");val enabled=coverageFlag(row,"enabled");val connected=coverageFlag(row,"connected")
+            val state=text(row,"state")
+            if(state !in COVERAGE_STATES || !enabled && state!="disabled" || enabled && !connected && state!="disconnected" ||
+                enabled && connected && (state=="disabled" || state=="disconnected"))
+                throw ProcessorProtocolException("Coverage state contradicts captured policy or account availability.")
+            val checkpointValue=property(row,"checkpoint")
+            val checkpoint=if(checkpointValue.isJsonNull) null else CatalogScanCheckpoint(uuid(checkpointValue,"jobId"),
+                decimal(checkpointValue,"sourceRevision"),decimal(checkpointValue,"accountRevision"),decimal(checkpointValue,"observedItems",true),
+                decimal(checkpointValue,"pendingItems",true),decimal(checkpointValue,"failedItems",true),coverageFlag(checkpointValue,"incompleteSearch"),
+                digest(checkpointValue,"sha256")).also {
+                    if(it.sourceRevision>revision || it.accountRevision>accountRevision)
+                        throw ProcessorProtocolException("Checkpoint comes from a future source/account revision.")
+                }
+            if((state=="complete" || state=="scanning" || state=="partial") && checkpoint==null)
+                throw ProcessorProtocolException("Observed scan states require a captured checkpoint.")
+            if(state=="complete" && (checkpoint!!.sourceRevision!=revision || checkpoint.accountRevision!=accountRevision ||
+                checkpoint.pendingItems!=0L || checkpoint.failedItems!=0L || checkpoint.incompleteSearch))
+                throw ProcessorProtocolException("An incomplete or stale scan cannot claim complete source coverage.")
+            if(state=="partial" && checkpoint!!.pendingItems==0L && checkpoint.failedItems==0L && !checkpoint.incompleteSearch)
+                throw ProcessorProtocolException("Partial coverage requires outstanding work or incomplete observations.")
+            sources.add(CatalogSourceCoverage(id,account,folder,revision,accountRevision,descendants,enabled,connected,state,checkpoint));previous=id
+        }
+        if(sources.first().id!=descriptor.firstId || sources.last().id!=descriptor.lastId)
+            throw ProcessorProtocolException("Source page does not match its captured identity range.")
+        return CatalogCoveragePage(descriptor,sources.toList())
+    }
+    private fun coverageHeader(root: JsonElement,format: String,library: UUID) {
+        val major=property(root,"major")
+        if(text(root,"format")!=format || !major.isJsonPrimitive || !major.asJsonPrimitive.isNumber || major.toString()!="1")
+            throw ProtocolCompatibilityException("Source coverage requires a compatible MPA update.")
+        if(uuid(root,"libraryId")!=library) throw ProcessorProtocolException("Source coverage belongs to another library.")
+    }
+    private fun coverageFlag(root: JsonElement,name: String): Boolean {
+        val value=property(root,name)
+        if(!value.isJsonPrimitive || !value.asJsonPrimitive.isBoolean) throw ProcessorProtocolException("Coverage flag must be boolean: $name")
+        return value.asBoolean
+    }
     private fun reference(value: JsonElement, maximum: Int): CatalogObjectReference {
         val account = text(value, "accountId"); val file = text(value, "fileId"); val folder = text(value, "workspaceId")
         checkOpaque(account); checkOpaque(file); checkOpaque(folder)
@@ -121,6 +196,7 @@ class CatalogPublicationReader(private val workspace: CatalogWorkspace) {
         const val MAX_INDEX_BYTES = 256 * 1024
         const val MAX_COMPRESSED_BYTES = 4 * 1024 * 1024
         const val MAX_EXPANDED_BYTES = 16 * 1024 * 1024
+        private val COVERAGE_STATES=setOf("complete","scanning","partial","pending","access-lost","offline","disconnected","disabled")
         private val UUID_PATTERN = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
         internal fun checkOpaque(value: String) {
             if (value.length !in 1..256 || !value.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == '_' })

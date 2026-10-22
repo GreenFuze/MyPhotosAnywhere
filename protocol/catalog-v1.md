@@ -291,3 +291,56 @@ including a failure after earlier leaves, cross-branch aliasing, cycles and fore
 Real signature tests alter syntactically valid settings JSON and require rejection before
 the first object read. The shared coverage placeholder is deliberately absent from fixture
 transport, preventing these tree-only tests from claiming complete-generation acceptance.
+
+## Bounded source coverage profile
+
+Coverage is a canonical `mpa-source-coverage-root` object with numeric `major: 1`,
+the captured library UUID, positive decimal-string `configurationRevision` and
+`discoveryRevision`, decimal-string `sourceCount` (0–256), and `pages`. Configuration
+and discovery revisions have their own owners; neither is the manifest's settings
+revision. Actual selected-workspace membership and the root reference hash are checked
+before interpreting it. A genuinely empty library has zero sources and zero pages.
+The generation owner must separately compare the received policies/accounts with the
+enrolled authority's approved configuration at that revision. A self-consistent revision
+number or source list alone cannot authorize a new source or consent.
+
+There are at most 16 page descriptors. Each declares `firstId`, `lastId`, decimal-string
+`count` (1–16), and an immutable `reference` subject to the existing 256 KiB metadata
+object/workspace rules. Descriptors use canonical source UUID string order, have strictly
+non-overlapping ranges, distinct file IDs and counts summing exactly to `sourceCount`.
+Only a one-source page has equal first/last IDs. Pages cannot silently go missing.
+
+A canonical `mpa-source-coverage-page` repeats major/library/configuration/discovery,
+then `sources`. Its exact bytes/hash, count and first/last IDs must match its descriptor.
+Source identities are strictly ordered. Each source contains `id`, opaque `accountId`
+and `folderId` (not My Drive's synthetic `root`), positive decimal-string `revision`
+and `accountRevision`, boolean `includeDescendants`, `enabled`, `connected`, `state`
+and explicit nullable `checkpoint`. Identity and account/folder binding are unique
+across the complete coverage map. At most 256 small source records are retained.
+
+States are `complete`, `scanning`, `partial`, `pending`, `access-lost`, `offline`,
+`disconnected` and `disabled`. Disabled policy requires `disabled`; an enabled source
+with a disconnected account requires `disconnected`. Connected/enabled sources cannot
+claim either state. `complete`, `scanning` and `partial` require a checkpoint with:
+
+- Nonzero canonical `jobId` UUID and positive decimal-string `sourceRevision` and
+  `accountRevision`, neither exceeding the source's captured current revision.
+- Nonnegative decimal-string `observedItems`, `pendingItems`, `failedItems` and boolean
+  `incompleteSearch`, plus lowercase `sha256` for the captured scan journal summary.
+
+Raw Drive page tokens and credentials are not portable coverage fields. A complete
+source must reference its current policy/account revision and have no pending items,
+failed items or incomplete search. Partial coverage must declare an outstanding gap.
+Old checkpoints can describe retained observations after a policy/account change;
+they cannot claim a fresh complete scan.
+
+After every page validates, each asset membership must name a known enabled source
+with the same account and current source revision, with depth 0 for a nonrecursive
+source and depth 0–256 otherwise. Disconnected, offline and partial sources may retain
+their previously observed photo facts. Absence from an incomplete scan never means
+deletion. A checkpoint digest is observation provenance, not original-file integrity.
+
+Matching C#/Kotlin readers and the shared independently generated coverage fixture cover
+all states, empty and 256-source libraries, 44 malformed graphs and source-membership
+conflicts. These readers do not perform authority enrollment, predecessor agreement,
+durable staging or the active-generation switch; those checks remain mandatory.
