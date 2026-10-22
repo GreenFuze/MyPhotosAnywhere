@@ -700,3 +700,20 @@ owner; neither the journal nor Drive discovery properties create trust. Local ch
 pass 141 Core, 53 AppServices and 24 Web tests, with zero Desktop Release warnings/errors.
 The final receipt-fence review additionally passes all eight focused journal tests and
 all 53 AppServices tests. Immutable cross-platform validation remains required.
+
+## Shared signed-file envelope
+
+C# and Kotlin now package the same canonical document and detached ES256 signature in
+one bounded immutable Drive file. The total 256 KiB limit includes signature/envelope
+overhead. Readers require a separately enrolled actor and verify its library, actor,
+epoch and allowed document kind. Self-asserted keys, unsigned files, duplicate or extra
+fields, noncanonical encodings and changed payloads cannot authorize a document.
+
+The shared fixture uses an independent Python cryptography P-256 signature and retains
+only synthetic public material. It includes 15 invalid/unsupported envelopes; matching
+tests also check wrong enrolled scopes and the total-file boundary. The first C# boundary
+test setup exceeded the existing per-string limit before exercising the envelope. The
+corrected fixture distributes its padding across eight bounded strings without relaxing
+any limit. All 62 C# Protocol and 552 Android unit tests pass; Android lint has zero
+findings. Both initial fixture-setup failures remain in the local diagnostic history.
+No enrollment, live publisher, background route or catalog activation is enabled.

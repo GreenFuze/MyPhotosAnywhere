@@ -12,6 +12,22 @@ Each commit retains its predecessor hash/ID for recovery. Same stream/epoch/sequ
 different commit hashes is a conflict; retain the agreed catalog and report reconciliation.
 No wall-clock winner, shared writable message file, or SQLite database in Drive.
 
+Signed protocol files use one canonical JSON envelope with exactly `format`, `major`,
+`document` and `signature`: format `mpa-signed-document`, integer major 1, an embedded
+canonical protocol document object, and signature fields `algorithm`, `keyId`, `value`.
+The ES256 signature authenticates the canonical document bytes, using the existing
+unpadded base64url/P1363 encoding. The complete envelope, including signature overhead,
+must fit 256 KiB. References hash those complete file bytes. Unsupported versions fail
+compatibility checks; duplicate, extra, noncanonical or malformed fields fail admission.
+No public key or enrollment claim in this envelope is accepted as authority. Consumers
+verify against independently enrolled library/actor/epoch/kind state before interpreting
+the payload. Packaging a document does not authorize or execute it. C# and Kotlin share
+independently generated signed-file vectors, including non-ASCII captions and 15 invalid
+cases; these codecs do not enable generation activation or enroll a device.
+Persist the complete signed envelope before allocating its Drive ID. Retry reuses those
+exact bytes and signature; re-signing the same document may produce different ES256
+signature bytes and must not silently replace a captured publication payload.
+
 Commit `kind` is `catalog-commit`, required capability `catalog.generations.v1`. Its
 payload contains `generationId` (UUID), `parent` (null only for genesis, otherwise an
 immutable commit reference), `rootIndex`, `sourceCoverage`, `settingsRevision`, and
