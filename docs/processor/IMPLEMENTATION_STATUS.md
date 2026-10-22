@@ -717,3 +717,18 @@ corrected fixture distributes its padding across eight bounded strings without r
 any limit. All 62 C# Protocol and 552 Android unit tests pass; Android lint has zero
 findings. Both initial fixture-setup failures remain in the local diagnostic history.
 No enrollment, live publisher, background route or catalog activation is enabled.
+
+## Controller-approved publisher policies
+
+Matching C#/Kotlin readers verify a signed publisher policy against a separately enrolled
+controller. The selected library/workspace cannot be changed by the received file. A
+publisher has a separate actor, key and epoch and can sign catalog commits only; it cannot
+use that role to authorize human operations or changes to originals. Explicit revocation
+returns no publisher. The owner still must persist current policy selection, reject forks
+and prevent replay of an earlier active policy; pure decoding cannot choose current state.
+
+Independent synthetic controller/publisher signatures cover active approval, revocation,
+a catalog genesis commit, and a denied user operation. Shared vectors include 26 signed
+invalid/overbroad policies. All 66 C# Protocol and 556 Android unit tests pass; lint has
+zero findings and Desktop Release compilation has zero warnings/errors. No live enrollment
+or publishing is enabled.

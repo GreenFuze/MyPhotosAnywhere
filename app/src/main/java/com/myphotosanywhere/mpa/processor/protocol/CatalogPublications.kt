@@ -20,6 +20,33 @@ data class CatalogIndexNode(val prefix: String, val children: List<CatalogIndexC
 /** Schemas only: verify signature/approved actor first. Drive membership, reference hashes,
  * ancestry and complete-tree validation remain mandatory before activating any generation. */
 class CatalogPublicationReader(private val workspace: CatalogWorkspace) {
+    fun readPublisherAuthorization(signedEnvelope: ByteArray, enrolledController: TrustedProtocolActor): CatalogPublisherAuthorization {
+        val approval = SignedProtocolDocuments(setOf(CatalogPublisherAuthorization.CAPABILITY)).verifyAndRead(signedEnvelope, enrolledController)
+        if (approval.kind != "library-publisher-authorization" || CatalogPublisherAuthorization.CAPABILITY !in approval.requiredCapabilities)
+            throw ProcessorProtocolException("An enrolled controller's explicit publisher authorization is required.")
+        val root = canonical(approval.canonicalPayload.toByteArray(Charsets.UTF_8))
+        if (root.keySet() != setOf("workspace", "publisher")) throw ProcessorProtocolException("Unexpected publisher policy fields.")
+        val selected = property(root, "workspace")
+        if (!selected.isJsonObject || selected.asJsonObject.keySet() != setOf("accountId", "folderId") ||
+            text(selected, "accountId") != workspace.accountId || text(selected, "folderId") != workspace.folderId || workspace.folderId == "root")
+            throw ProcessorProtocolException("Publisher authorization cannot choose a different metadata workspace.")
+        val publisher = property(root, "publisher")
+        val envelopeHash = MessageDigest.getInstance("SHA-256").digest(signedEnvelope).joinToString("") { "%02x".format(it) }
+        if (publisher.isJsonNull) return CatalogPublisherAuthorization(approval.libraryId, approval.actorId, approval.epoch, approval.sequence, workspace, null, null, envelopeHash)
+        if (!publisher.isJsonObject || publisher.asJsonObject.keySet() != setOf("actorId", "epoch", "publicKeySpki", "keyId"))
+            throw ProcessorProtocolException("Invalid publisher enrollment fields.")
+        val actor = uuid(publisher, "actorId"); val epoch = decimal(publisher, "epoch")
+        val encoded = text(publisher, "publicKeySpki"); val keyId = text(publisher, "keyId")
+        if (actor == approval.actorId || encoded.length !in 1..684) throw ProcessorProtocolException("The catalog publisher requires a separate actor and bounded public key.")
+        val publicKey = try { java.util.Base64.getDecoder().decode(encoded) }
+            catch (error: IllegalArgumentException) { throw ProcessorProtocolException("Invalid publisher public-key encoding.", error) }
+        if (java.util.Base64.getEncoder().encodeToString(publicKey) != encoded) throw ProcessorProtocolException("Publisher public key is not canonical base64.")
+        val verifier = ProtocolDocumentVerifier(publicKey)
+        if (keyId != verifier.keyId || keyId == enrolledController.verifier.keyId) throw ProcessorProtocolException("The catalog publisher requires its own matching public signing key.")
+        return CatalogPublisherAuthorization(approval.libraryId, approval.actorId, approval.epoch, approval.sequence, workspace,
+            TrustedProtocolActor(approval.libraryId, actor, epoch, publicKey, setOf("catalog-commit")), keyId, envelopeHash)
+    }
+
     fun readSourceConfiguration(verified: VerifiedProtocolDocument, expectedLibrary: UUID): CatalogSourceConfiguration {
         require(expectedLibrary != UUID(0, 0))
         if (verified.libraryId != expectedLibrary || verified.kind != "library-source-configuration" ||

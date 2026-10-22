@@ -28,6 +28,44 @@ Persist the complete signed envelope before allocating its Drive ID. Retry reuse
 exact bytes and signature; re-signing the same document may produce different ES256
 signature bytes and must not silently replace a captured publication payload.
 
+Publisher authority uses a controller-signed `library-publisher-authorization` envelope
+with capability `library.publishers.v1`. Its payload has exactly `workspace` and
+`publisher`. The workspace must match independently selected account/folder IDs. An
+active publisher names a canonical `actorId`, positive decimal-string `epoch`, canonical
+base64 P-256 `publicKeySpki` and its lowercase SHA-256 `keyId`. It uses a separate actor
+and signing key from the controller, with authority only for `catalog-commit`; its
+catalog sequence is independent of the controller's sequence. Explicit `publisher:null`
+revokes publication without choosing an older active policy.
+
+The root controller is independently enrolled; keys asserted inside Drive files cannot
+replace it. Owners durably select current controller epoch/sequence, detect conflicting
+policies and honor revocation before admitting a generation. Decoding an older valid
+policy does not make it current. Source configuration, recognition consent and approved
+original-file actions remain separate requirements. The reader returns an exact signed
+envelope hash for captured authority; local journal/generation owners still have to bind
+all their selected policies. No enrollment UI or persistent current-policy selection is
+implied by these codecs. Independent vectors include 26 correctly signed but invalid or
+overbroad policies, revocation, and a publisher signature that is denied for user operations.
+
+Publisher authority uses a controller-signed `library-publisher-authorization` envelope
+with capability `library.publishers.v1`. Its payload has exactly `workspace` and
+`publisher`. The workspace must match independently selected account/folder IDs. An
+active publisher names a canonical `actorId`, positive decimal-string `epoch`, canonical
+base64 P-256 `publicKeySpki` and its lowercase SHA-256 `keyId`. It uses a separate actor
+and signing key from the controller, with authority only for `catalog-commit`; its
+catalog sequence is independent of the controller's sequence. Explicit `publisher:null`
+revokes publication without choosing an older active policy.
+
+The root controller is independently enrolled; keys asserted inside Drive files cannot
+replace it. Owners durably select current controller epoch/sequence, detect conflicting
+policies and honor revocation before admitting a generation. Decoding an older valid
+policy does not make it current. Source configuration, recognition consent and approved
+original-file actions remain separate requirements. The reader returns an exact signed
+envelope hash for captured authority; local journal/generation owners still have to bind
+all their selected policies. No enrollment UI or persistent current-policy selection is
+implied by these codecs. Independent vectors include 26 correctly signed but invalid or
+overbroad policies, revocation, and a publisher signature that is denied for user operations.
+
 Commit `kind` is `catalog-commit`, required capability `catalog.generations.v1`. Its
 payload contains `generationId` (UUID), `parent` (null only for genesis, otherwise an
 immutable commit reference), `rootIndex`, `sourceCoverage`, `settingsRevision`, and
