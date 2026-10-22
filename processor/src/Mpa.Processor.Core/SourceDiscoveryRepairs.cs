@@ -44,6 +44,7 @@ public sealed partial class SourceDiscoveryRepository
         ValidateCurrent(parent);
         if (!parent.Scope.IncludeDescendants) return false;
         if (!Identity(verifiedFolderId) || verifiedSharedDriveId is not null && !Identity(verifiedSharedDriveId)) throw new ArgumentException("Invalid verified repair folder.");
+        if (ManagedWorkspaceBoundary.Capture(_database).ContainsRoot(verifiedFolderId)) return false;
         if (parent.Folder.Depth == 256 || verifiedFolderId == parent.Folder.FolderId || verifiedFolderId == parent.Scope.RootFolderId ||
             parent.Folder.SharedDriveId is not null && parent.Folder.SharedDriveId != verifiedSharedDriveId)
             throw new InvalidDataException("Repair traversal cannot escape its captured source or create a cycle.");

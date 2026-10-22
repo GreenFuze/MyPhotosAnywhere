@@ -161,6 +161,10 @@ public sealed class DesktopWebHost : IAsyncDisposable
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Library settings changed. Refresh Sources before applying this change." }, context.RequestAborted).ConfigureAwait(false); }
             catch (ExistingLibrarySourceException)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "This account and folder are already configured. Update their existing source entry." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (ManagedWorkspaceSourceException error)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
+            catch (SourceWorkspaceLimitException error)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
             catch (LibraryWorkspaceApprovalException error)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
             catch (DriveWorkspaceSelectionException error)

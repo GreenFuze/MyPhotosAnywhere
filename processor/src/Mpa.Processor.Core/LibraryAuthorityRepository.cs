@@ -14,19 +14,22 @@ public sealed class ControllerAuthorityConflictException() : InvalidOperationExc
 /// independently approved host/device setup, never a received Drive descriptor. Native
 /// private-key persistence/possession must be established by that setup owner first.
 /// No key replacement, source permission, original mutation or catalog activation occurs here.</summary>
-public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase database, StorageBudgetManager budget)
+public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase database, StorageBudgetManager? budget = null)
 {
     private const string PinKey = "library_controller_v1";
     private const string SelectedKey = "current_publisher_policy_v1";
     private readonly ProcessorStateDatabase _database = database ?? throw new ArgumentNullException(nameof(database));
-    private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
+    private readonly StorageBudgetManager? _budget = budget;
+    private StorageBudgetManager Budget => _budget ?? throw new InvalidOperationException("This authority reader has no write budget; use its configured write owner for mutations.");
     private static readonly string[] ControllerKinds = ["library-publisher-authorization", "library-source-configuration"];
 
     public LibraryControllerPin? Controller() => ReadPin(null);
+    internal LibraryControllerPin? Controller(SqliteTransaction? transaction) => ReadPin(transaction);
 
     public LibraryControllerPin Bootstrap(Guid actorId, long epoch, CatalogWorkspace selectedWorkspace,
         long expectedAccountRevision, ReadOnlySpan<byte> persistedNativePublicKey, PublisherSigningRegistration? signingRegistration = null, LibraryBootstrapApproval? sourceApproval = null)
     {
+        _ = Budget;
         ArgumentNullException.ThrowIfNull(selectedWorkspace);
         if (actorId == Guid.Empty || epoch < 1 || expectedAccountRevision < 1 || selectedWorkspace.FolderId == "root")
             throw new ArgumentException("Independently approved controller, workspace and account revision are required.");
@@ -38,16 +41,16 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
         if (existing is not null)
         {
             if (candidate != existing) throw new ControllerAuthorityConflictException();
-            if (signingRegistration is not null) new ProtocolSigningJournal(_database, _budget).AssertBootstrapActors(transaction, existing, signingRegistration);
+            if (signingRegistration is not null) new ProtocolSigningJournal(_database, Budget).AssertBootstrapActors(transaction, existing, signingRegistration);
             using var sourceReservation = sourceApproval is null ? null : StoreBootstrapSources(transaction, existing, sourceApproval);
             transaction.Commit(); return existing;
         }
         using (var account = Command(transaction, "SELECT 1 FROM drive_account WHERE permission_id=$account AND connected=1 AND revision=$revision",
             ("$account", selectedWorkspace.AccountId), ("$revision", expectedAccountRevision)))
             if (account.ExecuteScalar() is null) throw new StaleLibraryConfigurationException();
-        var encoded = EncodePin(candidate); using var reservation = _budget.Reserve(65536); reservation.RecheckBeforeWrite(reservation.Bytes);
+        var encoded = EncodePin(candidate); using var reservation = Budget.Reserve(65536); reservation.RecheckBeforeWrite(reservation.Bytes);
         Insert(transaction, PinKey, encoded); Insert(transaction, PinKey + ":sha256", Hash(Encoding.UTF8.GetBytes(encoded)));
-        if (signingRegistration is not null) new ProtocolSigningJournal(_database, _budget).InitializeBootstrapActors(transaction, candidate, signingRegistration);
+        if (signingRegistration is not null) new ProtocolSigningJournal(_database, Budget).InitializeBootstrapActors(transaction, candidate, signingRegistration);
         using var bootstrapSourceReservation = sourceApproval is null ? null : StoreBootstrapSources(transaction, candidate, sourceApproval);
         transaction.Commit(); return candidate;
     }
@@ -67,6 +70,7 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
     /// remains the enrollment/operation owner's separate responsibility.</summary>
     public CatalogPublisherAuthorization SelectPublisherPolicy(ReadOnlySpan<byte> signedEnvelope)
     {
+        _ = Budget;
         if (signedEnvelope.Length is < 1 or > ProtocolDocumentReader.MaximumDocumentBytes) throw new ArgumentException("A bounded signed policy is required.", nameof(signedEnvelope));
         var owned = signedEnvelope.ToArray();
         using var transaction = _database.Connection.BeginTransaction();
@@ -83,7 +87,7 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
         {
             var retained = ReadPolicy(transaction, pin, currentSequence); transaction.Commit(); return retained;
         }
-        using var reservation = _budget.Reserve(checked(owned.LongLength * 3 + 65536)); reservation.RecheckBeforeWrite(reservation.Bytes);
+        using var reservation = Budget.Reserve(checked(owned.LongLength * 3 + 65536)); reservation.RecheckBeforeWrite(reservation.Bytes);
         if (old is null) { Insert(transaction, key, Encoding.UTF8.GetString(owned)); Insert(transaction, key + ":sha256", hash); }
         CatalogPublisherAuthorization result;
         if (policy.Sequence > currentSequence)

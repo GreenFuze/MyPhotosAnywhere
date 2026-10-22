@@ -138,6 +138,8 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
 
     private async Task<SourceDiscoveryStep> FolderAsync(SourceDiscoveryWork work, CancellationToken token)
     {
+        if (await StateAsync(database => new SourceDiscoveryRepository(database).TryExcludeManagedWorkspace(work), token).ConfigureAwait(false))
+            return new(work.Lease.JobId, work.Lease.ItemId, false, true, false);
         var checkpoint = await StateAsync(database =>
         {
             var repository = new SourceDiscoveryRepository(database); repository.ValidateCurrent(work); return repository.Checkpoint(work);
@@ -151,17 +153,20 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
         return await StateAsync(database =>
         {
             var repository = new SourceDiscoveryRepository(database); repository.ValidateCurrent(work);
-            var failures = page.Failures.Select(failure => failure.FileId).ToList();
-            foreach (var folder in page.Items.Where(item => item.Folder is not null).Select(item => item.Folder!))
+            if (repository.TryExcludeManagedWorkspace(work)) return new SourceDiscoveryStep(work.Lease.JobId, work.Lease.ItemId, false, true, false);
+            var boundary = ManagedWorkspaceBoundary.Capture(database);
+            var items = page.Items.Where(item => !boundary.ContainsRoot(item.Id)).ToArray();
+            var failures = page.Failures.Where(failure => !boundary.ContainsRoot(failure.FileId ?? "")).Select(failure => failure.FileId).ToList(); var inaccessible = 0;
+            foreach (var folder in items.Where(item => item.Folder is not null).Select(item => item.Folder!))
                 if (work.Scope.IncludeDescendants)
                 {
                     if (folder.CanListChildren) repository.EnqueueChild(work, folder.Id, folder.SharedDriveId);
-                    else failures.Add(folder.Id);
+                    else { failures.Add(folder.Id); inaccessible++; }
                 }
             foreach (var failed in failures) repository.RecordFailure(work, failed);
             if (page.IncompleteSearch) repository.RecordFailure(work, null);
-            ApplyMedia(database, work.Scope, work.Folder, page.Items);
-            var advanced = repository.Advance(work, page.NextPageToken, page.Items.Count - (failures.Count - page.Failures.Count), failures.Count, page.IncompleteSearch);
+            ApplyMedia(database, work.Scope, work.Folder, items);
+            var advanced = repository.Advance(work, page.NextPageToken, items.Length - inaccessible, failures.Count, page.IncompleteSearch);
             if (page.NextPageToken is null) repository.CompleteFolder(advanced);
             else new DurableJobRepository(database).ReturnJoinedRead(advanced.Lease);
             return new SourceDiscoveryStep(work.Lease.JobId, work.Lease.ItemId, false, page.NextPageToken is null, false);
@@ -170,7 +175,8 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
 
     private async Task<SourceDiscoveryStep> RepairAsync(SourceDiscoveryRepair repair, CancellationToken token)
     {
-        await StateAsync(database => { new SourceDiscoveryRepository(database).ValidateCurrent(repair); return true; }, token).ConfigureAwait(false);
+        if (await StateAsync(database => new SourceDiscoveryRepository(database).TryExcludeManagedWorkspace(repair), token).ConfigureAwait(false))
+            return new(repair.Lease.JobId, repair.Lease.ItemId, true, true, false);
         var page = repair.FileId is null ? await ReadPageAsync(repair.Scope, repair.Folder, repair.PageToken, token).ConfigureAwait(false) :
             new DriveSourcePage([await _accounts.ReadDriveAsync(repair.Scope.AccountId, (reader, revision, readToken) =>
             {
@@ -180,15 +186,17 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
         return await StateAsync(database =>
         {
             var repository = new SourceDiscoveryRepository(database); repository.ValidateCurrent(repair);
+            if (repository.TryExcludeManagedWorkspace(repair)) return new SourceDiscoveryStep(repair.Lease.JobId, repair.Lease.ItemId, true, true, false);
+            var boundary = ManagedWorkspaceBoundary.Capture(database); var items = page.Items.Where(item => !boundary.ContainsRoot(item.Id)).ToArray();
             var inaccessible = false;
-            foreach (var folder in page.Items.Where(item => item.Folder is not null).Select(item => item.Folder!))
+            foreach (var folder in items.Where(item => item.Folder is not null).Select(item => item.Folder!))
                 if (repair.Scope.IncludeDescendants)
                 {
                     if (folder.CanListChildren) repository.EnqueueChild(repair, folder.Id, folder.SharedDriveId);
                     else inaccessible = true;
                 }
-            ApplyMedia(database, repair.Scope, repair.Folder, page.Items);
-            var failed = page.Failures.Count != 0 || inaccessible || page.IncompleteSearch;
+            ApplyMedia(database, repair.Scope, repair.Folder, items);
+            var failed = page.Failures.Any(failure => !boundary.ContainsRoot(failure.FileId ?? "")) || inaccessible || page.IncompleteSearch;
             if (failed) new DurableJobRepository(database).Fail(repair.Lease, "invalid-source-metadata", "This captured metadata read remains incomplete. Healthy entries were retained; retry this failed observation.", true);
             else repository.CompleteRepair(repair);
             return new SourceDiscoveryStep(repair.Lease.JobId, repair.Lease.ItemId, true, !failed, failed);

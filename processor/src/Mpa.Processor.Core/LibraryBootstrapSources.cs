@@ -48,7 +48,7 @@ public sealed partial class LibraryAuthorityRepository
             if (existing.CanonicalSnapshot != text) throw new LibraryBootstrapApprovalConflictException();
             return null;
         }
-        var reservation = _budget.Reserve(checked(Encoding.UTF8.GetByteCount(text) * 3L + 65536));
+        var reservation = Budget.Reserve(checked(Encoding.UTF8.GetByteCount(text) * 3L + 65536));
         try
         {
             reservation.RecheckBeforeWrite(reservation.Bytes);

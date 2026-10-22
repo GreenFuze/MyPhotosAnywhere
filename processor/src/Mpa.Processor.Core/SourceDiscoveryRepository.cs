@@ -69,6 +69,7 @@ public sealed partial class SourceDiscoveryRepository
         ValidateActive(parent); ValidateCurrent(parent);
         if (!parent.Scope.IncludeDescendants) return false;
         if (!Identity(verifiedFolderId) || verifiedSharedDriveId is not null && !Identity(verifiedSharedDriveId)) throw new ArgumentException("Invalid verified child folder.");
+        if (ManagedWorkspaceBoundary.Capture(_database).ContainsRoot(verifiedFolderId)) return false;
         if (parent.Folder.Depth == 256 || verifiedFolderId == parent.Folder.FolderId || verifiedFolderId == parent.Scope.RootFolderId)
             throw new InvalidDataException("Source traversal contains a cycle or exceeds the supported depth.");
         if (parent.Folder.SharedDriveId is not null && parent.Folder.SharedDriveId != verifiedSharedDriveId)
@@ -82,6 +83,7 @@ public sealed partial class SourceDiscoveryRepository
 
     public void CompleteFolder(SourceDiscoveryWork work)
     {
+        if (TryExcludeManagedWorkspace(work)) return;
         ValidateCurrent(work); var checkpoint = Checkpoint(work);
         if (!checkpoint.Started || checkpoint.NextPageToken is not null) throw new InvalidOperationException("A folder requires a terminal checkpoint before completion.");
         _jobs.Complete(work.Lease, _codec.Encode(JsonSerializer.SerializeToUtf8Bytes(new { format = "mpa-source-folder-receipt-1",

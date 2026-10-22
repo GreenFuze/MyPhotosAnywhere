@@ -922,3 +922,26 @@ source/privacy changes and preservation across disconnect. The private initial s
 is not a remote signature, recognition consent or permission to mutate originals. Signed
 source-policy publication, subsequent reviewed operations, cloud reconciliation and
 managed-workspace traversal exclusion still must be connected before catalog activation.
+
+## Managed workspace discovery boundary
+
+Source admission now verifies actual parent identities through its captured account and
+rejects the pinned metadata workspace or its descendants. IDs, not names, define the
+boundary across accounts. Ancestor cycles, changed identities and exceeded bounds fail
+explicitly. Network reads remain outside state transactions, are joined on cancellation,
+and a changed workspace requires fresh source admission before committing.
+
+Discovery filters that exact workspace from ordinary pages and failed-item repairs.
+Already queued work is checked before reading and again after the real read returns,
+so concurrent setup cannot insert generated previews into the photo catalog. Exclusion
+has its own durable receipt. If the reserved folder already has photo observations,
+processing fails with those facts preserved for reconciliation rather than calling the
+folder empty or deleting earlier originals. Unrelated failed originals remain retryable.
+
+Local validation passes 169 Core, 84 AppServices and 25 Web tests, plus all three ancestry
+cases after a test-fixture-only bound adjustment. Strict Desktop Release compilation has
+zero warnings/errors. Processor schema 8 and Android Room 12 are unchanged. Push checks
+for the preceding initial-source-association revision `453f4ec` all passed; intentionally
+skipped same-repository pull-request duplicates are not counted as validation. Cloud
+enrollment, reviewed later source policies, publication snapshots and high-water/restore
+reconciliation remain prerequisites for the first shared catalog and completed release.

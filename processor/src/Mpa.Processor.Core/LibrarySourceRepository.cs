@@ -34,6 +34,7 @@ public sealed class LibrarySourceRepository(ProcessorStateDatabase database)
         if (id == Guid.Empty || !Identity(accountId) || !Identity(verifiedFolderId) || !Display(verifiedDisplayName) || expectedAccountRevision < 1)
             throw new ArgumentException("Invalid verified source binding.");
         using var transaction = _database.Connection.BeginTransaction();
+        ManagedWorkspaceBoundary.Capture(_database, transaction).AssertSourceRoot(verifiedFolderId);
         using (var duplicate = Command(transaction, "SELECT 1 FROM source_binding WHERE account_id=$account AND folder_id=$folder", ("$account", accountId), ("$folder", verifiedFolderId)))
             if (duplicate.ExecuteScalar() is not null) throw new ExistingLibrarySourceException();
         using (var account = Command(transaction, "SELECT 1 FROM drive_account WHERE permission_id=$account AND connected=1 AND revision=$revision", ("$account", accountId), ("$revision", expectedAccountRevision)))

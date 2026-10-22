@@ -124,14 +124,20 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
     public async Task<LibrarySourceSnapshot> AddSourceAsync(DesktopAddSource request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var boundary = await _state.ExecuteAsync(ManagedWorkspaceBoundary.Capture, cancellationToken).ConfigureAwait(false);
         var captured = await _accounts.ReadDriveAsync(request.AccountId, async (reader, revision, token) =>
         {
             var folder = await reader.ReadFolderAsync(request.FolderId, token).ConfigureAwait(false);
             if (!folder.CanListChildren) throw new HttpRequestException("Google does not allow listing this source folder.", null, System.Net.HttpStatusCode.Forbidden);
+            await new SourceWorkspaceVerifier(reader, boundary).AssertOutsideAsync(folder, token).ConfigureAwait(false);
             return (Folder: folder, AccountRevision: revision);
         }, cancellationToken).ConfigureAwait(false);
-        var result = await _state.ExecuteAsync(database => new LibrarySourceRepository(database).Add(Guid.NewGuid(), request.AccountId,
-            captured.AccountRevision, captured.Folder.Id, captured.Folder.Name, request.IncludeDescendants, request.ExpectedRevision), cancellationToken).ConfigureAwait(false);
+        var result = await _state.ExecuteAsync(database =>
+        {
+            if (ManagedWorkspaceBoundary.Capture(database).RootFolderId != boundary.RootFolderId) throw new StaleLibraryConfigurationException();
+            return new LibrarySourceRepository(database).Add(Guid.NewGuid(), request.AccountId,
+                captured.AccountRevision, captured.Folder.Id, captured.Folder.Name, request.IncludeDescendants, request.ExpectedRevision);
+        }, cancellationToken).ConfigureAwait(false);
         _sources?.NotifySourcesChanged(); return result;
     }
     public async Task<LibrarySourceSnapshot> UpdateSourceAsync(DesktopUpdateSource request, CancellationToken cancellationToken)
