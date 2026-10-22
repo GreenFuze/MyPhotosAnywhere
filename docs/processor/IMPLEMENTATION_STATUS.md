@@ -1085,3 +1085,24 @@ device guard, configured heap, known-mismatch-only restart and app assertions ar
 All nine Python checker tests pass, including the six existing cases. Actual emulator
 validation of this change is pending. This is no exception or passing native-test claim;
 the final immutable revision still requires the complete API 29/35/37 acceptance matrix.
+
+## Current local publication-policy fence
+
+A read-only transaction now captures the pinned controller, current signed publisher and
+source policies, exact local source settings and connected workspace account revision.
+Its canonical authority digest includes both selected signed-policy hashes/sequences and
+actor/key/workspace/configuration identities. Assertions reject a captured scope after
+revocation, source changes, account disconnect/reconnect, altered identities or corruption.
+Reconnection changes the required access revision while preserving human source authority.
+
+All 202 Core, 104 AppServices and 25 Web tests pass; strict Desktop Release compilation
+has zero warnings/errors. Five new authority cases preserve rejected/corrupt state and
+prove that the read-only fence works without a writable storage budget. Processor schema
+8 and Room 12 remain unchanged.
+
+This is only the durable local policy check. It does not establish native publisher-key
+possession, a completed cloud reconciliation/high-water proof, an observation barrier for
+policies that could not be persisted, a verified predecessor or exclusive head admission.
+It cannot be used as a stand-alone production publication authority. Those prerequisites
+and the immutable pending-upload access-reconciliation path must be connected before
+enabling live generation publication, scheduling or phone activation.

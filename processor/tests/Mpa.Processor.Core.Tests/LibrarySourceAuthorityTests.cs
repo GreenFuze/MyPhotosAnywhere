@@ -119,7 +119,7 @@ public sealed partial class LibraryAuthorityTests
     private sealed partial class Fixture
     {
         private static readonly Guid SourceIdentity = Guid.Parse("00000000-0000-4000-8000-000000000001");
-        public byte[] SourcePolicy(long sequence, long revision = 1, bool enabled = true, ECDsa? signer = null, string? workspace = null)
+        public byte[] SourcePolicy(long sequence, long revision = 1, bool enabled = true, ECDsa? signer = null, string? workspace = null, long? sourceRevision = null)
         {
             var body = new CanonicalJson().Encode(JsonSerializer.SerializeToUtf8Bytes(new { format = "mpa", major = 1, minor = 0,
                 libraryId = _library.ToString("D"), actorId = ActorId.ToString("D"), epoch = "1", sequence = sequence.ToString(CultureInfo.InvariantCulture),
@@ -127,7 +127,7 @@ public sealed partial class LibraryAuthorityTests
                 payload = new { configurationRevision = revision.ToString(CultureInfo.InvariantCulture),
                     workspace = new { accountId = Workspace.AccountId, folderId = workspace ?? Workspace.FolderId }, accounts = new[] { Workspace.AccountId },
                     sources = new[] { new { id = SourceIdentity.ToString("D"), accountId = Workspace.AccountId, folderId = "photo-folder",
-                        revision = revision.ToString(CultureInfo.InvariantCulture), includeDescendants = true, enabled } } } }));
+                        revision = (sourceRevision ?? revision).ToString(CultureInfo.InvariantCulture), includeDescendants = true, enabled } } } }));
             return new SignedProtocolDocuments([CatalogSourceConfiguration.Capability]).Encode(body, new ProtocolDocumentSigner(signer ?? Controller).Sign(body));
         }
     }
