@@ -44,10 +44,16 @@ public sealed partial class SourceDiscoveryRepository
     public SourceDiscoverySchedule EnsureScheduled(Guid sourceId, long sourceRevision, long accountRevision)
     {
         var scope = CaptureScope(sourceId, sourceRevision, accountRevision);
-        var suffix = "discovery-auto-" + sourceId.ToString("N") + "-" + sourceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+        if (CurrentScan(scope) is Guid current) return new(current, false);
+        // The first scan-selection schema does not infer recency from old random
+        // UUIDs or row order. A new automatic identity requests fresh metadata;
+        // existing jobs/checkpoints/receipts remain intact as historical work.
+        var suffix = "discovery-auto-2-" + sourceId.ToString("N") + "-" + sourceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) +
             "-" + accountRevision.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var job = _identity.Derive(scope.AccountId, suffix);
-        return new(job, _jobs.EnsureJobWithInitialItem(job, JobKind, ScopeContext(scope), VerificationItem(scope)));
+        var created = _jobs.EnsureJobWithInitialItem(job, JobKind, ScopeContext(scope), VerificationItem(scope), new ScanAdmission(this, scope));
+        if (!created) throw new InvalidDataException("An automatically admitted source scan lost its atomic selection record.");
+        return new(job, true);
     }
     public SourceDiscoveryVerification? ClaimVerification()
     {

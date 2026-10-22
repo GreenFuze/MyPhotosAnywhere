@@ -35,7 +35,8 @@ public sealed partial class SourceDiscoveryRepository
             verifiedSharedDriveId is not null && !Identity(verifiedSharedDriveId)) throw new ArgumentException("Invalid captured discovery source.");
         var scope = CaptureScope(sourceId, sourceRevision, accountRevision);
         if (scope.RootFolderId != verifiedRootFolderId) throw new StaleLibraryConfigurationException();
-        _jobs.CreateWithInitialItem(jobId, JobKind, ScopeContext(scope), Item(scope, new(verifiedRootFolderId, verifiedSharedDriveId, 0)));
+        _jobs.CreateWithInitialItem(jobId, JobKind, ScopeContext(scope), Item(scope, new(verifiedRootFolderId, verifiedSharedDriveId, 0)),
+            new ScanAdmission(this, scope));
     }
     private SourceDiscoveryScope CaptureScope(Guid sourceId, long sourceRevision, long accountRevision)
     {

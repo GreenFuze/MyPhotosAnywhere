@@ -15,6 +15,13 @@ public sealed record PendingStageReceipt(Guid Id, Guid JobId, Guid ItemId, strin
 public sealed class StaleStageLeaseException() : InvalidOperationException("Stage lease is no longer current; retain/reconcile receipts and do not publish stale results.");
 public sealed class ConflictingJobItemException() : InvalidOperationException("The durable item identity already binds different input, context or recipes. Existing work was retained.");
 
+/// <summary>Internal aggregate participation in the job-admission transaction. Borrowed
+/// transaction only: no network, await, commit/dispose or reference escape is permitted.</summary>
+internal interface IDurableJobAdmission
+{
+    void Record(SqliteTransaction transaction, Guid jobId);
+}
+
 /// <summary>Serial background coordinator repository. Transactions fence each attempt and commit
 /// successful stage receipts plus outbox together. Network/native work never runs inside a transaction.</summary>
 public sealed class DurableJobRepository(ProcessorStateDatabase database)
@@ -30,14 +37,21 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
     }
 
     public void CreateWithInitialItem(Guid jobId, string kind, ReadOnlySpan<byte> capturedContext, JobItemSpec item)
+        => CreateWithInitialItem(jobId, kind, capturedContext, item, null);
+
+    internal void CreateWithInitialItem(Guid jobId, string kind, ReadOnlySpan<byte> capturedContext, JobItemSpec item, IDurableJobAdmission? admission)
     {
         if (jobId == Guid.Empty || !Identifier(kind)) throw new ArgumentException("Invalid job identity/kind.");
         var canonical = CanonicalObject(capturedContext); var prepared = Prepare(item);
         using var transaction = _database.Connection.BeginTransaction();
-        InsertJob(transaction, jobId, kind, canonical); InsertItem(transaction, jobId, prepared); transaction.Commit();
+        InsertJob(transaction, jobId, kind, canonical); InsertItem(transaction, jobId, prepared);
+        admission?.Record(transaction, jobId); transaction.Commit();
     }
 
     public bool EnsureJobWithInitialItem(Guid jobId, string kind, ReadOnlySpan<byte> capturedContext, JobItemSpec item)
+        => EnsureJobWithInitialItem(jobId, kind, capturedContext, item, null);
+
+    internal bool EnsureJobWithInitialItem(Guid jobId, string kind, ReadOnlySpan<byte> capturedContext, JobItemSpec item, IDurableJobAdmission? admission)
     {
         if (jobId == Guid.Empty || !Identifier(kind)) throw new ArgumentException("Invalid job identity/kind.");
         var canonical = CanonicalObject(capturedContext); var prepared = Prepare(item); var exists = false;
@@ -55,6 +69,7 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
         }
         if (!exists) { InsertJob(transaction, jobId, kind, canonical); InsertItem(transaction, jobId, prepared); }
         else if (EnsureItem(transaction, jobId, prepared)) throw new InvalidDataException("A previously admitted atomic job lost its initial item.");
+        if (!exists) admission?.Record(transaction, jobId);
         transaction.Commit(); return !exists;
     }
     private void InsertJob(SqliteTransaction? transaction, Guid jobId, string kind, string canonicalContext)

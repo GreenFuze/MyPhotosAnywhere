@@ -63,7 +63,7 @@ public sealed class ProcessorStateDatabase : IDisposable
                 var objects = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
                 if (application != ApplicationId && !(application == 0 && version == 0 && objects == 0))
                     throw new InvalidDataException("Unknown database identity; preserve it and choose an empty Processor state directory.");
-                if (version is not (0 or 1 or 2 or 3 or 4 or 5)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
+                if (version is not (0 or 1 or 2 or 3 or 4 or 5 or 6)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
                 command.CommandText = "PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;";
                 command.ExecuteNonQuery();
                 command.CommandText = "PRAGMA journal_mode=WAL";
@@ -186,6 +186,20 @@ public sealed class ProcessorStateDatabase : IDisposable
                 {
                     using var transaction = connection.BeginTransaction(); command.Transaction = transaction;
                     command.CommandText = "ALTER TABLE job_item ADD COLUMN captured_context TEXT NOT NULL DEFAULT '{}'; PRAGMA user_version=5;";
+                    command.ExecuteNonQuery(); transaction.Commit();
+                }
+                if (version < 6)
+                {
+                    using var transaction = connection.BeginTransaction(); command.Transaction = transaction;
+                    command.CommandText = """
+                        CREATE TABLE current_source_scan(
+                          source_id TEXT PRIMARY KEY REFERENCES source_binding(id),
+                          job_id TEXT NOT NULL UNIQUE REFERENCES job(id),
+                          source_revision INTEGER NOT NULL CHECK(source_revision>=1),
+                          account_revision INTEGER NOT NULL CHECK(account_revision>=1)
+                        ) STRICT;
+                        PRAGMA user_version=6;
+                        """;
                     command.ExecuteNonQuery(); transaction.Commit();
                 }
             }

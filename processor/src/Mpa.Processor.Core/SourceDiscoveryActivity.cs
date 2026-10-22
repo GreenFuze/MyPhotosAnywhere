@@ -20,7 +20,7 @@ public sealed partial class SourceDiscoveryRepository
         ArgumentNullException.ThrowIfNull(request);
         if (request.RequestId == Guid.Empty) throw new ArgumentException("A scan request identity is required.", nameof(request));
         var scope = CaptureScope(request.SourceId, request.SourceRevision, request.AccountRevision);
-        return new(request.RequestId, _jobs.EnsureJobWithInitialItem(request.RequestId, JobKind, ScopeContext(scope), VerificationItem(scope)));
+        return new(request.RequestId, _jobs.EnsureJobWithInitialItem(request.RequestId, JobKind, ScopeContext(scope), VerificationItem(scope), new ScanAdmission(this, scope)));
     }
 
     public int RetryFailed(SourceRetryRequest request)

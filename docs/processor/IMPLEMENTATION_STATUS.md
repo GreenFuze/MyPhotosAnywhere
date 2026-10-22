@@ -1,22 +1,22 @@
 # MPA 0.6.0 implementation ledger
 
-Updated: 2026-10-21. **Stage 0 validation continues; Stage 1 contract integration and Stage 2 foundations are in progress. No 0.6 application or installer is released.**
+Updated: 2026-10-22. **Stage 0 validation continues; contract, core and catalog integration are in progress. No 0.6 application or installer is released.**
 
 ## Authority and baseline
 
 The owner approved implementing the complete joint release unattended, reported switching to High effort, and subsequently directed emulator-first development with the S23 reserved for final tests. The historical plan-only stop in the plan documents has been satisfied. Preserve fast failure, object ownership and original-media protections.
 
-Baseline: `6c9ead7b1d4446dc819dee71974aa7b68614f232` (0.5.33 publication revision), application source `7714d96b6f8b654c8f16e6358dd9d993356380fe`. Work branch: `feat/processor-060`. Native evidence records the exact clean committed SHA; early local experiments are explicitly provisional. Only isolated protocol classes/tests have been added to Android; no UI behavior, version or Room schema has changed.
+Baseline: `6c9ead7b1d4446dc819dee71974aa7b68614f232` (0.5.33 publication revision), application source `7714d96b6f8b654c8f16e6358dd9d993356380fe`. Work branch: `feat/processor-060`. Native evidence records the exact clean committed SHA; local experiments are explicitly provisional. Android has portable protocol consumers and bounded legacy XMP output; UI composition, version and Room schema remain at baseline.
 
 ## Stage ledger
 
 | Stage | State | Evidence / remaining work |
 | --- | --- | --- |
 | 0: feasibility/baseline | In progress | Production OAuth, full desktop grant, fresh-process refresh, bounded synthetic Drive round trip passed. Manual post-consent source discovery, actual-expiry refresh and injected lost-completion reconciliation passed. Four-target two-model/decoder native matrix passed on 67607b1; expanded object model matrix is running on 9bae0a3. Actual cross-client/crash/multiple-account/duration and remaining codec/OCR/package gates stay open. |
-| 1: contracts | In progress | Shared Kotlin/C# canonical JSON and Drive identity goldens passed; Kotlin 11 targeted tests plus zero-findings lint passed; C# 25 tests now cover signatures, causality, aliases, closed approval scopes, artifact integrity and worker framing. The earlier 17-test contract revision passed all four native OS/architecture targets. Catalog/worker wire and staged-index contracts are specified; integration/scale acceptance remains. |
+| 1: contracts | In progress | Matching signatures/identity/facts-tree/source-coverage fixtures pass: 47 C# Protocol tests and 28 focused Android tests; all 537 Android unit tests and zero-findings lint passed for the coverage slice. Stable-patch revalidation and complete integration/scale acceptance remain. |
 | 2: core/plugins | In progress | Local SQLite ownership, durable stage/checkpoint/receipt outbox and failed-only retry foundation under test. Resource reservations, actual process ownership/recovery, complete plugins and tray/Exit remain. |
 | 3: accounts/coordination | In progress | Production protected account/refresh and authenticated loopback web host implemented. Browser LAN onboarding and Drive-only mobile enrollment/acknowledged controls remain. No phone LAN connection is permitted. |
-| 4: catalog | Pending | Immutable publishing, staged phone catalog, human synchronization. |
+| 4: catalog | In progress | Bounded WAL facts snapshots, verified immutable objects/tree traversal and source coverage are implemented. Publishing, approved-configuration/ancestry agreement, staged phone activation and human synchronization remain. |
 | 5: imports/previews | Pending | All three Takeout paths, per-stage retry, previews/video. |
 | 6: recognition | Pending | People/object/OCR workers, consent, quality and native coverage. |
 | 7: Android | Pending | Complete remote workflows and remove batch inference. |
@@ -492,3 +492,25 @@ This establishes portable validation, not live publication/activation. Capturing
 current scan coverage from the same durable snapshot as facts, complete graph-role and
 predecessor/authority validation, journals, dirty-prefix publication and transactionally
 staged activation remain. No persisted schema or product UI behavior changed in this slice.
+
+## Atomic current-scan selection
+
+Processor schema 6 adds an explicit current-scan reference per source. The reference,
+captured source/account revisions, job and initial work item commit in one transaction.
+No timestamp, UUID comparison or row order determines the selected scan. Automatic
+scheduling retains the current admitted request, including failed/paused work. A new
+explicit scan selects its own job; replaying an older HTTP request returns that job's
+original identity without rewinding a newer selection. Missing/corrupt selection records
+fail visibly instead of resetting work or returning an empty/completed source.
+
+Schema 5 upgrades add the new empty selection table and preserve every preexisting row,
+installation identity, captured context, checkpoints and receipts. A fresh metadata-only
+automatic request establishes selection without guessing the order of old jobs. Historical
+work is preserved. Older-schema test setup now removes the new table when constructing
+an authentic earlier schema; all existing preservation assertions remain intact.
+
+All 112 Core tests, including seven new selection/migration/fault cases and the 10k/100k
+fixtures, pass. All 47 AppServices tests, 24 Web tests and strict complete Desktop build
+pass with zero compiler/analyzer warnings/errors. Native CI for this change is pending.
+Android Room remains 12. Current scan selection is a prerequisite for snapshot coverage
+export, which is not yet wired to publication or live generation activation.
