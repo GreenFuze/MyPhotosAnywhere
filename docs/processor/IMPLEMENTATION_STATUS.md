@@ -945,3 +945,31 @@ for the preceding initial-source-association revision `453f4ec` all passed; inte
 skipped same-repository pull-request duplicates are not counted as validation. Cloud
 enrollment, reviewed later source policies, publication snapshots and high-water/restore
 reconciliation remain prerequisites for the first shared catalog and completed release.
+
+## Signed source policy acceptance and initial signing
+
+Source configuration now has an exact signed-envelope journal and selected pointer under
+the independently pinned controller. Restart verifies retained bytes, signature, scope
+and sequence. Delayed records retain the selected newer configuration; same-sequence
+equivocation, revision rollback and conflicting same-revision updates are rejected.
+Publisher and source documents cannot reuse a controller sequence. A lost controller or
+damaged source pointer/hash is an explicit invariant failure, not fresh enrollment.
+
+Initial outgoing source signing reads the original approval and checks current settings
+under the serial state owner before reserving or replaying its signing intent. Changed
+sources cannot silently become the first approved policy. Account disconnect preserves
+the proof and exact sealed envelope; it does not grant Drive write access. Source-policy
+acceptance itself neither edits local source bindings nor uploads/activates a catalog.
+Later human-reviewed policy changes and cloud reconciliation remain separate work.
+
+All 177 Core, 86 AppServices and 25 Web tests pass, including eight new authority cases
+and two initial-signing cases. Strict Desktop Release compilation has zero warnings and
+errors. Low-storage admission, failed envelope/hash and failed selection-pointer writes
+preserve the prior selection and roll back partial history. The first focused test had
+an incorrect expectation for an unsupported capability; the corrected exact exception
+assertion preserves rejection. Two strict compiler/analyzer findings in new test code
+were fixed without suppressions. Processor schema remains 8 and Android Room 12.
+
+Before catalog publication, the coverage reader still needs explicit handling and
+regression coverage for intentional metadata-workspace exclusion receipts from the same
+WAL snapshot. No catalog publication or activation route is enabled by this increment.

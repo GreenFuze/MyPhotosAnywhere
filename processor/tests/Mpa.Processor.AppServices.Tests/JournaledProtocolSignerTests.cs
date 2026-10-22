@@ -10,7 +10,7 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.AppServices.Tests;
 
 [TestClass]
-public sealed class JournaledProtocolSignerTests
+public sealed partial class JournaledProtocolSignerTests
 {
     [TestMethod]
     public async Task ConcurrentRetriesRetainOneCounterAndExactlyTheFirstSealedEnvelope()
@@ -120,11 +120,11 @@ public sealed class JournaledProtocolSignerTests
             try { await fixture.Keys.InitializeAsync(CancellationToken.None).ConfigureAwait(false); if (bootstrap) await fixture.BootstrapAsync().ConfigureAwait(false); return fixture; }
             catch { await fixture.DisposeAsync().ConfigureAwait(false); throw; }
         }
-        public Task<LibraryControllerPin> BootstrapAsync() => State.ExecuteAsync(database =>
+        public Task<LibraryControllerPin> BootstrapAsync(LibraryBootstrapApproval? approval = null) => State.ExecuteAsync(database =>
         {
             var identity = Keys.PublicIdentity;
             return new LibraryAuthorityRepository(database, Budget).Bootstrap(identity.ControllerId, identity.ControllerEpoch, new("account", "metadata"), 1,
-                Convert.FromBase64String(identity.ControllerPublicKeySpki), new(identity.PublisherId, identity.PublisherEpoch, identity.PublisherPublicKeySpki, identity.PublisherKeyId));
+                Convert.FromBase64String(identity.ControllerPublicKeySpki), new(identity.PublisherId, identity.PublisherEpoch, identity.PublisherPublicKeySpki, identity.PublisherKeyId), approval);
         }, CancellationToken.None);
         public Task<ProtocolSigningIntent> SignAsync(Guid id) => Signer.SignControllerAsync(id, Kind, Body, CancellationToken.None);
         public Task<ProtocolSigningIntent?> ReadAsync(Guid id) => State.ExecuteAsync(database => new ProtocolSigningJournal(database, Budget).Read(id), CancellationToken.None);

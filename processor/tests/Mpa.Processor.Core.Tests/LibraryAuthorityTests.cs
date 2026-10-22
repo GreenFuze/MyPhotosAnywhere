@@ -122,7 +122,7 @@ public sealed partial class LibraryAuthorityTests
         public long Available { get; set; } = 20 * StorageBudgetManager.Gibibyte;
         public StorageSpaceSnapshot Read() => new(100 * StorageBudgetManager.Gibibyte, Available, 0);
     }
-    private sealed class Fixture : IDisposable
+    private sealed partial class Fixture : IDisposable
     {
         public static readonly CatalogWorkspace Workspace = new("account-A", "metadata-workspace");
         private readonly WorkerProcessTests.WorkerTestDirectory? _root;

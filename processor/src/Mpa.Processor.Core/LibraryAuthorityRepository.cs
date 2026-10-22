@@ -76,6 +76,7 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
         using var transaction = _database.Connection.BeginTransaction();
         var pin = ReadPin(transaction) ?? throw new InvalidOperationException("Independently enroll the controller before accepting Drive policies.");
         var policy = Reader(pin).ReadPublisherAuthorization(owned, Actor(pin)); var sequence = policy.Sequence.ToString(CultureInfo.InvariantCulture);
+        AssertControllerSequenceKind(transaction, policy.Sequence, source: false);
         var key = DocumentKey(policy.Sequence); var old = ReadMeta(transaction, key, ProtocolDocumentReader.MaximumDocumentBytes);
         var oldHash = ReadMeta(transaction, key + ":sha256", 64); var hash = Hash(owned);
         if ((old is null) != (oldHash is null)) throw new InvalidDataException("Controller document integrity record is incomplete.");
@@ -103,6 +104,7 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
 
     private CatalogPublisherAuthorization ReadPolicy(SqliteTransaction transaction, LibraryControllerPin pin, long sequence)
     {
+        AssertControllerSequenceKind(transaction, sequence, source: false);
         var key = DocumentKey(sequence); var text = ReadMeta(transaction, key, ProtocolDocumentReader.MaximumDocumentBytes);
         var hash = ReadMeta(transaction, key + ":sha256", 64);
         if (text is null || hash is null || hash != Hash(Encoding.UTF8.GetBytes(text))) throw new InvalidDataException("Selected publisher document is missing or corrupt.");
@@ -120,7 +122,7 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
         var text = ReadMeta(transaction, PinKey, 4096); var hash = ReadMeta(transaction, PinKey + ":sha256", 64);
         if (text is null && hash is null)
         {
-            if (ReadMeta(transaction, SelectedKey, 19) is not null || HasPublisherHistory(transaction) || HasBootstrapSources(transaction))
+            if (ReadMeta(transaction, SelectedKey, 19) is not null || HasPublisherHistory(transaction) || HasSourceHistory(transaction) || HasBootstrapSources(transaction))
                 throw new InvalidDataException("Accepted publisher state has lost its pinned controller; never bootstrap a replacement.");
             return null;
         }
@@ -159,8 +161,8 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
     }
     private bool HasPublisherHistory(SqliteTransaction? transaction)
     {
-        // Only publisher policies currently enter this journal. Extend its typed role
-        // inventory before admitting source/configuration/operation documents here.
+        // Publisher and source documents have separate selected pointers and share the
+        // enrolled controller's sequence namespace. Other roles require explicit admission.
         using var command = Command(transaction, "SELECT 1 FROM processor_meta WHERE key GLOB 'controller_document_v1:*' LIMIT 1");
         return command.ExecuteScalar() is not null;
     }

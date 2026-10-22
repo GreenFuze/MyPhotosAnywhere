@@ -17,17 +17,32 @@ public sealed class JournaledProtocolSigner(ProcessorStateCoordinator state, Lib
         CatalogPublicationReader.Capability, DriveCatalogFacts.Capability];
 
     public Task<ProtocolSigningIntent> SignControllerAsync(Guid id, string kind,
-        Func<LibrarySigningPublicIdentity, long, byte[]> body, CancellationToken cancellationToken) =>
-        SignAsync(id, kind, true, body, cancellationToken);
-
-    public Task<ProtocolSigningIntent> SignCatalogAsync(Guid id,
-        Func<LibrarySigningPublicIdentity, long, byte[]> body, CancellationToken cancellationToken) =>
-        SignAsync(id, "catalog-commit", false, body, cancellationToken);
-
-    private Task<ProtocolSigningIntent> SignAsync(Guid id, string kind, bool controller,
-        Func<LibrarySigningPublicIdentity, long, byte[]> body, CancellationToken token)
+        Func<LibrarySigningPublicIdentity, long, byte[]> body, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
+        return SignAsync(id, kind, true, (_, identity) => sequence => body(identity, sequence), cancellationToken);
+    }
+
+    public Task<ProtocolSigningIntent> SignCatalogAsync(Guid id,
+        Func<LibrarySigningPublicIdentity, long, byte[]> body, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        return SignAsync(id, "catalog-commit", false, (_, identity) => sequence => body(identity, sequence), cancellationToken);
+    }
+
+    /// <summary>Only the exact initial human-approved source association may become the
+    /// first outgoing source policy. Rechecks happen under the serial state owner before
+    /// reserving or replaying a sequence; later settings cannot silently replace consent.</summary>
+    public Task<ProtocolSigningIntent> SignInitialSourceConfigurationAsync(Guid id, CancellationToken cancellationToken) =>
+        SignAsync(id, "library-source-configuration", true, (database, identity) =>
+        {
+            var approved = new LibraryAuthorityRepository(database).AssertBootstrapSourcesCurrent();
+            return sequence => InitialSourceConfigurationDocument.Encode(identity, sequence, approved);
+        }, cancellationToken);
+
+    private Task<ProtocolSigningIntent> SignAsync(Guid id, string kind, bool controller,
+        Func<ProcessorStateDatabase, LibrarySigningPublicIdentity, Func<long, byte[]>> prepare, CancellationToken token)
+    {
         var identity = _keys.PublicIdentity; // A native vault write/read-back must already have completed.
         return _state.ExecuteAsync(database =>
         {
@@ -36,9 +51,9 @@ public sealed class JournaledProtocolSigner(ProcessorStateCoordinator state, Lib
             if (pin.LibraryId != identity.LibraryId || pin.ActorId != identity.ControllerId || pin.Epoch != identity.ControllerEpoch ||
                 pin.PublicKeySpki != identity.ControllerPublicKeySpki || pin.KeyId != identity.ControllerKeyId)
                 throw new InvalidDataException("The native signing owner does not match the pinned library controller.");
-            var journal = new ProtocolSigningJournal(database, _budget);
+            var body = prepare(database, identity); var journal = new ProtocolSigningJournal(database, _budget);
             var intent = journal.Reserve(id, controller ? identity.ControllerId : identity.PublisherId,
-                controller ? identity.ControllerEpoch : identity.PublisherEpoch, kind, sequence => body(identity, sequence));
+                controller ? identity.ControllerEpoch : identity.PublisherEpoch, kind, body);
             token.ThrowIfCancellationRequested();
             if (intent.Envelope is null)
             {
