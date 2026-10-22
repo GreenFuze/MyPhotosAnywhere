@@ -835,3 +835,19 @@ publisher policy (including pending revocations), verify dependencies/predecesso
 serialize catalog heads and join real Drive work. Existing schema-7 trust records with
 no signing history cannot silently acquire reset counters. No live setup or publisher
 route is enabled by this increment.
+
+The native signing boundary now combines the borrowed key owner and serial journal.
+It requires an already pinned matching controller, reserves before signing and verifies
+retained sealed replays against the actual native public identity. Concurrent requests
+for one intent retain its first envelope; cancellation after reservation leaves the
+same unsealed intent available for retry. Six integration tests exercise real P-256
+signatures with a synthetic vault, including uncertain seals and restart. All 68
+AppServices and 24 Web tests pass; strict Desktop Release compilation has zero warnings
+and errors. Scheduling, cloud reconciliation and independent setup approval remain
+separate responsibilities.
+
+Downloaded `d5114c3` artifacts independently verify 1,400 native tests (350 per desktop
+target), four clean Desktop build/audit reports and all 477 device tests with complete
+traced runtime capture and valid PNG evidence. Artifacts contain reports rather than
+release binaries; no independent binary-signature claim is made. Revision `0bcb814`
+also passed all four push workflows; independent artifact inspection remains pending.
