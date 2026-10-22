@@ -1243,3 +1243,34 @@ owner must reconcile ALL cloud history under the independently pinned current po
 retain failed-observation barriers, verify predecessor/dependencies and exclusively admit
 one head before live scheduling/publication. Empty/subset inventories cannot prove that
 work safe. No live publication route is enabled. Processor schema 8 and Room 12 remain.
+
+## Durable dependency outbox adapter
+
+CatalogGenerationWorkspaceSink now connects the bounded dependency builder to the
+existing immutable publication journal/uploader and joined account reader. It owns exact
+payload bytes before awaiting, reserves a deterministic generation/scope/role/content
+identity before Drive allocation, and reuses the retained payload/file identity after a
+lost completion reply or a new adapter instance. Dependency roles/MIME, canonical JSON,
+wire byte limits and complete captured scope are validated explicitly. This adapter
+cannot publish catalog commits/controller policies, mutate an original or activate a head.
+
+A stored upload receipt proves only an earlier write. Every reference returned by this
+adapter requires a fresh actual workspace read and byte/hash check, plus current authority
+and local access fences afterward. Missing/moved/changed remote objects remain errors;
+the adapter never silently recreates a receipt's missing object or returns an old receipt
+as current availability. Revocation during readback, late cancellation and changed caller
+buffers cannot produce an accepted dependency reference. Original bytes are untouched.
+
+All 125 AppServices tests pass, with seven new adapter cases covering durable pre-create
+ordering, exact lost-reply retry, readback on every reuse, deleted/altered remote state,
+revocation, role/generation isolation, payload ownership, held cancellation and wire bounds.
+The preceding full Core207/Web25 and strict Desktop Release checks pass; Desktop has zero
+warnings/errors. Test-only signed/catalog authority remains explicitly synthetic.
+
+No production authority is fabricated and no live route/scheduler is enabled. Full cloud
+reconciliation, failed-observation/history barriers, durable exclusive generation/head
+ownership, immutable pending-work reauthorization, predecessor validation and signed
+commit admission still precede live use. Reconnection must not remint or retarget captured
+work. The adapter does not claim those unfinished generation-owner responsibilities.
+Processor schema8 and Room12 remain unchanged. Local evidence: catalog-workspace-sink-*
+logs/TRX under preflight-060; these are development checks rather than final-release proof.
