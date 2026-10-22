@@ -669,3 +669,34 @@ visible across authorized applications, without granting file access. They are n
 trusted enrollment, identity or authorization evidence.
 These are synthetic HTTP tests; actual Drive publication, durable outbox/enrollment,
 generation activation and release acceptance remain pending.
+
+## Durable immutable-object publication and account integration
+
+Processor schema 7 adds a bounded metadata outbox, preserving the schema-6 state,
+installation/library identities, source bindings, journals and local originals. Android
+Room remains schema 12. Older migration fixtures explicitly remove the new table when
+constructing historical databases; their original data-preservation assertions remain.
+
+The journal captures library/actor/generation, account and credential revision, workspace,
+configuration revision, authority digest, role, MIME and owned payload bytes. A canonical
+context hash binds immutable fields to the payload hash. ID assignment precedes create
+and cannot replace another allocated ID, alias a different operation in the same account
+or retarget old work. Verification receipts match exact account/folder/file/hash/length.
+Pending enumeration returns bounded IDs; payloads are loaded one at a time. Storage
+reservations, SQLite failures and malformed records remain explicit, preserving retries.
+Completed rows remain retained; no garbage collection or original deletion is added.
+
+The uploader borrows the existing engine account lease, requires an explicit authority
+validator and rechecks current account/configuration before uploads and receipt admission.
+Lost replies retain allocated IDs. Concurrent callers re-read beneath that account lease
+and reuse completed work. Late cancellation, disconnect, revoked authority or unexpected
+transport bytes cannot confirm completion. Shutdown and credential cleanup join the
+actual response. A retained receipt records an earlier verified upload, not current
+remote availability or authority to activate a generation.
+
+These components do not yet enable a web route, publishing scheduler, enrollment or
+catalog-head activation. Authority is independently supplied by the future enrollment
+owner; neither the journal nor Drive discovery properties create trust. Local checks
+pass 141 Core, 53 AppServices and 24 Web tests, with zero Desktop Release warnings/errors.
+The final receipt-fence review additionally passes all eight focused journal tests and
+all 53 AppServices tests. Immutable cross-platform validation remains required.

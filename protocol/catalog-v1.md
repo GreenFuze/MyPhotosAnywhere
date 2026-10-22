@@ -447,3 +447,21 @@ applications, rather than app-private `appProperties`. This does not change file
 These hints and names are untrusted: actual workspace membership, enrolled signatures
 and captured content references remain the admission authorities. See Google's
 [custom property visibility](https://developers.google.com/workspace/drive/api/guides/properties).
+
+### Durable publication owner integration
+
+Before allocating an object ID, the local journal persists exact bytes, role/type, their
+digest and captured library/publisher/generation/account/workspace/configuration authority.
+It binds those immutable fields with a canonical context digest. Before create, it
+persists the allocated ID; retry cannot mint a replacement or retarget a captured job.
+Account/configuration revisions fence uploads and receipt admission. A reconnect does
+not silently transfer old work to another credential revision. A future generation owner
+must explicitly reconcile such work without replacing its captured object identity.
+
+The account adapter requires an independently supplied publisher-authority validator,
+borrows the existing serialized Google connection and revalidates before create and after
+the exact stored-object checks. Its bounded local receipt does not activate a generation.
+Lost replies, late cancellation, revoked authority, corruption and disposal leave the
+operation available for explicit recovery. Two concurrent callers re-read the journal
+under the same account lease so completed work is not uploaded twice. No live scheduling
+or enrollment is inferred from these transport/journal primitives.

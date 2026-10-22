@@ -63,7 +63,7 @@ public sealed class ProcessorStateDatabase : IDisposable
                 var objects = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
                 if (application != ApplicationId && !(application == 0 && version == 0 && objects == 0))
                     throw new InvalidDataException("Unknown database identity; preserve it and choose an empty Processor state directory.");
-                if (version is not (0 or 1 or 2 or 3 or 4 or 5 or 6)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
+                if (version is not (0 or 1 or 2 or 3 or 4 or 5 or 6 or 7)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
                 command.CommandText = "PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;";
                 command.ExecuteNonQuery();
                 command.CommandText = "PRAGMA journal_mode=WAL";
@@ -201,6 +201,26 @@ public sealed class ProcessorStateDatabase : IDisposable
                         PRAGMA user_version=6;
                         """;
                     command.ExecuteNonQuery(); transaction.Commit();
+                }
+            }
+            using (var migration = connection.CreateCommand())
+            {
+                migration.CommandText = "PRAGMA user_version";
+                if (Convert.ToInt32(migration.ExecuteScalar(), CultureInfo.InvariantCulture) < 7)
+                {
+                    using var transaction = connection.BeginTransaction(); migration.Transaction = transaction;
+                    migration.CommandText = """
+                        CREATE TABLE workspace_publication(
+                          id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES drive_account(permission_id),
+                          scope TEXT NOT NULL CHECK(length(scope) BETWEEN 1 AND 4096), context_hash TEXT NOT NULL, role TEXT NOT NULL, mime_type TEXT NOT NULL,
+                          payload BLOB NOT NULL CHECK(length(payload) BETWEEN 1 AND 4194304), payload_hash TEXT NOT NULL,
+                          file_id TEXT, verified_version INTEGER CHECK(verified_version>0),
+                          CHECK(verified_version IS NULL OR file_id IS NOT NULL), UNIQUE(account_id,file_id)
+                        ) STRICT;
+                        CREATE INDEX pending_workspace_publication ON workspace_publication(verified_version,id);
+                        PRAGMA user_version=7;
+                        """;
+                    migration.ExecuteNonQuery(); transaction.Commit();
                 }
             }
             _instanceLease = lease;

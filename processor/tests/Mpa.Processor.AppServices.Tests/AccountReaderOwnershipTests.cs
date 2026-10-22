@@ -119,6 +119,8 @@ public sealed partial class AccountServiceTests
         public Func<string, string?, string?, CancellationToken, Task<DriveSourcePage>>? SourceRead { get; set; }
         public Func<string, string?, string, CancellationToken, Task<DriveSourceItem>>? RepairRead { get; set; }
         public Func<string, string, long, string, CancellationToken, Task<DriveWorkspaceObject>>? WorkspaceRead { get; set; }
+        public Func<CancellationToken, Task<string>>? WorkspaceAllocate { get; set; }
+        public Func<string, string, string, ReadOnlyMemory<byte>, string, CancellationToken, Task<DriveWorkspaceObject>>? WorkspaceCreate { get; set; }
         public int DisposalAttempts { get; private set; }
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Canceled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -129,7 +131,7 @@ public sealed partial class AccountServiceTests
         {
             Assert.AreEqual("permission-A", permissionId); Opened.Add(connectionId); return new Connection(this);
         }
-        private sealed class Connection(LibraryFactory owner) : IGoogleLibraryConnection
+        private sealed class Connection(LibraryFactory owner) : IGoogleLibraryConnection, IGoogleWorkspacePublication
         {
             public async Task<DriveMediaPage> ReadMediaPageAsync(string? pageToken, CancellationToken cancellationToken)
             {
@@ -148,6 +150,8 @@ public sealed partial class AccountServiceTests
             public Task<DriveSourcePage> ReadSourcePageAsync(string parentId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken) => owner.SourceRead?.Invoke(parentId, sharedDriveId, pageToken, cancellationToken) ?? throw new InvalidOperationException("Unexpected source request.");
             public Task<DriveSourceItem> ReadSourceItemAsync(string parentId, string? sharedDriveId, string fileId, CancellationToken cancellationToken) => owner.RepairRead?.Invoke(parentId, sharedDriveId, fileId, cancellationToken) ?? throw new InvalidOperationException("Unexpected source repair request.");
             public Task<DriveWorkspaceObject> ReadWorkspaceObjectAsync(string folderId, string fileId, long expectedBytes, string expectedSha256, CancellationToken cancellationToken) => owner.WorkspaceRead?.Invoke(folderId, fileId, expectedBytes, expectedSha256, cancellationToken) ?? throw new InvalidOperationException("Unexpected metadata workspace read.");
+            public Task<string> AllocateWorkspaceObjectIdAsync(CancellationToken cancellationToken) => owner.WorkspaceAllocate?.Invoke(cancellationToken) ?? throw new InvalidOperationException("Unexpected metadata workspace allocation.");
+            public Task<DriveWorkspaceObject> CreateWorkspaceObjectAsync(string folderId, string allocatedId, string mimeType, ReadOnlyMemory<byte> bytes, string sha256, CancellationToken cancellationToken) => owner.WorkspaceCreate?.Invoke(folderId, allocatedId, mimeType, bytes, sha256, cancellationToken) ?? throw new InvalidOperationException("Unexpected metadata workspace creation.");
             public async ValueTask DisposeAsync()
             {
                 owner.DisposalAttempts++; owner.DisposalStarted.TrySetResult();
