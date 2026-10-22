@@ -20,6 +20,39 @@ data class CatalogIndexNode(val prefix: String, val children: List<CatalogIndexC
 /** Schemas only: verify signature/approved actor first. Drive membership, reference hashes,
  * ancestry and complete-tree validation remain mandatory before activating any generation. */
 class CatalogPublicationReader(private val workspace: CatalogWorkspace) {
+    fun readSourceConfiguration(verified: VerifiedProtocolDocument, expectedLibrary: UUID): CatalogSourceConfiguration {
+        require(expectedLibrary != UUID(0, 0))
+        if (verified.libraryId != expectedLibrary || verified.kind != "library-source-configuration" ||
+            CatalogSourceConfiguration.CAPABILITY !in verified.requiredCapabilities)
+            throw ProcessorProtocolException("An enrolled controller's verified source configuration is required.")
+        val root = canonical(verified.canonicalPayload.toByteArray(Charsets.UTF_8))
+        val selected = property(root, "workspace")
+        if (text(selected, "accountId") != workspace.accountId || text(selected, "folderId") != workspace.folderId)
+            throw ProcessorProtocolException("Source configuration cannot select another metadata workspace.")
+        val accountRows = property(root, "accounts")
+        if (!accountRows.isJsonArray || accountRows.asJsonArray.size() !in 1..128)
+            throw ProcessorProtocolException("Source configuration exceeds its account bound.")
+        val accounts = mutableListOf<String>(); var priorAccount: String? = null
+        for (row in accountRows.asJsonArray) {
+            if (!row.isJsonPrimitive || !row.asJsonPrimitive.isString) throw ProcessorProtocolException("An approved account must be an opaque identity.")
+            val account = row.asString; checkOpaque(account)
+            if (priorAccount != null && priorAccount >= account) throw ProcessorProtocolException("Approved accounts must be unique and ordinally ordered.")
+            accounts.add(account); priorAccount = account
+        }
+        if (workspace.accountId !in accounts) throw ProcessorProtocolException("The selected workspace account requires explicit association.")
+        val rows = property(root, "sources")
+        if (!rows.isJsonArray || rows.asJsonArray.size() > 256) throw ProcessorProtocolException("Source configuration exceeds its source bound.")
+        val sources = mutableListOf<CatalogApprovedSource>(); val bindings = mutableSetOf<Pair<String, String>>(); var previous: String? = null
+        for (row in rows.asJsonArray) {
+            val id = uuid(row, "id"); val account = text(row, "accountId"); val folder = text(row, "folderId"); checkOpaque(account); checkOpaque(folder)
+            if (account !in accounts || folder == "root" || !bindings.add(account to folder) || previous != null && previous >= id.toString())
+                throw ProcessorProtocolException("Approved sources require ordered identities, associated accounts and unique canonical folder bindings.")
+            sources.add(CatalogApprovedSource(id, account, folder, decimal(row, "revision"), coverageFlag(row, "includeDescendants"), coverageFlag(row, "enabled")))
+            previous = id.toString()
+        }
+        return CatalogSourceConfiguration(expectedLibrary, decimal(root, "configurationRevision"), workspace, accounts, sources)
+    }
+
     fun readCommit(verified: VerifiedProtocolDocument): CatalogCommit {
         if (verified.kind != "catalog-commit" || CAPABILITY !in verified.requiredCapabilities)
             throw ProcessorProtocolException("A verified catalog commit with its required capability is required.")

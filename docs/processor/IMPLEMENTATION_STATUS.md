@@ -613,3 +613,24 @@ markers fail. Nine verifier tests pass. The test APK builds, zero-findings lint 
 and independent aapt2 inspection confirms the actual runner/target package. Native traced
 execution and allocation ownership conclusions remain pending. Explicit legacy inspection
 mode applies only to archived pre-runner evidence; the CI entry point always requires tracing.
+
+## Enrolled source-policy comparison (2026-10-22)
+
+Matching C#/Kotlin `CatalogSourceConfiguration` readers accept only the selected library,
+workspace and verified enrolled-controller document kind/capability. Bounded immutable
+account/source lists require explicit account association and unique canonical bindings.
+The coverage-admission callback can now compare every captured source against those exact
+approved identities, revisions and enabled/recursion flags. Self-consistent coverage cannot
+add, retarget or enable a source. Connectivity/credential revisions remain observed state;
+this source policy does not grant recognition consent or original-mutation authority.
+Actual enrollment, durable authoritative configuration selection, operation admission and
+activation remain separate integration work. The independent fixture contains 30 rejected
+documents, nine coverage-policy conflicts and empty/maximum sets; tests also verify an
+enrolled signature and the actual combined traversal callback. All 58 C# Protocol tests,
+548 Android unit tests and zero-findings lint pass locally. Release-mode Desktop compilation
+also reports zero warnings/errors.
+
+The complete `a7862d0` trusted push matrix passed. Independent native/Desktop reports verify
+1,184 tests (296 per target), clean complete logs and agreeing reported web inventories.
+Application binary hashes remain outside those report artifacts. Its device job passed
+API 29/35/37; independent artifact/runtime verification and its warning review are pending.

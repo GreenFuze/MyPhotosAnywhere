@@ -379,3 +379,38 @@ catalog and 22 invalid graphs. Matching consumers cover corrupted/missing metada
 revision changes, page/index/chunk/predecessor aliases, source/account/revision/depth
 conflicts, whole-graph budgets, late failures, configuration rejection, cancellation and
 abandoned enumeration.
+
+## Enrolled source configuration
+
+A controller's signed `library-source-configuration` document requires capability
+`library.sources.v1`. Signature verification must use a previously enrolled actor allowed
+to publish that kind. Decoding a self-supplied key/document never enrolls a controller.
+The generation owner selects the authoritative configuration revision before admitting
+coverage; a newly received larger revision is not automatically trusted or applied.
+
+The payload contains positive decimal-string `configurationRevision`, a `workspace`
+with `accountId`/`folderId` matching the independently selected workspace, `accounts`
+and `sources`. Accounts are 1–128 unique ordinally ordered opaque permission IDs and
+include the workspace account. Sources are 0–256 records ordered by canonical UUID,
+with `id`, associated `accountId`, canonical `folderId`, positive decimal-string
+`revision`, and boolean `includeDescendants`/`enabled`. Account/folder bindings are
+unique; the synthetic `root` alias and paths/URLs are forbidden. Disabled policies can
+remain present without erasing their identities or human annotations. These documents
+retain the signed-envelope/canonical byte limits.
+
+`CatalogSourceConfiguration.ValidateCoverage` / `validateCoverage` compares the
+complete captured coverage set to those exact library/configuration/source identities,
+bindings, source revisions and flags. Missing, extra, retargeted or newly enabled
+sources fail, including when the received coverage graph is otherwise internally
+consistent. Credential revision, connectivity and scan progress remain observed state;
+reconnection cannot grant permission for a different source. Partial, offline and
+disconnected observations can therefore pass policy comparison while still honestly
+reporting their operational gaps.
+
+This is source association/scope approval, not recognition consent, processing settings,
+original mutation permission, actor enrollment, operation admission or generation
+activation. Those owners still apply their separate revision/authority/consent checks.
+The immutable ordered policy lists can be used by the required covered-traversal
+admission callback. The independent shared configuration fixture covers empty and
+maximum source/account sets, 30 malformed/unscoped documents and nine coverage-policy
+conflicts, plus matching signature and combined-traversal checks in both consumers.
