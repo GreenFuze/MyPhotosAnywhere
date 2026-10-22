@@ -762,3 +762,28 @@ The signed-file revision's first macOS ARM build failed because npm's fallback a
 endpoint returned HTTP 400. The unchanged lockfile independently audited with zero
 vulnerabilities, and the failed/canceled jobs passed on one retry at the same application
 revision. Original failure evidence is retained; no audit check or dependency was changed.
+
+## Native library signing-key ownership
+
+A dedicated owner now keeps separate controller and publisher P-256 keys and actor IDs
+in the existing native credential vault. Public IDs/SPKI/key fingerprints are exported;
+private material uses a bounded binary record, with transient PKCS8/vault buffers zeroed
+after use. New keys become available only after the real vault write and exact read-back
+complete. Existing records retain actors and epochs across restart. Missing pinned keys,
+wrong pins, malformed records or another library/installation fail without replacing or
+deleting saved keys. Role checks bind signatures to the owner's library/actor/epoch;
+publisher keys cannot sign controller or user-operation documents.
+
+Initialization, cancellation and Exit join the actual vault operation, including a store
+that ignores cancellation. A failure after persistence is treated as uncertain; restart
+reads the saved identity rather than minting a replacement. Nine new tests include
+blocked cancellation delivery, unavailable read-back, missing pinned keys, uncertain
+writes, role isolation and secret-buffer cleanup. All 62 AppServices and 24 Web tests
+pass; strict Desktop Release compilation has zero warnings/errors. The vault exchanges
+in these tests are synthetic; actual setup/native-store and cross-platform acceptance
+remain required. No production bootstrap route or publisher scheduler is enabled.
+
+The setup owner must independently approve/pin the public controller and bind the chosen
+publisher policy. Signing callers still must reserve durable sequences, reconcile cloud
+history after restore and journal exact signed envelopes before publication; this private
+key owner does not authorize a counter reset or activation of a generation.
