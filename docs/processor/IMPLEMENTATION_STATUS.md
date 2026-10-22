@@ -1274,3 +1274,38 @@ commit admission still precede live use. Reconnection must not remint or retarge
 work. The adapter does not claim those unfinished generation-owner responsibilities.
 Processor schema8 and Room12 remain unchanged. Local evidence: catalog-workspace-sink-*
 logs/TRX under preflight-060; these are development checks rather than final-release proof.
+
+## Canonical outgoing catalog commit bodies
+
+CatalogPublicationWriter now serializes a bounded canonical commit payload and validates
+it against the same existing typed field/role/history rules, without constructing an
+unverified object disguised as VerifiedProtocolDocument. Signed incoming admission still
+requires its original kind/capability checks. Existing malformed golden assertions remain
+unchanged. The outgoing writer additionally rejects the Drive root alias as an object.
+
+CatalogCommitDocumentWriter captures an immutable plan for the journaled signer's bounded
+body factory. It checks publisher/library/epoch, exact approved source policy digest and
+revision, workspace, prepared dependencies, genesis/parent shape and minimum history.
+Canonical body creation precedes reservation; the existing journal reserves the exact
+sequence/body before native signing and replays the sealed envelope exactly. A changed
+plan cannot reuse the same intent, and invalid context/parent shape cannot burn a counter.
+This is serialization, not current authority, remote ancestry or head activation proof.
+
+Full local strict regression passes 69 Protocol, 207 Core, 127 AppServices and 25 Web tests.
+Four new methods cover golden byte equivalence, malformed/reference/history cases, actual
+journal/native signing and exact replay, scope/configuration mismatch and unburned failed
+reservations. The first CA1822 finding was resolved by capturing the plan in an OOD owner;
+no suppression/check removal was used. Desktop Release has zero warnings/errors. Evidence
+is catalog-commit-writer-*.log/TRX in preflight-060. Processor schema8/Room12 are unchanged.
+
+Pushed 3d72d3a completed Desktop39836408286, Android39836408404, Protocol39836408231 and
+Device39836408179 workflows successfully; all three device APIs passed. The Intel native
+job row remained stale/in_progress after every step including Complete job succeeded;
+its downloaded six reports independently verify all465 tests and both shutdown regressions,
+with no log diagnostics. This resolves the actual earlier f2e4444 cancellation-admission
+regression without waiving it. The reports do not constitute final0.6 binary acceptance.
+
+Live publication, controller policy delivery, exclusive generation/head ownership,
+cloud reconciliation/history/observation persistence and pending-work reauthorization are
+still required before wiring these components into production scheduling or activation.
+No production permission is inferred from a constructed payload or a stored upload receipt.

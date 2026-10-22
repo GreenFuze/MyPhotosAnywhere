@@ -35,17 +35,22 @@ public sealed partial class CatalogPublicationReader(CatalogWorkspace workspace)
         ArgumentNullException.ThrowIfNull(verified);
         if (verified.Kind != "catalog-commit" || !verified.RequiredCapabilities.Contains(Capability, StringComparer.Ordinal))
             throw new ProtocolFormatException("A verified catalog commit with its required capability is required.");
-        using var document = Canonical(Encoding.UTF8.GetBytes(verified.CanonicalPayload));
+        return ValidateCommitPayload(Encoding.UTF8.GetBytes(verified.CanonicalPayload), verified.Sequence);
+    }
+
+    internal CatalogCommit ValidateCommitPayload(ReadOnlySpan<byte> canonicalPayload, long sequence)
+    {
+        using var document = Canonical(canonicalPayload);
         var root = document.RootElement;
         var generation = Uuid(root, "generationId");
         var parentValue = Property(root, "parent");
         var parent = parentValue.ValueKind == JsonValueKind.Null ? null : Reference(parentValue, MaximumIndexBytes);
-        if ((verified.Sequence == 1) != (parent is null)) throw new ProtocolFormatException("Only the first stream commit may omit its predecessor.");
+        if ((sequence == 1) != (parent is null)) throw new ProtocolFormatException("Only the first stream commit may omit its predecessor.");
         var index = Reference(Property(root, "rootIndex"), MaximumIndexBytes);
         var coverage = Reference(Property(root, "sourceCoverage"), MaximumIndexBytes);
         var settings = Decimal(root, "settingsRevision", allowZero: true);
         var minimum = Decimal(root, "minimumHistoryGeneration");
-        if (minimum > verified.Sequence) throw new ProtocolFormatException("Required history cannot exceed the current stream sequence.");
+        if (minimum > sequence) throw new ProtocolFormatException("Required history cannot exceed the current stream sequence.");
         var ids = new HashSet<string>(StringComparer.Ordinal) { index.FileId, coverage.FileId };
         if (ids.Count != 2 || parent is not null && !ids.Add(parent.FileId))
             throw new ProtocolFormatException("Distinct catalog document roles cannot alias the same Drive object.");

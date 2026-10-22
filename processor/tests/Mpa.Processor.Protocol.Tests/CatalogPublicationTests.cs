@@ -6,7 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Mpa.Processor.Protocol.Tests;
 
 [TestClass]
-public sealed class CatalogPublicationTests
+public sealed partial class CatalogPublicationTests
 {
     private static readonly CatalogWorkspace Workspace = new("test-account", "test-workspace");
     private static JsonDocument Fixture() => JsonDocument.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "catalog-publication.json")));
