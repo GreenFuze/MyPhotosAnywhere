@@ -58,7 +58,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
     implementation("com.google.android.gms:play-services-auth:22.0.0")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
-    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
     implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("com.google.code.gson:gson:2.14.0")
     implementation("com.google.mlkit:face-detection:16.1.7")
@@ -73,7 +73,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
-    testImplementation("com.squareup.okhttp3:mockwebserver:5.5.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.5.1")
     testImplementation("org.robolectric:robolectric:4.17")
 }
 

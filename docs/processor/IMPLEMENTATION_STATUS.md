@@ -514,3 +514,19 @@ fixtures, pass. All 47 AppServices tests, 24 Web tests and strict complete Deskt
 pass with zero compiler/analyzer warnings/errors. Native CI for this change is pending.
 Android Room remains 12. Current scan selection is a prerequisite for snapshot coverage
 export, which is not yet wired to publication or live generation activation.
+
+## October 22 dependency and registry diagnostics
+
+CI for `8194f0c` discovered newly published stable OkHttp/MockWebServer 5.5.1 after local
+lint had passed against earlier repository metadata. Both exact pins are updated together.
+The upstream tag and changelog identify a certificate-blocklist fix. A full fresh-dependency
+Android invocation passes all 537 unit tests and zero-findings lint; the unchanged AGP
+exception is the only accepted diagnostic. Immutable revalidation of this pin is pending.
+
+The same revision's Intel macOS frontend audit failed at npm's retiring Quick Audit
+endpoint; no clean audit result was assumed. An independent fresh audit of the unchanged
+lockfile returned zero vulnerabilities. Retrying the failed CI job then produced a clean
+four-target Desktop run. The original failure remains recorded; its preceding bulk-request
+failure cause is not independently established. Audit severity, dependencies and checks
+were not relaxed. Protocol contracts passed all four targets on `8194f0c`; the device run
+is still in progress at this update.
