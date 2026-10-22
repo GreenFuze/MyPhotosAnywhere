@@ -1034,3 +1034,34 @@ process measurements remain part of final acceptance. Processor schema 8 and Roo
 unchanged. All three preceding `5c7c13e` device jobs report success; GitHub's run-level
 status was still stale/in-progress at the last observation and is not counted as a
 completed passing workflow.
+
+## Bounded dependency preparation
+
+The frozen catalog now supplies indexed scalar partition bounds before materializing a
+candidate chunk. The partitioner emits at most 1,000 records per chunk, applies the
+consumer's 16 MiB expanded/4 MiB compressed limits and splits dense partitions through
+the existing four byte-prefix levels. A capped pooled compression buffer includes gzip
+framing in the bound. Exhausted depth or object budget fails without truncating photos.
+
+Canonical index and coverage writers feed a generation dependency builder. It compares
+every captured source binding and revision with the accepted signed configuration before
+any sink call, validates coverage pages against their captured root, independently
+decodes generated compressed facts and checks each source membership. Nested indexes
+reference exact captured metadata objects; scope, digest/size, payload mutation, duplicate
+role IDs and predecessor aliasing are rejected. Cancellation joins actual sink work.
+
+The builder returns dependency references only. It creates no signed commit, library
+discovery pointer or active generation. Its production sink still must persist exact
+outbox scope/bytes and verify actual Drive ownership under current authority. High-water,
+restore, current revocation/source policy and predecessor admission remain mandatory
+before enabling live publication or phone activation.
+
+All 104 AppServices and 25 Web tests pass, plus strict Desktop Release compilation with
+zero warnings/errors. Fourteen new cases cover count/compression splits, exact decoder
+round trips, empty roots, exhausted capacity/cancellation, reference rejection and full
+nested graphs. The complete traversal case uses 1,001 photos forced into one initial
+partition and 18 sources across two coverage pages. An isolated signed traversal fixture
+does not assert production publisher authorization. Initial fixture capability ordering
+and strict analyzer findings were fixed without weakening checks. Core's preceding full
+197-test run passed; the new scalar partition query is exercised by these service cases.
+Immutable validation for the complete increment is pending; schemas remain unchanged.

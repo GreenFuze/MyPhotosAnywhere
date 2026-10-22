@@ -9,6 +9,8 @@ public sealed class FrozenCatalogCaptureException(Exception cause, FrozenCatalog
     : Exception("Catalog capture failed and private cleanup is unconfirmed; ownership is retained.", cause)
 { public FrozenCatalogSnapshot RetainedOwner { get; } = retainedOwner; }
 
+public sealed record FrozenCatalogPartitionSize(long Count, long EncodedUpperBound);
+
 /// <summary>Disposable private metadata copy. Capture takes ownership of the live WAL
 /// reader and releases it before returning, including on failure/cancellation. Later
 /// hashing, compression and Drive uploads read only this bounded-cache SQLite copy.
@@ -122,6 +124,23 @@ public sealed class FrozenCatalogSnapshot : IDisposable
     }
 
     private static string Hash(ReadOnlySpan<byte> bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
+
+    /// <summary>Indexed bounded scalar admission before materializing a candidate chunk.
+    /// Per-row wrappers conservatively overestimate the combined canonical facts object.</summary>
+    public FrozenCatalogPartitionSize PartitionSize(string prefix, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_closed, this);
+        if (prefix is null || prefix.Length is < 2 or > 8 || prefix.Length % 2 != 0 || prefix.Any(value => value is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+            throw new ArgumentException("A complete byte prefix is required.", nameof(prefix));
+        cancellationToken.ThrowIfCancellationRequested(); using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT count(*),coalesce(sum(length(payload)),0) FROM fact WHERE id >= $prefix AND id < $end";
+        command.Parameters.AddWithValue("$prefix", prefix); command.Parameters.AddWithValue("$end", prefix + "g");
+        using var reader = command.ExecuteReader(); if (!reader.Read()) throw new InvalidDataException("Captured partition size is missing.");
+        var count = reader.GetInt64(0); var bytes = reader.GetInt64(1);
+        if (count < 0 || bytes < 0 || count > Count) throw new InvalidDataException("Captured partition size is invalid.");
+        cancellationToken.ThrowIfCancellationRequested(); return new(count, checked(bytes + 8));
+    }
+
     public void Dispose()
     {
         if (_closed) return; _connection?.Dispose(); _connection = null;
