@@ -647,3 +647,25 @@ an intentionally unconfigured profile returns the expected unavailable status/ex
 without starting a listener. Both helpers propagate an injected npm failure as exit 23
 and skip launching, including when the scripts' own path contains spaces. This validates
 development helpers, not GUI/install acceptance. Batch line endings are explicit in Git.
+
+## Immutable workspace-creation transport
+
+The existing Google account owner now implements a separate publication interface with
+single-ID allocation and bounded create-only metadata upload. It does not extend the
+read-only connection interface or construct a second credential owner. The caller must
+authorize and journal the chosen workspace/ID/payload before creation; retries never
+allocate a replacement or update a conflicting existing file. Exact downloaded hash,
+length, actual parent/type, before/after object revision and final workspace checks are
+required after both success and conflict. Caller memory is copied before asynchronous
+work. Cancellation/disposal joins the actual response. There is no original-upload,
+update or delete entry point here, and no live publishing scheduler was enabled.
+
+All 40 Google Drive tests pass locally, retaining the preceding 31 tests plus nine
+publication tests for allocation, captured bytes, conflict, uncertain replies, scope/type/
+hash failures, permissions, canceled/bad inputs, malformed IDs and actual response joins.
+All 47 AppServices and 24 Web regressions pass; the strict Desktop Release build has
+zero warnings and errors. Non-secret role/digest discovery hints use Drive properties
+visible across authorized applications, without granting file access. They are not
+trusted enrollment, identity or authorization evidence.
+These are synthetic HTTP tests; actual Drive publication, durable outbox/enrollment,
+generation activation and release acceptance remain pending.

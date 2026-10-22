@@ -28,16 +28,23 @@ public sealed partial class GoogleAccountConnection
         return ExecuteAsync(async token =>
         {
             var credential = await MediaCredentialAsync(token).ConfigureAwait(false);
-            var before = await ReadWorkspaceMetadataAsync(credential, folderId, fileId, expectedBytes, token).ConfigureAwait(false);
-            var bytes = await MediaGetAsync(credential, new("https://www.googleapis.com/drive/v3/files/" + Uri.EscapeDataString(fileId) +
-                "?supportsAllDrives=true&alt=media"), (int)expectedBytes, token).ConfigureAwait(false);
-            if (bytes.LongLength != expectedBytes || !CryptographicOperations.FixedTimeEquals(SHA256.HashData(bytes), Convert.FromHexString(expectedSha256)))
-                throw new InvalidDataException("Metadata workspace object is truncated or does not match its immutable SHA-256 reference.");
-            var after = await ReadWorkspaceMetadataAsync(credential, folderId, fileId, expectedBytes, token).ConfigureAwait(false);
-            if (before != after) throw new DriveWorkspaceObjectChangedException();
-            token.ThrowIfCancellationRequested();
-            return new DriveWorkspaceObject(account, fileId, folderId, after.Version, bytes);
+            return await ReadWorkspaceObjectCoreAsync(credential, account, folderId, fileId, expectedBytes, expectedSha256, token).ConfigureAwait(false);
         }, cancellationToken);
+    }
+
+    private async Task<DriveWorkspaceObject> ReadWorkspaceObjectCoreAsync(UserCredential credential, string account, string folderId,
+        string fileId, long expectedBytes, string expectedSha256, CancellationToken token, string? expectedMimeType = null)
+    {
+        var before = await ReadWorkspaceMetadataAsync(credential, folderId, fileId, expectedBytes, token).ConfigureAwait(false);
+        if (expectedMimeType is not null && before.MimeType != expectedMimeType) throw new DriveWorkspaceObjectChangedException();
+        var bytes = await MediaGetAsync(credential, new("https://www.googleapis.com/drive/v3/files/" + Uri.EscapeDataString(fileId) +
+            "?supportsAllDrives=true&alt=media"), (int)expectedBytes, token).ConfigureAwait(false);
+        if (bytes.LongLength != expectedBytes || !CryptographicOperations.FixedTimeEquals(SHA256.HashData(bytes), Convert.FromHexString(expectedSha256)))
+            throw new InvalidDataException("Metadata workspace object is truncated or does not match its immutable SHA-256 reference.");
+        var after = await ReadWorkspaceMetadataAsync(credential, folderId, fileId, expectedBytes, token).ConfigureAwait(false);
+        if (before != after) throw new DriveWorkspaceObjectChangedException();
+        token.ThrowIfCancellationRequested();
+        return new DriveWorkspaceObject(account, fileId, folderId, after.Version, bytes);
     }
 
     private async Task<WorkspaceMetadata> ReadWorkspaceMetadataAsync(UserCredential credential, string folderId, string fileId, long expectedBytes, CancellationToken token)

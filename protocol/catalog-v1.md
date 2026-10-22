@@ -414,3 +414,36 @@ The immutable ordered policy lists can be used by the required covered-traversal
 admission callback. The independent shared configuration fixture covers empty and
 maximum source/account sets, 30 malformed/unscoped documents and nine coverage-policy
 conflicts, plus matching signature and combined-traversal checks in both consumers.
+
+## Captured workspace-object creation transport
+
+The native account connection exposes a separate metadata-publication interface; its
+existing read-only interface remains unchanged. The publication owner must authorize
+the workspace and durably record its account/folder, allocated object ID, exact payload
+length/SHA and generation scope before creation. ID allocation is a separate operation.
+Google supports [pre-generated IDs](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/generateIds)
+and documents that retrying a successful upload at the same ID returns conflict rather
+than creating a duplicate. See [upload recovery](https://developers.google.com/workspace/drive/api/guides/manage-uploads#use_a_pre-generated_id_to_upload_files).
+
+`CreateWorkspaceObjectAsync` owns a bounded synchronous copy of its supplied bytes,
+verifies its captured SHA, checks the actual folder/write capability and only creates
+new JSON/gzip/binary metadata objects, at most 4 MiB. It never allocates another ID during
+create and has no update/delete/original-upload operation. A success or conflict is not
+storage proof: the transport independently re-reads the captured object's actual parent,
+type, size and revision, downloads/verifies its exact bytes/hash, checks the object again
+and rechecks the workspace. Wrong types, movement, restricted access, corruption,
+cancellation and uncertain replies remain explicit failures. Resumption retains the
+original allocated ID; it cannot overwrite a conflicting file.
+
+The operation borrows the existing serialized credential/HTTP owner and joins the real
+response before cancellation/disposal releases it. The metadata name is derived from
+the payload digest; lookup/identity uses Drive IDs. This transport primitive does not
+enroll an actor, authorize a workspace, journal a generation, activate it or publish a
+head. Those responsibilities remain with the durable publication owner. Its fixture
+tests are synthetic HTTP exchanges; they are not evidence of a live production write.
+
+Non-secret role/digest discovery hints use Drive `properties`, visible across authorized
+applications, rather than app-private `appProperties`. This does not change file sharing.
+These hints and names are untrusted: actual workspace membership, enrolled signatures
+and captured content references remain the admission authorities. See Google's
+[custom property visibility](https://developers.google.com/workspace/drive/api/guides/properties).
