@@ -53,13 +53,15 @@ public sealed partial class CatalogGenerationCaptureServiceTests
     }
 
     [TestMethod]
-    public async Task ExitCancelsAndJoinsConsumerBeforeRetainedReaderAndStateRelease()
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task ExitCancelsAndJoinsConsumerBeforeRetainedReaderAndStateRelease(bool consumerChecksCancellation)
     {
         await using var fixture = new Fixture(); await using var owner = fixture.Owner();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); Task? stopping = null;
         var running = fixture.Run(owner, async (_, snapshot, token) =>
-        { entered.TrySetResult(); await release.Task.ConfigureAwait(false); Assert.AreEqual(1L, snapshot.Count); token.ThrowIfCancellationRequested(); return true; });
+        { entered.TrySetResult(); await release.Task.ConfigureAwait(false); Assert.AreEqual(1L, snapshot.Count); if (consumerChecksCancellation) token.ThrowIfCancellationRequested(); return true; });
         try
         {
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false); stopping = owner.DisposeAsync().AsTask();

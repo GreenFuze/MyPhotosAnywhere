@@ -61,17 +61,27 @@ public sealed class CatalogPreparationService(ProcessorStateCoordinator state, s
                     throw;
                 }
                 Close(live); T result;
-                try { linked.Token.ThrowIfCancellationRequested(); result = await consumer(frozen, linked.Token).ConfigureAwait(false); }
+                try
+                {
+                    ThrowIfCanceled(cancellationToken, linked.Token);
+                    result = await consumer(frozen, linked.Token).ConfigureAwait(false);
+                    ThrowIfCanceled(cancellationToken, linked.Token);
+                }
                 catch (Exception error)
                 {
                     try { Close(frozen); }
                     catch (Exception cleanup) { throw new AggregateException("Catalog operation and generated cleanup failed.", error, cleanup); }
                     throw;
                 }
-                Close(frozen); return result;
+                Close(frozen); ThrowIfCanceled(cancellationToken, linked.Token); return result;
             }
             finally { _serial.Release(); }
         }
+    }
+    private void ThrowIfCanceled(CancellationToken caller, CancellationToken linked)
+    {
+        lock (_gate)
+            if (_stopping || caller.IsCancellationRequested || linked.IsCancellationRequested) throw new OperationCanceledException("Catalog preparation was retired before result admission.", linked);
     }
     private void Close(CatalogFactsSnapshot live)
     {

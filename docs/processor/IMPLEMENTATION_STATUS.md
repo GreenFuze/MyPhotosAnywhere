@@ -1412,3 +1412,21 @@ Fresh cross-platform validation of schema 10/current observations is required af
 Full cloud/head reconciliation, exclusive complete generation phases, pending-work access
 attempts, production publication/activation, plugins/client workflows/installers and final
 joint release acceptance remain pending. No final 0.6 APK, installer or release exists.
+
+## Synchronous catalog retirement and result admission
+
+The 816f36f native matrix found a real result-admission race on Intel macOS:
+CatalogPreparationService could return success after Exit began because CancelAsync's
+linked-token callback had not propagated before the consumer resumed. The failure was
+not waived. Preparation, retained capture and workspace observation now check their
+synchronous owner retirement flags before accepting results or dispatching later policy
+work, while still joining actual consumers/readers before releasing borrowed resources.
+The observation owner also rejects late reads before persisting or invoking a verifier.
+
+Existing cancellation assertions remain unchanged. Both cooperative and deliberately
+uncooperative catalog consumers are covered. All 20 local affected lifecycle cases pass;
+Web passes 25 cases. The final integrated working-tree suite also passed all 151
+AppServices cases and Desktop Release has zero warnings/errors. Evidence is
+catalog-retirement-final and initial-policy-services-full logs/TRX in preflight-060.
+New immutable-revision cross-platform verification is required. No diagnostic exception,
+exception-type relaxation or test removal was introduced.

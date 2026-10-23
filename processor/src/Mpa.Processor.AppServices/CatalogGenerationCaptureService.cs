@@ -66,9 +66,10 @@ public sealed class CatalogGenerationCaptureService : IAsyncDisposable
                 }
                 _reader = await Task.Run(() => _store!.Open(claim, token), CancellationToken.None).ConfigureAwait(false);
                 await ValidateAsync(scope, token).ConfigureAwait(false);
+                ThrowIfCanceled(cancellationToken, token);
                 var result = await consumer(claim, _reader, token).ConfigureAwait(false);
-                token.ThrowIfCancellationRequested(); await ValidateAsync(scope, token).ConfigureAwait(false);
-                CloseResources(); return result;
+                ThrowIfCanceled(cancellationToken, token); await ValidateAsync(scope, token).ConfigureAwait(false);
+                CloseResources(); ThrowIfCanceled(cancellationToken, token); return result;
             }
             catch (Exception error)
             {
@@ -79,6 +80,11 @@ public sealed class CatalogGenerationCaptureService : IAsyncDisposable
             }
             finally { _serial.Release(); }
         }
+    }
+    private void ThrowIfCanceled(CancellationToken caller, CancellationToken linked)
+    {
+        lock (_gate)
+            if (_stopping || caller.IsCancellationRequested || linked.IsCancellationRequested) throw new OperationCanceledException("Catalog generation capture was retired before result admission.", linked);
     }
     private async Task ValidateAsync(WorkspacePublicationScope scope, CancellationToken token)
     {

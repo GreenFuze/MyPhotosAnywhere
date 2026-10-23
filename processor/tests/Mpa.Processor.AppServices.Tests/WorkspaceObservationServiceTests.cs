@@ -87,6 +87,7 @@ public sealed partial class CatalogGenerationCaptureServiceTests
         finally { release.TrySetResult(); }
         await Assert.ThrowsAsync<OperationCanceledException>(() => running).ConfigureAwait(false); Assert.IsNotNull(stopping); await stopping.ConfigureAwait(false);
         Assert.IsTrue(scanner.ExitConfirmed); Assert.IsNull(new WorkspaceObservationRepository(fixture.Database, fixture.Budget).LastCheckpoint());
+        Assert.AreEqual(0, new WorkspaceObservationRepository(fixture.Database, fixture.Budget).Known(ScanContext(fixture)).Count);
         await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None)).ConfigureAwait(false);
     }
 

@@ -20,12 +20,14 @@ public sealed class CatalogPreparationServiceTests
     }
 
     [TestMethod]
-    public async Task ExitCancelsAndJoinsTheActualConsumerBeforeReleasingGeneratedFiles()
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task ExitCancelsAndJoinsTheActualConsumerBeforeReleasingGeneratedFiles(bool consumerChecksCancellation)
     {
         await using var fixture = new Fixture(); var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); Task? stopping = null;
         var run = fixture.Service.RunAsync(async (snapshot, token) =>
-        { entered.TrySetResult(); await release.Task.ConfigureAwait(false); token.ThrowIfCancellationRequested(); return snapshot.Count; }, CancellationToken.None);
+        { entered.TrySetResult(); await release.Task.ConfigureAwait(false); if (consumerChecksCancellation) token.ThrowIfCancellationRequested(); return snapshot.Count; }, CancellationToken.None);
         try
         {
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false); stopping = fixture.Service.DisposeAsync().AsTask();
