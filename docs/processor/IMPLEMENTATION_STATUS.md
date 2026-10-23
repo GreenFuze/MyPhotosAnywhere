@@ -1,6 +1,42 @@
 # MPA 0.6.0 implementation ledger
 
-## Durable generation publication plan and native signing (in validation)
+## Joined worker retirement and native exit verification
+
+A full Core run exposed a diagnostics-file cleanup failure in the existing stubborn-child
+test. Joined test ownership subsequently exposed a real termination timeout. A controlled
+concurrent replay captured Windows reporting native exit while the async exit task remained
+pending, with diagnostics still owned. The exact original cleanup event was masked and
+cannot be conclusively attributed from that first run alone; neither failed run is a pass.
+
+Shutdown now retires the resource monitor before native exit queries, checks the actual OS
+exit signal within the original five/ten-second deadlines, and still joins the original
+async exit owner. Native exit never substitutes for that join. Every confirmed-exit path
+joins actual writes, frame/diagnostic pumps and supervision before releasing resources,
+including paths following earlier cancellation/stop errors. Unconfirmed exit retains
+ownership. Native primary and secondary shutdown failures remain available; structured
+timeouts retain nonsecret native/task-state evidence instead of an uninformative deadline.
+
+ProcessorWorkSupervisor now requires RetirementConfirmed, not process exit alone, before
+releasing operation input/budget/state leases, including recovery after a bounded join.
+The test fixture owns even failed startup attempts, joins retained workers before directory
+cleanup, and preserves the actual failure. Existing process/input assertions remain, with
+additional actual Completion, exclusive diagnostic-file and retirement checks. A real
+before-handshake cancellation case exercises joined shutdown; the stalled-child scenario
+exists only in the synthetic fixture, never the product plugin registry.
+
+Five paired lifecycle replays now pass under the same concurrent conditions that reproduced
+the pending-exit failure. All 315 Core, 231 AppServices and 26 Web cases pass, plus the strict
+Desktop Release build. Complete final logs are clean and all four outputs use the identical
+Core binary SHA-256 eeb72ec22e814a5759120bea4433907baba2014b5dadc6071e792e81e7f71043.
+The mechanically idle-guarded frozen test build has zero warnings/errors. Earlier full
+passes belong to the intermediate correction; their shared Core hash and failed independent
+replay remain separately retained as intermediate evidence, not current acceptance.
+Build/test overlap caused separate local copy diagnostics; guarded, serialized rebuilds
+resolve that scheduling cause, without suppressions or deadline extensions. No historical
+warning waiver was extended. Fresh exact-commit cross-platform checks remain required;
+no APK, installer, live Drive operation or final acceptance is claimed here.
+
+## Durable generation publication plan and native signing
 
 Processor schema 11 explicitly migrates the capture table, preserving original scopes,
 snapshot/commit identities, descriptors and active claims. A separate bounded canonical
@@ -23,9 +59,12 @@ The production engine still performs its current read; full exclusive generation
 private single-upload current admission, actual commit readback/verified/complete phases,
 head activation, completed snapshot retirement and renewed-credential access attempts remain
 the next owner work. No new network/publication path, media mutation or cleanup permission
-was enabled. Android Room 12 and the upgrade signer are unchanged. Schema-11 migration,
-actual retained-file lifetime, immutable plan recovery, low-storage and signing tests are
-being validated; do not interpret the earlier revision's passing tests as current validation.
+was enabled. Android Room 12 and the upgrade signer are unchanged. The full local suites
+listed above include schema-11 migration/rollback, actual retained-file lifetime, immutable
+plan recovery, low-storage and native signing. Preceding plan commit 3728fa0 independently
+passed Protocol40019053591 and Desktop40019053696 on all four operating systems, Android
+40019053732 and native40019053893 on APIs29/35/37. These do not substitute for the newer
+worker correction's exact-revision CI or the remaining joint release acceptance.
 
 ## Engine-owned current catalog reconciliation
 

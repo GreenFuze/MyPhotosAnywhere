@@ -121,8 +121,8 @@ public sealed class ProcessorWorkSupervisor : IProcessorWorkControl, IAsyncDispo
             if (retained.Worker is not null)
             {
                 try { await retained.Worker.JoinAfterFailedStopAsync().WaitAsync(TimeSpan.FromSeconds(25)).ConfigureAwait(false); }
-                catch (Exception error) when (retained.Worker.ExitConfirmed) { lock (_gate) _failure = error; }
-                if (!retained.Worker.ExitConfirmed) throw new InvalidOperationException("Retained worker exit is still unconfirmed.");
+                catch (Exception error) when (retained.Worker.RetirementConfirmed) { lock (_gate) _failure = error; }
+                if (!retained.Worker.RetirementConfirmed) throw new InvalidOperationException("Retained worker exit, I/O join or cleanup is still unconfirmed.");
             }
             await retained.Operation.DisposeAsync().ConfigureAwait(false);
             lock (_gate) _retained = null;
@@ -162,10 +162,10 @@ public sealed class ProcessorWorkSupervisor : IProcessorWorkControl, IAsyncDispo
                     catch (Exception joinError) { failure = Combine(failure, joinError); }
                 }
             }
-            if (worker is not null && !worker.ExitConfirmed)
+            if (worker is not null && !worker.RetirementConfirmed)
             {
                 lock (_gate) _retained = new(worker, operation);
-                failure = Combine(failure, new InvalidOperationException("Worker exit is unconfirmed; operation resources remain owned."));
+                failure = Combine(failure, new InvalidOperationException("Worker exit, I/O join or cleanup is unconfirmed; operation resources remain owned."));
             }
             else
             {

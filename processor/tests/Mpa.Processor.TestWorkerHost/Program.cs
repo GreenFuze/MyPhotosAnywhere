@@ -8,7 +8,7 @@ using Mpa.Processor.WorkerRuntime;
 using Mpa.Processor.TestSupport;
 
 // Synthetic child-process fixture only. Never included in the product installer/plugin registry.
-if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "partial-frame" or "malformed" or "exit-error" or "exit-clean" or "parent-launcher"))
+if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "partial-frame" or "malformed" or "exit-error" or "exit-clean" or "parent-launcher" or "startup-stall"))
     throw new ArgumentException("Expected a known synthetic scenario and an owned test directory.");
 var root = Path.GetFullPath(args[1]);
 if (!Directory.Exists(root) || !Path.GetFileName(root).StartsWith("MPA-Worker-Test-", StringComparison.Ordinal))
@@ -38,6 +38,14 @@ if (args[0] == "parent-launcher")
 
 if (Environment.GetEnvironmentVariable("MPA_SYNTHETIC_PARENT_SECRET") is not null)
     throw new InvalidOperationException("Synthetic parent environment marker crossed the worker boundary.");
+
+if (args[0] == "startup-stall")
+{
+    using (var marker = new FileStream(Path.Combine(root, "worker-before-handshake.marker"), FileMode.CreateNew, FileAccess.Write, FileShare.None))
+    { marker.WriteByte(1); marker.Flush(flushToDisk: true); }
+    await Task.Delay(Timeout.InfiniteTimeSpan).ConfigureAwait(false); // Deliberately owned cancellation/forced-stop fixture; never a production delegate.
+    return 0;
+}
 
 var secret = Environment.GetEnvironmentVariable("MPA_PARENT_KEY") ?? throw new InvalidOperationException("No owning controller key.");
 var port = int.Parse(Environment.GetEnvironmentVariable("MPA_PARENT_PORT") ?? "0", CultureInfo.InvariantCulture);

@@ -79,14 +79,43 @@ public sealed class WorkerProcessTests
     {
         using var root = new WorkerTestDirectory();
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var worker = await FramedWorkerProcess.StartAsync(await SpecAsync(root.Path, "ignore-eof").ConfigureAwait(false), deadline.Token).ConfigureAwait(false);
+        var spec = await SpecAsync(root.Path, "ignore-eof").ConfigureAwait(false);
+        var starting = FramedWorkerProcess.StartAsync(spec, deadline.Token);
+        await using var owner = new JoinedWorkerTestAttempt(starting);
+        var worker = await starting.ConfigureAwait(false);
+        Assert.IsFalse(worker.RetirementConfirmed);
         await using var frames = worker.ReadFramesAsync(deadline.Token).GetAsyncEnumerator();
         Assert.IsTrue(await frames.MoveNextAsync().ConfigureAwait(false));
         using var process = Process.GetProcessById(worker.ProcessId);
         await worker.DisposeAsync().ConfigureAwait(false);
         Assert.IsTrue(process.HasExited);
+        Assert.IsTrue(worker.RetirementConfirmed);
+        await worker.Completion.ConfigureAwait(false);
         using var released = File.Open(Path.Combine(root.Path, "worker-read-lease.bin"), FileMode.Open, FileAccess.Read, FileShare.None);
         Assert.AreEqual(42, released.ReadByte());
+        using var diagnostics = File.Open(spec.NewDiagnosticPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Assert.AreEqual(0L, diagnostics.Length);
+    }
+
+    [TestMethod]
+    public async Task ActualCancellationBeforeOwnershipHandshakeJoinsChildAndDiagnosticPump()
+    {
+        using var root = new WorkerTestDirectory(); using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cancellation = new CancellationTokenSource(); var spec = await SpecAsync(root.Path, "startup-stall").ConfigureAwait(false);
+        var starting = FramedWorkerProcess.StartAsync(spec, cancellation.Token);
+        await using var owner = new JoinedWorkerTestAttempt(starting, cancellation);
+        while (!File.Exists(Path.Combine(root.Path, "worker-before-handshake.marker")))
+        {
+            if (starting.IsCompleted) { await starting.ConfigureAwait(false); Assert.Fail("The synthetic stalled worker unexpectedly completed setup."); }
+            await Task.Delay(20, deadline.Token).ConfigureAwait(false);
+        }
+        await cancellation.CancelAsync().ConfigureAwait(false);
+        await Assert.ThrowsAsync<OperationCanceledException>(() => starting.WaitAsync(deadline.Token)).ConfigureAwait(false);
+        Assert.IsFalse(File.Exists(Path.Combine(root.Path, "worker-started.marker")));
+        using var diagnostics = File.Open(spec.NewDiagnosticPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Assert.AreEqual(0L, diagnostics.Length);
+        using var original = File.Open(Path.Combine(root.Path, "worker-read-lease.bin"), FileMode.Open, FileAccess.Read, FileShare.None);
+        Assert.AreEqual(42, original.ReadByte());
     }
 
     [TestMethod]
@@ -228,6 +257,24 @@ public sealed class WorkerProcessTests
         using (var input = new FileStream(Path.Combine(root, "worker-read-lease.bin"), FileMode.CreateNew, FileAccess.Write, FileShare.None))
         { input.WriteByte(42); input.Flush(flushToDisk: true); }
         return new(host, digest, [fixture, scenario, root], Path.GetDirectoryName(fixture)!, Path.Combine(root, "diagnostics-" + Guid.NewGuid().ToString("N") + ".log"));
+    }
+
+    private sealed class JoinedWorkerTestAttempt(Task<FramedWorkerProcess> starting, CancellationTokenSource? cancel = null) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            if (cancel is not null) await cancel.CancelAsync().ConfigureAwait(false);
+            FramedWorkerProcess worker;
+            try { worker = await starting.ConfigureAwait(false); }
+            catch (OperationCanceledException) when (cancel?.IsCancellationRequested == true) { return; } // Asserted canceled startup, now joined.
+            catch (WorkerStartCleanupException error)
+            {
+                Console.WriteLine("Actual startup/stop failure retained before test-directory cleanup: " + error);
+                await error.RetainedWorker.JoinAfterFailedStopAsync().ConfigureAwait(false); throw;
+            }
+            try { await worker.DisposeAsync().ConfigureAwait(false); }
+            catch { await worker.JoinAfterFailedStopAsync().ConfigureAwait(false); throw; }
+        }
     }
 
     internal sealed class WorkerTestDirectory : IDisposable
