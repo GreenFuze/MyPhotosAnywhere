@@ -4,10 +4,17 @@ using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.AppServices;
 
+public interface IWorkspaceDocumentSource
+{
+    Task<WorkspaceDocumentInventory> CaptureAsync(IReadOnlyCollection<string> previouslyKnownIds, CancellationToken token);
+    Task<DriveChangeCursor> CheckUnchangedAsync(WorkspaceDocumentInventory inventory, CancellationToken token);
+    Task<DriveWorkspaceObject> ReadAsync(DriveWorkspaceDocumentCandidate candidate, CancellationToken token);
+}
+
 /// <summary>Read-only document reconciliation through the engine's joined account
 /// lease. Setup supplies the captured workspace; incoming documents cannot select it.
 /// Returned bytes/inventories remain untrusted and confer no publication permission.</summary>
-public sealed class CatalogWorkspaceDocumentSource
+public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
 {
     private readonly ProcessorStateCoordinator _state;
     private readonly ProcessorAccountService _accounts;

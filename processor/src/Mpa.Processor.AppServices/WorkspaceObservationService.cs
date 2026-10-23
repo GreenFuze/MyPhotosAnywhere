@@ -1,0 +1,92 @@
+using System.Security.Cryptography;
+using Mpa.Processor.Core;
+using Mpa.Processor.GoogleDrive;
+
+namespace Mpa.Processor.AppServices;
+
+/// <summary>Joined full-scan owner. Persists exact read identities before invoking the
+/// caller's signature/history/policy verifier, then records a cursor only after every
+/// document and the final Drive change check succeed. Stored cursors never skip startup
+/// reconciliation. A checkpoint is evidence, not publication or catalog-head admission.</summary>
+public sealed class WorkspaceObservationService(ProcessorStateCoordinator state, StorageBudgetManager budget,
+    WorkspaceObservationContext context, IWorkspaceDocumentSource source) : IAsyncDisposable
+{
+    private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
+    private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
+    private readonly WorkspaceObservationContext _context = context ?? throw new ArgumentNullException(nameof(context));
+    private readonly IWorkspaceDocumentSource _source = source ?? throw new ArgumentNullException(nameof(source));
+    private readonly object _gate = new();
+    private readonly SemaphoreSlim _serial = new(1, 1);
+    private readonly CancellationTokenSource _stop = new();
+    private bool _stopping;
+    private bool _exitConfirmed;
+    private Task? _disposal;
+    private Exception? _failure;
+    public bool ExitConfirmed { get { lock (_gate) return _exitConfirmed; } }
+    public Exception? Failure { get { lock (_gate) return _failure; } }
+
+    public async Task<WorkspaceInventoryCheckpoint> ScanAsync(Func<DriveWorkspaceObject, CancellationToken, Task> verifyAndPersist,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(verifyAndPersist); CancellationTokenSource linked;
+        lock (_gate) { ObjectDisposedException.ThrowIf(_stopping, this); linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token); }
+        using (linked)
+        {
+            await _serial.WaitAsync(linked.Token).ConfigureAwait(false);
+            try
+            {
+                lock (_gate) ObjectDisposedException.ThrowIf(_stopping, this); var token = linked.Token;
+                var known = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).Known(_context), token).ConfigureAwait(false);
+                var inventory = await _source.CaptureAsync(known.Select(document => document.FileId).ToArray(), token).ConfigureAwait(false);
+                if (inventory.AccountId != _context.AccountId || inventory.FolderId != _context.FolderId || inventory.SharedDriveId != _context.SharedDriveId ||
+                    inventory.Documents.Count > WorkspaceObservationRepository.MaximumDocuments || inventory.Documents.Select(document => document.FileId).Distinct(StringComparer.Ordinal).Count() != inventory.Documents.Count)
+                    throw new InvalidDataException("Actual workspace inventory changed its captured context or identity bound.");
+                var observed = new List<WorkspaceDocumentObservation>();
+                foreach (var candidate in inventory.Documents)
+                {
+                    if (candidate.FileId is not { Length: > 0 and <= 128 } || candidate.FileId is "root" || candidate.FileId == _context.FolderId ||
+                        candidate.FileId.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not ('_' or '-')) ||
+                        candidate.Version < 1 || candidate.Bytes is < 1 or > GoogleAccountConnection.MaximumWorkspaceDocumentBytes)
+                        throw new InvalidDataException("Captured metadata document exceeds its identity or byte bound before reading.");
+                    token.ThrowIfCancellationRequested(); var document = await _source.ReadAsync(candidate, token).ConfigureAwait(false);
+                    if (document.AccountId != _context.AccountId || document.FolderId != _context.FolderId || document.FileId != candidate.FileId ||
+                        document.DriveVersion != candidate.Version || document.Bytes.Length != candidate.Bytes || document.Bytes.Length is < 1 or > GoogleAccountConnection.MaximumWorkspaceDocumentBytes)
+                        throw new InvalidDataException("Actual document read substituted its captured identity, revision or size.");
+                    var observation = new WorkspaceDocumentObservation(document.FileId, document.DriveVersion, document.Bytes.Length, Convert.ToHexStringLower(SHA256.HashData(document.Bytes.Span)));
+                    await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).RememberRead(_context, observation), token).ConfigureAwait(false);
+                    // If persistence fails, the verifier never receives this document.
+                    // Its policy writes also must succeed before this scan can complete.
+                    await verifyAndPersist(document, token).ConfigureAwait(false); token.ThrowIfCancellationRequested(); observed.Add(observation);
+                }
+                if (inventory.MissingKnownIds.Count != 0) throw new WorkspaceObservationConflictException();
+                var cursor = await _source.CheckUnchangedAsync(inventory, token).ConfigureAwait(false);
+                if (cursor.AccountId != _context.AccountId || cursor.SharedDriveId != _context.SharedDriveId) throw new InvalidDataException("The final change cursor belongs to another workspace access context.");
+                var checkpoint = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).Complete(_context, cursor.Token, observed), token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested(); lock (_gate) _failure = null; return checkpoint;
+            }
+            catch (Exception error) { lock (_gate) _failure = error; throw; }
+            finally { _serial.Release(); }
+        }
+    }
+    public ValueTask DisposeAsync()
+    {
+        lock (_gate)
+        {
+            _stopping = true;
+            if (_disposal is { IsFaulted: true } && !_exitConfirmed) _disposal = null;
+            return new(_disposal ??= StopAsync());
+        }
+    }
+    private async Task StopAsync()
+    {
+        Exception? cancellationFailure = null;
+        try { await _stop.CancelAsync().ConfigureAwait(false); } catch (Exception error) { cancellationFailure = error; }
+        await _serial.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (cancellationFailure is not null) throw new AggregateException("Workspace observation cancellation needs attention; retain its account/state owners.", cancellationFailure);
+            _stop.Dispose(); lock (_gate) _exitConfirmed = true;
+        }
+        finally { _serial.Release(); }
+    }
+}

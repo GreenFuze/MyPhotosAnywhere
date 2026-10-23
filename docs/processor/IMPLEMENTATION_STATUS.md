@@ -1370,3 +1370,45 @@ state directory. ProcessorStateDatabase now retains its actual constructor lease
 the retained store compares against that trusted path, preserving exact-directory and
 installation-marker checks. All nine macOS failures shared this cause. The correction
 requires a fresh full native matrix; the failed run is not counted as passing.
+
+## Durable workspace observations and native controller policy recovery
+
+Processor schema 10 adds bounded document observations and inventory checkpoints. The
+journal retains file identities, versions, byte counts and digests; an immutable file
+rewrite, older version, missing known document, stale access or foreign workspace
+cannot silently replace that history. Cursor advancement requires the complete exact
+observed inventory. The checkpoint is historical evidence, never publication admission.
+Migration failure preserves schema 9 and capture/history rows; prior upgrade fixtures now
+also remove the schema 10 additions when constructing their genuine older schemas.
+Android Room 12 is unchanged.
+
+WorkspaceObservationService performs a full joined scan on every invocation, persists
+each actual read before invoking its signature/history/policy verifier, and checks Drive
+changes again before committing the cursor. A failed state/policy write or final check
+keeps the prior cursor. New policies are still observed before reporting missing older
+files. Exit cancels and joins even an uncooperative reader before account/state retirement.
+No stored cursor bypasses startup reconciliation and no production scheduler is enabled.
+
+LocalControllerPolicyObserver connects actual native identity and exact sealed signing
+history to monotonic source/publisher selection. Valid cloud work beyond the local counter
+or with an unsealed local intent requires explicit recovery; it cannot adopt/reset the
+counter. Revocation remains selected when an older authorization is replayed. Retired
+access and failed policy writes preserve the earlier accepted state. This observer handles
+this installation's controller policies only; catalog ancestry and general enrollment are
+separate unfinished responsibilities.
+
+The 4096-document inventory digest streams length-framed canonical records, retaining the
+shared protocol's 1000-item array rejection. A 32768-byte checkpoint cap supports valid
+4096-character opaque cursors including non-ASCII text. Local final checks pass 68 affected
+Core/upgrade/migration tests and all 146 AppServices tests, including real native-key and
+journaled policy cases. Earlier full Core 236 and Web 25 regressions passed; the final Core
+selection adds the two new bound cases and rechecks changed code. Desktop Release reports
+zero warnings/errors. Final logs contain no diagnostics. Evidence is workspace-observation-*
+in preflight-060. Initial analyzer findings were corrected without suppressions.
+
+Preceding 2fe7a02 completed Protocol 39926369077 on Windows/Linux/ARM+Intel macOS,
+Desktop 39926369021, Android 39926369123 and all API 29/35/37 jobs 39926369099 successfully.
+Fresh cross-platform validation of schema 10/current observations is required after push.
+Full cloud/head reconciliation, exclusive complete generation phases, pending-work access
+attempts, production publication/activation, plugins/client workflows/installers and final
+joint release acceptance remain pending. No final 0.6 APK, installer or release exists.

@@ -7,7 +7,7 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.AppServices.Tests;
 
 [TestClass]
-public sealed class CatalogGenerationCaptureServiceTests
+public sealed partial class CatalogGenerationCaptureServiceTests
 {
     [TestMethod]
     public async Task RecreatedOwnerResumesExactFrozenFactsAndIdentitiesAfterLiveLibraryChanges()
