@@ -51,14 +51,20 @@ public sealed partial class WorkspaceObservationRepository
     /// <summary>Only the exact still-current attempt can complete. Its checkpoint and
     /// completion fence commit together, so neither can survive alone after a failed write.</summary>
     public WorkspaceInventoryCheckpoint CompleteScan(WorkspaceObservationAttempt attempt, string cursor,
-        IReadOnlyCollection<WorkspaceDocumentObservation> completeInventory)
+        IReadOnlyCollection<WorkspaceDocumentObservation> completeInventory, WorkspacePublicationInventory? publications = null)
     {
         ArgumentNullException.ThrowIfNull(attempt);
         using var transaction = _database.Connection.BeginTransaction(); AssertContext(attempt.Context, transaction);
         if (attempt.Completed is not null || ReadAttempt(transaction) != attempt) throw new WorkspaceObservationConflictException();
         AssertCandidatesRead(attempt.Context, transaction);
         var checkpoint = Complete(attempt.Context, cursor, completeInventory, transaction);
-        WriteAttempt(attempt with { Completed = checkpoint }, transaction); transaction.Commit(); return checkpoint;
+        WriteAttempt(attempt with { Completed = checkpoint }, transaction);
+        if (publications is not null)
+        {
+            if (publications.Context != attempt.Context) throw new WorkspacePublicationConflictException();
+            new WorkspacePublicationRepository(_database, _budget).AssertInventoryUnchanged(publications, transaction);
+        }
+        transaction.Commit(); return checkpoint;
     }
 
     /// <summary>Historical diagnostic read only. A completed stored attempt cannot

@@ -41,8 +41,11 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                 var attempt = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).BeginScan(_context), token).ConfigureAwait(false);
                 ThrowIfCanceled(cancellationToken, token);
                 var known = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).KnownIdentities(_context), token).ConfigureAwait(false);
+                var publications = await _state.ExecuteAsync(database => new WorkspacePublicationRepository(database, _budget).Inventory(_context), token).ConfigureAwait(false);
+                var expectedFiles = publications.Objects.Where(item => item.FileId is not null).ToDictionary(item => item.FileId!, StringComparer.Ordinal);
+                var relevant = known.Union(expectedFiles.Keys, StringComparer.Ordinal).ToArray();
                 var progress = new InventoryProgress(this, attempt, cancellationToken, token);
-                var inventory = await _source.CaptureAsync(known, progress, token).ConfigureAwait(false);
+                var inventory = await _source.CaptureAsync(relevant, progress, token).ConfigureAwait(false);
                 ThrowIfCanceled(cancellationToken, token);
                 attempt = progress.CapturedAttempt();
                 if (inventory.AccountId != _context.AccountId || inventory.FolderId != _context.FolderId || inventory.SharedDriveId != _context.SharedDriveId ||
@@ -70,11 +73,17 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                     var observation = new WorkspaceDocumentObservation(document.FileId, document.DriveVersion, document.Bytes.Length, Convert.ToHexStringLower(SHA256.HashData(document.Bytes.Span)), StoredMime(candidate.MimeType));
                     await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).RememberRead(_context, observation), token).ConfigureAwait(false);
                     ThrowIfCanceled(cancellationToken, token);
+                    if (expectedFiles.TryGetValue(document.FileId, out var expected) && (expected.Bytes != observation.Bytes || expected.Sha256 != observation.Sha256 ||
+                        expected.MimeType != candidate.MimeType || expected.VerifiedVersion is { } version && observation.Version < version))
+                        throw new WorkspaceObservationConflictException();
                     // If persistence fails, the verifier never receives this document.
                     // Its policy writes also must succeed before this scan can complete.
                     await verifyAndPersist(document, token).ConfigureAwait(false); ThrowIfCanceled(cancellationToken, token); observed.Add(observation);
                 }
-                if (inventory.MissingKnownIds.Count != 0) throw new WorkspaceObservationConflictException();
+                var present = inventory.Documents.Select(item => item.FileId).ToHashSet(StringComparer.Ordinal);
+                if (inventory.MissingKnownIds.Any(id => known.Contains(id, StringComparer.Ordinal) || !expectedFiles.TryGetValue(id, out var expected) || expected.VerifiedVersion is not null) ||
+                    expectedFiles.Values.Any(expected => expected.VerifiedVersion is not null && !present.Contains(expected.FileId!)))
+                    throw new WorkspaceObservationConflictException();
                 // Extra folder/access checks must finish before the last change fence,
                 // not open an unchecked network interval after that fence/checkpoint.
                 if (inspectBeforeFinalChangeCheck is not null)
@@ -87,7 +96,7 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                 if (cursor.AccountId != _context.AccountId || cursor.SharedDriveId != _context.SharedDriveId) throw new InvalidDataException("The final change cursor belongs to another workspace access context.");
                 ThrowIfCanceled(cancellationToken, token);
                 attempt = progress.CapturedAttempt();
-                var checkpoint = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).CompleteScan(attempt, cursor.Token, observed), token).ConfigureAwait(false);
+                var checkpoint = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).CompleteScan(attempt, cursor.Token, observed, publications), token).ConfigureAwait(false);
                 lock (_gate) { ThrowIfCanceled(cancellationToken, token); _failure = null; return checkpoint; }
             }
             catch (Exception error) { lock (_gate) _failure = error; throw; }

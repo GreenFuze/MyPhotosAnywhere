@@ -7,6 +7,31 @@ namespace Mpa.Processor.AppServices.Tests;
 public sealed partial class AccountServiceTests
 {
     [TestMethod]
+    public async Task ConcurrentOutboxAllocationNeedsReconciliationAndRetryPreservesItsOriginalIdentity()
+    {
+        await using var fixture = await InitialPublicationFixture.CreateAsync().ConfigureAwait(false); var prepared = await fixture.PreparedAsync().ConfigureAwait(false);
+        await using var runtime = PublicationRuntime(fixture); var changes = fixture.Setup.Accounts.Readers.DocumentChanges!; var changed = false; var fatal = false;
+        runtime.Failed += _ => fatal = true;
+        fixture.Setup.Accounts.Readers.DocumentChanges = async (cursor, token) =>
+        {
+            if (!changed)
+            {
+                changed = true;
+                await fixture.Setup.Accounts.State.ExecuteAsync(database => new WorkspacePublicationRepository(database, fixture.Budget)
+                    .AssignFileId(prepared.Sources.Id, prepared.Sources.Sha256, "retained-id"), token).ConfigureAwait(false);
+            }
+            return await changes(cursor, token).ConfigureAwait(false);
+        };
+        runtime.Request(CancellationToken.None); await runtime.WaitForCurrentAttemptAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false);
+        Assert.AreEqual(InitialLibraryPublicationStage.NeedsAttention, runtime.Activity.Stage); Assert.IsTrue(runtime.Activity.CanRetry);
+        Assert.IsInstanceOfType<WorkspacePublicationInventoryChangedException>(runtime.LastAttemptFailure); Assert.IsNull(runtime.Failure); Assert.IsFalse(fatal);
+        Assert.AreEqual(0, fixture.Creates); Assert.AreEqual(0, fixture.Allocations);
+        runtime.Request(CancellationToken.None); await runtime.WaitForCurrentAttemptAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(20)).ConfigureAwait(false);
+        Assert.AreEqual(InitialLibraryPublicationStage.PoliciesPublished, runtime.Activity.Stage); Assert.AreEqual(1, fixture.Allocations); Assert.AreEqual(2, fixture.Creates);
+        var recovered = await fixture.PreparedAsync().ConfigureAwait(false); Assert.AreEqual(prepared.Plan, recovered.Plan); Assert.AreEqual("retained-id", recovered.Sources.FileId);
+    }
+
+    [TestMethod]
     public async Task SetupRuntimeNeverInfersHumanApprovalAndCancelsBeforeAdmissionWithoutCreatingAJob()
     {
         await using var setup = await SetupFixture.CreateAsync().ConfigureAwait(false);

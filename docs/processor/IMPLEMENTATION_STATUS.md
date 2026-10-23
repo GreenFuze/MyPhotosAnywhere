@@ -1651,6 +1651,35 @@ process, consistent frame-consumer error and intact/released input lease. The in
 worker cases pass locally; strengthened final full suites and fresh platform CI remain
 required. No release acceptance is claimed from the earlier failed matrix.
 
+## Complete pending-publication observations
+
+Each scan now captures a complete bounded local outbox description, including unallocated,
+uncertain allocated and previously verified objects. Original scopes, IDs and payload
+digests remain immutable. Descriptions are framed and hashed individually; payloads are
+validated one at a time without retaining the entire outbox in memory. Truncated, foreign,
+aliased or unsupported work cannot silently disappear from reconciliation.
+
+Allocated IDs participate in the change fence even before a successful read. An uncertain
+allocation may be absent until retry; a verified receipt remains required even if no earlier
+scan observed it. Actual bytes, encoding, size and minimum verified version must match the
+captured work. Conflicting reads are retained before rejection. The scan completion and
+unchanged-outbox assertion share one transaction, including rollback if a write trigger
+changes a receipt. Newly admitted work survives an invalidated scan.
+
+A changed outbox is a typed operational retry condition. Corrupted immutable descriptions
+remain invariant failures. The actual setup runtime reports the operational distinction and
+retries using the same captured allocation and signing plan. Inspecting older scopes through
+renewed access never changes those scopes or grants renewed upload authority.
+
+The integration passed the full 281 Core cases before the final exception classification,
+then all 102 affected Core cases and all 203 AppServices cases with the final classification.
+The strict final Desktop Release build has zero warnings/errors and complete logs are clean.
+The preceding b915a82 worker correction passed Protocol39978807541, Android39978807619,
+Desktop39978807933 and device39978807825; skipped duplicate runs are not passes. Fresh
+exact-revision checks remain required for this increment. Processor schema 10 and Android
+Room 12 are unchanged. General signed history/predecessor verification, generation publication,
+renewed-access admission and the remaining joint release work are still unfinished.
+
 The preceding 5d5d2ef passed Protocol39946912329 on all native platforms, Android39946912239,
 Desktop39946912280 and device39946912278 on all three API levels. Fresh final-source CI is
 required. Processor schema 10 and Android Room 12 are unchanged. General current-history,

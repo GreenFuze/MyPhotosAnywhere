@@ -140,7 +140,7 @@ public sealed partial class WorkspaceObservationRepository(ProcessorStateDatabas
             value.Cursor is not { Length: > 0 and <= 4096 } || value.Cursor.Any(char.IsControl) || !Digest(value.InventorySha256)) throw new InvalidDataException("Retained inventory checkpoint is invalid.");
         ValidateContext(value.Context); return value;
     }
-    private void AssertContext(WorkspaceObservationContext context, SqliteTransaction transaction)
+    internal void AssertContext(WorkspaceObservationContext context, SqliteTransaction transaction)
     {
         ValidateContext(context); var pin = new LibraryAuthorityRepository(_database).Controller(transaction);
         if (pin is null || pin.LibraryId != context.LibraryId || pin.AccountId != context.AccountId || pin.FolderId != context.FolderId) throw new StaleLibraryConfigurationException();

@@ -11,6 +11,62 @@ public sealed partial class CatalogGenerationCaptureServiceTests
     private static readonly string[] NewScanRevocation = ["revocation-B"];
 
     [TestMethod]
+    public async Task UncertainAllocationCanBeAbsentButAnUnseenVerifiedReceiptRemainsRequired()
+    {
+        await using var fixture = new Fixture(); var context = ScanContext(fixture); var source = new ScanSource(); var id = Guid.NewGuid();
+        await fixture.State.ExecuteAsync(database =>
+        {
+            var outbox = new WorkspacePublicationRepository(database, fixture.Budget); var record = outbox.Prepare(id, fixture.Scope, "facts-index", "application/json", "{}"u8);
+            return outbox.AssignFileId(id, record.Sha256, "new-file");
+        }, CancellationToken.None).ConfigureAwait(false);
+        await using var scanner = new WorkspaceObservationService(fixture.State, fixture.Budget, context, source);
+        var empty = await scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None).ConfigureAwait(false);
+        Assert.AreEqual("new-file", source.LastKnown.Single()); Assert.AreEqual(0, empty.Documents); Assert.AreEqual(0, source.Reads);
+        await fixture.State.ExecuteAsync(database =>
+        {
+            var outbox = new WorkspacePublicationRepository(database, fixture.Budget); var record = outbox.Read(id)!;
+            return outbox.ConfirmVerified(id, context.AccountId, context.FolderId, record.FileId!, record.Sha256, record.Payload.Length, 7);
+        }, CancellationToken.None).ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<WorkspaceObservationConflictException>(() => scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None)).ConfigureAwait(false);
+        Assert.AreEqual(empty, new WorkspaceObservationRepository(fixture.Database, fixture.Budget).LastCheckpoint());
+        source.Add("new-file"); source.Documents["new-file"] = source.Documents["new-file"] with { DriveVersion = 7 };
+        var complete = await scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None).ConfigureAwait(false);
+        Assert.AreEqual(1, complete.Documents); Assert.AreEqual("new-file", new WorkspacePublicationRepository(fixture.Database, fixture.Budget).Read(id)!.FileId);
+    }
+
+    [TestMethod]
+    public async Task ConflictingAllocatedObjectIsRetainedBeforeRejectionAndCannotInventARetryIdentity()
+    {
+        await using var fixture = new Fixture(); var source = new ScanSource(); var context = ScanContext(fixture); var id = Guid.NewGuid(); var called = false;
+        await fixture.State.ExecuteAsync(database =>
+        {
+            var outbox = new WorkspacePublicationRepository(database, fixture.Budget); var record = outbox.Prepare(id, fixture.Scope, "facts-index", "application/json", "{}"u8);
+            return outbox.AssignFileId(id, record.Sha256, "conflicting-file");
+        }, CancellationToken.None).ConfigureAwait(false);
+        source.Add("conflicting-file"); source.Documents["conflicting-file"] = source.Documents["conflicting-file"] with { Bytes = "{\"wrong\":true}"u8.ToArray() };
+        await using var scanner = new WorkspaceObservationService(fixture.State, fixture.Budget, context, source);
+        await Assert.ThrowsExactlyAsync<WorkspaceObservationConflictException>(() => scanner.ScanAsync((_, _) => { called = true; return Task.CompletedTask; }, CancellationToken.None)).ConfigureAwait(false);
+        Assert.IsFalse(called); var retained = new WorkspaceObservationRepository(fixture.Database, fixture.Budget).Known(context).Single();
+        Assert.AreEqual("conflicting-file", retained.FileId); Assert.AreEqual(source.Documents[retained.FileId].Bytes.Length, retained.Bytes);
+        var pending = new WorkspacePublicationRepository(fixture.Database, fixture.Budget).Read(id)!; Assert.AreEqual("conflicting-file", pending.FileId); Assert.IsNull(pending.VerifiedVersion);
+    }
+
+    [TestMethod]
+    public async Task OutboxChangesDuringFinalInspectionInvalidateCompletionWithoutLosingTheNewWork()
+    {
+        await using var fixture = new Fixture(); var source = new ScanSource(); var context = ScanContext(fixture); var id = Guid.NewGuid();
+        await using var scanner = new WorkspaceObservationService(fixture.State, fixture.Budget, context, source);
+        await Assert.ThrowsExactlyAsync<WorkspacePublicationInventoryChangedException>(() => scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None,
+            async token => { await fixture.State.ExecuteAsync(database => new WorkspacePublicationRepository(database, fixture.Budget).Prepare(id, fixture.Scope,
+                "facts-index", "application/json", "{}"u8), token).ConfigureAwait(false); })).ConfigureAwait(false);
+        var observations = new WorkspaceObservationRepository(fixture.Database, fixture.Budget);
+        Assert.IsNull(observations.LastCheckpoint()); Assert.IsNull(observations.LastAttempt()!.Completed);
+        Assert.IsNotNull(new WorkspacePublicationRepository(fixture.Database, fixture.Budget).Read(id));
+        var recovered = await scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None).ConfigureAwait(false); observations.AssertCompletedScan(recovered);
+        Assert.IsNull(new WorkspacePublicationRepository(fixture.Database, fixture.Budget).Read(id)!.FileId);
+    }
+
+    [TestMethod]
     public async Task MixedJsonAndBinaryScansRetainExactEncodingsWithoutRaisingTheSignedJsonCap()
     {
         await using var fixture = new Fixture(); var context = ScanContext(fixture); var source = new ScanSource(); source.Add("policy-A");

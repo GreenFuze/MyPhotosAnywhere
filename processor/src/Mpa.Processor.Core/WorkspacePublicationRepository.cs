@@ -16,7 +16,7 @@ public sealed class WorkspacePublicationConflictException() : InvalidOperationEx
 /// source authority and original-mutation consent separately. Capture payload/scope before
 /// allocating a Drive ID; persist that ID before any create request. Never retarget a retry.
 /// Verified rows are retained; this repository neither deletes originals nor activates heads.</summary>
-public sealed class WorkspacePublicationRepository(ProcessorStateDatabase database, StorageBudgetManager budget)
+public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabase database, StorageBudgetManager budget)
 {
     public const int MaximumPayloadBytes = 4 * 1024 * 1024;
     private readonly ProcessorStateDatabase _database = database ?? throw new ArgumentNullException(nameof(database));
