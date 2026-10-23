@@ -30,6 +30,9 @@ public sealed class WorkspaceObservationRepository(ProcessorStateDatabase databa
         var result = ReadAll(context, transaction); transaction.Commit(); return result;
     }
 
+    internal ReadOnlyCollection<WorkspaceDocumentObservation> Known(WorkspaceObservationContext context, SqliteTransaction transaction)
+    { AssertContext(context, transaction); return ReadAll(context, transaction); }
+
     public WorkspaceDocumentObservation RememberRead(WorkspaceObservationContext context, WorkspaceDocumentObservation observation)
     {
         Validate(observation); using var transaction = _database.Connection.BeginTransaction(); AssertContext(context, transaction);
@@ -102,7 +105,7 @@ public sealed class WorkspaceObservationRepository(ProcessorStateDatabase databa
         }
         return result.AsReadOnly();
     }
-    private WorkspaceDocumentObservation? ReadOne(WorkspaceObservationContext context, string fileId, SqliteTransaction transaction)
+    internal WorkspaceDocumentObservation? ReadOne(WorkspaceObservationContext context, string fileId, SqliteTransaction transaction)
     {
         using var command = Command(transaction, "SELECT id,length(document),document,row_hash FROM workspace_document_observation WHERE id=$id", ("$id", fileId));
         using var reader = command.ExecuteReader(); return reader.Read() ? DecodeObservation(context, reader) : null;
@@ -117,7 +120,7 @@ public sealed class WorkspaceObservationRepository(ProcessorStateDatabase databa
         if (value.Observation.FileId == context.FolderId) throw new InvalidDataException("Retained metadata aliases its containing workspace.");
         return value.Observation;
     }
-    private WorkspaceInventoryCheckpoint? ReadCheckpoint(SqliteTransaction transaction)
+    internal WorkspaceInventoryCheckpoint? ReadCheckpoint(SqliteTransaction transaction)
     {
         using var command = Command(transaction, "SELECT length(document),document,row_hash FROM workspace_inventory_checkpoint WHERE id=1");
         using var reader = command.ExecuteReader(); if (!reader.Read()) return null;
@@ -150,7 +153,7 @@ public sealed class WorkspaceObservationRepository(ProcessorStateDatabase databa
     }
     private static bool Identity(string? text) => text is { Length: > 0 and <= 128 } && text.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-');
     private static bool Digest(string? text) => text is { Length: 64 } && text.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
-    private static string InventoryHash(IEnumerable<WorkspaceDocumentObservation> ordered)
+    internal static string InventoryHash(IEnumerable<WorkspaceDocumentObservation> ordered)
     {
         // The inventory exceeds the protocol's 1000-element array cap. Frame each
         // independently bounded canonical record instead of relaxing that shared cap.

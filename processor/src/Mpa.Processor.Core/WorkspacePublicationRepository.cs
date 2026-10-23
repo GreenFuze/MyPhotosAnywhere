@@ -54,10 +54,12 @@ public sealed class WorkspacePublicationRepository(ProcessorStateDatabase databa
 
     /// <summary>Complete bounded outbox identities, including verified work. Unlike a
     /// pending-work page this fails if the caller's inventory bound cannot cover it.</summary>
-    public IReadOnlyList<Guid> Identities(int maximum = 128)
+    public IReadOnlyList<Guid> Identities(int maximum = 128) => Identities(maximum, null);
+
+    internal IReadOnlyList<Guid> Identities(int maximum, SqliteTransaction? transaction)
     {
         if (maximum is < 1 or > 4096) throw new ArgumentOutOfRangeException(nameof(maximum));
-        using var command = Command(null, "SELECT id FROM workspace_publication ORDER BY id LIMIT $limit", ("$limit", maximum + 1));
+        using var command = Command(transaction, "SELECT id FROM workspace_publication ORDER BY id LIMIT $limit", ("$limit", maximum + 1));
         using var reader = command.ExecuteReader(); var ids = new List<Guid>();
         while (reader.Read())
         {
@@ -133,7 +135,7 @@ public sealed class WorkspacePublicationRepository(ProcessorStateDatabase databa
     }
 
     private WorkspacePublicationRecord Required(Guid id, SqliteTransaction transaction) => Read(id, transaction) ?? throw new InvalidOperationException("The captured publication is missing.");
-    private WorkspacePublicationRecord? Read(Guid id, SqliteTransaction? transaction)
+    internal WorkspacePublicationRecord? Read(Guid id, SqliteTransaction? transaction)
     {
         using var command = Command(transaction, "SELECT " + Columns + " FROM workspace_publication WHERE id=$id", ("$id", id.ToString("D")));
         using var reader = command.ExecuteReader(); if (!reader.Read()) return null;

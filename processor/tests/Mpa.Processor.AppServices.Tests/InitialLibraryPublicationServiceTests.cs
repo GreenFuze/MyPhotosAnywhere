@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Mpa.Processor.Core;
 using Mpa.Processor.GoogleDrive;
@@ -15,6 +16,9 @@ public sealed partial class AccountServiceTests
         Assert.AreEqual(2, fixture.Allocations); Assert.AreEqual(2, fixture.Creates); Assert.AreEqual(2, fixture.Cloud.Count);
         Assert.IsTrue(results.All(result => result.Plan == results[0].Plan));
         Assert.IsTrue(results.All(result => result.Publisher.VerifiedVersion == 7 && result.Sources.VerifiedVersion == 7 && result.Observation.Documents == 2));
+        Assert.IsTrue(results.All(result => result.Completion == results[0].Completion));
+        Assert.AreEqual(results[0].Plan, results[0].Completion.Plan);
+        Assert.AreEqual(results[0].Completion, await fixture.Setup.Accounts.State.ExecuteAsync(database => new LibraryAuthorityRepository(database, fixture.Budget).InitialPublicationCompletion(), CancellationToken.None).ConfigureAwait(false));
         Assert.IsTrue(fixture.InitialInventories >= 5); Assert.AreEqual(1, fixture.Setup.Accounts.Readers.Opened.Count);
         Assert.IsNull(fixture.Owner.Failure); Assert.AreEqual(0L, fixture.Budget.Status().ReservedBytes);
         await fixture.Owner.DisposeAsync().ConfigureAwait(false); Assert.IsTrue(fixture.Owner.ExitConfirmed);
@@ -58,6 +62,7 @@ public sealed partial class AccountServiceTests
         fixture.Cloud.Clear(); fixture.FailInventoryAfterFirstCreate = false;
         await Assert.ThrowsExactlyAsync<WorkspaceObservationConflictException>(() => fixture.Owner.PublishAsync(CancellationToken.None)).ConfigureAwait(false);
         Assert.AreEqual(1, fixture.Creates); Assert.AreEqual(1, fixture.Allocations); Assert.IsNull((await fixture.PreparedAsync().ConfigureAwait(false)).Sources.FileId);
+        Assert.IsNull(await fixture.Setup.Accounts.State.ExecuteAsync(database => new LibraryAuthorityRepository(database, fixture.Budget).InitialPublicationCompletion(), CancellationToken.None).ConfigureAwait(false));
     }
 
     [TestMethod]
@@ -113,6 +118,30 @@ public sealed partial class AccountServiceTests
         var retained = await fixture.Setup.Accounts.State.ExecuteAsync(database => new LibraryAuthorityRepository(database).InitialPublicationPlan(), CancellationToken.None).ConfigureAwait(false);
         Assert.AreEqual(first.Plan, retained); Assert.AreEqual(0, fixture.Allocations); Assert.AreEqual(0, fixture.Creates);
     }
+
+    [TestMethod]
+    public async Task InterruptedCompletionCheckpointResumesAfterRealObservationWithoutReuploadingEitherPolicy()
+    {
+        await using var fixture = await InitialPublicationFixture.CreateAsync().ConfigureAwait(false);
+        await InitialPublicationSqlAsync(fixture, "CREATE TRIGGER fail_completion BEFORE INSERT ON processor_meta WHEN NEW.key='initial_library_publication_complete_v1:sha256' BEGIN SELECT RAISE(ABORT,'synthetic full'); END").ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<SqliteException>(() => fixture.Owner.PublishAsync(CancellationToken.None)).ConfigureAwait(false);
+        var prepared = await fixture.PreparedAsync().ConfigureAwait(false);
+        Assert.AreEqual(7L, prepared.Publisher.VerifiedVersion); Assert.AreEqual(7L, prepared.Sources.VerifiedVersion);
+        Assert.AreEqual(2, fixture.Cloud.Count); Assert.AreEqual(2, fixture.Creates); Assert.AreEqual(2, fixture.Allocations);
+        Assert.IsNull(await fixture.Setup.Accounts.State.ExecuteAsync(database => new LibraryAuthorityRepository(database, fixture.Budget).InitialPublicationCompletion(), CancellationToken.None).ConfigureAwait(false));
+        await InitialPublicationSqlAsync(fixture, "DROP TRIGGER fail_completion").ConfigureAwait(false);
+        await fixture.Owner.DisposeAsync().ConfigureAwait(false); fixture.ReopenOwner();
+        var resumed = await fixture.Owner.PublishAsync(CancellationToken.None).ConfigureAwait(false);
+        Assert.AreEqual(prepared.Plan, resumed.Completion.Plan); Assert.AreEqual(2, resumed.Completion.Observation.Documents);
+        Assert.AreEqual(prepared.Publisher.FileId, resumed.Completion.Publisher.FileId); Assert.AreEqual(prepared.Sources.FileId, resumed.Completion.Sources.FileId);
+        Assert.AreEqual(2, fixture.Creates); Assert.AreEqual(2, fixture.Allocations); Assert.IsNull(fixture.Owner.Failure);
+    }
+
+    private static Task<int> InitialPublicationSqlAsync(InitialPublicationFixture fixture, string sql) => fixture.Setup.Accounts.State.ExecuteAsync(database =>
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.Combine(database.StateDirectory, "processor.db"), Pooling = false }.ToString());
+        connection.Open(); using var command = connection.CreateCommand(); command.CommandText = sql; return command.ExecuteNonQuery();
+    }, CancellationToken.None);
 
     [TestMethod]
     public async Task InitialPublicationCannotIgnoreNonJsonChangesAfterItsUnfilteredInventory()

@@ -62,7 +62,7 @@ public sealed partial class LibraryAuthorityRepository
 
     private static ProtocolSigningIntent InitialSealedPolicy(ProtocolSigningJournal journal, SqliteTransaction transaction, Guid id, string kind, LibraryControllerPin pin)
     {
-        var intent = journal.Read(id, transaction) ?? throw new InvalidOperationException("The captured initial policy intent is missing.");
+        var intent = journal.Read(id, transaction) ?? throw new InvalidDataException("The captured initial policy intent is missing.");
         if (intent.LibraryId != pin.LibraryId || intent.ActorId != pin.ActorId || intent.Epoch != pin.Epoch || intent.Kind != kind || intent.Envelope is null || intent.EnvelopeSha256 is null)
             throw new InvalidDataException("Initial publication requires the exact sealed controller policy intents.");
         return intent;

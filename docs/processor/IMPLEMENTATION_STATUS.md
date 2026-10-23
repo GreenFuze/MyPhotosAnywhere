@@ -1546,3 +1546,24 @@ General history/head reconciliation, reconnect recovery, durable setup schedulin
 the rest of the joint release remain unfinished. Processor schema 10 and Android Room 12
 are unchanged. The preceding 285811f revision passed native Protocol39936601289, Android
 39936601321, Desktop39936601222 and device39936601180; fresh current-source CI is required.
+
+## Durable initial publication completion
+
+The joined native owner now records an immutable historical completion receipt after
+both exact policies were uploaded, read back and included in the final current scan.
+One SQLite transaction validates the fixed plan, sealed signing history, original human
+source approval, verified outbox records and retained observations/checkpoint before
+writing the receipt and its digest. It reuses the actual transaction-aware integrity
+readers rather than copying partial SQL checks. Processor schema 10 is unchanged.
+
+Subsequent setup stages can read this receipt after later source policies, revocations,
+disconnects or additional catalog work. That is historical evidence, not current cloud
+availability, head activation or renewed-access authority. Later observations do not
+replace the original receipt. Missing/corrupt completion over later outbox or even
+unsealed signing work stops bootstrap reconstruction. Lost approval, signing/outbox or
+observation records and checkpoint revision reuse cannot be treated as a new setup.
+
+All 108 affected Core authority/signing/outbox/observation cases pass, including nine
+completion cases. Native application coverage also verifies that a failed completion
+write retains both uploaded objects and resumes without reuploading them. Low storage
+and interrupted receipt/hash writes leave no half-completed stage.

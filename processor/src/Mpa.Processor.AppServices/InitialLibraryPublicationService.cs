@@ -5,7 +5,7 @@ using Mpa.Processor.GoogleDrive;
 namespace Mpa.Processor.AppServices;
 
 public sealed record PublishedInitialLibraryPolicies(LibraryInitialPublicationPlan Plan, WorkspacePublicationRecord Publisher,
-    WorkspacePublicationRecord Sources, WorkspaceInventoryCheckpoint Observation);
+    WorkspacePublicationRecord Sources, WorkspaceInventoryCheckpoint Observation, LibraryInitialPublicationCompletion Completion);
 
 /// <summary>Joined owner for this installation's two initial policies only. Every write
 /// is preceded by actual folder access and complete unfiltered child reconciliation.
@@ -59,10 +59,17 @@ public sealed class InitialLibraryPublicationService(ProcessorStateCoordinator s
                 }
                 if (current.Work.Publisher.VerifiedVersion is null || current.Work.Sources.VerifiedVersion is null || current.Observations.Count != 2)
                     throw new InvalidDataException("Initial publication did not retain and observe both exact verified policies.");
+                var completion = await _state.ExecuteAsync(database =>
+                {
+                    ThrowIfCanceled(cancellationToken, linked.Token);
+                    var authority = new LibraryAuthorityRepository(database, _budget);
+                    _keys.AssertPublicationIdentity(authority.Controller() ?? throw new InvalidDataException("Initial completion lost its native controller."), authority.CaptureLocalPublicationAuthority());
+                    return authority.CompleteInitialPublication(current.Work.Plan, current.Checkpoint);
+                }, linked.Token).ConfigureAwait(false);
                 lock (_gate)
                 {
                     ThrowIfCanceled(cancellationToken, linked.Token); _failure = null;
-                    return new(current.Work.Plan, current.Work.Publisher, current.Work.Sources, current.Checkpoint);
+                    return new(current.Work.Plan, current.Work.Publisher, current.Work.Sources, current.Checkpoint, completion);
                 }
             }
             catch (Exception error) { lock (_gate) _failure = error; throw; }
