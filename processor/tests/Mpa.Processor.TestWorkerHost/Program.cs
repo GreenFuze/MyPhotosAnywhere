@@ -8,7 +8,7 @@ using Mpa.Processor.WorkerRuntime;
 using Mpa.Processor.TestSupport;
 
 // Synthetic child-process fixture only. Never included in the product installer/plugin registry.
-if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "malformed" or "exit-error" or "exit-clean" or "parent-launcher"))
+if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "partial-frame" or "malformed" or "exit-error" or "exit-clean" or "parent-launcher"))
     throw new ArgumentException("Expected a known synthetic scenario and an owned test directory.");
 var root = Path.GetFullPath(args[1]);
 if (!Directory.Exists(root) || !Path.GetFileName(root).StartsWith("MPA-Worker-Test-", StringComparison.Ordinal))
@@ -53,12 +53,19 @@ using var writer = new WorkerFrameWriter(output);
 await writer.WriteAsync("{\"type\":\"hello\"}"u8.ToArray(), CancellationToken.None).ConfigureAwait(false);
 if (args[0] == "exit-error") return 7;
 if (args[0] == "exit-clean") return 0;
+if (args[0] == "partial-frame")
+{
+    await output.WriteAsync(new byte[] { 0, 0, 0, 32, (byte)'{' }).ConfigureAwait(false);
+    await output.FlushAsync().ConfigureAwait(false);
+    using (var marker = new FileStream(Path.Combine(root, "worker-partial-frame.marker"), FileMode.CreateNew, FileAccess.Write, FileShare.None))
+    { marker.WriteByte(1); marker.Flush(flushToDisk: true); }
+}
 if (args[0] == "malformed")
 {
     await output.WriteAsync(new byte[4]).ConfigureAwait(false); // Deliberately invalid zero-length frame.
     await output.FlushAsync().ConfigureAwait(false);
 }
-if (args[0] is "ignore-eof" or "malformed")
+if (args[0] is "ignore-eof" or "partial-frame" or "malformed")
 {
     var end = await guard.Completion.ConfigureAwait(false);
     return end.ParentLost ? 86 : 0;

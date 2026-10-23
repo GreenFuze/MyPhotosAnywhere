@@ -1632,6 +1632,25 @@ inventory bound is unchanged; general multi-generation retention still needs rec
 with the protocol graph's separate object budget. Processor schema 10 and Android Room 12
 remain unchanged. No live Drive or new UI/device acceptance is claimed by this increment.
 
+## Worker failure ownership after resource termination
+
+Protocol CI for 37a572f exposed an existing shutdown race on Linux: a resource-limit
+failure terminated its child, then a truncated pipe frame replaced that original failure
+when the supervisor awaited its task group. The original exact exception assertion stayed
+blocking; no rerun, exception waiver or relaxed assertion was used to accept that result.
+
+FramedWorkerProcess now retains every observed fault, joins all owned tasks and propagates
+the first observed failure through Completion and the frame consumer. Secondary diagnostics
+remain available through its failure record after retirement. A pipe fault caused by owned
+termination cannot replace the resource failure; an original malformed-frame failure still
+remains a protocol failure. Existing release/join/input-lease behavior is preserved.
+
+A real child fixture leaves a flushed partial frame before its lifetime stop. Regression
+coverage requires the exact resource exception, retained truncated-frame diagnostic, joined
+process, consistent frame-consumer error and intact/released input lease. The initial nine
+worker cases pass locally; strengthened final full suites and fresh platform CI remain
+required. No release acceptance is claimed from the earlier failed matrix.
+
 The preceding 5d5d2ef passed Protocol39946912329 on all native platforms, Android39946912239,
 Desktop39946912280 and device39946912278 on all three API levels. Fresh final-source CI is
 required. Processor schema 10 and Android Room 12 are unchanged. General current-history,

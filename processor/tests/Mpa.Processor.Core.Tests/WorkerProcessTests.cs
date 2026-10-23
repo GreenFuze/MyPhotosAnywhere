@@ -13,6 +13,40 @@ namespace Mpa.Processor.Core.Tests;
 public sealed class WorkerProcessTests
 {
     [TestMethod]
+    public async Task ResourceStopKeepsItsPrimaryFailureAndRetainsTheInterruptedFrameDiagnosticAfterJoining()
+    {
+        using var root = new WorkerTestDirectory(); using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        var spec = await SpecAsync(root.Path, "partial-frame").ConfigureAwait(false);
+        var worker = await FramedWorkerProcess.StartAsync(spec with { ResourcePolicy = new(1024L * 1024 * 1024, TimeSpan.FromSeconds(5)) }, deadline.Token).ConfigureAwait(false);
+        try
+        {
+            var marker = Path.Combine(root.Path, "worker-partial-frame.marker");
+            while (!File.Exists(marker))
+            {
+                if (worker.Completion.IsCompleted) await worker.Completion.ConfigureAwait(false);
+                await Task.Delay(20, deadline.Token).ConfigureAwait(false);
+            }
+            var error = await Assert.ThrowsExactlyAsync<WorkerResourceLimitException>(() => worker.Completion.WaitAsync(deadline.Token)).ConfigureAwait(false);
+            Assert.AreEqual("lifetime-milliseconds", error.Resource); Assert.IsTrue(worker.ExitConfirmed);
+            var failure = worker.Failure; Assert.IsNotNull(failure); Assert.AreSame(error, failure.Primary);
+            Assert.IsTrue(failure.Secondary.Any(secondary => secondary is ProtocolFormatException { InnerException: EndOfStreamException }));
+            await using var frames = worker.ReadFramesAsync(deadline.Token).GetAsyncEnumerator();
+            Assert.IsTrue(await frames.MoveNextAsync().ConfigureAwait(false)); // The complete hello preceding the partial frame remains readable.
+            var channelFailure = await Assert.ThrowsExactlyAsync<WorkerResourceLimitException>(() => frames.MoveNextAsync().AsTask()).ConfigureAwait(false);
+            Assert.AreSame(error, channelFailure);
+            await Assert.ThrowsExactlyAsync<WorkerResourceLimitException>(() => worker.DisposeAsync().AsTask()).ConfigureAwait(false);
+            Assert.AreSame(error, worker.Failure!.Primary);
+            using var released = File.Open(Path.Combine(root.Path, "worker-read-lease.bin"), FileMode.Open, FileAccess.Read, FileShare.None);
+            Assert.AreEqual(42, released.ReadByte());
+        }
+        finally
+        {
+            try { await worker.DisposeAsync().ConfigureAwait(false); }
+            catch (WorkerResourceLimitException) { /* Expected failed worker; all owned tasks/process were still joined. */ }
+        }
+    }
+
+    [TestMethod]
     public async Task ActualChildExchangesFramesAndConcurrentDisposalJoinsItAndReleasesTheReadLease()
     {
         using var root = new WorkerTestDirectory();

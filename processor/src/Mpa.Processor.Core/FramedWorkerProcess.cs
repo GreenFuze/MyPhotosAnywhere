@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Channels;
@@ -19,6 +21,7 @@ public sealed class WorkerProcessFailedException(int exitCode) : IOException("Fi
 {
     public int ExitCode { get; } = exitCode;
 }
+public sealed record WorkerProcessFailure(Exception Primary, ReadOnlyCollection<Exception> Secondary);
 
 /// <summary>Owns one DIRECT first-party worker process that cannot spawn native delegates.
 /// Installed manifest validation/role selection belongs to the launcher; no LAN command may
@@ -31,6 +34,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     private readonly CancellationTokenSource _stopReading = new();
     private readonly Channel<byte[]> _frames = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(8) { SingleWriter = true, FullMode = BoundedChannelFullMode.Wait });
     private readonly TaskCompletionSource<Exception> _fault = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly List<Exception> _observedFaults = [];
     private readonly WorkerFrameWriter _writer;
     private readonly Task _framePump;
     private readonly Task _diagnosticPump;
@@ -49,6 +53,16 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     public int ProcessId { get; }
     public Task Completion { get; }
     public bool ExitConfirmed => _processExit.IsCompletedSuccessfully;
+    /// <summary>All observed faults remain available after joined retirement. A forced
+    /// termination's pipe fault never replaces the failure that caused termination.</summary>
+    public WorkerProcessFailure? Failure
+    {
+        get
+        {
+            lock (_exitOutcomeGate) return _observedFaults.Count == 0 ? null :
+                new(_observedFaults[0], _observedFaults.Skip(1).ToList().AsReadOnly());
+        }
+    }
     private long _observedPeakResidentBytes;
     public long ObservedPeakResidentBytes => Interlocked.Read(ref _observedPeakResidentBytes);
 
@@ -152,7 +166,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
                 lock (_disposalGate)
                 {
                     _writes.Remove(completed);
-                    if (!_stopping && error is not null) _fault.TrySetResult(error);
+                    if (!_stopping && error is not null) RecordFault(error);
                 }
             }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             return write;
@@ -170,7 +184,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
             _frames.Writer.TryComplete();
         }
         catch (OperationCanceledException) when (_stopReading.IsCancellationRequested) { _frames.Writer.TryComplete(); }
-        catch (Exception error) { _frames.Writer.TryComplete(error); _fault.TrySetResult(error); throw; }
+        catch (Exception error) { _frames.Writer.TryComplete(RecordFault(error)); throw; }
     }
 
     private async Task PumpDiagnosticsAsync(FileStream destination)
@@ -191,7 +205,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
                 }
                 await destination.FlushAsync().ConfigureAwait(false);
             }
-            catch (Exception error) { _fault.TrySetResult(error); throw; }
+            catch (Exception error) { RecordFault(error); throw; }
         }
     }
 
@@ -201,10 +215,23 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         if (first == _fault.Task) KillOwned(requestedStop: false);
         await _processExit.ConfigureAwait(false);
         await _stopMonitoring.CancelAsync().ConfigureAwait(false);
-        await Task.WhenAll(_framePump, _diagnosticPump, _resourceMonitor).ConfigureAwait(false);
-        if (_fault.Task.IsCompletedSuccessfully) throw await _fault.Task.ConfigureAwait(false);
+        // Join every owned task before choosing the already observed first failure.
+        // Killing a worker mid-frame can fault its reader; WhenAll's task ordering
+        // must not replace the resource/diagnostic failure that caused that kill.
+        try { await Task.WhenAll(_framePump, _diagnosticPump, _resourceMonitor).ConfigureAwait(false); }
+        catch (Exception error) { RecordFault(error); }
+        if (_fault.Task.IsCompletedSuccessfully) ExceptionDispatchInfo.Capture(await _fault.Task.ConfigureAwait(false)).Throw();
         lock (_exitOutcomeGate)
-            if (_process.ExitCode != 0 && !_forcedStop) throw new WorkerProcessFailedException(_process.ExitCode);
+            if (_process.ExitCode != 0 && !_forcedStop) throw RecordFault(new WorkerProcessFailedException(_process.ExitCode));
+    }
+
+    private Exception RecordFault(Exception error)
+    {
+        lock (_exitOutcomeGate)
+        {
+            if (!_observedFaults.Any(observed => ReferenceEquals(observed, error))) _observedFaults.Add(error);
+            var primary = _observedFaults[0]; _fault.TrySetResult(primary); return primary;
+        }
     }
 
     private async Task MonitorResourcesAsync(WorkerResourcePolicy policy)
@@ -235,7 +262,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         }
         catch (OperationCanceledException) when (_stopMonitoring.IsCancellationRequested) { /* Owner joined monitoring on shutdown/exit. */ }
         catch (InvalidOperationException) when (_process.HasExited) { /* Exit raced the final sample. */ }
-        catch (Exception error) { _fault.TrySetResult(error); }
+        catch (Exception error) { RecordFault(error); }
     }
 
     public ValueTask DisposeAsync()
