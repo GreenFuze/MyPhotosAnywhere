@@ -1456,3 +1456,25 @@ cases and Web 25 tests pass, and Desktop Release has zero warnings/errors. Logs/
 initial-policy-* and catalog-retirement-final in preflight-060. No warning suppression,
 new diagnostic waiver or weakened assertion was introduced. These changes and df7cde0's
 Intel macOS shutdown-race fix require fresh native/platform CI before acceptance.
+
+## Immutable initial policy upload context
+
+Initial policy publication now captures the original scope/generation, both object IDs,
+fixed signing intents and exact sealed envelope digests before outbox preparation. It
+requires the original human source approval, locally selected initial policies and real
+sealed signing history in one serial state transaction. A restart returns the same
+context; reconnecting retains its old account revision without granting renewed access.
+Missing context over existing outbox work cannot allocate a replacement plan. Failed or
+corrupt context writes preserve both policies and existing work for explicit recovery.
+
+The signing journal's transaction-aware integrity reader is now internal so this owner
+reuses actual envelope/body/signature validation within its transaction rather than
+copying a partial SQL check. Historical context inspection remains separate from current
+native/cloud admission. Processor schema 10 and Android Room 12 are unchanged.
+
+Local strict coverage passes 98 authority/outbox/signing cases, including five new upload
+context cases; all 154 AppServices and 25 Web tests pass. Desktop Release is clean. Fresh
+reviewed artifact names avoid the local test runner's prior overwrite-report diagnostic;
+no warning was suppressed or accepted. Evidence is initial-outbox-*-reviewed in
+preflight-060. One new development test initially compared memory owners; it now verifies
+retained IDs/scope/hash and actual payload bytes. Cross-platform checks remain required.

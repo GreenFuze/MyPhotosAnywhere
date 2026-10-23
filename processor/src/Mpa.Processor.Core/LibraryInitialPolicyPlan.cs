@@ -57,6 +57,11 @@ public sealed partial class LibraryAuthorityRepository
         var plan = ReadInitialPolicyPlan(transaction) ?? throw new InvalidOperationException("Prepare the durable initial policy plan before signing.");
         if (plan != BuildInitialPlan(pin, approved, nativePublisher, plan.PublisherIntentId, plan.SourceIntentId) ||
             intentId != (kind == "library-publisher-authorization" ? plan.PublisherIntentId : plan.SourceIntentId)) throw new LibraryInitialPolicyConflictException();
+        AssertInitialPlanSelections(transaction, pin, plan);
+        transaction.Commit(); return plan;
+    }
+    private void AssertInitialPlanSelections(SqliteTransaction transaction, LibraryControllerPin pin, LibraryInitialPolicyPlan plan)
+    {
         var publisherSequence = SelectedSequence(transaction);
         if (publisherSequence is not null)
         {
@@ -65,7 +70,6 @@ public sealed partial class LibraryAuthorityRepository
         }
         var sources = ReadCurrentSources(transaction, pin);
         if (sources is not null) AssertInitialSelection(transaction, plan.SourceIntentId, "library-source-configuration", sources.Sequence, sources.EnvelopeSha256);
-        transaction.Commit(); return plan;
     }
     private static LibraryInitialPolicyPlan BuildInitialPlan(LibraryControllerPin pin, LibraryBootstrapSources approved,
         PublisherSigningRegistration publisher, Guid publisherIntent, Guid sourceIntent) => new(pin.LibraryId, pin.ActorId, pin.Epoch, pin.AccountId, pin.FolderId,

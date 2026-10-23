@@ -97,7 +97,7 @@ public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase databa
         transaction.Commit(); return intent with { Envelope = envelope, EnvelopeSha256 = hash };
     }
 
-    private ProtocolSigningIntent? Read(Guid id, SqliteTransaction? transaction)
+    internal ProtocolSigningIntent? Read(Guid id, SqliteTransaction? transaction)
     {
         Stored row;
         using (var command = Command(transaction, "SELECT actor_id,epoch,sequence,kind,length(body),body,body_hash,length(envelope),envelope,envelope_hash FROM signing_intent WHERE id=$id", ("$id", id.ToString("D"))))
