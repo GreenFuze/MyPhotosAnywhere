@@ -16,8 +16,8 @@ public sealed record ReconciledLocalCatalog(LocalCatalogPublicationAuthority Aut
 /// <summary>Joined ownership of actual Drive metadata reconciliation, owned signing
 /// history, current controller policies and the complete signed/covered current head.
 /// Starts closed on every attempt; no historical receipt, browser or caller record can
-/// grant permission. ReconcileAsync is read-only. Its internal single-dependency path
-/// admits one create-only metadata upload; no commit activation or original action exists.
+/// grant permission. ReconcileAsync is read-only. Its private one-object admissions
+/// cover dependencies and exact captured commits; no activation or original action exists.
 /// Retire this owner before its borrowed native keys, accounts, budget and state.</summary>
 public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoordinator state, ProcessorAccountService accounts,
     LibrarySigningIdentityOwner keys, StorageBudgetManager budget) : IAsyncDisposable

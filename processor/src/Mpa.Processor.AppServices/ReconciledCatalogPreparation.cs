@@ -115,7 +115,7 @@ public sealed partial class LocalCatalogReconciliationService
                 var publication = new CatalogGenerationCaptureRepository(database, owner._budget).Publication(active.Scope.GenerationId)
                     ?? throw new CatalogGenerationCaptureConflictException();
                 new LibraryAuthorityRepository(database).AssertLocalPublicationScope(active.Scope);
-                if (!(active.Phase == "publication-planned" && publication.Plan is null || active.Phase == "dependencies-ready" && publication.Plan == plan) ||
+                if (!(active.Phase == "publication-planned" && publication.Plan is null || active.Phase is "dependencies-ready" or "commit-sealed" && publication.Plan == plan) ||
                     publication.Basis != plan.Basis)
                     throw new CatalogGenerationCaptureConflictException();
                 var sources = new LibraryAuthorityRepository(database).CurrentSourceConfiguration() ?? throw new CatalogPublicationNotAuthorizedException();

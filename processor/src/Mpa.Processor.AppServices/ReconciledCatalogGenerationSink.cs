@@ -146,7 +146,10 @@ public sealed partial class LocalCatalogReconciliationService
             _owner._state.ExecuteAsync(database =>
             {
                 lock (_owner._gate) { _owner.Check(cancellationToken); if (_retired || scope != _expected.Scope) throw new WorkspacePublicationConflictException(); }
-                if (_owner.AssertGeneration(database, _proof, scope, cancellationToken) != _generation) throw new CatalogGenerationCaptureConflictException();
+                var generation = _expected.Role == "catalog-commit"
+                    ? _owner.AssertCommitGeneration(database, _proof, scope, cancellationToken)
+                    : _owner.AssertGeneration(database, _proof, scope, cancellationToken);
+                if (generation != _generation) throw new CatalogGenerationCaptureConflictException();
                 var actual = new WorkspacePublicationRepository(database, _owner._budget).Inventory(_proof.Publications.Context, _proof.Publications.Maximum);
                 var others = _proof.Publications.Objects.Where(item => item.Id != _expected.Id).ToDictionary(item => item.Id);
                 foreach (var item in actual.Objects.Where(item => item.Id != _expected.Id))

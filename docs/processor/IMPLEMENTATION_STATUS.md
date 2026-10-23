@@ -1,5 +1,35 @@
 # MPA 0.6.0 implementation ledger
 
+## Captured commit publication and actual current readback
+
+The concrete reconciler now publishes only the durable capture's original commit.
+An original sealed signature whose outbox checkpoint was lost can prepare only those
+same exact envelope bytes under the fixed CommitIntentId metadata-object identity.
+An original unsealed reservation first undergoes actual full current history and prepared
+graph reconciliation, then resumes the same native signing intent. New signing/outbox
+transitions are followed by another actual read before a private one-commit admission.
+Account-lease validation remains local and never reenters network/account ownership.
+
+The write grant uses the existing exact one-row monotonic inventory guard, binds the
+sealed generation/plan/body/native context, and rejects unrelated pending signing or
+publication work. Its current head must be the captured predecessor or the exact own next
+envelope after an uncertain reply. Another head cannot replace the parent or burn a new
+sequence. Original allocated-file membership remains required even when identical copies
+change which envelope is selected by listing order; missing originals cannot be retargeted.
+Current exact readback precedes grant retirement, then full signed ancestry/coverage/facts
+and final access/change/local/native/inventory checks precede returning the original
+reference. Failures close the private proof and preserve original journaled work.
+
+Nine focused integration cases pass, covering first and later generation ancestry, exact
+retry, sealed signature without outbox checkpoint, unsealed original recovery, lost actual
+create reply, identical visible copies, missing original allocation, foreign head rejection
+and joined Exit while a real readback adapter ignores cancellation. All 315 Core, 256
+AppServices, 26 Web and 77 Protocol cases pass on frozen binaries. Five strict test/Desktop
+builds have zero warnings/errors, complete final logs are clean and all outputs share
+identical component binaries. No Core verified/complete/retirement phases,
+head activation, automatic engine scheduling or renewed-credential attempt is claimed yet.
+This transport integration is not a completed release workflow and does not mutate media.
+
 ## Integrated retained generation preparation
 
 CatalogGenerationPreparationService now owns a joined serial run from actual current
