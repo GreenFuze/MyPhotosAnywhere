@@ -3,13 +3,15 @@ using System.Collections.ObjectModel;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.Core;
 
 public sealed record WorkspaceObservationContext(Guid LibraryId, string AccountId, string FolderId, long AccountRevision, string? SharedDriveId);
-public sealed record WorkspaceDocumentObservation(string FileId, long Version, long Bytes, string Sha256);
+public sealed record WorkspaceDocumentObservation(string FileId, long Version, long Bytes, string Sha256,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? MimeType = null);
 public sealed record WorkspaceInventoryCheckpoint(WorkspaceObservationContext Context, long Revision, string Cursor, int Documents, string InventorySha256);
 public sealed class WorkspaceObservationConflictException() : InvalidOperationException("A previously observed immutable workspace document changed or disappeared. Preserve the previous state and reconcile explicitly.");
 
@@ -40,7 +42,7 @@ public sealed partial class WorkspaceObservationRepository(ProcessorStateDatabas
         var old = ReadOne(context, observation.FileId, transaction);
         if (old is not null)
         {
-            if (old.Bytes != observation.Bytes || old.Sha256 != observation.Sha256 || old.Version > observation.Version) throw new WorkspaceObservationConflictException();
+            if (old.Bytes != observation.Bytes || old.Sha256 != observation.Sha256 || old.Version > observation.Version || old.MimeType != observation.MimeType) throw new WorkspaceObservationConflictException();
             if (old == observation) { transaction.Commit(); return old; }
         }
         else
@@ -157,8 +159,14 @@ public sealed partial class WorkspaceObservationRepository(ProcessorStateDatabas
     private static void Validate(WorkspaceDocumentObservation value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        if (!Identity(value.FileId) || value.FileId == "root" || value.Version < 1 || value.Bytes is < 1 or > ProtocolDocumentReader.MaximumDocumentBytes || !Digest(value.Sha256)) throw new ArgumentException("A bounded actual immutable document observation is required.", nameof(value));
+        if (!Identity(value.FileId) || value.FileId == "root" || value.Version < 1 || value.Bytes < 1 || value.Bytes > ObservationByteLimit(value.MimeType) || !Digest(value.Sha256)) throw new ArgumentException("A bounded actual immutable document observation is required.", nameof(value));
     }
+    private static int ObservationByteLimit(string? mimeType) => mimeType switch
+    {
+        null => ProtocolDocumentReader.MaximumDocumentBytes, // Legacy/canonical JSON representation.
+        "application/gzip" or "application/octet-stream" => CatalogChunkDecoder.MaximumCompressedBytes,
+        _ => throw new ArgumentException("Unsupported workspace metadata observation encoding.", nameof(mimeType))
+    };
     private static bool Identity(string? text) => text is { Length: > 0 and <= 128 } && text.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-');
     private static bool Digest(string? text) => text is { Length: 64 } && text.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
     internal static string InventoryHash(IEnumerable<WorkspaceDocumentObservation> ordered)

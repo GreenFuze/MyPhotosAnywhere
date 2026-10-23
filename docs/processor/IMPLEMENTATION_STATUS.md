@@ -1599,6 +1599,39 @@ engine that could publish approved setup automatically. It was built, not execut
 Google Drive in this increment. New UI visual review and live setup publication remain
 unverified; no account credentials, real Drive files or physical devices were used here.
 
+## Partial-page history and typed metadata discovery
+
+The actual joined account inventory now reports its start before listing and persists
+each valid bounded page before requesting another page or draining changes. A later page
+failure, incomplete-search flag or change-fence failure retains earlier candidates. Both
+initial and final change fences retain newly seen supported metadata before closing the
+scan. No signature callback or download precedes the required durable page writes.
+
+StartInventory retains the earliest unresolved cursor across retries and even completed
+listings. Completing a listing cannot erase failed history. Optional null cursor fields
+preserve the previous canonical attempt encoding; the private attempt bound accounts for
+three separately bounded opaque cursors without changing any signed envelope or array cap.
+General history admission still must independently reconcile that retained history.
+
+The Google account transport now provides unfiltered typed metadata discovery. JSON keeps
+its 256 KiB limit; gzip and octet-stream candidates use the separate 4 MiB compressed-object
+limit. Membership, exact size, MIME, Drive revision and download permission remain checked
+before and after reads. Originals, folders, shortcuts and Google documents are rejected
+without content download or mutation. Names and properties never select trusted roles.
+
+CatalogWorkspaceDocumentSource supports an explicit allMetadata mode, mutually exclusive
+with initial bootstrap. The shared reader and durable observation service retain encoding
+as part of immutable evidence. Encoding changes conflict; binary observations cannot become
+sealed JSON policy receipts. Null stored MIME preserves legacy canonical JSON bytes. Initial
+publication continues using its strict initial-only scope and original account revision.
+
+These reads do not establish valid gzip, signatures, complete graphs, current authorization
+or an active catalog. Full failed-history, pending-object and predecessor reconciliation,
+renewed access and complete generation publication remain required. The current 4,096-object
+inventory bound is unchanged; general multi-generation retention still needs reconciliation
+with the protocol graph's separate object budget. Processor schema 10 and Android Room 12
+remain unchanged. No live Drive or new UI/device acceptance is claimed by this increment.
+
 The preceding 5d5d2ef passed Protocol39946912329 on all native platforms, Android39946912239,
 Desktop39946912280 and device39946912278 on all three API levels. Fresh final-source CI is
 required. Processor schema 10 and Android Room 12 are unchanged. General current-history,

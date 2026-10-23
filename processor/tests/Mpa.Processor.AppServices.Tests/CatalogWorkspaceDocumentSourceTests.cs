@@ -9,6 +9,29 @@ public sealed partial class AccountServiceTests
     private static readonly DriveWorkspaceDocumentCandidate DocumentCandidate = new("object-A", 1, 2);
 
     [TestMethod]
+    public async Task TypedMetadataSourceUsesTheSameAccountOwnerAndKeepsBinaryIdentityAndBounds()
+    {
+        await using var fixture = new Fixture(); var account = await fixture.Service.ConnectAsync(null, new NoBrowser(), CancellationToken.None).ConfigureAwait(false); ConfigureDocuments(fixture);
+        var candidate = new DriveWorkspaceMetadataCandidate("facts-A", 7, 262145, "application/gzip"); var bytes = new byte[(int)candidate.Bytes];
+        fixture.Readers.MetadataInventory = (_, _, _, _) => Task.FromResult(new DriveWorkspaceMetadataPage(new([candidate]), null, false));
+        fixture.Readers.MetadataRead = (folder, captured, _) =>
+        { Assert.AreEqual("workspace-A", folder); Assert.AreEqual(candidate, captured); return Task.FromResult(new DriveWorkspaceObject("permission-A", captured.FileId, folder, captured.Version, bytes)); };
+        fixture.Readers.DocumentInventory = (_, _, _, _) => throw new InvalidOperationException("General metadata cannot use JSON-only discovery");
+        fixture.Readers.DocumentRead = (_, _, _) => throw new InvalidOperationException("General metadata cannot use JSON-only reads");
+        var source = new CatalogWorkspaceDocumentSource(fixture.State, fixture.Service, new("permission-A", "workspace-A"), null, account.Revision, allMetadata: true);
+        var inventory = await source.CaptureAsync([], CancellationToken.None).ConfigureAwait(false); var captured = inventory.Documents.Single();
+        Assert.AreEqual("application/gzip", captured.MimeType); Assert.AreEqual(candidate.Bytes, captured.Bytes);
+        CollectionAssert.AreEqual(bytes, (await source.ReadAsync(captured, CancellationToken.None).ConfigureAwait(false)).Bytes.ToArray());
+        Assert.AreEqual(1, fixture.Readers.Opened.Count); Assert.AreEqual(account.ConnectionId, fixture.Readers.Opened.Single());
+        Assert.ThrowsExactly<ArgumentException>(() => new CatalogWorkspaceDocumentSource(fixture.State, fixture.Service, new("permission-A", "workspace-A"), null,
+            account.Revision, initialPoliciesOnly: true, allMetadata: true));
+        await fixture.Service.ConnectAsync(account.PermissionId, new NoBrowser(), CancellationToken.None).ConfigureAwait(false);
+        var calls = fixture.Readers.DocumentCalls;
+        await Assert.ThrowsExactlyAsync<StaleLibraryConfigurationException>(() => source.ReadAsync(captured, CancellationToken.None)).ConfigureAwait(false);
+        Assert.AreEqual(calls, fixture.Readers.DocumentCalls);
+    }
+
+    [TestMethod]
     public async Task DocumentReconciliationUsesTheSameCapturedAccountOwnerAndNoOriginalReads()
     {
         await using var fixture = new Fixture(); var account = await fixture.Service.ConnectAsync(null, new NoBrowser(), CancellationToken.None).ConfigureAwait(false);
@@ -94,7 +117,9 @@ public sealed partial class AccountServiceTests
         public Func<DriveChangeCursor, CancellationToken, Task<DriveChangePage>>? DocumentChanges { get; set; }
         public Func<string, string?, string?, CancellationToken, Task<DriveWorkspaceDocumentPage>>? DocumentInventory { get; set; }
         public Func<string, DriveWorkspaceDocumentCandidate, CancellationToken, Task<DriveWorkspaceObject>>? DocumentRead { get; set; }
-        private sealed partial class Connection : IGoogleWorkspaceDiscovery, IGoogleWorkspaceChanges
+        public Func<string, string?, string?, CancellationToken, Task<DriveWorkspaceMetadataPage>>? MetadataInventory { get; set; }
+        public Func<string, DriveWorkspaceMetadataCandidate, CancellationToken, Task<DriveWorkspaceObject>>? MetadataRead { get; set; }
+        private sealed partial class Connection : IGoogleWorkspaceDiscovery, IGoogleWorkspaceChanges, IGoogleWorkspaceMetadataDiscovery
         {
             public Task<DriveChangeCursor> GetChangeCursorAsync(string? sharedDriveId, CancellationToken cancellationToken)
             { owner.DocumentCalls++; return owner.DocumentStart?.Invoke(sharedDriveId, cancellationToken) ?? throw new InvalidOperationException("Unexpected change start request."); }
@@ -104,6 +129,10 @@ public sealed partial class AccountServiceTests
             { owner.DocumentCalls++; return owner.DocumentInventory?.Invoke(folderId, sharedDriveId, pageToken, cancellationToken) ?? throw new InvalidOperationException("Unexpected document inventory request."); }
             public Task<DriveWorkspaceObject> ReadWorkspaceDocumentAsync(string folderId, DriveWorkspaceDocumentCandidate candidate, CancellationToken cancellationToken)
             { owner.DocumentCalls++; return owner.DocumentRead?.Invoke(folderId, candidate, cancellationToken) ?? throw new InvalidOperationException("Unexpected document request."); }
+            public Task<DriveWorkspaceMetadataPage> ReadWorkspaceMetadataPageAsync(string folderId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken)
+            { owner.DocumentCalls++; return owner.MetadataInventory?.Invoke(folderId, sharedDriveId, pageToken, cancellationToken) ?? throw new InvalidOperationException("Unexpected typed metadata inventory request."); }
+            public Task<DriveWorkspaceObject> ReadWorkspaceMetadataCandidateAsync(string folderId, DriveWorkspaceMetadataCandidate candidate, CancellationToken cancellationToken)
+            { owner.DocumentCalls++; return owner.MetadataRead?.Invoke(folderId, candidate, cancellationToken) ?? throw new InvalidOperationException("Unexpected typed metadata read."); }
         }
     }
 }

@@ -6,6 +6,14 @@ namespace Mpa.Processor.Core.Tests;
 public sealed partial class LibraryAuthorityTests
 {
     [TestMethod]
+    public void InitialCompletionCannotReclassifyABinaryObjectAsItsSealedJsonPolicy()
+    {
+        using var fixture = new Fixture(); var work = fixture.PrepareCompletionEvidence(sourceEncoding: "application/gzip");
+        Assert.ThrowsExactly<InvalidDataException>(() => fixture.Store.CompleteInitialPublication(work.Plan, work.Checkpoint));
+        Assert.IsNull(fixture.Store.InitialPublicationCompletion());
+        Assert.AreEqual(2L, fixture.Scalar("SELECT count(*) FROM workspace_publication WHERE verified_version IS NOT NULL"));
+    }
+    [TestMethod]
     public void InitialCompletionSurvivesRestartAndRetainsItsOriginalExactObservation()
     {
         using var root = new WorkerProcessTests.WorkerTestDirectory(); LibraryInitialPublicationCompletion saved;
@@ -132,7 +140,7 @@ public sealed partial class LibraryAuthorityTests
 
     private sealed partial class Fixture
     {
-        public (LibraryInitialPublicationPlan Plan, WorkspaceInventoryCheckpoint Checkpoint) PrepareCompletionEvidence(bool verifySources = true)
+        public (LibraryInitialPublicationPlan Plan, WorkspaceInventoryCheckpoint Checkpoint) PrepareCompletionEvidence(bool verifySources = true, string? sourceEncoding = null)
         {
             var sealedPolicies = SealInitialPolicies(); var plan = Store.PrepareInitialPublication(); var outbox = new WorkspacePublicationRepository(Database, Budget);
             var publisher = outbox.Prepare(plan.PublisherObjectId, plan.Scope, "publisher-authorization", "application/json", sealedPolicies.Publisher.Envelope!.Value.Span);
@@ -142,7 +150,7 @@ public sealed partial class LibraryAuthorityTests
             if (verifySources) outbox.ConfirmVerified(sources.Id, plan.Scope.AccountId, plan.Scope.FolderId, sources.FileId!, sources.Sha256, sources.Payload.Length, 7);
             var context = new WorkspaceObservationContext(plan.Scope.LibraryId, plan.Scope.AccountId, plan.Scope.FolderId, plan.Scope.AccountRevision, null);
             var observations = new WorkspaceObservationRepository(Database, Budget);
-            observations.RememberRead(context, new(publisher.FileId!, 7, publisher.Payload.Length, publisher.Sha256)); observations.RememberRead(context, new(sources.FileId!, 7, sources.Payload.Length, sources.Sha256));
+            observations.RememberRead(context, new(publisher.FileId!, 7, publisher.Payload.Length, publisher.Sha256)); observations.RememberRead(context, new(sources.FileId!, 7, sources.Payload.Length, sources.Sha256, sourceEncoding));
             return (plan, observations.CompleteScan(observations.BeginScan(context), "captured-cursor", observations.Known(context)));
         }
     }

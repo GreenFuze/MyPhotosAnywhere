@@ -7,7 +7,9 @@ namespace Mpa.Processor.AppServices;
 public interface IWorkspaceDocumentSource
 {
     Task<WorkspaceDocumentInventory> CaptureAsync(IReadOnlyCollection<string> previouslyKnownIds, CancellationToken token);
+    Task<WorkspaceDocumentInventory> CaptureAsync(IReadOnlyCollection<string> previouslyKnownIds, IWorkspaceInventoryObserver observer, CancellationToken token);
     Task<DriveChangeCursor> CheckUnchangedAsync(WorkspaceDocumentInventory inventory, CancellationToken token);
+    Task<DriveChangeCursor> CheckUnchangedAsync(WorkspaceDocumentInventory inventory, IWorkspaceInventoryObserver observer, CancellationToken token);
     Task<DriveWorkspaceObject> ReadAsync(DriveWorkspaceDocumentCandidate candidate, CancellationToken token);
 }
 
@@ -22,9 +24,10 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
     private readonly string? _sharedDriveId;
     private readonly long _accountRevision;
     private readonly bool _initialPoliciesOnly;
+    private readonly bool _allMetadata;
 
     public CatalogWorkspaceDocumentSource(ProcessorStateCoordinator state, ProcessorAccountService accounts,
-        CatalogWorkspace workspace, string? sharedDriveId, long accountRevision, bool initialPoliciesOnly = false)
+        CatalogWorkspace workspace, string? sharedDriveId, long accountRevision, bool initialPoliciesOnly = false, bool allMetadata = false)
     {
         _state = state ?? throw new ArgumentNullException(nameof(state));
         _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
@@ -32,22 +35,37 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
         ArgumentOutOfRangeException.ThrowIfLessThan(accountRevision, 1);
         if (!Identity(workspace.AccountId) || !Identity(workspace.FolderId) || workspace.FolderId == "root" || sharedDriveId is not null && !Identity(sharedDriveId))
             throw new ArgumentException("A captured canonical metadata workspace is required.", nameof(workspace));
-        _sharedDriveId = sharedDriveId; _accountRevision = accountRevision; _initialPoliciesOnly = initialPoliciesOnly;
+        if (initialPoliciesOnly && allMetadata) throw new ArgumentException("Initial bootstrap cannot adopt general catalog dependencies.", nameof(allMetadata));
+        _sharedDriveId = sharedDriveId; _accountRevision = accountRevision; _initialPoliciesOnly = initialPoliciesOnly; _allMetadata = allMetadata;
     }
 
     public Task<WorkspaceDocumentInventory> CaptureAsync(IReadOnlyCollection<string> previouslyKnownIds, CancellationToken token) =>
         UseAsync((documents, changes, ownedToken) => new WorkspaceDocumentInventoryReader(documents, changes,
-            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly).CaptureAsync(previouslyKnownIds, ownedToken), token);
+            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly, _allMetadata).CaptureAsync(previouslyKnownIds, ownedToken), token);
+
+    public Task<WorkspaceDocumentInventory> CaptureAsync(IReadOnlyCollection<string> previouslyKnownIds, IWorkspaceInventoryObserver observer, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
+        return UseAsync((documents, changes, ownedToken) => new WorkspaceDocumentInventoryReader(documents, changes,
+            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly, _allMetadata).CaptureAsync(previouslyKnownIds, ownedToken, observer), token);
+    }
 
     public Task<DriveChangeCursor> CheckUnchangedAsync(WorkspaceDocumentInventory inventory, CancellationToken token) =>
         UseAsync((documents, changes, ownedToken) => new WorkspaceDocumentInventoryReader(documents, changes,
-            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly).CheckUnchangedAsync(inventory, ownedToken), token);
+            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly, _allMetadata).CheckUnchangedAsync(inventory, ownedToken), token);
+
+    public Task<DriveChangeCursor> CheckUnchangedAsync(WorkspaceDocumentInventory inventory, IWorkspaceInventoryObserver observer, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
+        return UseAsync((documents, changes, ownedToken) => new WorkspaceDocumentInventoryReader(documents, changes,
+            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly, _allMetadata).CheckUnchangedAsync(inventory, ownedToken, observer), token);
+    }
 
     public Task<DriveWorkspaceObject> ReadAsync(DriveWorkspaceDocumentCandidate candidate, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(candidate);
         if (!Identity(candidate.FileId) || candidate.FileId is "root" || candidate.FileId == _workspace.FolderId || candidate.Version < 1 ||
-            candidate.Bytes is < 1 or > GoogleAccountConnection.MaximumWorkspaceDocumentBytes) throw new ArgumentException("A bounded metadata document candidate is required.", nameof(candidate));
+            candidate.Bytes < 1 || candidate.Bytes > WorkspaceDocumentInventoryReader.CandidateByteLimit(candidate.MimeType, _allMetadata)) throw new ArgumentException("A bounded metadata document candidate is required.", nameof(candidate));
         return UseAsync(async (documents, _, ownedToken) =>
         {
             var result = await documents.ReadWorkspaceDocumentAsync(_workspace.FolderId, candidate, ownedToken).ConfigureAwait(false);
@@ -64,7 +82,10 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
             if (revision != _accountRevision) throw new StaleLibraryConfigurationException();
             if (reader is not IGoogleWorkspaceDiscovery documents || reader is not IGoogleWorkspaceChanges changes)
                 throw new InvalidOperationException("The owned account reader does not support workspace document reconciliation.");
-            if (_initialPoliciesOnly)
+            if (_allMetadata)
+                documents = reader is IGoogleWorkspaceMetadataDiscovery metadata ? new AllMetadataDocuments(metadata) :
+                    throw new InvalidOperationException("General reconciliation requires a complete typed metadata inventory.");
+            else if (_initialPoliciesOnly)
                 documents = reader is IGoogleInitialWorkspaceDiscovery initial ? new InitialDocuments(documents, initial) :
                     throw new InvalidOperationException("Initial publication requires an unfiltered workspace inventory.");
             var result = await operation(documents, changes, token).ConfigureAwait(false);
@@ -87,5 +108,15 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
             initial.ReadInitialWorkspaceDocumentsAsync(folderId, sharedDriveId, pageToken, cancellationToken);
         public Task<DriveWorkspaceObject> ReadWorkspaceDocumentAsync(string folderId, DriveWorkspaceDocumentCandidate candidate, CancellationToken cancellationToken) =>
             documents.ReadWorkspaceDocumentAsync(folderId, candidate, cancellationToken);
+    }
+    private sealed class AllMetadataDocuments(IGoogleWorkspaceMetadataDiscovery metadata) : IGoogleWorkspaceDiscovery
+    {
+        public async Task<DriveWorkspaceDocumentPage> ReadWorkspaceDocumentsAsync(string folderId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken)
+        {
+            var page = await metadata.ReadWorkspaceMetadataPageAsync(folderId, sharedDriveId, pageToken, cancellationToken).ConfigureAwait(false);
+            return new(page.Objects.Select(item => new DriveWorkspaceDocumentCandidate(item.FileId, item.Version, item.Bytes, item.MimeType)).ToList().AsReadOnly(), page.NextPageToken, page.IncompleteSearch);
+        }
+        public Task<DriveWorkspaceObject> ReadWorkspaceDocumentAsync(string folderId, DriveWorkspaceDocumentCandidate candidate, CancellationToken cancellationToken) =>
+            metadata.ReadWorkspaceMetadataCandidateAsync(folderId, new(candidate.FileId, candidate.Version, candidate.Bytes, candidate.MimeType), cancellationToken);
     }
 }

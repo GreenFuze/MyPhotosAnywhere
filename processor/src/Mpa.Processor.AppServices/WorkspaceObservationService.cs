@@ -41,8 +41,10 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                 var attempt = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).BeginScan(_context), token).ConfigureAwait(false);
                 ThrowIfCanceled(cancellationToken, token);
                 var known = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).KnownIdentities(_context), token).ConfigureAwait(false);
-                var inventory = await _source.CaptureAsync(known, token).ConfigureAwait(false);
+                var progress = new InventoryProgress(this, attempt, cancellationToken, token);
+                var inventory = await _source.CaptureAsync(known, progress, token).ConfigureAwait(false);
                 ThrowIfCanceled(cancellationToken, token);
+                attempt = progress.CapturedAttempt();
                 if (inventory.AccountId != _context.AccountId || inventory.FolderId != _context.FolderId || inventory.SharedDriveId != _context.SharedDriveId ||
                     inventory.Documents.Count > WorkspaceObservationRepository.MaximumDocuments || inventory.Documents.Select(document => document.FileId).Distinct(StringComparer.Ordinal).Count() != inventory.Documents.Count)
                     throw new InvalidDataException("Actual workspace inventory changed its captured context or identity bound.");
@@ -50,11 +52,11 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                 {
                     if (candidate.FileId is not { Length: > 0 and <= 128 } || candidate.FileId is "root" || candidate.FileId == _context.FolderId ||
                         candidate.FileId.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not ('_' or '-')) ||
-                        candidate.Version < 1 || candidate.Bytes is < 1 or > GoogleAccountConnection.MaximumWorkspaceDocumentBytes)
+                        candidate.Version < 1 || candidate.Bytes < 1 || candidate.Bytes > WorkspaceDocumentInventoryReader.CandidateByteLimit(candidate.MimeType, includeBinaryMetadata: true))
                         throw new InvalidDataException("Captured metadata document exceeds its identity or byte bound before reading.");
                 }
                 attempt = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).RememberCandidates(attempt,
-                    inventory.Documents.Select(candidate => new WorkspaceCandidateObservation(candidate.FileId, candidate.Version, candidate.Bytes)).ToArray()), token).ConfigureAwait(false);
+                    inventory.Documents.Select(CandidateObservation).ToArray()), token).ConfigureAwait(false);
                 ThrowIfCanceled(cancellationToken, token);
                 var observed = new List<WorkspaceDocumentObservation>();
                 foreach (var candidate in inventory.Documents)
@@ -62,9 +64,10 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                     ThrowIfCanceled(cancellationToken, token); var document = await _source.ReadAsync(candidate, token).ConfigureAwait(false);
                     ThrowIfCanceled(cancellationToken, token);
                     if (document.AccountId != _context.AccountId || document.FolderId != _context.FolderId || document.FileId != candidate.FileId ||
-                        document.DriveVersion != candidate.Version || document.Bytes.Length != candidate.Bytes || document.Bytes.Length is < 1 or > GoogleAccountConnection.MaximumWorkspaceDocumentBytes)
+                        document.DriveVersion != candidate.Version || document.Bytes.Length != candidate.Bytes || document.Bytes.Length < 1 ||
+                        document.Bytes.Length > WorkspaceDocumentInventoryReader.CandidateByteLimit(candidate.MimeType, includeBinaryMetadata: true))
                         throw new InvalidDataException("Actual document read substituted its captured identity, revision or size.");
-                    var observation = new WorkspaceDocumentObservation(document.FileId, document.DriveVersion, document.Bytes.Length, Convert.ToHexStringLower(SHA256.HashData(document.Bytes.Span)));
+                    var observation = new WorkspaceDocumentObservation(document.FileId, document.DriveVersion, document.Bytes.Length, Convert.ToHexStringLower(SHA256.HashData(document.Bytes.Span)), StoredMime(candidate.MimeType));
                     await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).RememberRead(_context, observation), token).ConfigureAwait(false);
                     ThrowIfCanceled(cancellationToken, token);
                     // If persistence fails, the verifier never receives this document.
@@ -80,9 +83,10 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                     await inspectBeforeFinalChangeCheck(token).ConfigureAwait(false);
                     ThrowIfCanceled(cancellationToken, token);
                 }
-                var cursor = await _source.CheckUnchangedAsync(inventory, token).ConfigureAwait(false);
+                var cursor = await _source.CheckUnchangedAsync(inventory, progress, token).ConfigureAwait(false);
                 if (cursor.AccountId != _context.AccountId || cursor.SharedDriveId != _context.SharedDriveId) throw new InvalidDataException("The final change cursor belongs to another workspace access context.");
                 ThrowIfCanceled(cancellationToken, token);
+                attempt = progress.CapturedAttempt();
                 var checkpoint = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).CompleteScan(attempt, cursor.Token, observed), token).ConfigureAwait(false);
                 lock (_gate) { ThrowIfCanceled(cancellationToken, token); _failure = null; return checkpoint; }
             }
@@ -90,6 +94,32 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
             finally { _serial.Release(); }
         }
     }
+
+    private sealed class InventoryProgress(WorkspaceObservationService owner, WorkspaceObservationAttempt attempt, CancellationToken caller,
+        CancellationToken run) : IWorkspaceInventoryObserver
+    {
+        private WorkspaceObservationAttempt _attempt = attempt;
+        public async Task StartedAsync(DriveChangeCursor cursor, CancellationToken token)
+        {
+            owner.ThrowIfCanceled(caller, run); token.ThrowIfCancellationRequested();
+            if (cursor.AccountId != owner._context.AccountId || cursor.SharedDriveId != owner._context.SharedDriveId)
+                throw new InvalidDataException("Inventory progress substituted its captured account or drive.");
+            _attempt = await owner._state.ExecuteAsync(database => new WorkspaceObservationRepository(database, owner._budget).StartInventory(_attempt, cursor.Token), token).ConfigureAwait(false);
+            owner.ThrowIfCanceled(caller, run);
+        }
+        public async Task PageAsync(IReadOnlyCollection<DriveWorkspaceDocumentCandidate> candidates, CancellationToken token)
+        {
+            owner.ThrowIfCanceled(caller, run); token.ThrowIfCancellationRequested();
+            if (_attempt.InventoryStartCursor is null || candidates.Count > 100) throw new InvalidDataException("Inventory page lost its persisted bounded start.");
+            _attempt = await owner._state.ExecuteAsync(database => new WorkspaceObservationRepository(database, owner._budget).RememberCandidates(_attempt,
+                candidates.Select(CandidateObservation).ToArray()), token).ConfigureAwait(false);
+            owner.ThrowIfCanceled(caller, run);
+        }
+        public WorkspaceObservationAttempt CapturedAttempt() => _attempt.InventoryStartCursor is not null ? _attempt :
+            throw new InvalidOperationException("The owned inventory source omitted durable start/page observation.");
+    }
+    private static string? StoredMime(string mimeType) => mimeType == "application/json" ? null : mimeType;
+    private static WorkspaceCandidateObservation CandidateObservation(DriveWorkspaceDocumentCandidate candidate) => new(candidate.FileId, candidate.Version, candidate.Bytes, StoredMime(candidate.MimeType));
     private void ThrowIfCanceled(CancellationToken caller, CancellationToken linked)
     {
         lock (_gate)

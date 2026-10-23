@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 using Mpa.Processor.Protocol;
 
@@ -10,7 +11,8 @@ namespace Mpa.Processor.Core;
 
 /// <summary>Actual inventory metadata retained even if its subsequent download or
 /// verification fails. It is not a verified content hash, signature or publication receipt.</summary>
-public sealed record WorkspaceCandidateObservation(string FileId, long Version, long Bytes);
+public sealed record WorkspaceCandidateObservation(string FileId, long Version, long Bytes,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? MimeType = null);
 
 public sealed partial class WorkspaceObservationRepository
 {
@@ -41,8 +43,8 @@ public sealed partial class WorkspaceObservationRepository
         {
             ValidateCandidate(candidate, attempt.Context);
             if (!seen.Add(candidate.FileId)) throw new WorkspaceObservationConflictException();
-            if (retained.TryGetValue(candidate.FileId, out var old) && (old.Bytes != candidate.Bytes || old.Version > candidate.Version) ||
-                read.TryGetValue(candidate.FileId, out var actual) && (actual.Bytes != candidate.Bytes || actual.Version > candidate.Version))
+            if (retained.TryGetValue(candidate.FileId, out var old) && (old.Bytes != candidate.Bytes || old.Version > candidate.Version || old.MimeType != candidate.MimeType) ||
+                read.TryGetValue(candidate.FileId, out var actual) && (actual.Bytes != candidate.Bytes || actual.Version > candidate.Version || actual.MimeType != candidate.MimeType))
                 throw new WorkspaceObservationConflictException();
             if (candidate != old) changed.Add(candidate);
             retained[candidate.FileId] = candidate;
@@ -90,14 +92,14 @@ public sealed partial class WorkspaceObservationRepository
     {
         var read = ReadAll(context, transaction).ToDictionary(value => value.FileId, StringComparer.Ordinal);
         foreach (var candidate in ReadCandidates(context, transaction).Values)
-            if (!read.TryGetValue(candidate.FileId, out var document) || document.Bytes != candidate.Bytes || document.Version < candidate.Version)
+            if (!read.TryGetValue(candidate.FileId, out var document) || document.Bytes != candidate.Bytes || document.Version < candidate.Version || document.MimeType != candidate.MimeType)
                 throw new WorkspaceObservationConflictException();
     }
     private static void ValidateCandidate(WorkspaceCandidateObservation value, WorkspaceObservationContext context)
     {
         ArgumentNullException.ThrowIfNull(value);
         if (!Identity(value.FileId) || value.FileId == "root" || value.FileId == context.FolderId || value.Version < 1 ||
-            value.Bytes is < 1 or > ProtocolDocumentReader.MaximumDocumentBytes) throw new ArgumentException("A bounded actual workspace document candidate is required.", nameof(value));
+            value.Bytes < 1 || value.Bytes > ObservationByteLimit(value.MimeType)) throw new ArgumentException("A bounded actual workspace document candidate is required.", nameof(value));
     }
     private static string CandidateInventoryHash(IEnumerable<WorkspaceCandidateObservation> candidates)
     {

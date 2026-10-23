@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 
 namespace Mpa.Processor.Core;
@@ -7,12 +8,16 @@ namespace Mpa.Processor.Core;
 /// authority. A failed or interrupted newer attempt invalidates older scan evidence.
 /// Every process/access owner must still start closed and perform its own current scan.</summary>
 public sealed record WorkspaceObservationAttempt(WorkspaceObservationContext Context, Guid Id, long Revision,
-    long BaseCheckpointRevision, WorkspaceInventoryCheckpoint? Completed, string CandidateInventorySha256);
+    long BaseCheckpointRevision, WorkspaceInventoryCheckpoint? Completed, string CandidateInventorySha256,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FirstUnresolvedCursor = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? InventoryStartCursor = null);
 
 public sealed partial class WorkspaceObservationRepository
 {
     private const string AttemptKey = "workspace_observation_attempt_v1";
-    private const int MaximumAttemptBytes = 49152;
+    // At most three opaque 4096-character cursors (checkpoint, first unresolved,
+    // current start), each potentially JSON-escaped. Signed envelope caps are unchanged.
+    private const int MaximumAttemptBytes = 131072;
 
     /// <summary>Commit this fence before any network inspection. Failures leave the
     /// attempt incomplete without requiring another successful write to record failure.</summary>
@@ -25,8 +30,22 @@ public sealed partial class WorkspaceObservationRepository
         if ((previous?.Context.AccountRevision ?? checkpoint?.Context.AccountRevision ?? 0) > context.AccountRevision)
             throw new WorkspaceObservationConflictException();
         var attempt = new WorkspaceObservationAttempt(context, Guid.NewGuid(), checked((previous?.Revision ?? 0) + 1), checkpoint?.Revision ?? 0, null,
-            previous?.CandidateInventorySha256 ?? CandidateInventoryHash([]));
+            previous?.CandidateInventorySha256 ?? CandidateInventoryHash([]), previous?.FirstUnresolvedCursor);
         WriteAttempt(attempt, transaction); transaction.Commit(); return attempt;
+    }
+
+    /// <summary>Retain the actual start before listing. Preserve the earliest unresolved
+    /// start across failed attempts; a later start never proves that earlier changes were
+    /// reconciled. General publication must independently drain that retained history.</summary>
+    public WorkspaceObservationAttempt StartInventory(WorkspaceObservationAttempt attempt, string cursor)
+    {
+        ArgumentNullException.ThrowIfNull(attempt);
+        if (!ValidAttemptCursor(cursor)) throw new ArgumentException("A bounded actual inventory start cursor is required.", nameof(cursor));
+        using var transaction = _database.Connection.BeginTransaction(); AssertContext(attempt.Context, transaction);
+        if (attempt.Completed is not null || ReadAttempt(transaction) != attempt || attempt.InventoryStartCursor is not null)
+            throw new WorkspaceObservationConflictException();
+        var updated = attempt with { FirstUnresolvedCursor = attempt.FirstUnresolvedCursor ?? cursor, InventoryStartCursor = cursor };
+        WriteAttempt(updated, transaction); transaction.Commit(); return updated;
     }
 
     /// <summary>Only the exact still-current attempt can complete. Its checkpoint and
@@ -82,6 +101,9 @@ public sealed partial class WorkspaceObservationRepository
             if (value.Context is null || value.Id == Guid.Empty || value.Revision < 1 || value.BaseCheckpointRevision < 0 || !Digest(value.CandidateInventorySha256))
                 throw new InvalidDataException("Retained workspace scan attempt is invalid.");
             ValidateContext(value.Context);
+            if (value.FirstUnresolvedCursor is not null && !ValidAttemptCursor(value.FirstUnresolvedCursor) ||
+                value.InventoryStartCursor is not null && (!ValidAttemptCursor(value.InventoryStartCursor) || value.FirstUnresolvedCursor is null))
+                throw new InvalidDataException("Retained inventory start lost its bounded unresolved history.");
         }
         catch (ArgumentException error) { throw new InvalidDataException("Retained workspace scan attempt changed its context.", error); }
         if (CandidateInventoryHash(ReadCandidates(value.Context, transaction).Values) != value.CandidateInventorySha256)
@@ -123,4 +145,5 @@ public sealed partial class WorkspaceObservationRepository
         if (reader.GetInt64(0) is < 1 || reader.GetInt64(0) > maximum) throw new InvalidDataException("Workspace scan attempt exceeds its bound.");
         return reader.GetString(1);
     }
+    private static bool ValidAttemptCursor(string? cursor) => cursor is { Length: > 0 and <= 4096 } && !cursor.Any(char.IsControl);
 }

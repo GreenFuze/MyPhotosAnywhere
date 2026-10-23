@@ -9,6 +9,50 @@ namespace Mpa.Processor.AppServices.Tests;
 public sealed partial class AccountServiceTests
 {
     [TestMethod]
+    public async Task InitialPublicationRetainsAPartialInventoryBeforeTheNextPageFails()
+    {
+        await using var fixture = await InitialPublicationFixture.CreateAsync().ConfigureAwait(false); var prepared = await fixture.PreparedAsync().ConfigureAwait(false);
+        fixture.Setup.Accounts.Readers.InitialDocumentInventory = (_, _, next, _) => next is null ?
+            Task.FromResult(new DriveWorkspaceDocumentPage(new([new("uncertain-policy", 7, 2)]), "second", false)) :
+            throw new HttpRequestException("Synthetic failed second inventory page");
+        await Assert.ThrowsExactlyAsync<HttpRequestException>(() => fixture.Owner.PublishAsync(CancellationToken.None)).ConfigureAwait(false);
+        var context = new WorkspaceObservationContext(prepared.Plan.Scope.LibraryId, "permission-A", "metadata", 1, null);
+        await fixture.Setup.Accounts.State.ExecuteAsync(database =>
+        {
+            var repository = new WorkspaceObservationRepository(database, fixture.Budget);
+            Assert.AreEqual("uncertain-policy", repository.KnownIdentities(context).Single()); Assert.AreEqual(0, repository.Known(context).Count);
+            Assert.AreEqual("current", repository.LastAttempt()!.InventoryStartCursor); Assert.IsNull(repository.LastAttempt()!.Completed);
+            Assert.IsNull(repository.LastCheckpoint()); return true;
+        }, CancellationToken.None).ConfigureAwait(false);
+        fixture.Setup.Accounts.Readers.InitialDocumentInventory = (_, _, _, _) => Task.FromResult(new DriveWorkspaceDocumentPage(new([]), null, false));
+        await Assert.ThrowsExactlyAsync<WorkspaceObservationConflictException>(() => fixture.Owner.PublishAsync(CancellationToken.None)).ConfigureAwait(false);
+        Assert.AreEqual(0, fixture.Allocations); Assert.AreEqual(0, fixture.Creates);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task InitialAndFinalChangeFencesRetainNewMetadataBeforeClosingPublication(bool finalFence)
+    {
+        await using var fixture = await InitialPublicationFixture.CreateAsync().ConfigureAwait(false); var prepared = await fixture.PreparedAsync().ConfigureAwait(false); var calls = 0;
+        fixture.Setup.Accounts.Readers.DocumentChanges = (cursor, _) =>
+        {
+            calls++; DriveObservedChange[] changes = calls == (finalFence ? 2 : 1) ?
+                [new("file", "changed-policy", false, new("application/json", new(["metadata"]), false, 1, 2, true))] : [];
+            return Task.FromResult(new DriveChangePage(new(changes), null, cursor with { Token = "later" }));
+        };
+        await Assert.ThrowsExactlyAsync<WorkspaceInventoryIncompleteException>(() => fixture.Owner.PublishAsync(CancellationToken.None)).ConfigureAwait(false);
+        var context = new WorkspaceObservationContext(prepared.Plan.Scope.LibraryId, "permission-A", "metadata", 1, null);
+        await fixture.Setup.Accounts.State.ExecuteAsync(database =>
+        {
+            var repository = new WorkspaceObservationRepository(database, fixture.Budget);
+            Assert.AreEqual("changed-policy", repository.KnownIdentities(context).Single()); Assert.IsNull(repository.LastAttempt()!.Completed);
+            Assert.AreEqual("current", repository.LastAttempt()!.FirstUnresolvedCursor); Assert.IsNull(repository.LastCheckpoint()); return true;
+        }, CancellationToken.None).ConfigureAwait(false);
+        Assert.AreEqual(finalFence ? 2 : 1, calls); Assert.AreEqual(0, fixture.Allocations); Assert.AreEqual(0, fixture.Creates);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public async Task NewIncompleteScanDuringUploadClosesAdmissionAndPreservesTheExactPendingObject(bool afterCreate)

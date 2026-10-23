@@ -6,11 +6,92 @@ namespace Mpa.Processor.AppServices.Tests;
 [TestClass]
 public sealed class WorkspaceDocumentInventoryReaderTests
 {
+    [TestMethod]
+    public async Task InventoryStartAndEveryValidPageAreJoinedBeforeContinuationOrChangeFailure()
+    {
+        foreach (var mode in new[] { "partial", "cycle", "later-change" })
+        {
+            var fixture = new Fixture(); var progress = new Progress(fixture.Calls);
+            fixture.Documents.Enqueue(mode == "partial" ? new(new([new("first", 1, 2)]), null, true) : Page([new("first", 1, 2)], "repeat"));
+            if (mode == "cycle") fixture.Documents.Enqueue(Page([new("second", 1, 2)], "repeat"));
+            if (mode == "later-change")
+            {
+                fixture.Documents.Enqueue(Page([new("second", 1, 2)]));
+                fixture.Changes.Enqueue(Changes([new("file", "new-policy", false, File("application/json", "workspace"))], end: "later"));
+            }
+            await Assert.ThrowsExactlyAsync<WorkspaceInventoryIncompleteException>(() => fixture.Reader().CaptureAsync([], CancellationToken.None, progress)).ConfigureAwait(false);
+            Assert.AreEqual("start", progress.Start!.Token); Assert.AreEqual("start", fixture.Calls[0]); Assert.AreEqual("observe:start", fixture.Calls[1]);
+            Assert.AreEqual("list:first", fixture.Calls[2]); Assert.AreEqual("observe:first", fixture.Calls[3]);
+            Assert.AreEqual(mode == "partial" ? 1 : mode == "cycle" ? 2 : 3, progress.Candidates.Count);
+            if (mode == "later-change") Assert.AreEqual("new-policy", progress.Candidates[^1].FileId);
+        }
+    }
+
+    [TestMethod]
+    public async Task FailedStartOrPagePersistenceStopsBeforeTheNextReadOrChangeFence()
+    {
+        foreach (var atStart in new[] { false, true })
+        {
+            var fixture = new Fixture(); var progress = new Progress(fixture.Calls) { FailStart = atStart, FailPage = !atStart };
+            fixture.Documents.Enqueue(Page([new("first", 1, 2)], "next"));
+            await Assert.ThrowsExactlyAsync<IOException>(() => fixture.Reader().CaptureAsync([], CancellationToken.None, progress)).ConfigureAwait(false);
+            Assert.AreEqual(atStart ? 2 : 4, fixture.Calls.Count); Assert.IsFalse(fixture.Calls.Any(call => call.StartsWith("changes:", StringComparison.Ordinal)));
+        }
+    }
+
+    [TestMethod]
+    public async Task FinalChangeFenceObservesNewSupportedMetadataBeforeClosingTheScan()
+    {
+        var fixture = new Fixture(); fixture.Documents.Enqueue(Page([])); fixture.Changes.Enqueue(Changes([], end: "end"));
+        var progress = new Progress(fixture.Calls); var inventory = await fixture.Reader().CaptureAsync([], CancellationToken.None, progress).ConfigureAwait(false);
+        fixture.Changes.Enqueue(Changes([new("file", "new-policy", false, File("application/json", "workspace"))], end: "later"));
+        await Assert.ThrowsExactlyAsync<WorkspaceInventoryIncompleteException>(() => fixture.Reader().CheckUnchangedAsync(inventory, CancellationToken.None, progress)).ConfigureAwait(false);
+        Assert.AreEqual("new-policy", progress.Candidates.Single().FileId); Assert.AreEqual("observe:new-policy", fixture.Calls[^1]);
+    }
+
+    private sealed class Progress(List<string> calls) : IWorkspaceInventoryObserver
+    {
+        public bool FailStart { get; init; }
+        public bool FailPage { get; init; }
+        public DriveChangeCursor? Start { get; private set; }
+        public List<DriveWorkspaceDocumentCandidate> Candidates { get; } = [];
+        public Task StartedAsync(DriveChangeCursor cursor, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested(); calls.Add("observe:start"); if (FailStart) throw new IOException("Synthetic failed cursor persistence");
+            Start = cursor; return Task.CompletedTask;
+        }
+        public Task PageAsync(IReadOnlyCollection<DriveWorkspaceDocumentCandidate> candidates, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested(); foreach (var candidate in candidates) calls.Add("observe:" + candidate.FileId);
+            if (FailPage) throw new IOException("Synthetic failed page persistence"); Candidates.AddRange(candidates); return Task.CompletedTask;
+        }
+    }
     private static readonly string[] PriorInventory = ["z", "missing"];
     private static readonly string[] ExpectedCalls = ["start", "list:first", "list:page-2", "changes:start", "changes:more"];
     private static readonly string[] ExpectedIds = ["a", "z"];
     private static readonly string[] MissingIds = ["missing"];
     private static readonly string[] KnownIds = ["known"];
+
+    [TestMethod]
+    public async Task CancelingAnUncooperativeStartPersistenceJoinsItAndNeverListsALatePage()
+    {
+        var fixture = new Fixture(); var progress = new HeldStart(); using var cancel = new CancellationTokenSource();
+        var reading = fixture.Reader().CaptureAsync([], cancel.Token, progress);
+        await progress.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        try { await cancel.CancelAsync().ConfigureAwait(false); Assert.IsFalse(reading.IsCompleted); Assert.AreEqual(1, fixture.Calls.Count); }
+        finally { progress.Release.TrySetResult(); }
+        await Assert.ThrowsAsync<OperationCanceledException>(() => reading).ConfigureAwait(false); Assert.AreEqual(1, fixture.Calls.Count);
+    }
+
+    private sealed class HeldStart : IWorkspaceInventoryObserver
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public async Task StartedAsync(DriveChangeCursor cursor, CancellationToken token)
+        { Entered.TrySetResult(); await Release.Task.ConfigureAwait(false); }
+        public Task PageAsync(IReadOnlyCollection<DriveWorkspaceDocumentCandidate> candidates, CancellationToken token) =>
+            throw new InvalidOperationException("Canceled inventory cannot observe a late page.");
+    }
 
     [TestMethod]
     public async Task InitialInventoryChangeFenceIncludesUnsupportedChildrenButStillIgnoresOtherFolders()

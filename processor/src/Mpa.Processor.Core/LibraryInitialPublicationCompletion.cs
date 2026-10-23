@@ -126,7 +126,7 @@ public sealed partial class LibraryAuthorityRepository
     }
     private static void AssertCompletionObject(WorkspacePublicationRecord expected, WorkspaceDocumentObservation observed)
     {
-        if (observed.FileId != expected.FileId || observed.Version < expected.VerifiedVersion || observed.Bytes != expected.Payload.Length || observed.Sha256 != expected.Sha256)
+        if (observed.FileId != expected.FileId || observed.Version < expected.VerifiedVersion || observed.Bytes != expected.Payload.Length || observed.Sha256 != expected.Sha256 || observed.MimeType is not null)
             throw new InvalidDataException("Initial completion changed an observed policy identity, revision, length or digest.");
     }
     private bool HasLaterInitialPublicationWork(SqliteTransaction transaction, LibraryInitialPublicationPlan? plan)

@@ -11,6 +11,21 @@ public sealed partial class CatalogGenerationCaptureServiceTests
     private static readonly string[] NewScanRevocation = ["revocation-B"];
 
     [TestMethod]
+    public async Task MixedJsonAndBinaryScansRetainExactEncodingsWithoutRaisingTheSignedJsonCap()
+    {
+        await using var fixture = new Fixture(); var context = ScanContext(fixture); var source = new ScanSource(); source.Add("policy-A");
+        source.Documents.Add("facts-B", new("account-A", "facts-B", "metadata-workspace", 1, new byte[262145])); source.Encodings.Add("facts-B", "application/gzip");
+        await using var scanner = new WorkspaceObservationService(fixture.State, fixture.Budget, context, source);
+        var completed = await scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None).ConfigureAwait(false);
+        var repository = new WorkspaceObservationRepository(fixture.Database, fixture.Budget); repository.AssertCompletedScan(completed);
+        Assert.AreEqual(2, completed.Documents); Assert.AreEqual("application/gzip", repository.Known(context).Single(value => value.FileId == "facts-B").MimeType);
+        Assert.IsNull(repository.Known(context).Single(value => value.FileId == "policy-A").MimeType);
+        source.Encodings["facts-B"] = "application/json";
+        await Assert.ThrowsExactlyAsync<ArgumentException>(() => scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None)).ConfigureAwait(false);
+        Assert.AreEqual(completed, repository.LastCheckpoint()); Assert.IsNull(repository.LastAttempt()!.Completed);
+    }
+
+    [TestMethod]
     public async Task SupersededHeldScanCannotAdvanceOrReplaceAnotherOwnersCompletedEvidence()
     {
         await using var fixture = new Fixture(); var context = ScanContext(fixture); var held = new ScanSource(); held.Add("policy-A");
@@ -219,6 +234,7 @@ public sealed partial class CatalogGenerationCaptureServiceTests
     private sealed class ScanSource : IWorkspaceDocumentSource
     {
         public Dictionary<string, DriveWorkspaceObject> Documents { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, string> Encodings { get; } = new(StringComparer.Ordinal);
         public IReadOnlyCollection<string> LastKnown { get; private set; } = [];
         public Func<Task>? BeforeRead { get; set; }
         public bool FailFinal { get; set; }
@@ -231,15 +247,25 @@ public sealed partial class CatalogGenerationCaptureServiceTests
         public Task<WorkspaceDocumentInventory> CaptureAsync(IReadOnlyCollection<string> previouslyKnownIds, CancellationToken token)
         {
             token.ThrowIfCancellationRequested(); Captures++; LastKnown = previouslyKnownIds.ToArray();
-            var candidates = Documents.Values.OrderBy(value => value.FileId, StringComparer.Ordinal).Select(value => new DriveWorkspaceDocumentCandidate(value.FileId, value.DriveVersion, value.Bytes.Length)).ToList().AsReadOnly();
+            var candidates = Documents.Values.OrderBy(value => value.FileId, StringComparer.Ordinal).Select(value => new DriveWorkspaceDocumentCandidate(value.FileId, value.DriveVersion, value.Bytes.Length,
+                Encodings.GetValueOrDefault(value.FileId, "application/json"))).ToList().AsReadOnly();
             return Task.FromResult(new WorkspaceDocumentInventory("account-A", "metadata-workspace", null, candidates,
                 previouslyKnownIds.Except(Documents.Keys, StringComparer.Ordinal).ToList().AsReadOnly(), new("account-A", null, "start-" + Captures)));
+        }
+        public async Task<WorkspaceDocumentInventory> CaptureAsync(IReadOnlyCollection<string> previouslyKnownIds, IWorkspaceInventoryObserver observer, CancellationToken token)
+        {
+            var inventory = await CaptureAsync(previouslyKnownIds, token).ConfigureAwait(false);
+            await observer.StartedAsync(inventory.Cursor, token).ConfigureAwait(false);
+            foreach (var page in inventory.Documents.Chunk(100)) await observer.PageAsync(page, token).ConfigureAwait(false);
+            return inventory;
         }
         public Task<DriveChangeCursor> CheckUnchangedAsync(WorkspaceDocumentInventory inventory, CancellationToken token)
         {
             token.ThrowIfCancellationRequested(); FinalChecks++; Assert.AreEqual("metadata-workspace", inventory.FolderId);
             if (FailFinal) throw new WorkspaceInventoryIncompleteException(); return Task.FromResult(new DriveChangeCursor(ForeignCursor ? "foreign" : "account-A", null, "end-" + Captures));
         }
+        public Task<DriveChangeCursor> CheckUnchangedAsync(WorkspaceDocumentInventory inventory, IWorkspaceInventoryObserver observer, CancellationToken token) =>
+            CheckUnchangedAsync(inventory, token);
         public async Task<DriveWorkspaceObject> ReadAsync(DriveWorkspaceDocumentCandidate candidate, CancellationToken token)
         {
             token.ThrowIfCancellationRequested(); Reads++; if (BeforeRead is not null) await BeforeRead().ConfigureAwait(false);
