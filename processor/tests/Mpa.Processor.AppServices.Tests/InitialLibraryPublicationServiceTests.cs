@@ -318,6 +318,7 @@ public sealed partial class AccountServiceTests
         public StorageBudgetManager Budget { get; } = PublicationBudget();
         public InitialLibraryPublicationService Owner { get; private set; }
         public Dictionary<string, DriveWorkspaceObject> Cloud { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, string> MetadataMimeTypes { get; } = new(StringComparer.Ordinal);
         public int Allocations { get; set; }
         public int Creates { get; set; }
         public int InitialInventories { get; private set; }
@@ -355,12 +356,13 @@ public sealed partial class AccountServiceTests
                 return Task.FromResult(result);
             };
         }
-        public static async Task<InitialPublicationFixture> CreateAsync(bool shared = false)
+        public static async Task<InitialPublicationFixture> CreateAsync(bool shared = false, bool addSource = false)
         {
             var setup = await SetupFixture.CreateAsync().ConfigureAwait(false);
             try
             {
                 setup.Shared = shared;
+                if (addSource) await setup.AddSourceAsync("photos").ConfigureAwait(false);
                 var inspection = await setup.Setup.InspectAsync("permission-A", "metadata", CancellationToken.None).ConfigureAwait(false);
                 await setup.Setup.ApproveAsync(Approval(inspection) with { AcceptSharedWorkspace = shared }, CancellationToken.None).ConfigureAwait(false);
                 return new(setup);

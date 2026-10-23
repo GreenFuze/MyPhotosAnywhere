@@ -14,11 +14,14 @@ public sealed record InitialLibraryPublicationActivity(InitialLibraryPublication
 /// A historical completion advances this stage only; it is not a current catalog grant.
 /// Stop joins the actual attempt/uploader before borrowed keys/accounts/state may retire.</summary>
 public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator state, ProcessorAccountService accounts,
-    LibrarySigningIdentityOwner keys, StorageBudgetManager budget) : IAsyncDisposable
+    LibrarySigningIdentityOwner keys, StorageBudgetManager budget, LocalCatalogReconciliationService? catalog = null) : IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
     private readonly InitialLibraryPublicationService _publication = new(state, accounts, keys, budget);
+    // Ownership transfers to this runtime; its attempt and the concrete reconciler
+    // must both join before the composition root retires keys/accounts/state.
+    private readonly LocalCatalogReconciliationService? _catalog = catalog;
     private readonly object _gate = new();
     private readonly CancellationTokenSource _stop = new();
     private Task? _attempt;
@@ -33,6 +36,7 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
     public Exception? LastAttemptFailure { get { lock (_gate) return _lastAttemptFailure; } }
     public bool ExitConfirmed { get { lock (_gate) return _exitConfirmed; } }
     public InitialLibraryPublicationActivity Activity { get { lock (_gate) return _activity; } }
+    public ReconciledLocalCatalog? CurrentCatalog => _catalog?.Current;
 
     /// <summary>Called on engine startup and after committed workspace approval. The
     /// caller can cancel before admission; after admission only this owner's Stop can
@@ -83,6 +87,18 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
                 await _publication.PublishAsync(_stop.Token).ConfigureAwait(false); ThrowIfStopping();
                 readiness = InitialLibraryPublicationStage.PoliciesPublished;
             }
+            if (readiness == InitialLibraryPublicationStage.PoliciesPublished && _catalog is not null)
+            {
+                lock (_gate) { ThrowIfStopping(); _activity = new(InitialLibraryPublicationStage.Running, "Checking current library history.", false); }
+                while (true)
+                {
+                    try { await _catalog.ReconcileAsync(_stop.Token).ConfigureAwait(false); break; }
+                    // Each batch has committed real cursor progress. Continue the next
+                    // bounded batch without involving a browser or restarting bootstrap.
+                    catch (WorkspaceHistoryReplayPendingException) { ThrowIfStopping(); }
+                }
+                ThrowIfStopping();
+            }
             lock (_gate) { ThrowIfStopping(); _activity = new(readiness, null, false); }
         }
         catch (OperationCanceledException) when (IsStopping()) { }
@@ -103,7 +119,7 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
         TokenResponseException or CredentialVaultException or
         StaleLibraryConfigurationException or StaleDriveConnectionException or LibraryWorkspaceApprovalException or
         LibraryInitialPublicationConflictException or LibraryInitialPolicyConflictException or LibraryInitialPublicationCompletionMissingException or
-        WorkspaceObservationConflictException or WorkspaceHistoryRecoveryRequiredException or WorkspaceInventoryIncompleteException or WorkspacePublicationInventoryChangedException or ProtocolSigningInventoryChangedException or InsufficientStorageBudgetException or
+        WorkspaceObservationConflictException or WorkspaceHistoryRecoveryRequiredException or SigningHistoryRecoveryRequiredException or WorkspaceInventoryIncompleteException or WorkspacePublicationInventoryChangedException or ProtocolSigningInventoryChangedException or InsufficientStorageBudgetException or
         CatalogPublicationNotAuthorizedException or ControllerAuthorityConflictException ||
         error is SqliteException { SqliteErrorCode: 5 or 6 or 10 or 13 };
 
@@ -118,7 +134,7 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
             StaleDriveConnectionException or StaleLibraryConfigurationException => "Google Drive access or the approved source settings changed. Review them before retrying.",
             LibraryWorkspaceApprovalException => "Review this workspace’s sharing permission before publishing private metadata.",
             LibraryInitialPublicationCompletionMissingException or LibraryInitialPublicationConflictException or LibraryInitialPolicyConflictException or
-                WorkspaceObservationConflictException or WorkspaceHistoryRecoveryRequiredException or CatalogPublicationNotAuthorizedException or ControllerAuthorityConflictException or InvalidDataException or ProtocolFormatException =>
+                WorkspaceObservationConflictException or WorkspaceHistoryRecoveryRequiredException or SigningHistoryRecoveryRequiredException or CatalogPublicationNotAuthorizedException or ControllerAuthorityConflictException or InvalidDataException or ProtocolFormatException =>
                 "Saved library history needs reconciliation. Existing files and metadata have been preserved.",
             WorkspaceInventoryIncompleteException or WorkspacePublicationInventoryChangedException or ProtocolSigningInventoryChangedException => "The workspace or saved work changed during setup. Retry to check it again.",
             OperationCanceledException => "Library setup was interrupted. Saved progress is kept; retry when Google Drive is connected.",
@@ -146,8 +162,9 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
         Exception? cancellationFailure = null;
         try { await _stop.CancelAsync().ConfigureAwait(false); } catch (Exception error) { cancellationFailure = error; }
         var publicationStop = _publication.DisposeAsync().AsTask(); Task attempt;
+        var catalogStop = _catalog?.DisposeAsync().AsTask() ?? Task.CompletedTask;
         lock (_gate) attempt = _attempt ?? Task.CompletedTask;
-        var joined = Task.WhenAll(publicationStop, attempt);
+        var joined = Task.WhenAll(publicationStop, catalogStop, attempt);
         try { await joined.ConfigureAwait(false); }
         catch { if (joined.Exception is not null) throw joined.Exception; throw; }
         if (cancellationFailure is not null) throw new AggregateException("Library setup cancellation needs attention; retain its borrowed owners.", cancellationFailure);

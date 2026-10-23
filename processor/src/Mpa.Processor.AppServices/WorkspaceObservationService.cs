@@ -27,7 +27,16 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
     public bool ExitConfirmed { get { lock (_gate) return _exitConfirmed; } }
     public Exception? Failure { get { lock (_gate) return _failure; } }
 
-    public async Task<WorkspaceInventoryCheckpoint> ScanAsync(Func<DriveWorkspaceObject, CancellationToken, Task> verifyAndPersist,
+    public Task<WorkspaceInventoryCheckpoint> ScanAsync(Func<DriveWorkspaceObject, CancellationToken, Task> verifyAndPersist,
+        CancellationToken cancellationToken, Func<CancellationToken, Task>? inspectBeforeFinalChangeCheck = null)
+    {
+        ArgumentNullException.ThrowIfNull(verifyAndPersist);
+        return ScanObservedAsync((document, _, token) => verifyAndPersist(document, token), cancellationToken, inspectBeforeFinalChangeCheck);
+    }
+
+    /// <summary>The typed observation is already durable when the verifier runs.
+    /// Its encoding comes from actual captured metadata, never guessed from content.</summary>
+    public async Task<WorkspaceInventoryCheckpoint> ScanObservedAsync(Func<DriveWorkspaceObject, WorkspaceDocumentObservation, CancellationToken, Task> verifyAndPersist,
         CancellationToken cancellationToken, Func<CancellationToken, Task>? inspectBeforeFinalChangeCheck = null)
     {
         ArgumentNullException.ThrowIfNull(verifyAndPersist); CancellationTokenSource linked;
@@ -93,7 +102,7 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                         throw new WorkspaceObservationConflictException();
                     // If persistence fails, the verifier never receives this document.
                     // Its policy writes also must succeed before this scan can complete.
-                    await verifyAndPersist(document, token).ConfigureAwait(false); ThrowIfCanceled(cancellationToken, token); observed.Add(observation);
+                    await verifyAndPersist(document, observation, token).ConfigureAwait(false); ThrowIfCanceled(cancellationToken, token); observed.Add(observation);
                 }
                 var present = inventory.Documents.Select(item => item.FileId).ToHashSet(StringComparer.Ordinal);
                 if (inventory.MissingKnownIds.Any(id => known.Contains(id, StringComparer.Ordinal) || !expectedFiles.TryGetValue(id, out var expected) || expected.VerifiedVersion is not null) ||

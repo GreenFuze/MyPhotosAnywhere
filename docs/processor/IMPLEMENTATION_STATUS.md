@@ -1,5 +1,51 @@
 # MPA 0.6.0 implementation ledger
 
+## Engine-owned current catalog reconciliation
+
+The Desktop composition root now supplies a concrete LocalCatalogReconciliationService
+to its engine-owned setup runtime. After initial policies exist, startup and explicit retry
+perform a fresh complete metadata/history scan rather than treating initial completion as
+current authority. Longer change feeds automatically continue their committed 128-page
+batches without a browser request or restarting bootstrap. Exit joins both the actual
+catalog attempt and its owner before keys, accounts, vault and state retire.
+
+Every attempt starts closed. Actual typed observations are durable before verification;
+JSON and gzip encoding comes from captured Drive metadata. Owned envelopes must match
+the complete local sealed journal. Unknown/cloud-ahead signing history cannot advance
+counters. Missing sealed work without a matching pending outbox record requires recovery;
+unsealed intents and captured pending publications remain explicit with their original
+identities and scopes. Selected revocations remain durable even when they close the scan.
+
+The owner selects the current owned publisher's signed head independently of listing
+order, verifies its complete predecessor chain, and reads the covered index/coverage/facts
+graph through observed identities only. Each actual reread is retained and checked before
+decoding; foreign/unlisted references and changed bytes fail. Historical coverage must
+match an actually observed controller-signed source policy. All graph/access checks precede
+the final actual change fence. Local authority, native ownership, signing and outbox
+inventories are checked again before accepting the completed read.
+
+The returned record is read evidence, not a transferable publication or activation grant.
+No Drive allocation, create, update, delete, original download or original modification is
+performed by this owner. Generation publication/activation, renewed-access upload admission,
+independent enrollment, retired epochs and the remaining joint product remain unfinished.
+The earliest unresolved cursor and sticky recovery evidence are not reset. Processor
+schema 10, Android Room 12 and the established upgrade signer remain unchanged.
+
+All 228 AppServices cases and all 26 Web cases pass. The strict Desktop Release build has
+zero warnings/errors, complete final logs are clean, and all three use the same service
+binary SHA-256. The 15 new integration cases include actual startup/retry, 129-page automatic
+continuation, native signed heads, compressed facts/source coverage, cloud-ahead history,
+missing/pending work, revocation, changed reads, final-fence changes and joined retirement.
+Complete ancestry now fails before expensive covered-facts decoding. Existing assertions
+remain intact. New fixture mistakes were corrected using the real reservation API and
+the configured completion reader, without changing production visibility or relaxing checks.
+
+The preceding 4424637 passed Protocol
+40005087999 and Desktop40005087979 on Windows/Linux/macOS ARM and Intel, Android40005088033,
+and device40005087969 on API29/35/37. The earlier PNG-evidence failure remains a failed run;
+its actual correction passed this later exact-revision native matrix. No warning exception,
+assertion, severity or evidence gate was weakened.
+
 ## Signed catalog predecessor traversal
 
 CatalogCommitHistoryTraversal now walks the actual immutable parent references to the
