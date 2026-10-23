@@ -1,11 +1,51 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Mpa.Processor.Core;
 using Mpa.Processor.GoogleDrive;
+using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.AppServices.Tests;
 
 public sealed partial class AccountServiceTests
 {
+    [TestMethod]
+    public async Task SigningDuringActualChangeInspectionStopsSetupAndRetainsItsUnsealedRecoveryWork()
+    {
+        await using var fixture = await InitialPublicationFixture.CreateAsync().ConfigureAwait(false); var prepared = await fixture.PreparedAsync().ConfigureAwait(false);
+        await using var runtime = PublicationRuntime(fixture); var changes = fixture.Setup.Accounts.Readers.DocumentChanges!;
+        var pendingId = Guid.NewGuid(); var native = fixture.Setup.Keys.PublicIdentity; var changed = false; var fatal = false;
+        runtime.Failed += _ => fatal = true;
+        fixture.Setup.Accounts.Readers.DocumentChanges = async (cursor, token) =>
+        {
+            if (!changed)
+            {
+                changed = true;
+                await fixture.Setup.Accounts.State.ExecuteAsync(database => new ProtocolSigningJournal(database, fixture.Budget)
+                    .Reserve(pendingId, native.ControllerId, native.ControllerEpoch, "library-publisher-authorization", sequence =>
+                    {
+                        var envelope = System.Text.Json.Nodes.JsonNode.Parse(prepared.Publisher.Payload.Span)!;
+                        var body = envelope["document"]!.DeepClone(); body["sequence"] = sequence.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        return new CanonicalJson().Encode(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body));
+                    }), token).ConfigureAwait(false);
+            }
+            return await changes(cursor, token).ConfigureAwait(false);
+        };
+        runtime.Request(CancellationToken.None); await runtime.WaitForCurrentAttemptAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(20)).ConfigureAwait(false);
+        Assert.AreEqual(InitialLibraryPublicationStage.NeedsAttention, runtime.Activity.Stage); Assert.IsTrue(runtime.Activity.CanRetry);
+        Assert.IsInstanceOfType<ProtocolSigningInventoryChangedException>(runtime.LastAttemptFailure); Assert.IsNull(runtime.Failure); Assert.IsFalse(fatal);
+        Assert.AreEqual(0, fixture.Creates); Assert.AreEqual(0, fixture.Allocations);
+        var retained = await fixture.Setup.Accounts.State.ExecuteAsync(database =>
+        {
+            var journal = new ProtocolSigningJournal(database, fixture.Budget); var intent = journal.Read(pendingId)!;
+            Assert.IsNull(intent.Envelope); Assert.AreEqual(3L, intent.Sequence);
+            Assert.IsNull(new WorkspaceObservationRepository(database, fixture.Budget).LastAttempt()!.Completed); return intent;
+        }, CancellationToken.None).ConfigureAwait(false);
+        runtime.Request(CancellationToken.None); await runtime.WaitForCurrentAttemptAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(20)).ConfigureAwait(false);
+        Assert.IsInstanceOfType<LibraryInitialPublicationCompletionMissingException>(runtime.LastAttemptFailure);
+        var after = await fixture.Setup.Accounts.State.ExecuteAsync(database => new ProtocolSigningJournal(database, fixture.Budget).Read(pendingId), CancellationToken.None).ConfigureAwait(false);
+        Assert.AreEqual(retained.BodySha256, after!.BodySha256); Assert.AreEqual(retained.Sequence, after.Sequence); Assert.IsNull(after.Envelope);
+        Assert.AreEqual(0, fixture.Creates); Assert.AreEqual(0, fixture.Allocations); Assert.IsFalse(fatal);
+    }
+
     [TestMethod]
     public async Task ConcurrentOutboxAllocationNeedsReconciliationAndRetryPreservesItsOriginalIdentity()
     {

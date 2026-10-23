@@ -42,6 +42,9 @@ public sealed partial class LibraryAuthorityRepository
         if (ids.Count != 2 || !ids.Contains(plan.PublisherObjectId) || !ids.Contains(plan.SourceObjectId)) throw new LibraryInitialPublicationConflictException();
         var observations = new WorkspaceObservationRepository(_database, Budget);
         if (observations.ReadCheckpoint(transaction) != checkpoint) throw new WorkspaceObservationConflictException();
+        // Missing stage evidence over later signed work remains explicit recovery,
+        // rather than a retryable concurrent-scan failure that could restart bootstrap.
+        var existing = ReadInitialCompletion(transaction);
         observations.AssertCompletedScan(checkpoint, null, transaction);
         var known = observations.Known(checkpoint.Context, transaction);
         var publisher = CompletionObject(plan, true, outbox, transaction); var sources = CompletionObject(plan, false, outbox, transaction);
@@ -50,7 +53,6 @@ public sealed partial class LibraryAuthorityRepository
         var sourceObservation = known.SingleOrDefault(document => document.FileId == sources.FileId) ?? throw new WorkspaceObservationConflictException();
         var result = new LibraryInitialPublicationCompletion(plan, checkpoint, publisherObservation, sourceObservation);
         AssertCompletionEvidence(result, transaction);
-        var existing = ReadInitialCompletion(transaction);
         if (existing is not null) { transaction.Commit(); return existing; }
         var encoded = EncodeInitialCompletion(result);
         using var reservation = Budget.Reserve(checked(Encoding.UTF8.GetByteCount(encoded) * 3L + 65536)); reservation.RecheckBeforeWrite(reservation.Bytes);

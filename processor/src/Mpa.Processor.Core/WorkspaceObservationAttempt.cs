@@ -10,7 +10,8 @@ namespace Mpa.Processor.Core;
 public sealed record WorkspaceObservationAttempt(WorkspaceObservationContext Context, Guid Id, long Revision,
     long BaseCheckpointRevision, WorkspaceInventoryCheckpoint? Completed, string CandidateInventorySha256,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FirstUnresolvedCursor = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? InventoryStartCursor = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? InventoryStartCursor = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SigningInventorySha256 = null);
 
 public sealed partial class WorkspaceObservationRepository
 {
@@ -30,7 +31,8 @@ public sealed partial class WorkspaceObservationRepository
         if ((previous?.Context.AccountRevision ?? checkpoint?.Context.AccountRevision ?? 0) > context.AccountRevision)
             throw new WorkspaceObservationConflictException();
         var attempt = new WorkspaceObservationAttempt(context, Guid.NewGuid(), checked((previous?.Revision ?? 0) + 1), checkpoint?.Revision ?? 0, null,
-            previous?.CandidateInventorySha256 ?? CandidateInventoryHash([]), previous?.FirstUnresolvedCursor);
+            previous?.CandidateInventorySha256 ?? CandidateInventoryHash([]), previous?.FirstUnresolvedCursor,
+            SigningInventorySha256: new ProtocolSigningJournal(_database, _budget).Inventory(context.LibraryId, transaction).Sha256);
         WriteAttempt(attempt, transaction); transaction.Commit(); return attempt;
     }
 
@@ -64,6 +66,7 @@ public sealed partial class WorkspaceObservationRepository
             if (publications.Context != attempt.Context) throw new WorkspacePublicationConflictException();
             new WorkspacePublicationRepository(_database, _budget).AssertInventoryUnchanged(publications, transaction);
         }
+        AssertSigningInventory(attempt, transaction);
         transaction.Commit(); return checkpoint;
     }
 
@@ -88,6 +91,15 @@ public sealed partial class WorkspaceObservationRepository
         if (known.Count != checkpoint.Documents || InventoryHash(known) != checkpoint.InventorySha256)
             throw new WorkspaceObservationConflictException();
         AssertCandidatesRead(checkpoint.Context, transaction);
+        AssertSigningInventory(attempt, transaction);
+    }
+
+    private void AssertSigningInventory(WorkspaceObservationAttempt attempt, SqliteTransaction transaction)
+    {
+        // Older attempts remain readable evidence but cannot acquire the new current
+        // signing fence by completing or replaying their historical checkpoint.
+        var hash = attempt.SigningInventorySha256 ?? throw new WorkspaceObservationConflictException();
+        new ProtocolSigningJournal(_database, _budget).AssertInventoryUnchanged(attempt.Context.LibraryId, hash, transaction);
     }
 
     private WorkspaceObservationAttempt? ReadAttempt(SqliteTransaction transaction)
@@ -104,7 +116,8 @@ public sealed partial class WorkspaceObservationRepository
         try
         {
             value = Decode<WorkspaceObservationAttempt>(text, digest, MaximumAttemptBytes);
-            if (value.Context is null || value.Id == Guid.Empty || value.Revision < 1 || value.BaseCheckpointRevision < 0 || !Digest(value.CandidateInventorySha256))
+            if (value.Context is null || value.Id == Guid.Empty || value.Revision < 1 || value.BaseCheckpointRevision < 0 || !Digest(value.CandidateInventorySha256) ||
+                value.SigningInventorySha256 is not null && !Digest(value.SigningInventorySha256))
                 throw new InvalidDataException("Retained workspace scan attempt is invalid.");
             ValidateContext(value.Context);
             if (value.FirstUnresolvedCursor is not null && !ValidAttemptCursor(value.FirstUnresolvedCursor) ||

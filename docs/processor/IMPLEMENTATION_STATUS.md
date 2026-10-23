@@ -1,5 +1,47 @@
 # MPA 0.6.0 implementation ledger
 
+## Complete signing inventory and scan admission
+
+ProtocolSigningJournal now captures all local actors and every reserved/sealed intent
+in one transaction, including idle actors and unsealed work. It validates real payloads
+and signatures one at a time and retains only bounded immutable descriptions. Framed
+hashing supports more than the protocol's 1,000-item array limit without relaxing that
+limit. Explicit 64-actor/4,096-intent bounds reject incomplete inventories; orphaned,
+corrupt or missing counter history cannot be filtered out. Original IDs, bodies, exact
+envelopes, actors, counters and native keys are never replaced or advanced by inspection.
+An empty journal remains insufficient proof of native ownership or remote history.
+
+Every new actual workspace scan captures the complete signing digest before network
+inspection. Completion checks it after the checkpoint and attempt writes, within the
+same transaction, so concurrent reservation/sealing cannot leave a successful checkpoint.
+Current completed-scan admission also checks the digest. Historical checkpoint reading
+still works after later signing, while a fresh scan must reconcile the changed work.
+The optional omitted field preserves older canonical attempt bytes for historical reading;
+those attempts cannot complete or grant current admission without a fresh scan. Schema 10
+is unchanged.
+
+The initial setup runtime reports an actual changed signing inventory as needs-attention
+and preserves the pending work. Missing initial completion over later unsealed work keeps
+its explicit recovery error before any retryable scan error, rather than restarting
+bootstrap. No general publication/head authority is created. Initial setup still checks
+ready native ownership, exact original plans, current policies and actual cloud reads.
+General failed-history replay, complete predecessor/covered graph verification, renewed
+access and generation publication/activation remain unfinished.
+
+All 291 Core cases passed before the final legacy-proof guard. Final affected-Core128
+and all-AppServices204 cases pass with that guard; the Core binaries used by those suites
+and the strict Desktop Release build have the same SHA-256. The build has zero warnings
+or errors, and complete final logs have no unresolved diagnostics. The initial development
+run caught an exception-priority regression; explicit missing-stage recovery was restored
+without changing its assertion. A new synthetic orphan-row fixture was corrected to
+disable foreign keys only on its corruption-injection connection. Production constraints
+are unchanged. No live Drive operation, new UI/device acceptance, installer, APK or joint
+release is claimed. Warning gates and existing assertions remain unchanged.
+
+The preceding 731fb9d passed Protocol39983066115 and Desktop39983066176 on all four
+native platforms, Android39983066016 and device39983065976 on APIs29/35/37. Fresh
+exact-revision CI is required for this increment and the eventual joint release.
+
 Updated: 2026-10-22. **Stage 0 validation continues; contract, core and catalog integration are in progress. No 0.6 application or installer is released.**
 
 ## Authority and baseline
