@@ -17,6 +17,7 @@ public sealed class ProcessorStateDatabase : IDisposable
     internal SqliteConnection Connection => !_disposed ? _connection : throw new ObjectDisposedException(nameof(ProcessorStateDatabase));
     public string SqliteVersion { get; }
     public Guid InstallationId { get; }
+    public string StateDirectory { get; }
 
     public ProcessorStateReadSnapshot OpenReadSnapshot()
     {
@@ -34,6 +35,7 @@ public sealed class ProcessorStateDatabase : IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stateDirectory);
         var root = Path.GetFullPath(stateDirectory);
+        StateDirectory = Path.TrimEndingDirectorySeparator(root);
         if (Path.TrimEndingDirectorySeparator(root) == Path.GetPathRoot(root)) throw new ArgumentException("A dedicated local state directory is required.", nameof(stateDirectory));
         Directory.CreateDirectory(root);
         if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0) throw new IOException("Processor state directory cannot be a link/reparse point.");

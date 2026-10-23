@@ -22,7 +22,9 @@ public sealed class CatalogGenerationSnapshotStore : IDisposable
     {
         ArgumentNullException.ThrowIfNull(database); _budget = budget ?? throw new ArgumentNullException(nameof(budget));
         var state = Path.GetFullPath(stateDirectory); CheckRegular(state, true); CheckState(state, database.InstallationId);
-        if (!string.Equals(Path.TrimEndingDirectorySeparator(state), Path.GetDirectoryName(database.Connection.DataSource),
+        // SQLite may resolve parent aliases (macOS /var -> /private/var). The
+        // single-instance owner retains the exact path it actually leased.
+        if (!string.Equals(Path.TrimEndingDirectorySeparator(state), database.StateDirectory,
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)) throw new ArgumentException("Retained snapshots must use the leased database's exact state directory.", nameof(stateDirectory));
         var journal = new CatalogGenerationCaptureRepository(database, budget);
         _claims = journal.Active().ToDictionary(claim => claim.SnapshotId);
@@ -79,6 +81,20 @@ public sealed class CatalogGenerationSnapshotStore : IDisposable
             frozen.CopyForRetention(path, capture, token); token.ThrowIfCancellationRequested();
             using (var flush = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) flush.Flush(true);
             return FrozenCatalogSnapshot.InspectRetained(path, capture, token);
+        }
+        finally { EndUse(capture.SnapshotId); }
+    }
+
+    public bool ContainsCaptureFile(CatalogGenerationCapture capture)
+    {
+        CheckClaim(capture); BeginUse(capture.SnapshotId);
+        try
+        {
+            CheckRegular(_root, true); var path = SnapshotPath(capture.SnapshotId);
+            if (File.Exists(path + "-journal")) throw new InvalidDataException("An interrupted snapshot journal must be inspected before any new capture.");
+            if (Directory.Exists(path)) throw new InvalidDataException("The claimed snapshot was replaced by a directory.");
+            if (!File.Exists(path)) return false;
+            CheckRegular(path, false); return true;
         }
         finally { EndUse(capture.SnapshotId); }
     }

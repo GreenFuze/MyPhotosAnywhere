@@ -1346,3 +1346,27 @@ cloud reconciliation, renewed-access admission or production publication permiss
 The preceding fc39232 Windows TLS teardown correction also passed Protocol39919491932
 on all four native targets, Android39919491983 and all three API jobs39919491966. No new
 warning exception was required. Final0.6 installers, APK and release remain pending.
+
+## Joined journaled-capture application owner and macOS lease path
+
+CatalogGenerationCaptureService now serializes capture/resumption, fixes identities
+through the durable journal, recovers a complete copy after a lost seal checkpoint,
+and refuses to overwrite partial files. Only its reopened frozen reader reaches the
+awaited consumer. It checks the supplied external authority and current local source/
+publisher scope before admission, sealing and use, and after consumption. Exit cancels
+and joins consumers and native file work before releasing retained directory owners;
+cleanup failures latch the owner closed. This service is not wired to a production
+scheduler or route and does not substitute for cloud reconciliation/head admission.
+
+Local strict regression:59 affected Core/migration tests,135 complete AppServices tests,
+then8 final lifecycle tests (including a local-policy-change rejection) pass. Desktop
+Release has zero warnings/errors. Evidence: generation-owner-*.log/TRX in preflight-060.
+Initial analyzer findings were fixed by forwarding cancellation and reusing a constant
+account array; no suppression or check reduction was used.
+
+Cross-platform CI for5fde308 found a genuine macOS path-alias defect: SQLite resolved
+/var through /private/var, so comparing its returned path rejected the correctly leased
+state directory. ProcessorStateDatabase now retains its actual constructor lease path;
+the retained store compares against that trusted path, preserving exact-directory and
+installation-marker checks. All nine macOS failures shared this cause. The correction
+requires a fresh full native matrix; the failed run is not counted as passing.
