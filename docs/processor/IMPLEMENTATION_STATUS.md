@@ -1,5 +1,25 @@
 # MPA 0.6.0 implementation ledger
 
+## People readiness regression found by exact-revision native CI
+
+e8f36ae passed the complete Protocol, Desktop and Android build workflows, but its API37
+native invocation failed one existing People diagnostic assertion (150/151 ordinary cases
+passed). The retained semantics explicitly reported `Loading people` when the test tried
+to scroll to asynchronously computed diagnostics. API35 passed; matrix fail-fast canceled
+API29. That run is not accepted as passing, and no warning exception is added.
+
+People review results are now bound to their exact observed input, so a previous/default
+result cannot declare replacement data ready. Review loading has real progress and
+accessibility state. The existing native test awaits the seeded Room row and the matching
+rendered face count/current review before scrolling; all original diagnostic, rescan,
+pause and data-preservation assertions remain intact. There are no sleeps, whole-test
+retries or relaxed assertions.
+
+Local full unit tests, lint and both debug APK builds pass the strict gate, with only the
+already approved exact AGP deprecation. Fresh native checks remain required. This is a
+readiness correction in the current Android baseline; the 0.6 thin-client activation and
+the complete joint release remain unfinished.
+
 ## Complete signing inventory and scan admission
 
 ProtocolSigningJournal now captures all local actors and every reserved/sealed intent
