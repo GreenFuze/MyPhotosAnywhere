@@ -11,13 +11,16 @@ public sealed record WorkspaceObservationAttempt(WorkspaceObservationContext Con
     long BaseCheckpointRevision, WorkspaceInventoryCheckpoint? Completed, string CandidateInventorySha256,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FirstUnresolvedCursor = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? InventoryStartCursor = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SigningInventorySha256 = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SigningInventorySha256 = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? HistoryInventorySha256 = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] WorkspaceHistoryReplay? HistoryReplay = null);
 
 public sealed partial class WorkspaceObservationRepository
 {
     private const string AttemptKey = "workspace_observation_attempt_v1";
-    // At most three opaque 4096-character cursors (checkpoint, first unresolved,
-    // current start), each potentially JSON-escaped. Signed envelope caps are unchanged.
+    // At most five opaque 4096-character cursors (checkpoint, first unresolved,
+    // current start, replay start/end). Even JSON-escaped they fit with bounded
+    // context/metadata in 128 KiB. Signed envelope caps are unchanged.
     private const int MaximumAttemptBytes = 131072;
 
     /// <summary>Commit this fence before any network inspection. Failures leave the
@@ -32,7 +35,9 @@ public sealed partial class WorkspaceObservationRepository
             throw new WorkspaceObservationConflictException();
         var attempt = new WorkspaceObservationAttempt(context, Guid.NewGuid(), checked((previous?.Revision ?? 0) + 1), checkpoint?.Revision ?? 0, null,
             previous?.CandidateInventorySha256 ?? CandidateInventoryHash([]), previous?.FirstUnresolvedCursor,
-            SigningInventorySha256: new ProtocolSigningJournal(_database, _budget).Inventory(context.LibraryId, transaction).Sha256);
+            SigningInventorySha256: new ProtocolSigningJournal(_database, _budget).Inventory(context.LibraryId, transaction).Sha256,
+            HistoryInventorySha256: previous?.HistoryInventorySha256,
+            HistoryReplay: previous?.HistoryReplay is { } replay ? replay with { Active = false, AtEnd = false, BatchPages = 0 } : null);
         WriteAttempt(attempt, transaction); transaction.Commit(); return attempt;
     }
 
@@ -67,6 +72,7 @@ public sealed partial class WorkspaceObservationRepository
             new WorkspacePublicationRepository(_database, _budget).AssertInventoryUnchanged(publications, transaction);
         }
         AssertSigningInventory(attempt, transaction);
+        AssertHistoryReplay(attempt, transaction);
         transaction.Commit(); return checkpoint;
     }
 
@@ -92,6 +98,7 @@ public sealed partial class WorkspaceObservationRepository
             throw new WorkspaceObservationConflictException();
         AssertCandidatesRead(checkpoint.Context, transaction);
         AssertSigningInventory(attempt, transaction);
+        AssertHistoryReplay(attempt, transaction);
     }
 
     private void AssertSigningInventory(WorkspaceObservationAttempt attempt, SqliteTransaction transaction)
@@ -107,7 +114,7 @@ public sealed partial class WorkspaceObservationRepository
         var text = AttemptMeta(AttemptKey, MaximumAttemptBytes, transaction); var digest = AttemptMeta(AttemptKey + ":sha256", 64, transaction);
         if (text is null && digest is null)
         {
-            using var candidates = Command(transaction, "SELECT 1 FROM processor_meta WHERE key GLOB 'workspace_observed_candidate_v1:*' LIMIT 1");
+            using var candidates = Command(transaction, "SELECT 1 FROM processor_meta WHERE key GLOB 'workspace_observed_candidate_v1:*' OR key GLOB 'workspace_history_observed_v1:*' LIMIT 1");
             if (candidates.ExecuteScalar() is not null) throw new InvalidDataException("Workspace candidate evidence lost its scan owner.");
             return null;
         }
@@ -117,16 +124,24 @@ public sealed partial class WorkspaceObservationRepository
         {
             value = Decode<WorkspaceObservationAttempt>(text, digest, MaximumAttemptBytes);
             if (value.Context is null || value.Id == Guid.Empty || value.Revision < 1 || value.BaseCheckpointRevision < 0 || !Digest(value.CandidateInventorySha256) ||
-                value.SigningInventorySha256 is not null && !Digest(value.SigningInventorySha256))
+                value.SigningInventorySha256 is not null && !Digest(value.SigningInventorySha256) || value.HistoryInventorySha256 is not null && !Digest(value.HistoryInventorySha256))
                 throw new InvalidDataException("Retained workspace scan attempt is invalid.");
             ValidateContext(value.Context);
             if (value.FirstUnresolvedCursor is not null && !ValidAttemptCursor(value.FirstUnresolvedCursor) ||
                 value.InventoryStartCursor is not null && (!ValidAttemptCursor(value.InventoryStartCursor) || value.FirstUnresolvedCursor is null))
                 throw new InvalidDataException("Retained inventory start lost its bounded unresolved history.");
+            if (value.HistoryReplay is { } replay && (value.HistoryInventorySha256 is null || replay.Active && value.InventoryStartCursor is null || replay.StartCursor != value.FirstUnresolvedCursor ||
+                !ValidAttemptCursor(replay.StartCursor) || !ValidAttemptCursor(replay.Cursor) || replay.Pages < 0 || replay.BatchPages is < 0 or > 128 || replay.BatchPages > replay.Pages ||
+                !replay.Active && (replay.AtEnd || replay.BatchPages != 0 || value.Completed is not null) || replay.AtEnd && replay.BatchPages == 0 ||
+                replay.Pages == 0 && (replay.AtEnd || replay.Cursor != replay.StartCursor) || value.Completed is not null && !replay.AtEnd))
+                throw new InvalidDataException("Retained change replay lost its captured start or bounded progress.");
         }
         catch (ArgumentException error) { throw new InvalidDataException("Retained workspace scan attempt changed its context.", error); }
         if (CandidateInventoryHash(ReadCandidates(value.Context, transaction).Values) != value.CandidateInventorySha256)
             throw new InvalidDataException("Workspace candidate history changed or disappeared after its scan fence.");
+        var history = ReadHistory(value.Context, transaction);
+        if (value.HistoryInventorySha256 is null ? history.Count != 0 : HistoryDigest(history.Values) != value.HistoryInventorySha256)
+            throw new InvalidDataException("Workspace change observations changed or disappeared after their replay fence.");
         var checkpoint = ReadCheckpoint(transaction);
         if (value.Completed is { } complete)
         {

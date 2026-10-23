@@ -103,7 +103,7 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
         TokenResponseException or CredentialVaultException or
         StaleLibraryConfigurationException or StaleDriveConnectionException or LibraryWorkspaceApprovalException or
         LibraryInitialPublicationConflictException or LibraryInitialPolicyConflictException or LibraryInitialPublicationCompletionMissingException or
-        WorkspaceObservationConflictException or WorkspaceInventoryIncompleteException or WorkspacePublicationInventoryChangedException or ProtocolSigningInventoryChangedException or InsufficientStorageBudgetException or
+        WorkspaceObservationConflictException or WorkspaceHistoryRecoveryRequiredException or WorkspaceInventoryIncompleteException or WorkspacePublicationInventoryChangedException or ProtocolSigningInventoryChangedException or InsufficientStorageBudgetException or
         CatalogPublicationNotAuthorizedException or ControllerAuthorityConflictException ||
         error is SqliteException { SqliteErrorCode: 5 or 6 or 10 or 13 };
 
@@ -118,7 +118,7 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
             StaleDriveConnectionException or StaleLibraryConfigurationException => "Google Drive access or the approved source settings changed. Review them before retrying.",
             LibraryWorkspaceApprovalException => "Review this workspace’s sharing permission before publishing private metadata.",
             LibraryInitialPublicationCompletionMissingException or LibraryInitialPublicationConflictException or LibraryInitialPolicyConflictException or
-                WorkspaceObservationConflictException or CatalogPublicationNotAuthorizedException or ControllerAuthorityConflictException or InvalidDataException or ProtocolFormatException =>
+                WorkspaceObservationConflictException or WorkspaceHistoryRecoveryRequiredException or CatalogPublicationNotAuthorizedException or ControllerAuthorityConflictException or InvalidDataException or ProtocolFormatException =>
                 "Saved library history needs reconciliation. Existing files and metadata have been preserved.",
             WorkspaceInventoryIncompleteException or WorkspacePublicationInventoryChangedException or ProtocolSigningInventoryChangedException => "The workspace or saved work changed during setup. Retry to check it again.",
             OperationCanceledException => "Library setup was interrupted. Saved progress is kept; retry when Google Drive is connected.",

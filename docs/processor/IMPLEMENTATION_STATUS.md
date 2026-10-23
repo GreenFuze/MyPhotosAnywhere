@@ -1,5 +1,34 @@
 # MPA 0.6.0 implementation ledger
 
+## Retained change-history replay through the protected account owner
+
+Complete metadata scans now replay the retained unresolved Drive interval before document
+downloads, using the same joined account owner and state-only callbacks. Every relevant
+page, supported candidate and exact continuation commits atomically before the next read
+or a recovery error. New metadata requires a fresh inventory; historical versions cannot
+rewind current candidates. Unknown removals, access changes and unsupported metadata are
+retained as sticky recovery evidence, rather than inferred safe from missing parents.
+
+Replay batches are bounded to 128 pages and 100 events per page. Longer feeds resume at
+their last atomically committed cursor; a new batch starts closed. The earliest unresolved
+cursor never advances merely because transport, listing or replay succeeds. All retained
+identity evidence is bounded to 4,096 entries and hash protected. Missing, corrupted,
+foreign or overflowing records fail without truncation. Cancellation joins actual account
+work; stale access cannot admit its late end cursor. No original is written.
+
+Scan completion and current admission require completed replay, unchanged history and no
+sticky recovery flag. Old optional-field encoding remains readable and private schema 10
+is unchanged. Raw replay is not signature, predecessor, covered graph or head authority;
+the general generation owner and renewed-access admission remain unfinished. Initial
+policy-only bootstrap retains its narrower source mode.
+
+All 298 Core and all 213 AppServices cases pass, including page rollback/low-storage,
+restart, superseded callbacks, large-feed continuation, 4,096 identities, maximum opaque
+cursors, protected-account integration and disconnect during an uncooperative read.
+The strict Desktop Release build has zero warnings/errors. Complete final logs are clean;
+both test suites and Desktop use the same Core binary SHA-256. Fresh exact-revision CI
+remains required. No live Drive write, new device acceptance or release is claimed.
+
 ## People readiness regression found by exact-revision native CI
 
 e8f36ae passed the complete Protocol, Desktop and Android build workflows, but its API37

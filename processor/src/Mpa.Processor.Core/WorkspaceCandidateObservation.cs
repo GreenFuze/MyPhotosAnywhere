@@ -33,9 +33,16 @@ public sealed partial class WorkspaceObservationRepository
     /// Unknown unreadable documents cannot disappear from a later supposedly complete scan.</summary>
     public WorkspaceObservationAttempt RememberCandidates(WorkspaceObservationAttempt attempt, IReadOnlyCollection<WorkspaceCandidateObservation> candidates)
     {
+        using var transaction = _database.Connection.BeginTransaction();
+        var result = RememberCandidates(attempt, candidates, transaction); transaction.Commit(); return result;
+    }
+
+    private WorkspaceObservationAttempt RememberCandidates(WorkspaceObservationAttempt attempt, IReadOnlyCollection<WorkspaceCandidateObservation> candidates,
+        SqliteTransaction transaction)
+    {
         ArgumentNullException.ThrowIfNull(attempt); ArgumentNullException.ThrowIfNull(candidates);
         if (candidates.Count > MaximumDocuments) throw new ArgumentException("Workspace candidates exceed their bound.", nameof(candidates));
-        using var transaction = _database.Connection.BeginTransaction(); AssertContext(attempt.Context, transaction);
+        AssertContext(attempt.Context, transaction);
         if (attempt.Completed is not null || ReadAttempt(transaction) != attempt) throw new WorkspaceObservationConflictException();
         var retained = ReadCandidates(attempt.Context, transaction); var read = ReadAll(attempt.Context, transaction).ToDictionary(value => value.FileId, StringComparer.Ordinal);
         var seen = new HashSet<string>(StringComparer.Ordinal); var changed = new List<WorkspaceCandidateObservation>();
@@ -62,7 +69,7 @@ public sealed partial class WorkspaceObservationRepository
             if (command.ExecuteNonQuery() != 1) throw new InvalidOperationException("Workspace candidate did not retain exactly one identity.");
         }
         var updated = attempt with { CandidateInventorySha256 = CandidateInventoryHash(retained.Values) };
-        WriteAttempt(updated, transaction); transaction.Commit(); return updated;
+        WriteAttempt(updated, transaction); return updated;
     }
 
     private Dictionary<string, WorkspaceCandidateObservation> ReadCandidates(WorkspaceObservationContext context, SqliteTransaction transaction)

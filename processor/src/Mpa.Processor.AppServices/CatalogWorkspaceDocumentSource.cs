@@ -16,7 +16,7 @@ public interface IWorkspaceDocumentSource
 /// <summary>Read-only document reconciliation through the engine's joined account
 /// lease. Setup supplies the captured workspace; incoming documents cannot select it.
 /// Returned bytes/inventories remain untrusted and confer no publication permission.</summary>
-public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
+public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource, IWorkspaceHistoryDocumentSource
 {
     private readonly ProcessorStateCoordinator _state;
     private readonly ProcessorAccountService _accounts;
@@ -25,6 +25,7 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
     private readonly long _accountRevision;
     private readonly bool _initialPoliciesOnly;
     private readonly bool _allMetadata;
+    public bool RequiresHistoryReplay => _allMetadata;
 
     public CatalogWorkspaceDocumentSource(ProcessorStateCoordinator state, ProcessorAccountService accounts,
         CatalogWorkspace workspace, string? sharedDriveId, long accountRevision, bool initialPoliciesOnly = false, bool allMetadata = false)
@@ -73,6 +74,15 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
                 result.DriveVersion != candidate.Version || result.Bytes.Length != candidate.Bytes) throw new InvalidDataException("Document transport substituted a captured identity, revision or size.");
             return result;
         }, token);
+    }
+
+    public Task<WorkspaceDocumentInventory> ReplayHistoryAsync(WorkspaceDocumentInventory inventory, DriveChangeCursor from,
+        IWorkspaceHistoryObserver observer, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(inventory); ArgumentNullException.ThrowIfNull(from); ArgumentNullException.ThrowIfNull(observer);
+        if (!_allMetadata || inventory.AccountId != _workspace.AccountId || inventory.FolderId != _workspace.FolderId || inventory.SharedDriveId != _sharedDriveId)
+            throw new ArgumentException("History replay requires the captured complete metadata source.", nameof(inventory));
+        return UseAsync((_, changes, ownedToken) => new WorkspaceHistoryReplayReader(changes).ReplayAsync(inventory, from, observer, ownedToken), token);
     }
 
     private Task<T> UseAsync<T>(Func<IGoogleWorkspaceDiscovery, IGoogleWorkspaceChanges, CancellationToken, Task<T>> operation, CancellationToken cancellationToken) =>

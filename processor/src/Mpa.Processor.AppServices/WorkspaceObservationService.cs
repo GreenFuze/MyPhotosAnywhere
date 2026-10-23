@@ -61,6 +61,21 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                 attempt = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).RememberCandidates(attempt,
                     inventory.Documents.Select(CandidateObservation).ToArray()), token).ConfigureAwait(false);
                 ThrowIfCanceled(cancellationToken, token);
+                progress.UpdateAttempt(attempt);
+                if (_source is IWorkspaceHistoryDocumentSource { RequiresHistoryReplay: true } history)
+                {
+                    var from = await progress.StartHistoryAsync(token).ConfigureAwait(false);
+                    var replayed = await history.ReplayHistoryAsync(inventory, from, progress, token).ConfigureAwait(false);
+                    ThrowIfCanceled(cancellationToken, token);
+                    if (replayed.AccountId != inventory.AccountId || replayed.FolderId != inventory.FolderId || replayed.SharedDriveId != inventory.SharedDriveId ||
+                        !replayed.Documents.SequenceEqual(inventory.Documents) || !replayed.MissingKnownIds.SequenceEqual(inventory.MissingKnownIds))
+                        throw new InvalidDataException("History replay substituted its captured current inventory.");
+                    attempt = progress.CapturedAttempt();
+                    if (attempt.HistoryReplay is not { AtEnd: true } replay || replay.Cursor != replayed.Cursor.Token ||
+                        replayed.Cursor.AccountId != _context.AccountId || replayed.Cursor.SharedDriveId != _context.SharedDriveId)
+                        throw new InvalidDataException("History replay lost its actual persisted end cursor.");
+                    inventory = replayed;
+                }
                 var observed = new List<WorkspaceDocumentObservation>();
                 foreach (var candidate in inventory.Documents)
                 {
@@ -105,9 +120,31 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
     }
 
     private sealed class InventoryProgress(WorkspaceObservationService owner, WorkspaceObservationAttempt attempt, CancellationToken caller,
-        CancellationToken run) : IWorkspaceInventoryObserver
+        CancellationToken run) : IWorkspaceInventoryObserver, IWorkspaceHistoryObserver
     {
         private WorkspaceObservationAttempt _attempt = attempt;
+        public void UpdateAttempt(WorkspaceObservationAttempt updated)
+        {
+            if (updated.Id != _attempt.Id || updated.Context != _attempt.Context) throw new InvalidDataException("Inventory progress changed its owned scan.");
+            _attempt = updated;
+        }
+        public async Task<DriveChangeCursor> StartHistoryAsync(CancellationToken token)
+        {
+            owner.ThrowIfCanceled(caller, run); token.ThrowIfCancellationRequested();
+            _attempt = await owner._state.ExecuteAsync(database => new WorkspaceObservationRepository(database, owner._budget).StartHistoryReplay(_attempt), token).ConfigureAwait(false);
+            owner.ThrowIfCanceled(caller, run);
+            return new(owner._context.AccountId, owner._context.SharedDriveId, _attempt.HistoryReplay!.Cursor);
+        }
+        public async Task PageAsync(WorkspaceHistoryPageEvidence page, CancellationToken token)
+        {
+            owner.ThrowIfCanceled(caller, run); token.ThrowIfCancellationRequested();
+            if (page.From.AccountId != owner._context.AccountId || page.From.SharedDriveId != owner._context.SharedDriveId ||
+                page.Next.AccountId != owner._context.AccountId || page.Next.SharedDriveId != owner._context.SharedDriveId)
+                throw new InvalidDataException("History progress changed its owned account or drive.");
+            _attempt = await owner._state.ExecuteAsync(database => new WorkspaceObservationRepository(database, owner._budget).RememberHistoryPage(_attempt,
+                page.From.Token, page.Next.Token, page.AtEnd, page.Events, page.Candidates.Select(CandidateObservation).ToArray()), token).ConfigureAwait(false);
+            owner.ThrowIfCanceled(caller, run);
+        }
         public async Task StartedAsync(DriveChangeCursor cursor, CancellationToken token)
         {
             owner.ThrowIfCanceled(caller, run); token.ThrowIfCancellationRequested();
