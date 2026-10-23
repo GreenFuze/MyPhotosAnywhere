@@ -16,7 +16,7 @@ public sealed partial class LibraryAuthorityTests
             var observations = new WorkspaceObservationRepository(fixture.Database, fixture.Budget);
             var newer = observations.Known(work.Checkpoint.Context).Select(document => document with { Version = document.Version + 1 }).ToArray();
             foreach (var document in newer) observations.RememberRead(work.Checkpoint.Context, document);
-            var next = observations.Complete(work.Checkpoint.Context, "later-cursor", newer);
+            var next = observations.CompleteScan(observations.BeginScan(work.Checkpoint.Context), "later-cursor", newer);
             Assert.AreEqual(saved, fixture.Store.CompleteInitialPublication(work.Plan, next)); // No replacement of historical evidence.
             Assert.AreEqual(work.Checkpoint, saved.Observation); Assert.AreNotEqual(next, saved.Observation);
         }
@@ -53,7 +53,7 @@ public sealed partial class LibraryAuthorityTests
         new WorkspacePublicationRepository(fixture.Database, fixture.Budget).Prepare(Guid.NewGuid(), work.Plan.Scope, "facts-index", "application/json", "{}"u8);
         var observations = new WorkspaceObservationRepository(fixture.Database, fixture.Budget);
         var later = new WorkspaceDocumentObservation("later-object", 1, 2, new string('a', 64)); observations.RememberRead(work.Checkpoint.Context, later);
-        observations.Complete(work.Checkpoint.Context, "later-generation", observations.Known(work.Checkpoint.Context));
+        observations.CompleteScan(observations.BeginScan(work.Checkpoint.Context), "later-generation", observations.Known(work.Checkpoint.Context));
         fixture.Store.SelectPublisherPolicy(fixture.Policy(3, revoked: true)); new DriveAccountRepository(fixture.Database).Disconnect("account-A", 1);
         Assert.AreEqual(saved, fixture.Store.InitialPublicationCompletion());
         Assert.ThrowsExactly<CatalogPublicationNotAuthorizedException>(() => fixture.Store.AssertLocalPublicationScope(work.Plan.Scope));
@@ -143,7 +143,7 @@ public sealed partial class LibraryAuthorityTests
             var context = new WorkspaceObservationContext(plan.Scope.LibraryId, plan.Scope.AccountId, plan.Scope.FolderId, plan.Scope.AccountRevision, null);
             var observations = new WorkspaceObservationRepository(Database, Budget);
             observations.RememberRead(context, new(publisher.FileId!, 7, publisher.Payload.Length, publisher.Sha256)); observations.RememberRead(context, new(sources.FileId!, 7, sources.Payload.Length, sources.Sha256));
-            return (plan, observations.Complete(context, "captured-cursor", observations.Known(context)));
+            return (plan, observations.CompleteScan(observations.BeginScan(context), "captured-cursor", observations.Known(context)));
         }
     }
 }

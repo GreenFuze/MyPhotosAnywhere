@@ -167,6 +167,7 @@ public sealed class InitialLibraryPublicationService(ProcessorStateCoordinator s
         {
             ThrowIfCanceled(caller, token);
             var observations = new WorkspaceObservationRepository(database, _budget);
+            observations.AssertCompletedScan(reconciled.Checkpoint);
             if (observations.LastCheckpoint() != reconciled.Checkpoint || !observations.Known(reconciled.Checkpoint.Context).SequenceEqual(reconciled.Observations))
                 throw new WorkspaceObservationConflictException();
             return true;

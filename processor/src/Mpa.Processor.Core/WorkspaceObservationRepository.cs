@@ -17,7 +17,7 @@ public sealed class WorkspaceObservationConflictException() : InvalidOperationEx
 /// These are observations, never signatures, policy acceptance, head ancestry or permission
 /// to publish. Every process start still requires complete current reconciliation. The
 /// supplied bytes/digests must come from the joined account reader's exact captured file.</summary>
-public sealed class WorkspaceObservationRepository(ProcessorStateDatabase database, StorageBudgetManager budget)
+public sealed partial class WorkspaceObservationRepository(ProcessorStateDatabase database, StorageBudgetManager budget)
 {
     public const int MaximumDocuments = 4096;
     private readonly ProcessorStateDatabase _database = database ?? throw new ArgumentNullException(nameof(database));
@@ -60,8 +60,16 @@ public sealed class WorkspaceObservationRepository(ProcessorStateDatabase databa
 
     /// <summary>The caller first verifies all signatures/history, persists accepted
     /// policies and completes its final unchanged-Drive check. This checkpoint records
-    /// that scan only; its cursor cannot authorize a future process or access attempt.</summary>
+    /// that legacy scan only; its cursor cannot authorize a future process or access attempt.
+    /// Once a guarded scan exists, only CompleteScan may advance its checkpoint.</summary>
     public WorkspaceInventoryCheckpoint Complete(WorkspaceObservationContext context, string cursor, IReadOnlyCollection<WorkspaceDocumentObservation> completeInventory)
+    {
+        using var transaction = _database.Connection.BeginTransaction(); AssertContext(context, transaction);
+        if (ReadAttempt(transaction) is not null) throw new WorkspaceObservationConflictException();
+        var result = Complete(context, cursor, completeInventory, transaction); transaction.Commit(); return result;
+    }
+
+    private WorkspaceInventoryCheckpoint Complete(WorkspaceObservationContext context, string cursor, IReadOnlyCollection<WorkspaceDocumentObservation> completeInventory, SqliteTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(completeInventory);
         if (cursor is not { Length: > 0 and <= 4096 } || cursor.Any(char.IsControl)) throw new ArgumentException("A bounded actual Drive cursor is required.", nameof(cursor));
@@ -69,7 +77,7 @@ public sealed class WorkspaceObservationRepository(ProcessorStateDatabase databa
         var expected = completeInventory.OrderBy(document => document.FileId, StringComparer.Ordinal).ToArray();
         foreach (var document in expected) Validate(document);
         if (expected.Select(document => document.FileId).Distinct(StringComparer.Ordinal).Count() != expected.Length) throw new WorkspaceObservationConflictException();
-        using var transaction = _database.Connection.BeginTransaction(); AssertContext(context, transaction);
+        AssertContext(context, transaction);
         var known = ReadAll(context, transaction);
         if (!known.SequenceEqual(expected)) throw new WorkspaceObservationConflictException(); // Missing known files never reset history.
         var digest = InventoryHash(expected); var old = ReadCheckpoint(transaction);
@@ -78,7 +86,7 @@ public sealed class WorkspaceObservationRepository(ProcessorStateDatabase databa
             AssertSameWorkspace(old.Context, context);
             if (old.Context.AccountRevision > context.AccountRevision) throw new WorkspaceObservationConflictException();
             if (old.Context == context && old.Cursor == cursor && old.InventorySha256 == digest && old.Documents == known.Count)
-            { transaction.Commit(); return old; }
+            { return old; }
         }
         var checkpoint = new WorkspaceInventoryCheckpoint(context, checked((old?.Revision ?? 0) + 1), cursor, known.Count, digest);
         var encoded = Encode(checkpoint, 32768); using var reservation = _budget.Reserve(checked(Encoding.UTF8.GetByteCount(encoded) * 3L + 65536)); reservation.RecheckBeforeWrite(reservation.Bytes);
@@ -87,7 +95,7 @@ public sealed class WorkspaceObservationRepository(ProcessorStateDatabase databa
             ON CONFLICT(id) DO UPDATE SET document=excluded.document,row_hash=excluded.row_hash
             """, ("$document", encoded), ("$hash", Hash(Encoding.UTF8.GetBytes(encoded))));
         if (write.ExecuteNonQuery() != 1) throw new InvalidOperationException("Workspace inventory checkpoint did not update exactly one row.");
-        transaction.Commit(); return checkpoint;
+        return checkpoint;
     }
 
     public WorkspaceInventoryCheckpoint? LastCheckpoint()

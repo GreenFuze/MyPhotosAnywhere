@@ -11,6 +11,75 @@ public sealed partial class CatalogGenerationCaptureServiceTests
     private static readonly string[] NewScanRevocation = ["revocation-B"];
 
     [TestMethod]
+    public async Task SupersededHeldScanCannotAdvanceOrReplaceAnotherOwnersCompletedEvidence()
+    {
+        await using var fixture = new Fixture(); var context = ScanContext(fixture); var held = new ScanSource(); held.Add("policy-A");
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        held.BeforeRead = async () => { entered.TrySetResult(); await release.Task.ConfigureAwait(false); };
+        await using var first = new WorkspaceObservationService(fixture.State, fixture.Budget, context, held);
+        var running = first.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None); WorkspaceInventoryCheckpoint current;
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false); var actual = new ScanSource(); actual.Add("policy-A");
+            await using var second = new WorkspaceObservationService(fixture.State, fixture.Budget, context, actual);
+            current = await second.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None).ConfigureAwait(false);
+            Assert.IsFalse(running.IsCompleted);
+        }
+        finally { release.TrySetResult(); }
+        await Assert.ThrowsExactlyAsync<WorkspaceObservationConflictException>(() => running).ConfigureAwait(false);
+        var repository = new WorkspaceObservationRepository(fixture.Database, fixture.Budget); repository.AssertCompletedScan(current);
+        Assert.AreEqual(current, repository.LastCheckpoint()); Assert.IsNotNull(first.Failure);
+    }
+
+    [TestMethod]
+    public async Task EveryCapturedIdentityIsRetainedBeforeTheFirstDownloadEvenAfterFailureAndRestart()
+    {
+        await using var fixture = new Fixture(); var context = ScanContext(fixture); var source = new ScanSource(); source.Add("policy-A"); source.Add("policy-B");
+        source.BeforeRead = () => throw new IOException("Synthetic unreadable first policy");
+        await using (var scanner = new WorkspaceObservationService(fixture.State, fixture.Budget, context, source))
+            await Assert.ThrowsExactlyAsync<IOException>(() => scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None)).ConfigureAwait(false);
+        var repository = new WorkspaceObservationRepository(fixture.Database, fixture.Budget);
+        Assert.AreEqual(0, repository.Known(context).Count); Assert.AreEqual(2, repository.KnownIdentities(context).Count); Assert.IsNull(repository.LastAttempt()!.Completed);
+        source.BeforeRead = null; source.Documents.Remove("policy-B");
+        await using var restarted = new WorkspaceObservationService(fixture.State, fixture.Budget, context, source);
+        await Assert.ThrowsExactlyAsync<WorkspaceObservationConflictException>(() => restarted.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None)).ConfigureAwait(false);
+        CollectionAssert.AreEquivalent(BothScanPolicies, source.LastKnown.ToArray()); Assert.IsNull(repository.LastCheckpoint()); Assert.AreEqual(0, source.FinalChecks);
+        source.Add("policy-B"); var recovered = await restarted.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None).ConfigureAwait(false);
+        repository.AssertCompletedScan(recovered); Assert.AreEqual(2, recovered.Documents);
+    }
+
+    [TestMethod]
+    public async Task FailedCandidateBatchPreventsAllDownloadsAndPolicyCallbacks()
+    {
+        await using var fixture = new Fixture(); var context = ScanContext(fixture); var source = new ScanSource(); source.Add("policy-A"); source.Add("policy-B");
+        ObservationSql(fixture, "CREATE TRIGGER fail_candidate_batch BEFORE INSERT ON processor_meta WHEN NEW.key='workspace_observed_candidate_v1:policy-B' BEGIN SELECT RAISE(ABORT,'synthetic full'); END");
+        await using var scanner = new WorkspaceObservationService(fixture.State, fixture.Budget, context, source);
+        await Assert.ThrowsExactlyAsync<SqliteException>(() => scanner.ScanAsync((_, _) => throw new InvalidOperationException("Verifier must not run"), CancellationToken.None)).ConfigureAwait(false);
+        Assert.AreEqual(1, source.Captures); Assert.AreEqual(0, source.Reads); Assert.AreEqual(0, source.FinalChecks);
+        var repository = new WorkspaceObservationRepository(fixture.Database, fixture.Budget);
+        Assert.IsNull(repository.LastAttempt()!.Completed); Assert.AreEqual(0, repository.KnownIdentities(context).Count); Assert.IsNull(repository.LastCheckpoint());
+    }
+
+    [TestMethod]
+    public async Task FailedScanStartCannotInspectCloudOrReuseAnEarlierCompletedAttempt()
+    {
+        await using var fixture = new Fixture(); var context = ScanContext(fixture); var source = new ScanSource(); source.Add("policy-A");
+        await using var scanner = new WorkspaceObservationService(fixture.State, fixture.Budget, context, source);
+        var completed = await scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None).ConfigureAwait(false);
+        var repository = new WorkspaceObservationRepository(fixture.Database, fixture.Budget); repository.AssertCompletedScan(completed);
+        ObservationSql(fixture, "CREATE TRIGGER fail_scan_start BEFORE INSERT ON processor_meta WHEN NEW.key='workspace_observation_attempt_v1:sha256' BEGIN SELECT RAISE(ABORT,'synthetic full'); END");
+        await Assert.ThrowsExactlyAsync<SqliteException>(() => scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None)).ConfigureAwait(false);
+        Assert.AreEqual(1, source.Captures); Assert.AreEqual(1, source.Reads); Assert.IsNotNull(scanner.Failure);
+        ObservationSql(fixture, "DROP TRIGGER fail_scan_start");
+        source.FailFinal = true;
+        await Assert.ThrowsExactlyAsync<WorkspaceInventoryIncompleteException>(() => scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None)).ConfigureAwait(false);
+        Assert.IsNull(repository.LastAttempt()!.Completed); Assert.AreEqual(completed, repository.LastCheckpoint());
+        Assert.ThrowsExactly<WorkspaceObservationConflictException>(() => repository.AssertCompletedScan(completed));
+        source.FailFinal = false; var fresh = await scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None).ConfigureAwait(false);
+        repository.AssertCompletedScan(fresh); Assert.IsNull(scanner.Failure); Assert.AreEqual(3, source.Captures);
+    }
+
+    [TestMethod]
     public async Task FinalAccessInspectionRunsBeforeTheLastChangeFenceAndCannotAdvanceAFailedScan()
     {
         await using var fixture = new Fixture(); var source = new ScanSource(); source.Add("policy-A");
@@ -123,6 +192,8 @@ public sealed partial class CatalogGenerationCaptureServiceTests
         await Assert.ThrowsAsync<OperationCanceledException>(() => running).ConfigureAwait(false); Assert.IsNotNull(stopping); await stopping.ConfigureAwait(false);
         Assert.IsTrue(scanner.ExitConfirmed); Assert.IsNull(new WorkspaceObservationRepository(fixture.Database, fixture.Budget).LastCheckpoint());
         Assert.AreEqual(0, new WorkspaceObservationRepository(fixture.Database, fixture.Budget).Known(ScanContext(fixture)).Count);
+        Assert.AreEqual("policy-A", new WorkspaceObservationRepository(fixture.Database, fixture.Budget).KnownIdentities(ScanContext(fixture)).Single());
+        Assert.IsNull(new WorkspaceObservationRepository(fixture.Database, fixture.Budget).LastAttempt()!.Completed);
         await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None)).ConfigureAwait(false);
     }
 

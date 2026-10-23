@@ -1605,3 +1605,42 @@ required. Processor schema 10 and Android Room 12 are unchanged. General current
 head and pending-work reconciliation, renewed-access recovery, complete generation
 publication/activation, processing/plugins, desktop/mobile workflows, LAN onboarding,
 installers and exact tested joint release are still unfinished.
+
+## Durable observation failure fencing and unread candidates
+
+WorkspaceObservationService now commits an incomplete attempt before network work.
+Starting another scan invalidates earlier completed evidence even if no new bytes are
+successfully read. After a complete bounded inventory returns, it retains every listed
+candidate identity/version/size atomically before downloading the first document. A failed
+download cannot make an unread policy disappear from the next scan's known identities.
+Candidate records and their framed inventory digest commit together, without expanding
+the protocol's array limit or changing Processor schema 10.
+
+Only the exact current attempt may complete. Its completion fence and actual final
+checkpoint are one transaction. Failed writes, cancellation and restart retain any incomplete
+work, known documents and the earlier historical checkpoint. Superseded callers cannot
+replace a newer owner's completion. A digest mismatch, missing candidate, regressed
+version, rewritten size, retired access or changed workspace closes reconciliation.
+
+The actual initial-policy publication owner checks this fence before allocation/create
+admission and again before accepting a receipt. Initial completion also requires the
+current completed fence; it cannot reuse an older checkpoint after a newer failed scan.
+Existing historical completion receipts remain readable without becoming current authority.
+No network reconciliation runs inside the upload authority callback or account lease.
+
+All 270 Core cases and all 190 AppServices cases pass against the frozen final source.
+The final Desktop Release build has zero warnings/errors; complete final logs have no
+unresolved diagnostics. Coverage includes unread candidate recovery, 4,096 identities,
+atomic candidate/hash/checkpoint writes, stale concurrent scans and interrupted uploads
+before create or after remote create. Both upload cases recover the originally allocated
+identity without accepting a late receipt. No assertions or warning gates were weakened.
+
+The preceding b47b7a8 passed Protocol39962637760 on all four native platforms,
+Android39962639392, Desktop39962637709 and device39962637736 on APIs29/35/37.
+Fresh exact-revision CI remains required for this increment and the final joint release.
+
+This covers the existing bounded JSON document scan and initial setup. Full mixed-role
+JSON/gzip inventory, partial-page history, general failed-observation reconciliation,
+predecessor verification, renewed-access admission and complete catalog publication remain
+unfinished. A stored completed attempt cannot authorize a new process or skip startup
+reconciliation. No live Drive write or new device/UI acceptance is claimed here.

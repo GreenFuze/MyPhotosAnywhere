@@ -9,6 +9,37 @@ namespace Mpa.Processor.AppServices.Tests;
 public sealed partial class AccountServiceTests
 {
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task NewIncompleteScanDuringUploadClosesAdmissionAndPreservesTheExactPendingObject(bool afterCreate)
+    {
+        await using var fixture = await InitialPublicationFixture.CreateAsync().ConfigureAwait(false); var prepared = await fixture.PreparedAsync().ConfigureAwait(false);
+        var context = new WorkspaceObservationContext(prepared.Plan.Scope.LibraryId, "permission-A", "metadata", 1, null);
+        var allocate = fixture.Setup.Accounts.Readers.WorkspaceAllocate!; var create = fixture.Setup.Accounts.Readers.WorkspaceCreate!; var interrupt = true;
+        async Task InvalidateAsync(CancellationToken token)
+        {
+            if (!interrupt) return; interrupt = false;
+            await fixture.Setup.Accounts.State.ExecuteAsync(database => new WorkspaceObservationRepository(database, fixture.Budget).BeginScan(context), token).ConfigureAwait(false);
+        }
+        fixture.Setup.Accounts.Readers.WorkspaceAllocate = async token =>
+        {
+            var result = await allocate(token).ConfigureAwait(false); if (!afterCreate) await InvalidateAsync(token).ConfigureAwait(false); return result;
+        };
+        fixture.Setup.Accounts.Readers.WorkspaceCreate = async (folder, file, mime, bytes, hash, token) =>
+        {
+            var result = await create(folder, file, mime, bytes, hash, token).ConfigureAwait(false);
+            if (afterCreate) await InvalidateAsync(token).ConfigureAwait(false); return result;
+        };
+        await Assert.ThrowsExactlyAsync<WorkspaceObservationConflictException>(() => fixture.Owner.PublishAsync(CancellationToken.None)).ConfigureAwait(false);
+        var pending = await fixture.PreparedAsync().ConfigureAwait(false);
+        Assert.AreEqual(1, fixture.Allocations); Assert.AreEqual(afterCreate ? 1 : 0, fixture.Creates);
+        Assert.IsNotNull(pending.Publisher.FileId); Assert.IsNull(pending.Publisher.VerifiedVersion); Assert.IsNull(pending.Sources.FileId);
+        var resumed = await fixture.Owner.PublishAsync(CancellationToken.None).ConfigureAwait(false);
+        Assert.AreEqual(pending.Plan, resumed.Plan); Assert.AreEqual(pending.Publisher.FileId, resumed.Publisher.FileId);
+        Assert.AreEqual(2, fixture.Allocations); Assert.AreEqual(afterCreate ? 3 : 2, fixture.Creates); Assert.AreEqual(2, resumed.Observation.Documents);
+    }
+
+    [TestMethod]
     public async Task InitialPublicationUsesActualJoinedAccountScansAndObservesBothPoliciesAfterWriting()
     {
         await using var fixture = await InitialPublicationFixture.CreateAsync().ConfigureAwait(false);

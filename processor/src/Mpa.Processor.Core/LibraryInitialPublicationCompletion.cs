@@ -42,6 +42,7 @@ public sealed partial class LibraryAuthorityRepository
         if (ids.Count != 2 || !ids.Contains(plan.PublisherObjectId) || !ids.Contains(plan.SourceObjectId)) throw new LibraryInitialPublicationConflictException();
         var observations = new WorkspaceObservationRepository(_database, Budget);
         if (observations.ReadCheckpoint(transaction) != checkpoint) throw new WorkspaceObservationConflictException();
+        observations.AssertCompletedScan(checkpoint, null, transaction);
         var known = observations.Known(checkpoint.Context, transaction);
         var publisher = CompletionObject(plan, true, outbox, transaction); var sources = CompletionObject(plan, false, outbox, transaction);
         if (known.Count != 2) throw new WorkspaceObservationConflictException();
