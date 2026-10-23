@@ -1,5 +1,23 @@
 # MPA 0.6.0 implementation ledger
 
+## Details screenshot publication correction
+
+Exact 3669c8c native CI passed all 159 API37 assertions (151 ordinary, seven device-library,
+one revoked-access), but its evidence gate correctly rejected the light/large Details PNG.
+API29 and API35 passed. The failed API37 run remains failed: its device, pulled and reread
+bytes have the same SHA-256 and 8,265-byte size. The file contains one complete 8,192-byte
+IDAT chunk but no PNG ending, so this was already an incomplete saved capture, not a
+transport error. Full failed evidence is retained; no recapture or assertion retry is used.
+
+The older Details test now uses the existing NativeScreenshotEvidence owner. It copies
+the same captured pixels, bounds and validates PNG encoding before publication, flushes
+and syncs the owned descriptor, verifies exact bytes before and after publishing, and
+removes rejected entries while retaining cleanup failures. Original layout, accessibility
+and close assertions are unchanged. Strict local lint (zero findings) and instrumentation
+APK compilation pass with only the existing exact AGP deprecation. All eight PNG evidence
+regressions pass. Fresh exact-revision native evidence is still required. No warning
+exception or evidence gate is relaxed.
+
 ## Retained change-history replay through the protected account owner
 
 Complete metadata scans now replay the retained unresolved Drive interval before document
