@@ -26,7 +26,7 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
     public Exception? Failure { get { lock (_gate) return _failure; } }
 
     public async Task<WorkspaceInventoryCheckpoint> ScanAsync(Func<DriveWorkspaceObject, CancellationToken, Task> verifyAndPersist,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Func<CancellationToken, Task>? inspectBeforeFinalChangeCheck = null)
     {
         ArgumentNullException.ThrowIfNull(verifyAndPersist); CancellationTokenSource linked;
         lock (_gate) { ObjectDisposedException.ThrowIf(_stopping, this); linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token); }
@@ -62,6 +62,14 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                     await verifyAndPersist(document, token).ConfigureAwait(false); ThrowIfCanceled(cancellationToken, token); observed.Add(observation);
                 }
                 if (inventory.MissingKnownIds.Count != 0) throw new WorkspaceObservationConflictException();
+                // Extra folder/access checks must finish before the last change fence,
+                // not open an unchecked network interval after that fence/checkpoint.
+                if (inspectBeforeFinalChangeCheck is not null)
+                {
+                    ThrowIfCanceled(cancellationToken, token);
+                    await inspectBeforeFinalChangeCheck(token).ConfigureAwait(false);
+                    ThrowIfCanceled(cancellationToken, token);
+                }
                 var cursor = await _source.CheckUnchangedAsync(inventory, token).ConfigureAwait(false);
                 if (cursor.AccountId != _context.AccountId || cursor.SharedDriveId != _context.SharedDriveId) throw new InvalidDataException("The final change cursor belongs to another workspace access context.");
                 ThrowIfCanceled(cancellationToken, token);

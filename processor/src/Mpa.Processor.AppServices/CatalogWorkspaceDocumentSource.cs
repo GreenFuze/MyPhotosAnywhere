@@ -21,9 +21,10 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
     private readonly CatalogWorkspace _workspace;
     private readonly string? _sharedDriveId;
     private readonly long _accountRevision;
+    private readonly bool _initialPoliciesOnly;
 
     public CatalogWorkspaceDocumentSource(ProcessorStateCoordinator state, ProcessorAccountService accounts,
-        CatalogWorkspace workspace, string? sharedDriveId, long accountRevision)
+        CatalogWorkspace workspace, string? sharedDriveId, long accountRevision, bool initialPoliciesOnly = false)
     {
         _state = state ?? throw new ArgumentNullException(nameof(state));
         _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
@@ -31,16 +32,16 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
         ArgumentOutOfRangeException.ThrowIfLessThan(accountRevision, 1);
         if (!Identity(workspace.AccountId) || !Identity(workspace.FolderId) || workspace.FolderId == "root" || sharedDriveId is not null && !Identity(sharedDriveId))
             throw new ArgumentException("A captured canonical metadata workspace is required.", nameof(workspace));
-        _sharedDriveId = sharedDriveId; _accountRevision = accountRevision;
+        _sharedDriveId = sharedDriveId; _accountRevision = accountRevision; _initialPoliciesOnly = initialPoliciesOnly;
     }
 
     public Task<WorkspaceDocumentInventory> CaptureAsync(IReadOnlyCollection<string> previouslyKnownIds, CancellationToken token) =>
         UseAsync((documents, changes, ownedToken) => new WorkspaceDocumentInventoryReader(documents, changes,
-            _workspace.AccountId, _workspace.FolderId, _sharedDriveId).CaptureAsync(previouslyKnownIds, ownedToken), token);
+            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly).CaptureAsync(previouslyKnownIds, ownedToken), token);
 
     public Task<DriveChangeCursor> CheckUnchangedAsync(WorkspaceDocumentInventory inventory, CancellationToken token) =>
         UseAsync((documents, changes, ownedToken) => new WorkspaceDocumentInventoryReader(documents, changes,
-            _workspace.AccountId, _workspace.FolderId, _sharedDriveId).CheckUnchangedAsync(inventory, ownedToken), token);
+            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly).CheckUnchangedAsync(inventory, ownedToken), token);
 
     public Task<DriveWorkspaceObject> ReadAsync(DriveWorkspaceDocumentCandidate candidate, CancellationToken token)
     {
@@ -63,6 +64,9 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
             if (revision != _accountRevision) throw new StaleLibraryConfigurationException();
             if (reader is not IGoogleWorkspaceDiscovery documents || reader is not IGoogleWorkspaceChanges changes)
                 throw new InvalidOperationException("The owned account reader does not support workspace document reconciliation.");
+            if (_initialPoliciesOnly)
+                documents = reader is IGoogleInitialWorkspaceDiscovery initial ? new InitialDocuments(documents, initial) :
+                    throw new InvalidOperationException("Initial publication requires an unfiltered workspace inventory.");
             var result = await operation(documents, changes, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested(); cancellationToken.ThrowIfCancellationRequested();
             await _state.ExecuteAsync(database =>
@@ -76,4 +80,12 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource
         }, cancellationToken);
 
     private static bool Identity(string? value) => value is { Length: > 0 and <= 256 } && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
+
+    private sealed class InitialDocuments(IGoogleWorkspaceDiscovery documents, IGoogleInitialWorkspaceDiscovery initial) : IGoogleWorkspaceDiscovery
+    {
+        public Task<DriveWorkspaceDocumentPage> ReadWorkspaceDocumentsAsync(string folderId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken) =>
+            initial.ReadInitialWorkspaceDocumentsAsync(folderId, sharedDriveId, pageToken, cancellationToken);
+        public Task<DriveWorkspaceObject> ReadWorkspaceDocumentAsync(string folderId, DriveWorkspaceDocumentCandidate candidate, CancellationToken cancellationToken) =>
+            documents.ReadWorkspaceDocumentAsync(folderId, candidate, cancellationToken);
+    }
 }

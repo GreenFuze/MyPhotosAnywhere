@@ -1505,3 +1505,44 @@ The upload authority contract now explicitly states that validation runs inside 
 joined account lease. Production admission must reconcile before entering that lease
 and validate its run-owned proof/current local state inside it. Re-entering account
 network reconciliation from ValidateAsync would deadlock and is not a valid design.
+
+## Joined initial policy publication and current cloud admission
+
+InitialLibraryPublicationService now drives the actual native signer, retained outbox,
+account-owned folder inspection, full initial-workspace scan and create-only uploader.
+Its private admission capability permits one joined upload and performs only local/native
+validation inside the account lease. Actual cloud reconciliation happens outside that
+lease before each write and after every receipt. Concurrent retries, lost replies and
+interrupted post-write observations retain the original policy/object identities.
+
+Initial scans enumerate every child without a MIME/name/property authority filter.
+Unsupported originals, nested folders or other metadata roles stop bootstrap before their
+content is downloaded. This strict scan is separate from general JSON document discovery.
+Its change-feed fence also includes non-JSON children; ordinary discovery retains its
+existing scope. Folder permissions, sharing approval and shared-drive context are checked
+again before the final change fence/checkpoint. A verified object that was never observed
+before a crash still cannot disappear and be recreated as a fresh workspace.
+
+Actual local-controller observations are persisted and selected before initial-only
+classification, so an observed newer revocation closes this owner without restoring old
+permission. An unknown copy cannot be adopted even if its sealed bytes match. Complete
+outbox enumeration includes verified work and fails rather than returning a truncated
+subset. Reconnected access remains blocked without a separate renewed-access proof.
+
+Exit/caller cancellation joins uncooperative uploads and final folder inspections before
+borrowed keys/accounts/state may retire. Late results cannot admit receipts/checkpoints.
+All 173 AppServices and 60 GoogleDrive transport tests pass locally. New tests exercise
+actual account serialization, native keys/signatures, SQLite journals and simulated Drive
+storage; they do not claim a live Drive publication or a physical-device result.
+Affected Core authority/outbox/signing coverage passes 99 cases, all 25 Web cases pass,
+and the Desktop Release build has zero warnings/errors. Full final logs and actual TRX
+counters are recorded in preflight-060/initial-owner-validation.json. The initial local
+development run exposed a synthetic transport that incorrectly rejected an exact retry;
+the fixture now preserves create-only replay semantics and every original assertion.
+
+This owner deliberately handles only the two initial policies. It is not yet connected
+to a production route/scheduler and does not publish a generation or activate a catalog.
+General history/head reconciliation, reconnect recovery, durable setup scheduling and
+the rest of the joint release remain unfinished. Processor schema 10 and Android Room 12
+are unchanged. The preceding 285811f revision passed native Protocol39936601289, Android
+39936601321, Desktop39936601222 and device39936601180; fresh current-source CI is required.

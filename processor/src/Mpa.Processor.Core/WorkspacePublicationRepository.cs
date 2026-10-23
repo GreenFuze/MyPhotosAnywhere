@@ -52,6 +52,21 @@ public sealed class WorkspacePublicationRepository(ProcessorStateDatabase databa
 
     public WorkspacePublicationRecord? Read(Guid id) { CheckId(id); return Read(id, null); }
 
+    /// <summary>Complete bounded outbox identities, including verified work. Unlike a
+    /// pending-work page this fails if the caller's inventory bound cannot cover it.</summary>
+    public IReadOnlyList<Guid> Identities(int maximum = 128)
+    {
+        if (maximum is < 1 or > 4096) throw new ArgumentOutOfRangeException(nameof(maximum));
+        using var command = Command(null, "SELECT id FROM workspace_publication ORDER BY id LIMIT $limit", ("$limit", maximum + 1));
+        using var reader = command.ExecuteReader(); var ids = new List<Guid>();
+        while (reader.Read())
+        {
+            if (ids.Count == maximum) throw new InvalidDataException("Publication inventory exceeds the owner's complete reconciliation bound.");
+            ids.Add(ParseId(reader.GetString(0)));
+        }
+        return ids.AsReadOnly();
+    }
+
     /// <summary>Fence current account/configuration before writes or receipt admission.
     /// Existing retry data remains readable after reconnection; it is never retargeted.</summary>
     public void AssertCurrent(Guid id)

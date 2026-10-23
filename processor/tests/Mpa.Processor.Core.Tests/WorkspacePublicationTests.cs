@@ -10,6 +10,22 @@ public sealed class WorkspacePublicationTests
     private static readonly byte[] Payload = "{\"test\":true}"u8.ToArray();
 
     [TestMethod]
+    public void CompletePublicationInventoryIncludesVerifiedRecordsAndNeverReturnsATruncatedSubset()
+    {
+        using var fixture = new Fixture(); var verified = Guid.NewGuid(); var pending = Guid.NewGuid();
+        var prepared = fixture.Journal.Prepare(verified, fixture.Scope, "publisher-authorization", "application/json", Payload);
+        fixture.Journal.AssignFileId(verified, prepared.Sha256, "verified-policy");
+        fixture.Journal.ConfirmVerified(verified, fixture.Scope.AccountId, fixture.Scope.FolderId, "verified-policy", prepared.Sha256, Payload.Length, 7);
+        fixture.Journal.Prepare(pending, fixture.Scope, "source-configuration", "application/json", Payload);
+        CollectionAssert.AreEquivalent(new[] { verified, pending }, fixture.Journal.Identities(2).ToArray());
+        CollectionAssert.AreEqual(new[] { pending }, fixture.Journal.Pending().ToArray());
+        Assert.ThrowsExactly<InvalidDataException>(() => fixture.Journal.Identities(1));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => fixture.Journal.Identities(0));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => fixture.Journal.Identities(4097));
+        Assert.AreEqual(2, fixture.Journal.Identities(2).Count);
+    }
+
+    [TestMethod]
     public void RestartRetainsCapturedBytesScopeAndAllocatedIdUntilExactVerification()
     {
         using var root = new WorkerProcessTests.WorkerTestDirectory(); var id = Guid.NewGuid(); WorkspacePublicationScope scope;

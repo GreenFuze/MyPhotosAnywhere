@@ -9,6 +9,41 @@ public sealed partial class CatalogGenerationCaptureServiceTests
 {
     private static readonly string[] BothScanPolicies = ["policy-A", "policy-B"];
     private static readonly string[] NewScanRevocation = ["revocation-B"];
+
+    [TestMethod]
+    public async Task FinalAccessInspectionRunsBeforeTheLastChangeFenceAndCannotAdvanceAFailedScan()
+    {
+        await using var fixture = new Fixture(); var source = new ScanSource(); source.Add("policy-A");
+        await using var scanner = new WorkspaceObservationService(fixture.State, fixture.Budget, ScanContext(fixture), source);
+        await Assert.ThrowsExactlyAsync<WorkspaceInventoryIncompleteException>(() => scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None, _ =>
+        {
+            Assert.AreEqual(1, source.Reads); Assert.AreEqual(0, source.FinalChecks); source.FailFinal = true; return Task.CompletedTask;
+        })).ConfigureAwait(false);
+        Assert.IsNull(new WorkspaceObservationRepository(fixture.Database, fixture.Budget).LastCheckpoint());
+        Assert.AreEqual(1, new WorkspaceObservationRepository(fixture.Database, fixture.Budget).Known(ScanContext(fixture)).Count);
+        source.FailFinal = false;
+        Assert.AreEqual(1, (await scanner.ScanAsync((_, _) => Task.CompletedTask, CancellationToken.None, _ => Task.CompletedTask).ConfigureAwait(false)).Documents);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ObservationRetirementJoinsFinalInspectionAndCannotAcceptItsLateAccessApproval(bool exit)
+    {
+        await using var fixture = new Fixture(); var source = new ScanSource(); source.Add("policy-A");
+        await using var scanner = new WorkspaceObservationService(fixture.State, fixture.Budget, ScanContext(fixture), source);
+        using var caller = new CancellationTokenSource();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var scanning = scanner.ScanAsync((_, _) => Task.CompletedTask, caller.Token, async _ => { entered.TrySetResult(); await release.Task.ConfigureAwait(false); });
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false); Task stopping = Task.CompletedTask;
+        if (exit) stopping = scanner.DisposeAsync().AsTask(); else await caller.CancelAsync().ConfigureAwait(false);
+        try { Assert.IsFalse(scanning.IsCompleted); if (exit) Assert.IsFalse(stopping.IsCompleted); }
+        finally { release.TrySetResult(); }
+        await Assert.ThrowsAsync<OperationCanceledException>(() => scanning).ConfigureAwait(false); await stopping.ConfigureAwait(false);
+        Assert.AreEqual(0, source.FinalChecks); Assert.IsNull(new WorkspaceObservationRepository(fixture.Database, fixture.Budget).LastCheckpoint());
+        Assert.AreEqual(1, new WorkspaceObservationRepository(fixture.Database, fixture.Budget).Known(ScanContext(fixture)).Count);
+    }
+
     [TestMethod]
     public async Task EveryScanReadsCurrentDocumentsAndPersistsObservationBeforePolicyCallback()
     {

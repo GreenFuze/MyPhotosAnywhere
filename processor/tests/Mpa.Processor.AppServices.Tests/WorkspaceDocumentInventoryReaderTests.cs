@@ -11,6 +11,22 @@ public sealed class WorkspaceDocumentInventoryReaderTests
     private static readonly string[] ExpectedIds = ["a", "z"];
     private static readonly string[] MissingIds = ["missing"];
     private static readonly string[] KnownIds = ["known"];
+
+    [TestMethod]
+    public async Task InitialInventoryChangeFenceIncludesUnsupportedChildrenButStillIgnoresOtherFolders()
+    {
+        foreach (var mime in new[] { "image/jpeg", "application/vnd.google-apps.folder", "application/gzip" })
+        {
+            var fixture = new Fixture(); fixture.Documents.Enqueue(Page([]));
+            fixture.Changes.Enqueue(Changes([new("file", "unexpected", false, File(mime, "workspace"))], end: "later"));
+            await Assert.ThrowsExactlyAsync<WorkspaceInventoryIncompleteException>(() => new WorkspaceDocumentInventoryReader(fixture, fixture,
+                "account", "workspace", null, allChildChanges: true).CaptureAsync(Array.Empty<string>(), CancellationToken.None)).ConfigureAwait(false);
+        }
+        var unrelated = new Fixture(); unrelated.Documents.Enqueue(Page([]));
+        unrelated.Changes.Enqueue(Changes([new("file", "original", false, File("image/jpeg", "source"))], end: "later"));
+        Assert.AreEqual(0, (await new WorkspaceDocumentInventoryReader(unrelated, unrelated, "account", "workspace", null, allChildChanges: true)
+            .CaptureAsync(Array.Empty<string>(), CancellationToken.None).ConfigureAwait(false)).Documents.Count);
+    }
     [TestMethod]
     public async Task InventoryIsBracketedByChangesAndRetainsMissingKnownIdentities()
     {

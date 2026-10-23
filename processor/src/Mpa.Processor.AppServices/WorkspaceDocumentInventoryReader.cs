@@ -20,15 +20,16 @@ public sealed class WorkspaceDocumentInventoryReader
     private readonly string _accountId;
     private readonly string _folderId;
     private readonly string? _sharedDriveId;
+    private readonly bool _allChildChanges;
 
     public WorkspaceDocumentInventoryReader(IGoogleWorkspaceDiscovery documents, IGoogleWorkspaceChanges changes,
-        string accountId, string folderId, string? sharedDriveId)
+        string accountId, string folderId, string? sharedDriveId, bool allChildChanges = false)
     {
         _documents = documents ?? throw new ArgumentNullException(nameof(documents));
         _changes = changes ?? throw new ArgumentNullException(nameof(changes));
         if (!Identity(accountId) || !Identity(folderId) || folderId == "root" || sharedDriveId is not null && !Identity(sharedDriveId))
             throw new ArgumentException("A captured account and canonical metadata workspace are required.");
-        _accountId = accountId; _folderId = folderId; _sharedDriveId = sharedDriveId;
+        _accountId = accountId; _folderId = folderId; _sharedDriveId = sharedDriveId; _allChildChanges = allChildChanges;
     }
 
     public async Task<WorkspaceDocumentInventory> CaptureAsync(IReadOnlyCollection<string> previouslyKnownIds, CancellationToken token)
@@ -90,10 +91,11 @@ public sealed class WorkspaceDocumentInventoryReader
             {
                 if (!Identity(change.Id) || change.Kind is not ("file" or "drive")) throw new InvalidDataException("Invalid observed change identity or kind.");
                 // Observe old IDs even after a move, trash, permission loss or MIME
-                // change. New JSON in this exact folder also invalidates the scan.
+                // change. Bootstrap additionally observes every child MIME, so an
+                // unsupported original/folder cannot evade its complete empty-workspace check.
                 if (change.Kind == "drive" && (_sharedDriveId is null || change.Id == _sharedDriveId) ||
                     change.Kind == "file" && (change.Id == _folderId || known.Contains(change.Id) ||
-                    change.File is { MimeType: "application/json" } file && file.Parents.Contains(_folderId, StringComparer.Ordinal)))
+                    change.File is { } file && (_allChildChanges || file.MimeType == "application/json") && file.Parents.Contains(_folderId, StringComparer.Ordinal)))
                     throw new WorkspaceInventoryIncompleteException();
             }
             var next = page.Next ?? page.AtEnd!; CheckCursor(next);

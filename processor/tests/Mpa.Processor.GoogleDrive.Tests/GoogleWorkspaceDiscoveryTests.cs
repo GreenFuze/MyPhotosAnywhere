@@ -6,6 +6,34 @@ namespace Mpa.Processor.GoogleDrive.Tests;
 public sealed partial class GoogleWorkspacePublicationTests
 {
     [TestMethod]
+    public async Task InitialWorkspaceInventoryDoesNotFilterAwayUnknownOriginalsOrNestedFolders()
+    {
+        foreach (var mime in new[] { "image/jpeg", "application/vnd.google-apps.folder", "application/gzip" })
+        {
+            using var fixture = new Fixture { DocumentsBody = "{\"files\":[" + Changed(root => root["mimeType"] = mime) + "]}" };
+            await using var connection = await fixture.ConnectAsync().ConfigureAwait(false);
+            await Assert.ThrowsExactlyAsync<InvalidDataException>(() => connection.ReadInitialWorkspaceDocumentsAsync("workspace", null, null, CancellationToken.None)).ConfigureAwait(false);
+            var query = fixture.DocumentQueries.Single(); StringAssert.Contains(query, "trashed = false and 'workspace' in parents");
+            Assert.IsFalse(query.Contains("mimeType =", StringComparison.Ordinal));
+            Assert.AreEqual(0, fixture.BlobReads); Assert.AreEqual(0, fixture.Creates); Assert.AreEqual(0, fixture.Allocations);
+            Assert.IsTrue(fixture.Responses.All(response => response.Disposed));
+        }
+    }
+
+    [TestMethod]
+    public async Task InitialWorkspaceJsonCandidatesKeepSharedDriveAndContinuationBounds()
+    {
+        using var fixture = new Fixture { DocumentsBody = "{\"files\":[" + Metadata + "],\"nextPageToken\":\"next token&x\",\"incompleteSearch\":true}" };
+        await using var connection = await fixture.ConnectAsync().ConfigureAwait(false);
+        var page = await connection.ReadInitialWorkspaceDocumentsAsync("workspace", "shared-drive", "prior token&x", CancellationToken.None).ConfigureAwait(false);
+        Assert.AreEqual("allocated-file", page.Documents.Single().FileId); Assert.IsTrue(page.IncompleteSearch); Assert.AreEqual("next token&x", page.NextPageToken);
+        var query = fixture.DocumentQueries.Single(); StringAssert.Contains(query, "corpora=drive&driveId=shared-drive"); StringAssert.Contains(query, "pageToken=prior token&x");
+        Assert.IsFalse(query.Contains("mimeType =", StringComparison.Ordinal)); Assert.AreEqual(0, fixture.BlobReads);
+        Assert.ThrowsExactly<ArgumentException>(() => connection.ReadInitialWorkspaceDocumentsAsync("root", null, null, CancellationToken.None));
+        Assert.ThrowsExactly<ArgumentException>(() => connection.ReadInitialWorkspaceDocumentsAsync("workspace", null, "bad\npage", CancellationToken.None));
+    }
+
+    [TestMethod]
     public async Task WorkspaceInventoryRetainsOpaqueContinuationsAndIncompleteStateWithoutReadingOriginals()
     {
         using var fixture = new Fixture { DocumentsBody = "{\"files\":[" + Metadata + "],\"nextPageToken\":\"next token&x\",\"incompleteSearch\":true}" };

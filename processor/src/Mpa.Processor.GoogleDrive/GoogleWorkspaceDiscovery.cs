@@ -15,11 +15,25 @@ public interface IGoogleWorkspaceDiscovery
     Task<DriveWorkspaceObject> ReadWorkspaceDocumentAsync(string folderId, DriveWorkspaceDocumentCandidate candidate, CancellationToken cancellationToken);
 }
 
-public sealed partial class GoogleAccountConnection : IGoogleWorkspaceDiscovery
+/// <summary>Initial policy bootstrap must account for every child, rather than infer
+/// an empty workspace from a JSON-only search. Unsupported children fail closed without
+/// downloading, moving or deleting them. This is not general catalog dependency discovery.</summary>
+public interface IGoogleInitialWorkspaceDiscovery
+{
+    Task<DriveWorkspaceDocumentPage> ReadInitialWorkspaceDocumentsAsync(string folderId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken);
+}
+
+public sealed partial class GoogleAccountConnection : IGoogleWorkspaceDiscovery, IGoogleInitialWorkspaceDiscovery
 {
     // Signed document envelopes have a separate smaller cap than gzip facts objects.
     public const int MaximumWorkspaceDocumentBytes = 256 * 1024;
-    public Task<DriveWorkspaceDocumentPage> ReadWorkspaceDocumentsAsync(string folderId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken)
+    public Task<DriveWorkspaceDocumentPage> ReadWorkspaceDocumentsAsync(string folderId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken) =>
+        ReadWorkspaceDocumentsAsync(folderId, sharedDriveId, pageToken, false, cancellationToken);
+
+    public Task<DriveWorkspaceDocumentPage> ReadInitialWorkspaceDocumentsAsync(string folderId, string? sharedDriveId, string? pageToken, CancellationToken cancellationToken) =>
+        ReadWorkspaceDocumentsAsync(folderId, sharedDriveId, pageToken, true, cancellationToken);
+
+    private Task<DriveWorkspaceDocumentPage> ReadWorkspaceDocumentsAsync(string folderId, string? sharedDriveId, string? pageToken, bool allChildren, CancellationToken cancellationToken)
     {
         if (!ValidIdentity(folderId) || folderId == "root" || sharedDriveId is not null && !ValidIdentity(sharedDriveId))
             throw new ArgumentException("A selected canonical workspace and optional shared-drive identity are required.");
@@ -30,7 +44,7 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceDiscovery
             var credential = await MediaCredentialAsync(token).ConfigureAwait(false);
             // Properties and names are not an authority filter: all ordinary JSON
             // candidates in this workspace remain subject to signature admission.
-            var query = "trashed = false and mimeType = 'application/json' and '" + folderId + "' in parents";
+            var query = "trashed = false and " + (allChildren ? "" : "mimeType = 'application/json' and ") + "'" + folderId + "' in parents";
             var uri = "https://www.googleapis.com/drive/v3/files?pageSize=100&spaces=drive&includeItemsFromAllDrives=true&supportsAllDrives=true&q=" +
                 Uri.EscapeDataString(query) + "&fields=" + Uri.EscapeDataString("nextPageToken,incompleteSearch,files(" + WorkspaceObjectFields + ")") +
                 (sharedDriveId is null ? "&corpora=user" : "&corpora=drive&driveId=" + Uri.EscapeDataString(sharedDriveId)) +
