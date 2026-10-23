@@ -1,5 +1,38 @@
 # MPA 0.6.0 implementation ledger
 
+## Private current admission for one generation dependency
+
+The concrete reconciler now keeps its completed pin/native/signing/outbox/observation
+evidence private. Each dependency performs a fresh actual Drive reconciliation, obtains
+one internal admission while holding the owner's serial lease, and retires that admission
+after the joined create/readback. Validation inside the protected account lease is local;
+it cannot reenter account or network operations. Public read records remain evidence only.
+
+The grant binds one exact durable generation basis, role, MIME type, payload hash/size and
+derived outbox identity. All unrelated outbox and signing records must remain unchanged.
+Only that expected row may appear and monotonically acquire its allocated ID and verified
+receipt. Once observed, removal, rollback or retargeting closes the grant. The original
+parent must still be an actual observed member even when identical envelope copies change
+the selected listing identity. Caller payload bytes are owned before the first await.
+
+After retiring the write grant, another full actual reconciliation and local/native fence
+must observe the exact dependency before it is returned. Lost create replies retain and
+retry the same allocated identity. Exit joins uncooperative requests and rejects late
+results before borrowed accounts, native keys or state can retire. Unsupported roles,
+noncanonical JSON, stale sources, unrelated pending work and missing durable bases fail
+closed. No originals, signed commits or activation pointers can use this dependency path.
+
+Ten focused integration cases pass, including source changes during allocation, an actual
+new signed head during create, gzip MIME retention, identical-head-copy parent continuity,
+lost replies, unrelated outbox mutations, caller-byte replacement and joined Exit. All
+315 Core, 241 AppServices and 26 Web cases pass; strict Desktop Release has zero warnings
+or errors. Complete logs are clean and the suite outputs share the same actual Core and
+AppServices binaries. Core was rerun after detecting that assembly version metadata had
+changed its binary hash following the prior commit. This is not yet the full
+exclusive generation scheduler, commit publication/completion or completed-file retirement.
+Full before/after scans per object still require scale measurement and a verified
+incremental strategy before release; no performance claim is made.
+
 ## Joined worker retirement and native exit verification
 
 A full Core run exposed a diagnostics-file cleanup failure in the existing stubborn-child

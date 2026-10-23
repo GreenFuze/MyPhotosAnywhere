@@ -13,12 +13,13 @@ namespace Mpa.Processor.AppServices;
 public sealed record ReconciledLocalCatalog(LocalCatalogPublicationAuthority Authority, WorkspaceInventoryCheckpoint Observation,
     CatalogObjectReference? Parent, long Sequence, long Assets, ReadOnlyCollection<Guid> PendingSigning, ReadOnlyCollection<Guid> PendingPublications);
 
-/// <summary>Joined read-only reconciliation of actual Drive metadata, owned signing
+/// <summary>Joined ownership of actual Drive metadata reconciliation, owned signing
 /// history, current controller policies and the complete signed/covered current head.
 /// Starts closed on every attempt; no historical receipt, browser or caller record can
-/// grant permission. No file allocation/create/update/delete or original action exists.
+/// grant permission. ReconcileAsync is read-only. Its internal single-dependency path
+/// admits one create-only metadata upload; no commit activation or original action exists.
 /// Retire this owner before its borrowed native keys, accounts, budget and state.</summary>
-public sealed class LocalCatalogReconciliationService(ProcessorStateCoordinator state, ProcessorAccountService accounts,
+public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoordinator state, ProcessorAccountService accounts,
     LibrarySigningIdentityOwner keys, StorageBudgetManager budget) : IAsyncDisposable
 {
     private static readonly string[] Capabilities = [CatalogPublisherAuthorization.Capability, CatalogSourceConfiguration.Capability,
@@ -48,7 +49,7 @@ public sealed class LocalCatalogReconciliationService(ProcessorStateCoordinator 
             await _serial.WaitAsync(linked.Token).ConfigureAwait(false);
             try
             {
-                lock (_gate) { Check(linked.Token); _current = null; }
+                lock (_gate) { Check(linked.Token); _current = null; _completedRead = null; }
                 var captured = await _state.ExecuteAsync(database =>
                 {
                     Check(linked.Token); var authority = new LibraryAuthorityRepository(database, _budget);
@@ -79,9 +80,13 @@ public sealed class LocalCatalogReconciliationService(ProcessorStateCoordinator 
                     Check(linked.Token); new WorkspaceObservationRepository(database, _budget).AssertCompletedScan(checkpoint); return true;
                 }, linked.Token).ConfigureAwait(false);
                 var result = run.Result(checkpoint);
-                lock (_gate) { Check(linked.Token); _failure = null; return _current = result; }
+                lock (_gate)
+                {
+                    Check(linked.Token); _failure = null;
+                    _completedRead = new(result, captured, publications); return _current = result;
+                }
             }
-            catch (Exception error) { lock (_gate) { _current = null; _failure = error; } throw; }
+            catch (Exception error) { lock (_gate) { _current = null; _completedRead = null; _failure = error; } throw; }
             finally { _serial.Release(); }
         }
     }
@@ -250,7 +255,7 @@ public sealed class LocalCatalogReconciliationService(ProcessorStateCoordinator 
     {
         lock (_gate)
         {
-            _stopping = true; _current = null;
+            _stopping = true; _current = null; _completedRead = null;
             if (_disposal is { IsFaulted: true } && !_exitConfirmed) _disposal = null;
             return new(_disposal ??= StopAsync());
         }

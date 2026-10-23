@@ -46,7 +46,7 @@ public sealed class CatalogGenerationWorkspaceSink : ICatalogGenerationObjectSin
         var owned = payload.ToArray();
         if (mimeType == "application/json" && !new CanonicalJson(ProtocolDocumentReader.MaximumDocumentBytes).Encode(owned).AsSpan().SequenceEqual(owned))
             throw new ProtocolFormatException("Catalog dependency JSON must be canonical before publication.");
-        var hash = Convert.ToHexStringLower(SHA256.HashData(owned)); var id = ObjectId(role, mimeType, hash);
+        var hash = Convert.ToHexStringLower(SHA256.HashData(owned)); var id = ObjectId(_scope, role, mimeType, hash);
         await _authority.ValidateAsync(_scope, cancellationToken).ConfigureAwait(false); cancellationToken.ThrowIfCancellationRequested();
         var prepared = await _state.ExecuteAsync(database => new WorkspacePublicationRepository(database, _budget)
             .Prepare(id, _scope, role, mimeType, owned), cancellationToken).ConfigureAwait(false);
@@ -65,10 +65,10 @@ public sealed class CatalogGenerationWorkspaceSink : ICatalogGenerationObjectSin
         cancellationToken.ThrowIfCancellationRequested(); return reference;
     }
 
-    private Guid ObjectId(string role, string mimeType, string hash)
+    internal static Guid ObjectId(WorkspacePublicationScope scope, string role, string mimeType, string hash)
     {
         var context = new CanonicalJson(8192).Encode(JsonSerializer.SerializeToUtf8Bytes(new
-        { format = "mpa-catalog-dependency-outbox", major = 1, scope = _scope, role, mimeType, payloadSha256 = hash }));
+        { format = "mpa-catalog-dependency-outbox", major = 1, scope, role, mimeType, payloadSha256 = hash }));
         var digest = SHA256.HashData(context); digest[6] = (byte)((digest[6] & 15) | 128); digest[8] = (byte)((digest[8] & 63) | 128);
         return new(digest.AsSpan(0, 16), bigEndian: true);
     }
