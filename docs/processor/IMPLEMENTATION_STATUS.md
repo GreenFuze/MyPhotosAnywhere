@@ -1,5 +1,28 @@
 # MPA 0.6.0 implementation ledger
 
+## Signed catalog predecessor traversal
+
+CatalogCommitHistoryTraversal now walks the actual immutable parent references to the
+first commit, verifying every envelope against one independently enrolled publisher and
+its captured library/epoch. Every read checks workspace, bounded length and SHA-256 before
+signature/schema admission. Stream sequence gaps, repeated generation identities, cycles,
+commit/dependency role aliasing, foreign keys/epochs and oversized histories fail. The
+4,096-commit bound does not relax document or protocol array limits.
+
+Traversal retains only bounded identity sets and one envelope at a time. It does not
+prefetch while a consumer persists a yielded observation. Missing/changed predecessors
+can fail after an earlier yield; only normal full enumeration proves the chain completed.
+Uncooperative reads remain joined, and cancellation rejects their late results. This is
+a reusable verification component, not a current-policy/high-water reconciliation owner,
+covered-dependency validation or activation grant. Those integrations remain unfinished.
+
+All 74 Protocol cases pass, including real ECDSA chain signatures and the new late-failure,
+sequence/identity/role, foreign authority, bounded-history and cancellation regressions.
+The first development run rejected incorrectly ordered capabilities in the new synthetic
+fixture; that fixture was corrected without relaxing any assertion or decoder. The strict
+Desktop Release build has zero warnings/errors, and complete final logs are clean.
+Fresh exact-revision CI validation remains required.
+
 ## Details screenshot publication correction
 
 Exact 3669c8c native CI passed all 159 API37 assertions (151 ordinary, seven device-library,
