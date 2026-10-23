@@ -40,7 +40,9 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
     public Exception? Failure { get { lock (_gate) return _failure; } }
     public ReconciledLocalCatalog? Current { get { lock (_gate) return _current; } }
 
-    public async Task<ReconciledLocalCatalog> ReconcileAsync(CancellationToken cancellationToken)
+    public Task<ReconciledLocalCatalog> ReconcileAsync(CancellationToken cancellationToken) => ReconcileAsync(null, cancellationToken);
+
+    private async Task<ReconciledLocalCatalog> ReconcileAsync(CapturedCatalogCommitPlan? prepared, CancellationToken cancellationToken)
     {
         CancellationTokenSource linked;
         lock (_gate) { ObjectDisposedException.ThrowIf(_stopping, this); linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token); }
@@ -69,6 +71,7 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
                 var checkpoint = await scanner.ScanObservedAsync(run.ObserveAsync, linked.Token, async token =>
                 {
                     await run.VerifyHeadAsync(token).ConfigureAwait(false);
+                    if (prepared is not null) await run.VerifyPreparedAsync(prepared, token).ConfigureAwait(false);
                     var after = await InspectAsync(captured, token).ConfigureAwait(false);
                     if (after != access) throw new WorkspaceInventoryIncompleteException();
                     await AssertCapturedAsync(captured, publications, token).ConfigureAwait(false);
@@ -83,7 +86,7 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
                 lock (_gate)
                 {
                     Check(linked.Token); _failure = null;
-                    _completedRead = new(result, captured, publications); return _current = result;
+                    _completedRead = new(result, captured, publications, prepared); return _current = result;
                 }
             }
             catch (Exception error) { lock (_gate) { _current = null; _completedRead = null; _failure = error; } throw; }
@@ -120,7 +123,7 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
         LibrarySigningPublicIdentity Native, ProtocolSigningInventory Signing, bool AllowShared);
     private sealed record Access(long Version, bool Shared, string? SharedDriveId);
 
-    private sealed class Scan(LocalCatalogReconciliationService owner, Captured captured, WorkspaceObservationContext context,
+    private sealed partial class Scan(LocalCatalogReconciliationService owner, Captured captured, WorkspaceObservationContext context,
         CatalogWorkspaceDocumentSource source, WorkspacePublicationInventory publications) : ICatalogObjectSource
     {
         private readonly Dictionary<string, WorkspaceDocumentObservation> _observed = new(StringComparer.Ordinal);

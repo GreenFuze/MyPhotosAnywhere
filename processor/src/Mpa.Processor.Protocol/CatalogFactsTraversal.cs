@@ -22,12 +22,13 @@ public sealed class CatalogFactsTraversal
     public const int MaximumObjectBudget = 65536;
     private readonly Guid _library;
     private readonly CatalogPublicationReader _schema;
+    private readonly CatalogWorkspace _workspace;
     private readonly DriveCatalogFacts _facts;
     private readonly ICatalogObjectSource _source;
     private readonly int _budget;
     public CatalogFactsTraversal(Guid library, CatalogWorkspace workspace, ICatalogObjectSource source, int objectBudget = MaximumObjectBudget)
     {
-        _facts = new(library); _library = library; _schema = new(workspace);
+        _facts = new(library); _library = library; _schema = new(workspace); _workspace = workspace;
         _source = source ?? throw new ArgumentNullException(nameof(source));
         if (objectBudget is < 1 or > MaximumObjectBudget) throw new ArgumentOutOfRangeException(nameof(objectBudget));
         _budget = objectBudget;
@@ -45,13 +46,30 @@ public sealed class CatalogFactsTraversal
         ArgumentNullException.ThrowIfNull(validateConfiguration);
         return ReadAsync(verified, validateConfiguration, cancellationToken);
     }
-    private async IAsyncEnumerable<CatalogFactsLeaf> ReadAsync(VerifiedProtocolDocument verified,
-        Func<CatalogSourceCoverageSet, CancellationToken, Task>? validateConfiguration, [EnumeratorCancellation] CancellationToken cancellationToken)
+    /// <summary>Validate outgoing dependencies before signing. This does not construct
+    /// a verified document or establish incoming authority, ancestry or activation.
+    /// The owner must independently bind the candidate to its durable capture/current
+    /// source policy and finish the actual read/change fences after full enumeration.</summary>
+    public IAsyncEnumerable<CatalogFactsLeaf> ReadPreparedLeavesAsync(CatalogCommit candidate, long sequence,
+        Func<CatalogSourceCoverageSet, CancellationToken, Task> validateConfiguration, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(validateConfiguration);
+        _ = new CatalogPublicationWriter(_workspace).EncodeCommit(candidate, sequence);
+        return ReadGraphAsync(candidate, validateConfiguration, cancellationToken);
+    }
+    private IAsyncEnumerable<CatalogFactsLeaf> ReadAsync(VerifiedProtocolDocument verified,
+        Func<CatalogSourceCoverageSet, CancellationToken, Task>? validateConfiguration, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(verified); cancellationToken.ThrowIfCancellationRequested();
         if (verified.LibraryId != _library || !verified.RequiredCapabilities.Contains(DriveCatalogFacts.Capability, StringComparer.Ordinal))
             throw new ProtocolFormatException("The approved catalog must name this library and the observed Drive facts capability.");
         var commit = _schema.ReadCommit(verified);
+        return ReadGraphAsync(commit, validateConfiguration, cancellationToken);
+    }
+    private async IAsyncEnumerable<CatalogFactsLeaf> ReadGraphAsync(CatalogCommit commit,
+        Func<CatalogSourceCoverageSet, CancellationToken, Task>? validateConfiguration, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var visited = new HashSet<string>(StringComparer.Ordinal);
         void Reserve(CatalogObjectReference reference)
         {

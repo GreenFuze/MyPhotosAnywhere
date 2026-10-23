@@ -1,5 +1,42 @@
 # MPA 0.6.0 implementation ledger
 
+## Integrated retained generation preparation
+
+CatalogGenerationPreparationService now owns a joined serial run from actual current
+reconciliation through durable capture, the real private frozen SQLite reader, dependency
+building/uploads and full actual graph readback. The concrete reconciler chooses or
+resumes the journal's original generation/snapshot/signing identities under its private
+current proof. Local/native permission to copy a private snapshot is kept separate from
+the private per-upload Drive grant. Neither caller read records nor local receipts supply
+publication authority. Later discovery cannot replace a retained snapshot on retry.
+
+An explicit outgoing dependency traversal validates the same bounded schemas, complete
+coverage and facts tree before signing, without fabricating a verified incoming document.
+Inside the actual full workspace scan, every prepared reference must also belong to this
+generation's exact verified outbox role/MIME/bytes/hash and actual observed membership.
+The source-policy digest, coverage discovery/configuration and complete asset count bind
+the captured basis. Existing final changes/access/local/native/signing/outbox fences run
+after the full graph read. Only that private completed preparation proof may seal the
+immutable dependency plan. A retained ready plan is fully reread on retry.
+
+Six actual integration cases pass: empty/nonempty capture and recreated-owner reuse,
+lost compressed-object completion followed by new discovery and exact frozen retry,
+missing dependency rejection, a real changed-version event during the final graph read
+with same-capture retry, and joined Exit with an exclusive retained SQLite handle check.
+All 315 Core, 247 AppServices, 26 Web and 77 Protocol cases pass on frozen binaries.
+All five strict test/Desktop builds have zero warnings or errors; complete final logs
+are clean and every suite output shares the same actual component binaries. Development
+failures remain recorded: initial
+JSON MIME comparison did not normalize the established null-as-JSON representation;
+a new sequence fixture accidentally supplied a valid first sequence; and a new final
+change fixture first used the wrong constructor, then an unknown missing identity that
+correctly stayed blocked. The final fixture changes a real existing object's Drive
+version and leaves its immutable bytes unchanged. No existing assertion or gate changed.
+
+This owner stops at dependencies-ready. Current commit signing/upload/readback/completion,
+completed snapshot retirement, renewed-access recovery and engine scheduling remain
+unfinished; it is not wired as a completed publication workflow or claimed as 0.6 release.
+
 ## Private current admission for one generation dependency
 
 The concrete reconciler now keeps its completed pin/native/signing/outbox/observation

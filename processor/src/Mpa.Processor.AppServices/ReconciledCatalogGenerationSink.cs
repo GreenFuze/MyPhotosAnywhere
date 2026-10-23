@@ -18,7 +18,8 @@ public sealed class ReconciledCatalogGenerationSink(LocalCatalogReconciliationSe
 public sealed partial class LocalCatalogReconciliationService
 {
     private CompletedRead? _completedRead;
-    private sealed record CompletedRead(ReconciledLocalCatalog Result, Captured Captured, WorkspacePublicationInventory Publications);
+    private sealed record CompletedRead(ReconciledLocalCatalog Result, Captured Captured, WorkspacePublicationInventory Publications,
+        CapturedCatalogCommitPlan? Prepared = null);
 
     internal async Task<CatalogObjectReference> StoreGenerationDependencyAsync(WorkspacePublicationScope scope, string role, string mime,
         ReadOnlyMemory<byte> payload, CancellationToken cancellationToken)
@@ -97,18 +98,15 @@ public sealed partial class LocalCatalogReconciliationService
                 ? proof : throw new WorkspaceObservationConflictException();
         }
     }
-    private CapturedCatalogPublication AssertGeneration(ProcessorStateDatabase database, CompletedRead proof, WorkspacePublicationScope scope, CancellationToken token)
+    private CapturedCatalogPublication AssertGeneration(ProcessorStateDatabase database, CompletedRead proof, WorkspacePublicationScope scope, CancellationToken token, bool allowPrepared = false)
     {
-        _ = CurrentRead(proof.Result, token);
-        var authority = new LibraryAuthorityRepository(database, _budget);
-        if (authority.Controller() != proof.Captured.Pin || authority.CaptureLocalPublicationAuthority() != proof.Captured.Authority || _keys.PublicIdentity != proof.Captured.Native)
-            throw new StaleLibraryConfigurationException();
-        authority.AssertLocalPublicationScope(scope); _keys.AssertPublicationIdentity(proof.Captured.Pin, proof.Captured.Authority);
-        new ProtocolSigningJournal(database, _budget).AssertInventoryUnchanged(proof.Captured.Signing);
+        AssertReadProof(database, proof, token);
+        new LibraryAuthorityRepository(database, _budget).AssertLocalPublicationScope(scope);
         var observations = new WorkspaceObservationRepository(database, _budget); observations.AssertCompletedScan(proof.Result.Observation);
         var generation = new CatalogGenerationCaptureRepository(database, _budget).Publication(scope.GenerationId)
             ?? throw new CatalogGenerationCaptureConflictException();
-        if (generation.Capture.Scope != scope || generation.Capture.Phase != "publication-planned" || generation.Plan is not null ||
+        if (generation.Capture.Scope != scope || !(generation.Capture.Phase == "publication-planned" && generation.Plan is null ||
+            allowPrepared && generation.Capture.Phase == "dependencies-ready" && generation.Plan is not null) ||
             generation.Basis.ParentSequence != proof.Result.Sequence || proof.Result.PendingSigning.Count != 0)
             throw new CatalogGenerationCaptureConflictException();
         if (proof.Result.PendingPublications.Any(id => proof.Publications.Objects.Single(item => item.Id == id).Scope != scope))

@@ -20,6 +20,38 @@ public sealed class CatalogCoveredTraversalTests
     private static CatalogFactsTraversal Reader(JsonElement graph, Source source) => new(Library, Workspace, source, graph.GetProperty("objectBudget").GetInt32());
 
     [TestMethod]
+    [DataRow("valid")]
+    [DataRow("empty")]
+    public async Task OutgoingDependencyValidationPreservesCompleteCoverageAndGraphChecksWithoutAnIncomingGrant(string fixtureName)
+    {
+        using var fixture = Fixture(); var graph = fixture.RootElement.GetProperty(fixtureName); var source = new Source(graph);
+        var document = Verified(graph); var candidate = new CatalogPublicationReader(Workspace).ReadCommit(document); var approved = false;
+        var ids = new List<Guid>();
+        await foreach (var leaf in Reader(graph, source).ReadPreparedLeavesAsync(candidate, document.Sequence, (coverage, token) =>
+        {
+            token.ThrowIfCancellationRequested(); Assert.AreEqual(fixtureName == "empty" ? 0 : 3, coverage.Root.SourceCount);
+            approved = true; return Task.CompletedTask;
+        }).ConfigureAwait(false))
+        { Assert.IsTrue(approved); ids.AddRange(leaf.Facts.Assets.Select(asset => asset.Id)); }
+        Assert.IsTrue(approved);
+        CollectionAssert.AreEqual(fixtureName == "empty" ? EmptyReads : CompleteReads, source.Reads.ToArray());
+        Assert.AreEqual(fixtureName == "empty" ? 0 : fixture.RootElement.GetProperty("expectedIds").GetArrayLength(), ids.Count);
+    }
+
+    [TestMethod]
+    public void OutgoingDependencyCandidateCannotAliasRolesOrSubstituteItsSelectedWorkspace()
+    {
+        using var fixture = Fixture(); var graph = fixture.RootElement.GetProperty("valid"); var source = new Source(graph);
+        var document = Verified(graph); var candidate = new CatalogPublicationReader(Workspace).ReadCommit(document); var reader = Reader(graph, source);
+        Assert.ThrowsExactly<ProtocolFormatException>(() => reader.ReadPreparedLeavesAsync(candidate with { RootIndex = candidate.SourceCoverage },
+            document.Sequence, (_, _) => Task.CompletedTask));
+        Assert.ThrowsExactly<ProtocolFormatException>(() => reader.ReadPreparedLeavesAsync(candidate with
+        { RootIndex = candidate.RootIndex with { WorkspaceId = "another-folder" } }, document.Sequence, (_, _) => Task.CompletedTask));
+        Assert.ThrowsExactly<ProtocolFormatException>(() => reader.ReadPreparedLeavesAsync(candidate, 2, (_, _) => Task.CompletedTask));
+        Assert.AreEqual(0, source.Reads.Count);
+    }
+
+    [TestMethod]
     public async Task CompleteCoveragePrecedesConfigurationAdmissionAndEveryPhotoRead()
     {
         using var fixture = Fixture(); var graph = fixture.RootElement.GetProperty("valid"); var source = new Source(graph);
