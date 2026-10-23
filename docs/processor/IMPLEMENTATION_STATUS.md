@@ -1309,3 +1309,14 @@ Live publication, controller policy delivery, exclusive generation/head ownershi
 cloud reconciliation/history/observation persistence and pending-work reauthorization are
 still required before wiring these components into production scheduling or activation.
 No production permission is inferred from a constructed payload or a stored upload receipt.
+
+## Windows rejected-TLS fixture teardown ordering
+
+The 952c6b1 Protocol workflow failed only in its Windows LAN suite: the rejected-peer
+fixture disposed NetworkStream before the canceled server authentication task joined.
+Schannel's pending read threw ObjectDisposedException from that local teardown race.
+The fixture now cancels and joins authentication before scoped socket disposal; its
+wrong-pin/wrong-name rejection and unauthenticated-client assertions remain unchanged.
+No exception type was added to the accepted outcomes. All nine local strict LAN tests
+pass. Desktop, Android build and all API29/35/37 workflows for952c6b1 passed; cross-platform
+Protocol verification of this fixture correction is pending. No warning waiver is used.

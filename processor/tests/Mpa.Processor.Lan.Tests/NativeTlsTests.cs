@@ -87,7 +87,9 @@ public sealed class NativeTlsTests
             finally
             {
                 await deadline.CancelAsync().ConfigureAwait(false);
-                outgoing.Dispose(); accepted.Dispose();
+                // Join the canceled handshake before disposing its NetworkStream.
+                // Closing the socket here races Schannel's pending read and can
+                // replace the expected peer/cancellation outcome with use-after-close.
                 try { await serverAuthentication.ConfigureAwait(false); }
                 catch (AuthenticationException) { /* Expected peer rejection. */ }
                 catch (IOException) { /* Expected peer closure after rejection. */ }
