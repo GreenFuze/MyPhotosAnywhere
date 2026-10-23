@@ -1430,3 +1430,29 @@ AppServices cases and Desktop Release has zero warnings/errors. Evidence is
 catalog-retirement-final and initial-policy-services-full logs/TRX in preflight-060.
 New immutable-revision cross-platform verification is required. No diagnostic exception,
 exception-type relaxation or test removal was introduced.
+
+## Fixed initial controller-policy plan and revocation-safe signing
+
+Initial setup now persists both publisher/source signing-intent identities before any
+signature. The plan captures the pinned controller/workspace, registered native publisher
+and original human source-approval digest. A lost reply/restart returns that exact plan.
+Missing plan state with retained signing work or nonzero counters cannot create a fresh
+setup. Partial/corrupt plan writes fail explicitly and source changes preserve the old
+plan while blocking signing. The bounded singleton uses the existing authority metadata
+store; Processor schema 10 and Android Room 12 are unchanged.
+
+JournaledProtocolSigner can prepare this plan and sign its fixed initial native publisher
+authorization. Initial source signing also enforces its fixed intent when a plan exists.
+Both paths check current human approval, exact registered native identities and accepted
+policy history before counter reservation or sealed replay. A newer publisher revocation
+or source policy retires both old setup paths, including when the source payload remains
+unchanged. Historical plan inspection never reauthorizes a publisher. Exact sealed-history
+restoration/upload remains a separate recovery permission; these signing methods grant no
+Drive upload, original-mutation or complete cloud/head admission.
+
+All 69 local authority tests pass, including eight initial-plan cases. All 17 journaled
+signer tests pass; the integrated AppServices suite passes 151 tests. The final 20 lifecycle
+cases and Web 25 tests pass, and Desktop Release has zero warnings/errors. Logs/TRX are
+initial-policy-* and catalog-retirement-final in preflight-060. No warning suppression,
+new diagnostic waiver or weakened assertion was introduced. These changes and df7cde0's
+Intel macOS shutdown-race fix require fresh native/platform CI before acceptance.

@@ -16,6 +16,18 @@ public sealed class JournaledProtocolSigner(ProcessorStateCoordinator state, Lib
     private static readonly string[] Capabilities = [CatalogPublisherAuthorization.Capability, CatalogSourceConfiguration.Capability,
         CatalogPublicationReader.Capability, DriveCatalogFacts.Capability];
 
+    public Task<LibraryInitialPolicyPlan> PrepareInitialPolicyPlanAsync(CancellationToken token) =>
+        _state.ExecuteAsync(database => new LibraryAuthorityRepository(database, _budget).PrepareInitialPolicyPlan(Publisher(_keys.PublicIdentity)), token);
+
+    /// <summary>Sign only the fixed initial publisher intent. Superseding policies or
+    /// source changes retire this setup path; it cannot revive a revoked publisher.</summary>
+    public Task<ProtocolSigningIntent> SignInitialPublisherAuthorizationAsync(Guid id, CancellationToken token) =>
+        SignAsync(id, "library-publisher-authorization", true, (database, identity) =>
+        {
+            var plan = new LibraryAuthorityRepository(database, _budget).AssertInitialPolicyIntentCurrent(id, "library-publisher-authorization", Publisher(identity));
+            return sequence => InitialPublisherAuthorizationDocument.Encode(identity, sequence, plan);
+        }, token);
+
     public Task<ProtocolSigningIntent> SignControllerAsync(Guid id, string kind,
         Func<LibrarySigningPublicIdentity, long, byte[]> body, CancellationToken cancellationToken)
     {
@@ -36,9 +48,13 @@ public sealed class JournaledProtocolSigner(ProcessorStateCoordinator state, Lib
     public Task<ProtocolSigningIntent> SignInitialSourceConfigurationAsync(Guid id, CancellationToken cancellationToken) =>
         SignAsync(id, "library-source-configuration", true, (database, identity) =>
         {
-            var approved = new LibraryAuthorityRepository(database).AssertBootstrapSourcesCurrent();
+            var authority = new LibraryAuthorityRepository(database, _budget);
+            if (authority.InitialPolicyPlan() is not null) authority.AssertInitialPolicyIntentCurrent(id, "library-source-configuration", Publisher(identity));
+            var approved = authority.AssertBootstrapSourcesCurrent();
             return sequence => InitialSourceConfigurationDocument.Encode(identity, sequence, approved);
         }, cancellationToken);
+
+    private static PublisherSigningRegistration Publisher(LibrarySigningPublicIdentity identity) => new(identity.PublisherId, identity.PublisherEpoch, identity.PublisherPublicKeySpki, identity.PublisherKeyId);
 
     private Task<ProtocolSigningIntent> SignAsync(Guid id, string kind, bool controller,
         Func<ProcessorStateDatabase, LibrarySigningPublicIdentity, Func<long, byte[]>> prepare, CancellationToken token)

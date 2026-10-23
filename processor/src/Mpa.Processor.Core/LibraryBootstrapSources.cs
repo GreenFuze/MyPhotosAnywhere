@@ -27,13 +27,18 @@ public sealed partial class LibraryAuthorityRepository
     /// the original approved snapshot with the latest local settings after restart.</summary>
     public LibraryBootstrapSources AssertBootstrapSourcesCurrent()
     {
-        using var transaction = _database.Connection.BeginTransaction(); var pin = ReadPin(transaction)
+        using var transaction = _database.Connection.BeginTransaction(); var result = AssertBootstrapSourcesCurrent(transaction);
+        transaction.Commit(); return result;
+    }
+    internal LibraryBootstrapSources AssertBootstrapSourcesCurrent(SqliteTransaction transaction)
+    {
+        var pin = ReadPin(transaction)
             ?? throw new InvalidOperationException("Approve library setup first.");
         var approved = ReadBootstrapSources(transaction, pin) ?? throw new InvalidOperationException("The initial source association was not explicitly approved.");
         var current = new LibrarySourceRepository(_database).Snapshot(transaction);
         if (current.Revision != approved.ConfigurationRevision || CaptureBootstrapSources(pin, current, approved.AllowSharedMetadata) != approved.CanonicalSnapshot)
             throw new StaleLibraryConfigurationException();
-        transaction.Commit(); return approved;
+        return approved;
     }
 
     // The transaction owner retains this lease through its actual commit.
