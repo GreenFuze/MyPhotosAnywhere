@@ -107,7 +107,7 @@ public sealed class CatalogGenerationSnapshotStore : IDisposable
     }
     public FrozenCatalogSnapshot Open(CatalogGenerationCapture capture, CancellationToken token)
     {
-        CheckClaim(capture); if (capture.Phase != "frozen" || capture.Snapshot is null) throw new InvalidOperationException("A sealed frozen snapshot is required.");
+        CheckClaim(capture); if (capture.Phase is not ("frozen" or "publication-planned" or "dependencies-ready" or "commit-sealed") || capture.Snapshot is null) throw new InvalidOperationException("A sealed frozen snapshot is required.");
         CatalogGenerationCaptureRepository.ValidateDescriptor(capture.Snapshot); BeginUse(capture.SnapshotId);
         try
         {

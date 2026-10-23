@@ -18,7 +18,7 @@ public sealed class CatalogGenerationCaptureConflictException() : InvalidOperati
 /// for fresh admission; native/cloud authority, generation scheduling, head ancestry and
 /// signed publication are separate responsibilities. A retry never changes its original
 /// access revision, snapshot, generation or signing-intent identity.</summary>
-public sealed class CatalogGenerationCaptureRepository(ProcessorStateDatabase database, StorageBudgetManager budget)
+public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDatabase database, StorageBudgetManager budget)
 {
     public const long MaximumSnapshotBytes = 512L * 1024 * 1024;
     private readonly ProcessorStateDatabase _database = database ?? throw new ArgumentNullException(nameof(database));
@@ -86,6 +86,7 @@ public sealed class CatalogGenerationCaptureRepository(ProcessorStateDatabase da
     public CatalogGenerationCapture AbandonUnpublished(Guid generationId)
     {
         Id(generationId); using var transaction = _database.Connection.BeginTransaction(); var current = Read(generationId, transaction) ?? throw new InvalidOperationException("The generation capture is missing.");
+        if (current.Phase is "dependencies-ready" or "commit-sealed") throw new InvalidOperationException("Prepared publication work must be recovered; its snapshot claim cannot be abandoned.");
         using (var work = Command(transaction, """
             SELECT (SELECT count(*) FROM signing_intent WHERE id=$intent)+
               (SELECT count(*) FROM workspace_publication WHERE json_extract(scope,'$.GenerationId')=$id)
@@ -134,7 +135,7 @@ public sealed class CatalogGenerationCaptureRepository(ProcessorStateDatabase da
             if (reader.GetString(0) != generationId.ToString("D") || scope.GenerationId != generationId || reader.GetString(1) != scope.LibraryId.ToString("D") ||
                 reader.IsDBNull(11) || reader.GetString(11) != scope.LibraryId.ToString("D") || WorkspacePublicationRepository.EncodeScope(scope) != encoded ||
                 reader.GetString(6) != ContextHash(encoded, snapshotId, intent)) throw new InvalidDataException("Captured generation identity/scope integrity failed.");
-            var phase = reader.GetString(7); if (phase is not ("capturing" or "frozen" or "abandoned") || reader.IsDBNull(9) != reader.IsDBNull(10)) throw new InvalidDataException("Captured generation phase or snapshot proof is invalid.");
+            var phase = reader.GetString(7); if (phase is not ("capturing" or "frozen" or "publication-planned" or "dependencies-ready" or "commit-sealed" or "abandoned") || reader.IsDBNull(9) != reader.IsDBNull(10)) throw new InvalidDataException("Captured generation phase or snapshot proof is invalid.");
             CatalogSnapshotDescriptor? snapshot = null;
             if (!reader.IsDBNull(9))
             {
@@ -142,8 +143,9 @@ public sealed class CatalogGenerationCaptureRepository(ProcessorStateDatabase da
                 if (data != Encode(snapshot) || reader.GetString(10) != Hash(Encoding.UTF8.GetBytes(data))) throw new InvalidDataException("Retained snapshot descriptor integrity failed.");
                 MatchDescriptor(new(scope, snapshotId, intent, phase, null), snapshot);
             }
-            if (phase == "frozen" && snapshot is null || phase == "capturing" && snapshot is not null) throw new InvalidDataException("Captured generation phase disagrees with its frozen file proof.");
-            return new(scope, snapshotId, intent, phase, snapshot);
+            if (phase is "frozen" or "publication-planned" or "dependencies-ready" or "commit-sealed" && snapshot is null || phase == "capturing" && snapshot is not null) throw new InvalidDataException("Captured generation phase disagrees with its frozen file proof.");
+            var capture = new CatalogGenerationCapture(scope, snapshotId, intent, phase, snapshot);
+            reader.Close(); ValidatePublicationState(capture, transaction); return capture;
         }
         catch (Exception error) when (error is JsonException or ArgumentException or ProtocolFormatException or CatalogGenerationCaptureConflictException)
         { throw new InvalidDataException("Retained generation metadata is invalid; preserve it for recovery.", error); }

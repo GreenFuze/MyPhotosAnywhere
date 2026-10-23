@@ -140,7 +140,7 @@ public sealed class DiscoveredCatalogTests
         using (var old = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.Combine(directory.Path, "processor.db"), Pooling = false }.ToString()))
         {
             old.Open(); using var command = old.CreateCommand();
-            command.CommandText = "DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; DROP TABLE signing_intent; DROP TABLE signing_actor; DROP TABLE workspace_publication; DROP TABLE current_source_scan; ALTER TABLE job_item DROP COLUMN captured_context; DROP TABLE source_asset; DROP TABLE discovered_asset; DROP TABLE discovery_revision; PRAGMA user_version=3;"; command.ExecuteNonQuery();
+            command.CommandText = "DROP TABLE catalog_generation_publication; DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; DROP TABLE signing_intent; DROP TABLE signing_actor; DROP TABLE workspace_publication; DROP TABLE current_source_scan; ALTER TABLE job_item DROP COLUMN captured_context; DROP TABLE source_asset; DROP TABLE discovered_asset; DROP TABLE discovery_revision; PRAGMA user_version=3;"; command.ExecuteNonQuery();
         }
         using var upgraded = new ProcessorStateDatabase(directory.Path);
         var sources = new LibrarySourceRepository(upgraded);

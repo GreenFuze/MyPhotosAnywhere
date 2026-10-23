@@ -182,9 +182,9 @@ public sealed partial class LibraryAuthorityTests
         using var frozen = store.Open(capture, CancellationToken.None); Assert.AreEqual(1L, frozen.Count);
     }
 
-    private static CatalogGenerationCapture SaveRetentionFixture(Fixture fixture)
+    private static CatalogGenerationCapture SaveRetentionFixture(Fixture fixture, bool registerSigning = false)
     {
-        fixture.PrepareLocalPublication(); AddRetainedFacts(fixture, "retained-photo"); var journal = new CatalogGenerationCaptureRepository(fixture.Database, fixture.Budget);
+        fixture.PrepareLocalPublication(registerSigning); AddRetainedFacts(fixture, "retained-photo"); var journal = new CatalogGenerationCaptureRepository(fixture.Database, fixture.Budget);
         var capture = journal.Begin(Scope(fixture.Store.CaptureLocalPublicationAuthority()), Guid.NewGuid(), Guid.NewGuid());
         using var directory = new CatalogPreparationDirectory(fixture.StatePath, fixture.Database.InstallationId);
         using var frozen = FrozenCatalogSnapshot.CaptureAndRelease(CatalogFactsSnapshot.Open(fixture.Database), directory, fixture.Budget);

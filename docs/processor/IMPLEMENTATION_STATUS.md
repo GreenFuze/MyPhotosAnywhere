@@ -1,5 +1,32 @@
 # MPA 0.6.0 implementation ledger
 
+## Durable generation publication plan and native signing (in validation)
+
+Processor schema 11 explicitly migrates the capture table, preserving original scopes,
+snapshot/commit identities, descriptors and active claims. A separate bounded canonical
+publication journal fixes the frozen descriptor, selected parent/sequence, source-policy
+digest and human settings before the first dependency write. Its publication-planned phase
+detects a missing basis even before any upload exists. Dependency references become one
+immutable commit plan only after their exact generation/role/bytes and retained verified
+outbox ownership match. The plan checkpoint and dependencies-ready phase commit atomically.
+
+JournaledProtocolSigner.SignCapturedCatalogAsync now reads that durable plan under the
+serial state owner, checks current local authority and native identity, and signs only the
+fixed commit intent at the captured next sequence. Actual journal signature/body verification
+precedes commit-sealed. A lost phase update recovers the same sealed envelope. No caller
+body, new discovery snapshot, newer settings or replacement parent may change an existing
+intent. Claimed native snapshot files remain readable through the new phases and cannot
+be abandoned after dependency preparation or signing.
+
+This is local recovery/signing integration, not a cloud write grant or activated catalog.
+The production engine still performs its current read; full exclusive generation scheduling,
+private single-upload current admission, actual commit readback/verified/complete phases,
+head activation, completed snapshot retirement and renewed-credential access attempts remain
+the next owner work. No new network/publication path, media mutation or cleanup permission
+was enabled. Android Room 12 and the upgrade signer are unchanged. Schema-11 migration,
+actual retained-file lifetime, immutable plan recovery, low-storage and signing tests are
+being validated; do not interpret the earlier revision's passing tests as current validation.
+
 ## Engine-owned current catalog reconciliation
 
 The Desktop composition root now supplies a concrete LocalCatalogReconciliationService
@@ -29,7 +56,8 @@ No Drive allocation, create, update, delete, original download or original modif
 performed by this owner. Generation publication/activation, renewed-access upload admission,
 independent enrollment, retired epochs and the remaining joint product remain unfinished.
 The earliest unresolved cursor and sticky recovery evidence are not reset. Processor
-schema 10, Android Room 12 and the established upgrade signer remain unchanged.
+schema 10 at this preceding increment; the newer durable-plan increment above explicitly
+migrates it to 11. Android Room 12 and the established upgrade signer remain unchanged.
 
 All 228 AppServices cases and all 26 Web cases pass. The strict Desktop Release build has
 zero warnings/errors, complete final logs are clean, and all three use the same service

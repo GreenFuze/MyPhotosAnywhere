@@ -61,6 +61,11 @@ public sealed partial class LibraryAuthorityRepository
         var result = pin is null ? null : ReadCurrentSources(transaction, pin); transaction.Commit(); return result;
     }
 
+    internal AcceptedSourceConfiguration? CurrentSourceConfiguration(SqliteTransaction transaction)
+    {
+        var pin = ReadPin(transaction); return pin is null ? null : ReadCurrentSources(transaction, pin);
+    }
+
     private AcceptedSourceConfiguration? ReadCurrentSources(SqliteTransaction transaction, LibraryControllerPin pin)
     {
         var selected = ReadMeta(transaction, SelectedSourceKey, 19); var highest = HighestSourceSequence(transaction);

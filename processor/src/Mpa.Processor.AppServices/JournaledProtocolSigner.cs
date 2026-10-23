@@ -42,6 +42,28 @@ public sealed class JournaledProtocolSigner(ProcessorStateCoordinator state, Lib
         return SignAsync(id, "catalog-commit", false, (_, identity) => sequence => body(identity, sequence), cancellationToken);
     }
 
+    /// <summary>Generation signing always reconstructs its body from the durable fixed
+    /// plan under the serial state owner. A lost phase checkpoint replays the exact sealed
+    /// intent. This grants no cloud upload or activation authority.</summary>
+    public async Task<ProtocolSigningIntent> SignCapturedCatalogAsync(Guid generationId, CancellationToken cancellationToken)
+    {
+        var id = await _state.ExecuteAsync(database => new CatalogGenerationCaptureRepository(database, _budget).Read(generationId)?.CommitIntentId
+            ?? throw new InvalidOperationException("The generation capture is missing."), cancellationToken).ConfigureAwait(false);
+        var intent = await SignAsync(id, "catalog-commit", false, (database, identity) =>
+        {
+            var publication = new CatalogGenerationCaptureRepository(database, _budget).Publication(generationId)
+                ?? throw new InvalidOperationException("Capture the immutable publication plan before signing.");
+            var capture = publication.Capture; var plan = publication.Plan ?? throw new InvalidOperationException("Seal dependencies before signing.");
+            if (capture.CommitIntentId != id || capture.Phase is not ("dependencies-ready" or "commit-sealed") ||
+                capture.Scope.LibraryId != identity.LibraryId || capture.Scope.ActorId != identity.PublisherId || capture.Scope.ActorEpoch != identity.PublisherEpoch)
+                throw new CatalogGenerationCaptureConflictException();
+            new LibraryAuthorityRepository(database).AssertLocalPublicationScope(capture.Scope);
+            return sequence => plan.EncodeBody(capture.Scope, sequence);
+        }, cancellationToken).ConfigureAwait(false);
+        await _state.ExecuteAsync(database => new CatalogGenerationCaptureRepository(database, _budget).ConfirmCommitSealed(generationId), cancellationToken).ConfigureAwait(false);
+        return intent;
+    }
+
     /// <summary>Only the exact initial human-approved source association may become the
     /// first outgoing source policy. Rechecks happen under the serial state owner before
     /// reserving or replaying a sequence; later settings cannot silently replace consent.</summary>
