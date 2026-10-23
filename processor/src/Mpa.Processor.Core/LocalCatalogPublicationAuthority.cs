@@ -22,12 +22,16 @@ public sealed partial class LibraryAuthorityRepository
     public void AssertLocalPublicationScope(WorkspacePublicationScope scope)
     {
         ArgumentNullException.ThrowIfNull(scope); using var transaction = _database.Connection.BeginTransaction();
+        AssertLocalPublicationScope(scope, transaction); transaction.Commit();
+    }
+
+    internal void AssertLocalPublicationScope(WorkspacePublicationScope scope, SqliteTransaction transaction)
+    {
         var current = ReadLocalPublicationAuthority(transaction);
         if (scope.LibraryId != current.LibraryId || scope.ActorId != current.ActorId || scope.ActorEpoch != current.ActorEpoch ||
             scope.AccountId != current.AccountId || scope.AccountRevision != current.AccountRevision || scope.FolderId != current.FolderId ||
             scope.ConfigurationRevision != current.ConfigurationRevision || scope.AuthoritySha256 != current.AuthoritySha256 || scope.GenerationId == Guid.Empty)
             throw new StaleLibraryConfigurationException();
-        transaction.Commit();
     }
 
     private LocalCatalogPublicationAuthority ReadLocalPublicationAuthority(SqliteTransaction transaction)

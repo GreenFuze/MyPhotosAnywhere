@@ -38,6 +38,21 @@ public sealed class ProcessorStateStorageTests
         Assert.ThrowsExactly<DirectoryNotFoundException>(() => new ProcessorStateStorageReader(Path.Combine(fixture.Root, "absent")).Read());
     }
 
+    [TestMethod]
+    public void RetainedSnapshotMetadataIsCountedAndUnknownPrivateEntriesRemainExplicitFailures()
+    {
+        using var fixture = new Fixture(); var reader = new ProcessorStateStorageReader(fixture.Root); var before = reader.Read();
+        var budget = new StorageBudgetManager(reader);
+        using var snapshots = new CatalogGenerationSnapshotStore(fixture.Root, fixture.Database, budget);
+        var after = reader.Read(); var retained = CatalogGenerationSnapshotStore.MeasureOwnedBytes(fixture.Root);
+        Assert.IsTrue(retained > 0); Assert.AreEqual(checked(before.OwnedCacheBytes + retained), after.OwnedCacheBytes);
+        var unknown = Path.Combine(fixture.Root, "catalog-generation-snapshots", "never-owned-original.jpg");
+        File.WriteAllBytes(unknown, new byte[1024]);
+        Assert.ThrowsExactly<InvalidDataException>(() => reader.Read()); Assert.AreEqual(1024, new FileInfo(unknown).Length);
+        File.Delete(unknown); // Explicit fixture cleanup; storage accounting itself never removes a file.
+        Assert.AreEqual(after.OwnedCacheBytes, reader.Read().OwnedCacheBytes);
+    }
+
     private sealed class Fixture : IDisposable
     {
         public string Root { get; } = Path.Combine(Path.GetTempPath(), "mpa-state-budget-" + Guid.NewGuid().ToString("N"));

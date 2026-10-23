@@ -150,7 +150,7 @@ public sealed class WorkspacePublicationRepository(ProcessorStateDatabase databa
         foreach (var value in values) command.Parameters.AddWithValue(value.Name, value.Value);
         return command;
     }
-    private static void ValidateScope(WorkspacePublicationScope scope)
+    internal static void ValidateScope(WorkspacePublicationScope scope)
     {
         ArgumentNullException.ThrowIfNull(scope);
         if (scope.LibraryId == Guid.Empty || scope.ActorId == Guid.Empty || scope.ActorEpoch < 1 || scope.GenerationId == Guid.Empty || !Identity(scope.AccountId) ||
@@ -162,7 +162,7 @@ public sealed class WorkspacePublicationRepository(ProcessorStateDatabase databa
         if (role is not ("facts-chunk" or "facts-index" or "coverage-page" or "coverage-root" or "source-configuration" or "catalog-commit") ||
             mime is not ("application/json" or "application/gzip" or "application/octet-stream")) throw new ArgumentException("A supported metadata publication role/type is required.");
     }
-    private static string EncodeScope(WorkspacePublicationScope scope) => Encoding.UTF8.GetString(new CanonicalJson(4096).Encode(JsonSerializer.SerializeToUtf8Bytes(scope)));
+    internal static string EncodeScope(WorkspacePublicationScope scope) => Encoding.UTF8.GetString(new CanonicalJson(4096).Encode(JsonSerializer.SerializeToUtf8Bytes(scope)));
     private static string ContextHash(Guid id, string scope, string role, string mimeType, string payloadSha256) =>
         Hash(new CanonicalJson(8192).Encode(JsonSerializer.SerializeToUtf8Bytes(new { id = id.ToString("D"), scope, role, mimeType, payloadSha256 })));
     private static string Hash(ReadOnlySpan<byte> bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));

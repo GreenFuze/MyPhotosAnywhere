@@ -15,13 +15,14 @@ public sealed record FrozenCatalogPartitionSize(long Count, long EncodedUpperBou
 /// reader and releases it before returning, including on failure/cancellation. Later
 /// hashing, compression and Drive uploads read only this bounded-cache SQLite copy.
 /// This is neither an active catalog nor a durable upload or authority record.</summary>
-public sealed class FrozenCatalogSnapshot : IDisposable
+public sealed partial class FrozenCatalogSnapshot : IDisposable
 {
     private readonly string _path;
     private SqliteConnection? _connection;
     private StorageReservation? _storage;
     private bool _ownsFile;
     private bool _closed;
+    private Action? _releaseRetainedLease;
     public Guid LibraryId { get; }
     public long DiscoveryRevision { get; }
     public long ConfigurationRevision { get; }
@@ -154,6 +155,6 @@ public sealed class FrozenCatalogSnapshot : IDisposable
             }
             _ownsFile = false;
         }
-        _storage?.Dispose(); _storage = null; _closed = true;
+        _storage?.Dispose(); _storage = null; _releaseRetainedLease?.Invoke(); _releaseRetainedLease = null; _closed = true;
     }
 }

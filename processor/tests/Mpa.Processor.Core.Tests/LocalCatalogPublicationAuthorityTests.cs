@@ -62,10 +62,17 @@ public sealed partial class LibraryAuthorityTests
         Guid.NewGuid(), current.AccountId, current.AccountRevision, current.FolderId, current.ConfigurationRevision, current.AuthoritySha256);
     private sealed partial class Fixture
     {
-        public void PrepareLocalPublication()
+        public void PrepareLocalPublication(bool registerSigning = false)
         {
             var sources = new LibrarySourceRepository(Database); sources.Add(SourceIdentity, "account-A", 1, "photo-folder", "Photos", true, 1);
-            Bootstrap(new(2, false)); Store.SelectPublisherPolicy(Policy(1)); Store.SelectSourceConfiguration(SourcePolicy(2, 2, sourceRevision: 1));
+            if (registerSigning)
+            {
+                var publicKey = Publisher.ExportSubjectPublicKeyInfo();
+                Store.Bootstrap(ActorId, 1, Workspace, 1, Controller.ExportSubjectPublicKeyInfo(),
+                    new(_publisherId, 1, Convert.ToBase64String(publicKey), Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(publicKey))), new(2, false));
+            }
+            else Bootstrap(new(2, false));
+            Store.SelectPublisherPolicy(Policy(1)); Store.SelectSourceConfiguration(SourcePolicy(2, 2, sourceRevision: 1));
         }
         public void DisablePublicationSource() => new LibrarySourceRepository(Database).Update(SourceIdentity, false, true, 1, 2);
     }

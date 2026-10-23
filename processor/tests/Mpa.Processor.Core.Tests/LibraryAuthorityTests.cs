@@ -120,7 +120,8 @@ public sealed partial class LibraryAuthorityTests
     private sealed class Space : IStorageSpaceReader
     {
         public long Available { get; set; } = 20 * StorageBudgetManager.Gibibyte;
-        public StorageSpaceSnapshot Read() => new(100 * StorageBudgetManager.Gibibyte, Available, 0);
+        public Action? OnRead { get; set; }
+        public StorageSpaceSnapshot Read() { OnRead?.Invoke(); return new(100 * StorageBudgetManager.Gibibyte, Available, 0); }
     }
     private sealed partial class Fixture : IDisposable
     {

@@ -124,13 +124,13 @@ public sealed partial class ProtocolSigningJournalTests
             new DurableJobRepository(fixture.Database).Create(Guid.NewGuid(), "takeout-import", "{\"destination\":\"captured\",\"caption\":\"Human caption\"}"u8);
         }
         using (var connection = Open(root.Path))
-        { using var sql = connection.CreateCommand(); sql.CommandText = "DROP TABLE signing_intent; DROP TABLE signing_actor; PRAGMA user_version=7"; sql.ExecuteNonQuery(); }
+        { using var sql = connection.CreateCommand(); sql.CommandText = "DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; DROP TABLE signing_intent; DROP TABLE signing_actor; PRAGMA user_version=7"; sql.ExecuteNonQuery(); }
         using var database = new ProcessorStateDatabase(root.Path); var budget = new StorageBudgetManager(new Space()); var store = new LibraryAuthorityRepository(database, budget);
         Assert.AreEqual(pin, store.Controller());
         Assert.ThrowsExactly<InvalidDataException>(() => store.Bootstrap(pin.ActorId, pin.Epoch, new(pin.AccountId, pin.FolderId), 1, Convert.FromBase64String(pin.PublicKeySpki), publisher));
         using var read = Open(root.Path); using var query = read.CreateCommand(); query.CommandText = "SELECT captured_context FROM job";
         StringAssert.Contains((string)query.ExecuteScalar()!, "Human caption"); query.CommandText = "SELECT count(*) FROM signing_actor"; Assert.AreEqual(0L, query.ExecuteScalar());
-        query.CommandText = "PRAGMA user_version"; Assert.AreEqual(8L, query.ExecuteScalar());
+        query.CommandText = "PRAGMA user_version"; Assert.AreEqual(9L, query.ExecuteScalar());
     }
 
     [TestMethod]

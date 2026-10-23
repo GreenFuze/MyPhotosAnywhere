@@ -4,8 +4,8 @@ using Mpa.Processor.Core;
 
 namespace Mpa.Processor.AppServices;
 
-/// <summary>Measures only the engine's known SQLite files, never user media or arbitrary
-/// directory contents. Call on the serial state owner so WAL changes are joined. The native
+/// <summary>Measures the engine's state SQLite files and marked retained-catalog inventory,
+/// never user media or arbitrary source directories. Call on the serial state owner. The native
 /// volume query uses the actual directory, including mounted volumes and per-user quotas.
 /// This metadata budget does not authorize future preview/original-cache writes.</summary>
 public sealed partial class ProcessorStateStorageReader : IStorageSpaceReader
@@ -37,6 +37,7 @@ public sealed partial class ProcessorStateStorageReader : IStorageSpaceReader
                 throw new IOException("An owned state file was replaced by a directory or link.");
             owned = checked(owned + new FileInfo(path).Length);
         }
+        owned = checked(owned + CatalogGenerationSnapshotStore.MeasureOwnedBytes(_directory));
 
         if (OperatingSystem.IsWindows())
         {

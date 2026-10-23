@@ -104,9 +104,9 @@ public sealed partial class SourceDiscoveryRepositoryTests
             fixture.Jobs.Create(Guid.NewGuid(), "takeout-import", "{\"caption\":\"Reviewed name\",\"destination\":\"captured-folder\"}"u8);
             File.WriteAllBytes(original, originalBytes);
         }
-        ScanSql(directory.Path, "DROP TABLE signing_intent; DROP TABLE signing_actor; DROP TABLE workspace_publication; DROP TABLE current_source_scan; PRAGMA user_version=5"); var before = CaptureScanRows(directory.Path);
+        ScanSql(directory.Path, "DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; DROP TABLE signing_intent; DROP TABLE signing_actor; DROP TABLE workspace_publication; DROP TABLE current_source_scan; PRAGMA user_version=5"); var before = CaptureScanRows(directory.Path);
         using var upgraded = new ProcessorStateDatabase(directory.Path);
-        Assert.AreEqual(8L, ScanScalar(directory.Path, "PRAGMA user_version")); Assert.AreEqual(installation, upgraded.InstallationId);
+        Assert.AreEqual(9L, ScanScalar(directory.Path, "PRAGMA user_version")); Assert.AreEqual(installation, upgraded.InstallationId);
         CollectionAssert.AreEqual(before, CaptureScanRows(directory.Path)); Assert.AreEqual(0L, ScanScalar(directory.Path, "SELECT count(*) FROM current_source_scan"));
         CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(original));
         var fresh = new SourceDiscoveryRepository(upgraded).EnsureScheduled(source, 1, 1);

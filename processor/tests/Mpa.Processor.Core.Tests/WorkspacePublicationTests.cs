@@ -153,12 +153,12 @@ public sealed class WorkspacePublicationTests
         }
         var original = Path.Combine(root.Path, "retained-original.bin"); File.WriteAllBytes(original, Payload);
         using (var sql = Open(root.Path))
-        { using var command = sql.CreateCommand(); command.CommandText = "DROP TABLE signing_intent; DROP TABLE signing_actor; DROP TABLE workspace_publication; PRAGMA user_version=6"; command.ExecuteNonQuery(); }
+        { using var command = sql.CreateCommand(); command.CommandText = "DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; DROP TABLE signing_intent; DROP TABLE signing_actor; DROP TABLE workspace_publication; PRAGMA user_version=6"; command.ExecuteNonQuery(); }
         using var upgraded = new Fixture(root.Path);
         Assert.AreEqual(library, upgraded.Scope.LibraryId); Assert.AreEqual(installation, upgraded.Database.InstallationId);
         Assert.AreEqual(0, upgraded.Journal.Pending().Count); Assert.AreEqual(0, new DurableJobRepository(upgraded.Database).Summary(job).Failed);
         CollectionAssert.AreEqual(Payload, File.ReadAllBytes(original));
-        using var connection = Open(root.Path); using var query = connection.CreateCommand(); query.CommandText = "PRAGMA user_version"; Assert.AreEqual(8L, query.ExecuteScalar());
+        using var connection = Open(root.Path); using var query = connection.CreateCommand(); query.CommandText = "PRAGMA user_version"; Assert.AreEqual(9L, query.ExecuteScalar());
         query.CommandText = "SELECT captured_context FROM job WHERE id=$job"; query.Parameters.AddWithValue("$job", job.ToString("D"));
         StringAssert.Contains((string)query.ExecuteScalar()!, "Human caption");
     }

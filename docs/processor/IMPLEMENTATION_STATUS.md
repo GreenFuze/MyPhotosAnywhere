@@ -1320,3 +1320,29 @@ wrong-pin/wrong-name rejection and unauthenticated-client assertions remain unch
 No exception type was added to the accepted outcomes. All nine local strict LAN tests
 pass. Desktop, Android build and all API29/35/37 workflows for952c6b1 passed; cross-platform
 Protocol verification of this fixture correction is pending. No warning waiver is used.
+
+## Durable catalog capture and retained snapshot recovery
+
+Processor schema9 adds one exclusive durable catalog capture per library, fixing the
+original publication scope, snapshot ID and signing-intent ID before capture. Atomic
+migration preserves prior jobs, authority, accounts and signing history; Android Room12
+is unchanged. Captures cannot adopt prior uploads or release their claims after signing
+or outbox work begins. Frozen files survive Exit and verify their context, coverage,
+row count, byte length and whole-file digest before reuse. Interrupted copies remain
+claimed; recovery deletes only files proved to belong to abandoned unpublished work,
+after validating the entire bounded marked inventory. Unknown files remain untouched.
+
+The retained directory is included in actual storage accounting. Native readers retain
+the directory lease until joined; accounting tolerates only a concurrently completed
+recognized SQLite temporary journal. No user media path is accepted by this storage.
+
+Local strict evidence: 228 Core tests passed before the last cleanup/accounting cases;
+the final affected authority, retention and migration selection passed59 tests. All128
+AppServices and25 Web tests passed; Desktop Release has zero warnings/errors. Logs/TRX
+are generation-retention-* in preflight-060. Cross-platform verification of this source
+is pending. This is capture infrastructure, not complete generation/head scheduling,
+cloud reconciliation, renewed-access admission or production publication permission.
+
+The preceding fc39232 Windows TLS teardown correction also passed Protocol39919491932
+on all four native targets, Android39919491983 and all three API jobs39919491966. No new
+warning exception was required. Final0.6 installers, APK and release remain pending.

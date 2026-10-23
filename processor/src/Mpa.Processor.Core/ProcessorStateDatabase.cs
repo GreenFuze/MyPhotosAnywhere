@@ -63,7 +63,7 @@ public sealed class ProcessorStateDatabase : IDisposable
                 var objects = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
                 if (application != ApplicationId && !(application == 0 && version == 0 && objects == 0))
                     throw new InvalidDataException("Unknown database identity; preserve it and choose an empty Processor state directory.");
-                if (version is not (0 or 1 or 2 or 3 or 4 or 5 or 6 or 7 or 8)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
+                if (version is not (0 or 1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
                 command.CommandText = "PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;";
                 command.ExecuteNonQuery();
                 command.CommandText = "PRAGMA journal_mode=WAL";
@@ -245,6 +245,27 @@ public sealed class ProcessorStateDatabase : IDisposable
                           FOREIGN KEY(actor_id,epoch) REFERENCES signing_actor(actor_id,epoch)
                         ) STRICT;
                         PRAGMA user_version=8;
+                        """;
+                    migration.ExecuteNonQuery(); transaction.Commit();
+                }
+            }
+            using (var migration = connection.CreateCommand())
+            {
+                migration.CommandText = "PRAGMA user_version";
+                if (Convert.ToInt32(migration.ExecuteScalar(), CultureInfo.InvariantCulture) < 9)
+                {
+                    using var transaction = connection.BeginTransaction(); migration.Transaction = transaction;
+                    migration.CommandText = """
+                        CREATE TABLE catalog_generation_capture(
+                          id TEXT PRIMARY KEY, library_id TEXT NOT NULL, snapshot_id TEXT NOT NULL UNIQUE,
+                          commit_intent_id TEXT NOT NULL UNIQUE, scope TEXT NOT NULL CHECK(length(scope) BETWEEN 1 AND 4096), context_hash TEXT NOT NULL,
+                          phase TEXT NOT NULL CHECK(phase IN('capturing','frozen','abandoned')),
+                          snapshot TEXT CHECK(length(snapshot) BETWEEN 1 AND 4096), snapshot_hash TEXT,
+                          CHECK((snapshot IS NULL)=(snapshot_hash IS NULL)), CHECK(phase!='frozen' OR snapshot IS NOT NULL)
+                        ) STRICT;
+                        CREATE UNIQUE INDEX one_active_catalog_capture ON catalog_generation_capture(library_id) WHERE phase!='abandoned';
+                        CREATE INDEX workspace_publication_generation ON workspace_publication(json_extract(scope,'$.GenerationId'));
+                        PRAGMA user_version=9;
                         """;
                     migration.ExecuteNonQuery(); transaction.Commit();
                 }
