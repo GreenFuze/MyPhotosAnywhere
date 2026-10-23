@@ -5,7 +5,10 @@ using Mpa.Processor.GoogleDrive;
 namespace Mpa.Processor.AppServices;
 
 /// <summary>Must verify independently enrolled publisher/workspace authority for this
-/// exact captured scope. Neither journal contents nor Drive properties grant authority.</summary>
+/// exact captured scope. Neither journal contents nor Drive properties grant authority.
+/// Validation also runs inside the joined account lease: do not reacquire that account
+/// or perform network reconciliation here. The owner first completes reconciliation
+/// outside the upload lease; validation fences its run-owned admission and current state.</summary>
 public interface IWorkspacePublicationAuthority
 {
     Task ValidateAsync(WorkspacePublicationScope scope, CancellationToken cancellationToken);

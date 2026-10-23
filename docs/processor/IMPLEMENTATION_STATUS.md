@@ -1478,3 +1478,30 @@ reviewed artifact names avoid the local test runner's prior overwrite-report dia
 no warning was suppressed or accepted. Evidence is initial-outbox-*-reviewed in
 preflight-060. One new development test initially compared memory owners; it now verifies
 retained IDs/scope/hash and actual payload bytes. Cross-platform checks remain required.
+
+## Native initial policy to outbox preparation
+
+InitialLibraryPublicationPreparation now connects the actual fixed native signing plan to
+local signature-checked policy selection, the captured transport plan and both exact
+outbox records. It performs no network writes and cannot activate a catalog. Concurrent
+or lost-reply retries reuse the same two signing intents/object IDs. A failed second
+record resumes only that missing object. Changed account access remains blocked by the
+current local scope fence; it does not silently adopt a new revision. Callers still join
+preparation before retiring the borrowed native key/state owners.
+
+The create-only outbox now supports the explicit publisher-authorization metadata role.
+The facts dependency sink continues to reject publisher/source policies, commits and
+originals; its existing role-separation test passes. Actual upload admission remains
+closed until the production bootstrap/history owner is implemented. No HTTP route or
+scheduler was enabled and no Drive files were written by this increment.
+
+All 21 focused signing/initial-preparation/role-separation tests pass; the reviewed full
+AppServices suite passes 154 cases. Reviewed Core authority/outbox/signing coverage passes
+98 cases, Web passes 25 and Desktop Release has zero warnings/errors. The preceding
+09a6e5a revision passed all four native runners in Protocol39932564342 and all device APIs
+in39932564427; Desktop39932564472 also passed. Fresh current-source CI is still required.
+
+The upload authority contract now explicitly states that validation runs inside the
+joined account lease. Production admission must reconcile before entering that lease
+and validate its run-owned proof/current local state inside it. Re-entering account
+network reconciliation from ValidateAsync would deadlock and is not a valid design.

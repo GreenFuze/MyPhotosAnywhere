@@ -159,7 +159,7 @@ public sealed class WorkspacePublicationRepository(ProcessorStateDatabase databa
     }
     private static void ValidateContent(string role, string mime)
     {
-        if (role is not ("facts-chunk" or "facts-index" or "coverage-page" or "coverage-root" or "source-configuration" or "catalog-commit") ||
+        if (role is not ("facts-chunk" or "facts-index" or "coverage-page" or "coverage-root" or "publisher-authorization" or "source-configuration" or "catalog-commit") ||
             mime is not ("application/json" or "application/gzip" or "application/octet-stream")) throw new ArgumentException("A supported metadata publication role/type is required.");
     }
     internal static string EncodeScope(WorkspacePublicationScope scope) => Encoding.UTF8.GetString(new CanonicalJson(4096).Encode(JsonSerializer.SerializeToUtf8Bytes(scope)));
