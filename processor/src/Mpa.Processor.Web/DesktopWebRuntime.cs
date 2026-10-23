@@ -24,6 +24,7 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
     private ProcessorSourceRuntime? _sources;
     private CatalogViewerSessions? _viewers;
     private CatalogPreparationService? _preparations;
+    private InitialLibraryPublicationRuntime? _publication;
     private readonly object _gate = new();
     private Task? _processingStop;
     private Task? _failureStop;
@@ -35,7 +36,7 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
     private bool _signingClosed;
     private bool _vaultClosed;
     private bool _exitConfirmed;
-    public Exception? Failure { get { lock (_gate) return _preparations?.Failure ?? _sources?.Failure ?? _failure ?? _native.Failure; } }
+    public Exception? Failure { get { lock (_gate) return _publication?.Failure ?? _preparations?.Failure ?? _sources?.Failure ?? _failure ?? _native.Failure; } }
     public bool ExitConfirmed { get { lock (_gate) return _exitConfirmed; } }
     public event Action<Exception>? Failed;
     public DesktopWebHost Host => _host ?? throw new InvalidOperationException("The desktop web interface has not started.");
@@ -67,10 +68,13 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
             owner._viewers = new(state, stateDirectory, installationId, storage);
             owner._preparations = new(state, stateDirectory, installationId, storage);
             var setup = new LibraryWorkspaceSetup(state, owner._accounts, owner._signing, storage);
-            var application = new DesktopEngineApplication(library, state, owner._accounts, owner._sources.Work, owner._sources, owner._viewers, setup);
+            owner._publication = new(state, owner._accounts, owner._signing, storage);
+            owner._publication.Failed += owner.OnFailure;
+            var application = new DesktopEngineApplication(library, state, owner._accounts, owner._sources.Work, owner._sources, owner._viewers, setup, owner._publication);
             owner._host = await DesktopWebHost.StartAsync(application, assetsDirectory, enableLan ? owner._identity.Identity : null, cancellationToken).ConfigureAwait(false);
             owner._host.Diagnostic += owner.ReportFailure;
             await owner._sources.ActivateAsync(cancellationToken).ConfigureAwait(false);
+            owner._publication.Request(cancellationToken);
             return owner;
         }
         catch (Exception error)
@@ -114,7 +118,8 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
         static async Task StopNativeAsync(ProcessorWorkSupervisor native) => await native.StopAsync().ConfigureAwait(false);
         static async Task StopViewersAsync(CatalogViewerSessions? viewers) { if (viewers is not null) await viewers.DisposeAsync().ConfigureAwait(false); }
         static async Task StopPreparationsAsync(CatalogPreparationService? preparations) { if (preparations is not null) await preparations.DisposeAsync().ConfigureAwait(false); }
-        var joined = Task.WhenAll(StopSourcesAsync(_sources), StopNativeAsync(_native), StopViewersAsync(_viewers), StopPreparationsAsync(_preparations));
+        static async Task StopPublicationAsync(InitialLibraryPublicationRuntime? publication) { if (publication is not null) await publication.DisposeAsync().ConfigureAwait(false); }
+        var joined = Task.WhenAll(StopSourcesAsync(_sources), StopNativeAsync(_native), StopViewersAsync(_viewers), StopPreparationsAsync(_preparations), StopPublicationAsync(_publication));
         try { await joined.ConfigureAwait(false); }
         catch { if (joined.Exception is not null) throw joined.Exception; throw; }
     }
@@ -137,7 +142,8 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
         // A listener failure cannot bypass independent background-work shutdown.
         try { await StopProcessingAsync().ConfigureAwait(false); }
         catch (Exception error) { Retain(error); }
-        if (!_hostClosed || _sources is { ExitConfirmed: false } || _viewers is { ExitConfirmed: false } || _preparations is { ExitConfirmed: false } || _native.State != ProcessorWorkState.Stopped)
+        if (!_hostClosed || _sources is { ExitConfirmed: false } || _viewers is { ExitConfirmed: false } || _preparations is { ExitConfirmed: false } ||
+            _publication is { ExitConfirmed: false } || _native.State != ProcessorWorkState.Stopped)
             throw new InvalidOperationException("Desktop requests or processing resources have not joined; account/vault/state ownership is retained.", Failure);
         if (!_accountsClosed) { if (_accounts is not null) await _accounts.DisposeAsync().ConfigureAwait(false); _accountsClosed = true; }
         if (!_identityClosed) { if (_identity is not null) await _identity.DisposeAsync().ConfigureAwait(false); _identityClosed = true; }

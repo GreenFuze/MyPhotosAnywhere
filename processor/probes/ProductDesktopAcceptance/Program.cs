@@ -22,6 +22,8 @@ internal static class Program
         await using var state = new ProcessorStateCoordinator(database);
         var sources = await state.ExecuteAsync(db => new LibrarySourceRepository(db).Snapshot(), CancellationToken.None).ConfigureAwait(false);
         if (sources.Sources.Count != 1 || !sources.Sources[0].Enabled || sources.Sources[0].FolderId != args[3]) throw new InvalidOperationException("Only the explicitly identified disposable source may be used.");
+        var controller = await state.ExecuteAsync(db => new LibraryAuthorityRepository(db).Controller(), CancellationToken.None).ConfigureAwait(false);
+        if (controller is not null) throw new InvalidOperationException("This read-only HTTP acceptance requires an isolated state without a library approval; approved production setup can publish metadata automatically.");
         await using var native = new ProcessorWorkSupervisor();
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         await using var runtime = await DesktopWebRuntime.StartAsync(state, database.InstallationId, root, native, args[0], args[2], enableLan: false, deadline.Token).ConfigureAwait(false);

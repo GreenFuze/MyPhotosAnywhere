@@ -1567,3 +1567,41 @@ All 108 affected Core authority/signing/outbox/observation cases pass, including
 completion cases. Native application coverage also verifies that a failed completion
 write retains both uploaded objects and resumes without reuploading them. Low storage
 and interrupted receipt/hash writes leave no half-completed stage.
+
+## Engine-owned setup scheduling and web progress
+
+DesktopWebRuntime now owns InitialLibraryPublicationRuntime, resumes durable approved
+setup at startup and joins it before retiring accounts, keys, vault or state. A committed
+workspace approval queues the job independently of its browser request. Closing the
+browser or canceling a progress read cannot cancel or duplicate the admitted work.
+Retry joins the previous attempt, including the short interval after an error becomes
+visible but before that task completes. Startup uses historical completion only to
+advance this initial stage, not to grant current catalog publication authority.
+
+Operational failures retain exact work and show safe actionable progress. Expired Google
+authorization, locked credential storage, changed source authority, interrupted scans and
+storage failures remain separate from unexpected invariants. An invariant reports to the
+engine failure owner and cannot be automatically restarted. Full internal diagnostics
+remain outside browser status responses. No original file is modified by setup.
+
+The host-only authenticated API exposes bounded status and a CSRF-protected retry.
+Remote browser sessions cannot inspect or mutate this setup. Settings shows actual
+running/completed/attention/stopped progress, permits reviewing a pinned workspace that
+still lacks explicit source association, and offers read-refresh after a status failure.
+It explicitly distinguishes saved Drive setup from the still-pending shared photo catalog.
+Progress reads stop on navigation; the engine job continues independently.
+
+Frozen local coverage passes all 184 AppServices and 26 Web cases, 108 affected Core
+cases, and four frontend API tests. TypeScript/bundling and Desktop/probe Release builds
+pass with zero warnings/errors. The frontend build now runs the API tests in CI. The
+read-only HTTP acceptance probe refuses a pinned-controller state before starting an
+engine that could publish approved setup automatically. It was built, not executed against
+Google Drive in this increment. New UI visual review and live setup publication remain
+unverified; no account credentials, real Drive files or physical devices were used here.
+
+The preceding 5d5d2ef passed Protocol39946912329 on all native platforms, Android39946912239,
+Desktop39946912280 and device39946912278 on all three API levels. Fresh final-source CI is
+required. Processor schema 10 and Android Room 12 are unchanged. General current-history,
+head and pending-work reconciliation, renewed-access recovery, complete generation
+publication/activation, processing/plugins, desktop/mobile workflows, LAN onboarding,
+installers and exact tested joint release are still unfinished.

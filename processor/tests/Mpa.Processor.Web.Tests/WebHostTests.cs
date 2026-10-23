@@ -14,6 +14,31 @@ namespace Mpa.Processor.Web.Tests;
 public sealed class WebHostTests
 {
     [TestMethod]
+    public async Task LibraryPublicationStatusAndRetryRequireHostSessionAndCsrfWithoutExposingEngineDiagnostics()
+    {
+        using var assets = new Assets(); var engine = new Engine();
+        await using var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
+        using var http = Client(host.LocalEndpoint);
+        using (var anonymous = await http.GetAsync("api/library-publication").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false); login.EnsureSuccessStatusCode();
+        var csrf = (await login.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("csrf").GetString();
+        using (var current = await http.GetAsync("api/library-publication").ConfigureAwait(false))
+        {
+            current.EnsureSuccessStatusCode(); var value = await current.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false);
+            Assert.AreEqual("NeedsAttention", value.GetProperty("stage").GetString()); Assert.IsTrue(value.GetProperty("canRetry").GetBoolean());
+            Assert.AreEqual(3, value.EnumerateObject().Count());
+        }
+        using (var forged = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, new { }, null, "api/library-publication").ConfigureAwait(false))
+            Assert.AreEqual(HttpStatusCode.Unauthorized, forged.StatusCode);
+        Assert.AreEqual(0, engine.PublicationRequests);
+        using (var retry = await SourceMutationAsync(http, host.LocalEndpoint, HttpMethod.Post, new { }, csrf, "api/library-publication").ConfigureAwait(false))
+        {
+            retry.EnsureSuccessStatusCode(); Assert.AreEqual("Running", (await retry.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("stage").GetString());
+        }
+        Assert.AreEqual(1, engine.PublicationRequests);
+    }
+
+    [TestMethod]
     public async Task WorkspaceApprovalRequiresHostSessionCsrfAndReviewedCapturedFields()
     {
         using var assets = new Assets(); var engine = new Engine();
@@ -118,11 +143,14 @@ public sealed class WebHostTests
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/accounts") { Content = JsonContent.Create(new { operation = "connect" }) };
         request.Headers.Add("Origin", host.HttpsEndpoint.GetLeftPart(UriPartial.Authority)); request.Headers.Add("X-MPA-CSRF", session.GetProperty("csrf").GetString());
         using var denied = await http.SendAsync(request).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
-        foreach (var path in new[] { "api/library", "api/workspace-inspection?account=account&folder=metadata" })
+        foreach (var path in new[] { "api/library", "api/workspace-inspection?account=account&folder=metadata", "api/library-publication" })
         { using var setup = await http.GetAsync(path).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, setup.StatusCode); }
         var approval = new Mpa.Processor.AppServices.ApproveLibraryWorkspace("account", "metadata", 1, 7, 1, new string('a', 64), false, true);
         using (var setup = await SourceMutationAsync(http, host.HttpsEndpoint, HttpMethod.Post, approval, session.GetProperty("csrf").GetString(), "api/library").ConfigureAwait(false))
             Assert.AreEqual(HttpStatusCode.Forbidden, setup.StatusCode);
+        using (var retry = await SourceMutationAsync(http, host.HttpsEndpoint, HttpMethod.Post, new { }, session.GetProperty("csrf").GetString(), "api/library-publication").ConfigureAwait(false))
+            Assert.AreEqual(HttpStatusCode.Forbidden, retry.StatusCode);
+        Assert.AreEqual(0, engine.PublicationRequests);
         using var status = await http.GetAsync("api/status").ConfigureAwait(false); status.EnsureSuccessStatusCode();
         Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
     }
@@ -317,6 +345,10 @@ public sealed class WebHostTests
     }
     private sealed class Engine : IDesktopWebApplication
     {
+        public int PublicationRequests { get; private set; }
+        public Task<DesktopLibraryPublication> LibraryPublicationAsync(CancellationToken cancellationToken) => Task.FromResult(new DesktopLibraryPublication("NeedsAttention", "Retry library setup.", true));
+        public Task<DesktopLibraryPublication> RequestLibraryPublicationAsync(CancellationToken cancellationToken)
+        { cancellationToken.ThrowIfCancellationRequested(); PublicationRequests++; return Task.FromResult(new DesktopLibraryPublication("Running", null, false)); }
         public Mpa.Processor.AppServices.ApproveLibraryWorkspace? WorkspaceApproval { get; private set; }
         public bool RejectWorkspace { get; set; }
         public Exception? WorkspaceFailure { get; set; }

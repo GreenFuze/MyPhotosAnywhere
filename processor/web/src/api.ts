@@ -29,6 +29,10 @@ export interface SourceJob {
 export interface ActivityPage { jobs: SourceJob[]; nextCursor: string | null }
 
 export class AuthenticationRequired extends Error {}
+export interface LibraryPublication {
+  stage: 'NeedsApproval' | 'Running' | 'PoliciesPublished' | 'NeedsAttention' | 'Stopping' | 'Stopped';
+  detail: string | null; canRetry: boolean;
+}
 
 /** The browser never receives a Google credential. CSRF stays in this page's memory;
  * the session cookie is HttpOnly. Closing a page cancels reads, not engine jobs. */
@@ -92,6 +96,20 @@ export class DesktopApi {
   }
   async sources(signal: AbortSignal): Promise<Sources> { return await this.get<Sources>('/api/sources', signal); }
   async library(signal: AbortSignal): Promise<{ controller: LibraryController | null }> { return await this.get('/api/library', signal); }
+  async libraryPublication(signal: AbortSignal): Promise<LibraryPublication> {
+    return this.publicationStatus(await this.get<unknown>('/api/library-publication', signal));
+  }
+  async retryLibraryPublication(): Promise<LibraryPublication> {
+    return this.publicationStatus(await this.sourceCommand('/api/library-publication', {}));
+  }
+  private publicationStatus(value: unknown): LibraryPublication {
+    if (typeof value !== 'object' || value === null || !('stage' in value) || typeof value.stage !== 'string' ||
+      !['NeedsApproval', 'Running', 'PoliciesPublished', 'NeedsAttention', 'Stopping', 'Stopped'].includes(value.stage) ||
+      !('detail' in value) || value.detail !== null && (typeof value.detail !== 'string' || value.detail.length > 1024) ||
+      !('canRetry' in value) || typeof value.canRetry !== 'boolean' || value.canRetry && value.stage !== 'NeedsAttention')
+      throw new Error('MPA returned an invalid library setup status. Your saved setup was retained.');
+    return value as LibraryPublication;
+  }
   async inspectWorkspace(account: string, folder: string, signal: AbortSignal): Promise<WorkspaceInspection> {
     return await this.get('/api/workspace-inspection?' + new URLSearchParams({ account, folder }), signal);
   }

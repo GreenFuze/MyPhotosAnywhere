@@ -20,3 +20,9 @@ CI compiles this mode on every desktop target without account execution.
 The same read-only mode also verifies actual setup inspection (canonical folder identity,
 read/write capabilities, sharing metadata, revision and a bounded child listing). Its
 pinned synthetic folder is nonempty and must never be reported empty for fresh bootstrap.
+# Read-only state prerequisite
+
+The HTTP acceptance path refuses a state with an approved library controller before it
+starts the desktop engine. Normal application startup can now resume an approved setup
+and publish its initial metadata policies. This probe retains its read-only Drive scope;
+live setup publication requires separate acceptance and cannot be inferred from its pass.

@@ -1,0 +1,156 @@
+using Microsoft.Data.Sqlite;
+using Google.Apis.Auth.OAuth2.Responses;
+using Mpa.Processor.Core;
+using Mpa.Processor.Credentials;
+using Mpa.Processor.Protocol;
+
+namespace Mpa.Processor.AppServices;
+
+public enum InitialLibraryPublicationStage { NeedsApproval, Running, PoliciesPublished, NeedsAttention, Stopping, Stopped }
+public sealed record InitialLibraryPublicationActivity(InitialLibraryPublicationStage Stage, string? Detail, bool CanRetry);
+
+/// <summary>Engine-owned setup work, recoverable from durable human approval and the
+/// exact outbox/completion journal. Browser cancellation never owns an admitted attempt.
+/// A historical completion advances this stage only; it is not a current catalog grant.
+/// Stop joins the actual attempt/uploader before borrowed keys/accounts/state may retire.</summary>
+public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator state, ProcessorAccountService accounts,
+    LibrarySigningIdentityOwner keys, StorageBudgetManager budget) : IAsyncDisposable
+{
+    private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
+    private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
+    private readonly InitialLibraryPublicationService _publication = new(state, accounts, keys, budget);
+    private readonly object _gate = new();
+    private readonly CancellationTokenSource _stop = new();
+    private Task? _attempt;
+    private Task? _disposal;
+    private bool _stopping;
+    private bool _exitConfirmed;
+    private Exception? _failure;
+    private Exception? _lastAttemptFailure;
+    private InitialLibraryPublicationActivity _activity = new(InitialLibraryPublicationStage.NeedsApproval, null, false);
+    public event Action<Exception>? Failed;
+    public Exception? Failure { get { lock (_gate) return _failure; } }
+    public Exception? LastAttemptFailure { get { lock (_gate) return _lastAttemptFailure; } }
+    public bool ExitConfirmed { get { lock (_gate) return _exitConfirmed; } }
+    public InitialLibraryPublicationActivity Activity { get { lock (_gate) return _activity; } }
+
+    /// <summary>Called on engine startup and after committed workspace approval. The
+    /// caller can cancel before admission; after admission only this owner's Stop can
+    /// retire the job. The durable approval/outbox recovers even a lost wake-up reply.</summary>
+    public InitialLibraryPublicationActivity Request(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            cancellationToken.ThrowIfCancellationRequested(); ObjectDisposedException.ThrowIf(_stopping, this);
+            if (_failure is not null) throw new InvalidOperationException("Library setup stopped after an internal failure. Inspect it before restarting.", _failure);
+            if (_attempt is { IsCompleted: false } && _activity.Stage != InitialLibraryPublicationStage.NeedsAttention) return _activity;
+            var previous = _attempt;
+            _activity = new(InitialLibraryPublicationStage.Running, null, false); _lastAttemptFailure = null;
+            // A retry can arrive after an error is visible but just before the old
+            // Task completes. Retain that request and join the old attempt first.
+            _attempt = Task.Run(async () =>
+            {
+                if (previous is not null) await previous.ConfigureAwait(false);
+                await RunAsync().ConfigureAwait(false);
+            }, CancellationToken.None); return _activity;
+        }
+    }
+
+    /// <summary>Observe/join the currently admitted attempt without transferring its
+    /// lifetime to the observer. Disposal always joins it without a timeout wrapper.</summary>
+    public Task WaitForCurrentAttemptAsync(CancellationToken cancellationToken)
+    {
+        Task attempt; lock (_gate) attempt = _attempt ?? Task.CompletedTask;
+        return attempt.WaitAsync(cancellationToken);
+    }
+
+    private async Task RunAsync()
+    {
+        try
+        {
+            ThrowIfStopping();
+            var readiness = await _state.ExecuteAsync(database =>
+            {
+                ThrowIfStopping(); var authority = new LibraryAuthorityRepository(database, _budget);
+                if (authority.InitialPublicationCompletion() is not null) return InitialLibraryPublicationStage.PoliciesPublished;
+                if (authority.Controller() is null || authority.BootstrapSources() is null) return InitialLibraryPublicationStage.NeedsApproval;
+                authority.AssertBootstrapSourcesCurrent(); return InitialLibraryPublicationStage.Running;
+            }, _stop.Token).ConfigureAwait(false);
+            ThrowIfStopping();
+            if (readiness == InitialLibraryPublicationStage.Running)
+            {
+                await _publication.PublishAsync(_stop.Token).ConfigureAwait(false); ThrowIfStopping();
+                readiness = InitialLibraryPublicationStage.PoliciesPublished;
+            }
+            lock (_gate) { ThrowIfStopping(); _activity = new(readiness, null, false); }
+        }
+        catch (OperationCanceledException) when (IsStopping()) { }
+        catch (Exception error)
+        {
+            var recoverable = Recoverable(error);
+            lock (_gate)
+            {
+                _lastAttemptFailure = error;
+                if (!recoverable) _failure = error;
+                if (!_stopping) _activity = new(InitialLibraryPublicationStage.NeedsAttention, Detail(error, recoverable), recoverable);
+            }
+            if (!recoverable) Failed?.Invoke(error);
+        }
+    }
+
+    private static bool Recoverable(Exception error) => error is IOException or HttpRequestException or OperationCanceledException or ProtocolFormatException or
+        TokenResponseException or CredentialVaultException or
+        StaleLibraryConfigurationException or StaleDriveConnectionException or LibraryWorkspaceApprovalException or
+        LibraryInitialPublicationConflictException or LibraryInitialPolicyConflictException or LibraryInitialPublicationCompletionMissingException or
+        WorkspaceObservationConflictException or WorkspaceInventoryIncompleteException or InsufficientStorageBudgetException or
+        CatalogPublicationNotAuthorizedException or ControllerAuthorityConflictException ||
+        error is SqliteException { SqliteErrorCode: 5 or 6 or 10 or 13 };
+
+    private static string Detail(Exception error, bool recoverable)
+    {
+        if (!recoverable) return "Library setup stopped after an internal error. Its saved work has been preserved.";
+        return error switch
+        {
+            InsufficientStorageBudgetException => "Free space on this computer, then retry library setup.",
+            TokenResponseException or HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized } => "Reconnect Google Drive in Settings, then retry library setup. Saved progress has been kept.",
+            CredentialVaultException => "Unlock this computer’s credential storage, then retry library setup. Saved progress has been kept.",
+            StaleDriveConnectionException or StaleLibraryConfigurationException => "Google Drive access or the approved source settings changed. Review them before retrying.",
+            LibraryWorkspaceApprovalException => "Review this workspace’s sharing permission before publishing private metadata.",
+            LibraryInitialPublicationCompletionMissingException or LibraryInitialPublicationConflictException or LibraryInitialPolicyConflictException or
+                WorkspaceObservationConflictException or CatalogPublicationNotAuthorizedException or ControllerAuthorityConflictException or InvalidDataException or ProtocolFormatException =>
+                "Saved library history needs reconciliation. Existing files and metadata have been preserved.",
+            WorkspaceInventoryIncompleteException => "The workspace changed during setup. Retry to check it again.",
+            OperationCanceledException => "Library setup was interrupted. Saved progress is kept; retry when Google Drive is connected.",
+            _ => "Google Drive or local storage could not finish library setup. Review the connection and available space, then retry."
+        };
+    }
+
+    private bool IsStopping() { lock (_gate) return _stopping; }
+    private void ThrowIfStopping()
+    {
+        lock (_gate) if (_stopping || _stop.IsCancellationRequested) throw new OperationCanceledException("Library setup runtime was retired.", _stop.Token);
+    }
+    public ValueTask DisposeAsync()
+    {
+        lock (_gate)
+        {
+            _stopping = true;
+            if (!_exitConfirmed) _activity = new(InitialLibraryPublicationStage.Stopping, null, false);
+            if (_disposal is { IsFaulted: true } && !_exitConfirmed) _disposal = null;
+            return new(_disposal ??= StopAsync());
+        }
+    }
+    private async Task StopAsync()
+    {
+        Exception? cancellationFailure = null;
+        try { await _stop.CancelAsync().ConfigureAwait(false); } catch (Exception error) { cancellationFailure = error; }
+        var publicationStop = _publication.DisposeAsync().AsTask(); Task attempt;
+        lock (_gate) attempt = _attempt ?? Task.CompletedTask;
+        var joined = Task.WhenAll(publicationStop, attempt);
+        try { await joined.ConfigureAwait(false); }
+        catch { if (joined.Exception is not null) throw joined.Exception; throw; }
+        if (cancellationFailure is not null) throw new AggregateException("Library setup cancellation needs attention; retain its borrowed owners.", cancellationFailure);
+        _stop.Dispose(); lock (_gate) { _exitConfirmed = true; _activity = new(InitialLibraryPublicationStage.Stopped, null, false); }
+    }
+}

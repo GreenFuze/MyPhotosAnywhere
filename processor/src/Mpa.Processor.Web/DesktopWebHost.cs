@@ -261,6 +261,12 @@ public sealed class DesktopWebHost : IAsyncDisposable
             case ("GET", "/api/library"):
                 if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
                 await context.Response.WriteAsJsonAsync(new { controller = await _application.LibraryAsync(token).ConfigureAwait(false) }, token).ConfigureAwait(false); break;
+            case ("GET", "/api/library-publication"):
+                if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
+                await context.Response.WriteAsJsonAsync(await _application.LibraryPublicationAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("POST", "/api/library-publication"):
+                if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
+                await context.Response.WriteAsJsonAsync(await _application.RequestLibraryPublicationAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
             case ("GET", "/api/workspace-inspection"):
                 if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
                 var workspaceAccount = RequiredQuery(context, "account"); var workspaceFolder = RequiredQuery(context, "folder");
