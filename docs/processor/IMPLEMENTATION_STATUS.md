@@ -1,5 +1,50 @@
 # MPA 0.6.0 implementation ledger
 
+## Native worker exit and startup-recovery ownership
+
+A deterministic real-child test now holds event dispatch beyond the old ten-second
+join deadline: the original event-based waiter stays pending while the separate real
+native wait and its actual thread join complete. The test retains and joins the original
+waiter after releasing its barrier. This reproduces the observable failure class; it
+does not establish the historical host's exact delay trigger.
+
+FramedWorkerProcess now creates no event-based exit waiter. A dedicated owned thread
+per direct worker performs the actual blocking native wait. Its signal alone cannot
+permit retirement: supervision, bounded stop, recovery and resource release require
+the real thread join plus every existing pipe/write/monitor join. The existing five-
+second grace and ten-second post-kill budgets remain unchanged.
+
+Framed ownership transfers before thread startup. If no native thread starts, cleanup
+must perform a real bounded process wait itself; a timed-out cleanup cannot complete
+the pending signal or permit a later thread start. Failure retains the existing worker
+owner. Diagnostics distinguish started/joined/native-retired state. No global pool,
+heap, native-handle cache or new original-mutation interface is introduced.
+
+All twenty focused actual-worker/supervisor/installed-worker cases pass, including four
+new native-wait cases, held-event timeout reproduction, forced stop, startup cleanup,
+input leases and first-failure preservation. Strict focused builds have zero findings.
+The first new harness attempt correctly rejected the not-yet-allowlisted exact scenario;
+that failed setup log is retained.
+
+Review found and corrected two additional startup/recovery edges: no-thread recovery
+must return an asynchronous pending task so the existing supervisor timeout remains
+effective, and disposal must branch on actual retirement rather than a successful
+native signal alone. Two real-child cases now prove bounded timeout preserves the live
+child/lease and that the same no-thread recovery task returns promptly and joins only
+after actual exit. All 22 affected cases pass with the corrected source.
+
+The earlier candidate passed 848 full cases, but those results are retained explicitly
+as candidate evidence, not validation of the corrected source. The corrected immutable
+run passes all 850 cases: 348 Core, 322 AppServices, 26 Web, 80 Protocol, 65 Google Drive
+and nine LAN. Seven strict Release builds have zero warnings/errors, complete logs and
+TRX counters are clean, and application component hashes match every test/Desktop output.
+Evidence is retained in preflight-060/native-exit-owner-corrected-validation.json.
+
+Fresh exact-source four-platform CI and final acceptance remain required. The historical
+host trigger remains unidentified; this change removes its event-owned wait mechanism
+and tests that failure class without claiming a diagnosis of the old host. No release
+readiness or physical-device result is inferred from these local tests.
+
 ## Immutable cross-generation dependency references
 
 The current owner can select a byte-identical completed dependency only under its own

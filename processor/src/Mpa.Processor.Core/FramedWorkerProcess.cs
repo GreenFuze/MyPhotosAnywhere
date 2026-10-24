@@ -28,6 +28,9 @@ public sealed record WorkerTerminationObservation(int ProcessId, bool? NativeExi
 {
     public long? MillisecondsSinceNativeSignal { get; init; }
     public long? MillisecondsSinceExitEvent { get; init; }
+    public bool NativeWaitThreadStarted { get; init; }
+    public bool NativeWaitThreadJoined { get; init; }
+    public bool NativeWaitRetirementConfirmed { get; init; }
     public int DiagnosticReadStage { get; init; }
     public int PoolThreads { get; init; }
     public int AvailablePoolWorkers { get; init; }
@@ -39,7 +42,8 @@ public sealed class WorkerTerminationTimeoutException(WorkerTerminationObservati
         ", frames=" + observation.Frames + ", diagnostics=" + observation.Diagnostics + ", monitor=" + observation.Monitor +
         ", supervision=" + observation.Supervision + ", elapsed after kill=" + observation.MillisecondsAfterKill +
         "ms, native signal age=" + observation.MillisecondsSinceNativeSignal + "ms, exit event age=" + observation.MillisecondsSinceExitEvent +
-        "ms, diagnostic stage=" + observation.DiagnosticReadStage + ", pool threads=" + observation.PoolThreads +
+        "ms, native thread started=" + observation.NativeWaitThreadStarted + ", joined=" + observation.NativeWaitThreadJoined +
+        ", native retirement=" + observation.NativeWaitRetirementConfirmed + ", diagnostic stage=" + observation.DiagnosticReadStage + ", pool threads=" + observation.PoolThreads +
         ", available workers=" + observation.AvailablePoolWorkers + ", pending work=" + observation.PendingPoolWork + ".", inner)
 {
     public WorkerTerminationObservation Observation { get; } = observation;
@@ -61,9 +65,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     private readonly Task _framePump;
     private readonly Task _diagnosticPump;
     private readonly Task _processExit;
-    private readonly EventHandler _exitObserver;
-    private long _nativeExitObservedTicks;
-    private long _exitEventObservedTicks;
+    private readonly NativeProcessExitWaiter _nativeExit;
     private int _diagnosticReadStage;
     private readonly Task _resourceMonitor;
     private readonly CancellationTokenSource _stopMonitoring = new();
@@ -95,16 +97,15 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     private long _observedPeakResidentBytes;
     public long ObservedPeakResidentBytes => Interlocked.Read(ref _observedPeakResidentBytes);
 
-    private FramedWorkerProcess(Process process, FileStream executableLease, ParentLifetimeListener parent, FileStream diagnostics, WorkerResourcePolicy policy)
+    private FramedWorkerProcess(Process process, FileStream executableLease, ParentLifetimeListener parent, FileStream diagnostics, WorkerResourcePolicy policy, NativeProcessExitWaiter nativeExit)
     {
         _process = process; _executableLease = executableLease; _parent = parent;
         ProcessId = process.Id;
         _writer = new WorkerFrameWriter(process.StandardInput.BaseStream);
-        // Diagnostic observation only; this event never completes an ownership task
-        // or permits release of native/process/pipe resources.
-        _exitObserver = (_, _) => Interlocked.CompareExchange(ref _exitEventObservedTicks, Stopwatch.GetTimestamp(), 0);
-        process.Exited += _exitObserver;
-        _processExit = process.WaitForExitAsync();
+        _nativeExit = nativeExit;
+        // This pending signal is completed only by the actual native wait owner, or
+        // by real no-thread startup cleanup. No Process event waiter is created.
+        _processExit = nativeExit.Completion;
         _framePump = PumpFramesAsync();
         _diagnosticPump = PumpDiagnosticsAsync(diagnostics);
         _resourceMonitor = MonitorResourcesAsync(policy);
@@ -126,6 +127,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         ParentLifetimeListener? parent = null;
         Process? process = null;
         FileStream? diagnostic = null;
+        NativeProcessExitWaiter? nativeExit = null;
         var transferred = false;
         var started = false;
         try
@@ -153,10 +155,12 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
             process = new Process { StartInfo = start };
             if (!process.Start()) throw new InvalidOperationException("Worker process did not start.");
             started = true;
-            var worker = new FramedWorkerProcess(process, executable, parent, diagnostic, policy);
+            nativeExit = new(process);
+            var worker = new FramedWorkerProcess(process, executable, parent, diagnostic, policy, nativeExit);
             transferred = true;
             try
             {
+                nativeExit.Start(); // Retained Framed ownership already exists if thread startup fails.
                 await parent.AcceptAsync(cancellationToken).ConfigureAwait(false);
                 worker._ownershipReady.SetResult();
                 return worker;
@@ -176,7 +180,15 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
                 if (process is not null)
                 {
                     // A canceled startup must still join its owned child; do not pass the canceled job token.
-                    try { if (started && !process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false); } }
+                    try
+                    {
+                        if (started)
+                        {
+                            if (!process.HasExited) process.Kill(entireProcessTree: true);
+                            if (nativeExit is not null) _ = nativeExit.CompleteUnstartedCleanup(Timeout.InfiniteTimeSpan);
+                            else process.WaitForExit();
+                        }
+                    }
                     finally { process.Dispose(); }
                 }
                 try { if (parent is not null) await parent.DisposeAsync().ConfigureAwait(false); }
@@ -254,6 +266,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         var first = await Task.WhenAny(_processExit, _fault.Task).ConfigureAwait(false);
         if (first == _fault.Task) KillOwned(requestedStop: false);
         await _processExit.ConfigureAwait(false);
+        _nativeExit.Join();
         await _stopMonitoring.CancelAsync().ConfigureAwait(false);
         // Join every owned task before choosing the already observed first failure.
         // Killing a worker mid-frame can fault its reader; WhenAll's task ordering
@@ -324,7 +337,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         await ObserveAsync(() => _resourceMonitor).ConfigureAwait(false);
         try { _process.StandardInput.BaseStream.Close(); } catch (Exception error) { failures.Add(error); }
         await ObserveAsync(StopProcessAsync).ConfigureAwait(false);
-        if (_processExit.IsCompletedSuccessfully)
+        if (_nativeExit.RetirementConfirmed)
         {
             // Exit can race a bounded-stop failure. In that case the old finally
             // released process/CTS owners without joining their actual pipe pumps.
@@ -366,8 +379,10 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
                     _framePump.Status, _diagnosticPump.Status, _resourceMonitor.Status, Completion.Status,
                     (long)Stopwatch.GetElapsedTime(killed).TotalMilliseconds)
                 {
-                    MillisecondsSinceNativeSignal = SignalAge(Interlocked.Read(ref _nativeExitObservedTicks)),
-                    MillisecondsSinceExitEvent = SignalAge(Interlocked.Read(ref _exitEventObservedTicks)),
+                    MillisecondsSinceNativeSignal = SignalAge(_nativeExit.NativeSignalTicks),
+                    MillisecondsSinceExitEvent = null,
+                    NativeWaitThreadStarted = _nativeExit.Started, NativeWaitThreadJoined = _nativeExit.ThreadJoined,
+                    NativeWaitRetirementConfirmed = _nativeExit.RetirementConfirmed,
                     DiagnosticReadStage = Volatile.Read(ref _diagnosticReadStage), PoolThreads = ThreadPool.ThreadCount,
                     AvailablePoolWorkers = available, PendingPoolWork = ThreadPool.PendingWorkItemCount
                 }, error);
@@ -375,23 +390,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         }
     }
 
-    private async Task WaitForActualExitAsync(TimeSpan timeout)
-    {
-        var started = Stopwatch.GetTimestamp();
-        while (!_processExit.IsCompleted)
-        {
-            // A completed native process can precede delivery of its async exit
-            // notification. The zero-time native wait checks the actual signal and
-            // raises the existing exit event; its result NEVER substitutes for joining
-            // the original async owner or any pipe/monitor task. Deadlines stay fixed.
-            if (_process.WaitForExit(0)) Interlocked.CompareExchange(ref _nativeExitObservedTicks, Stopwatch.GetTimestamp(), 0);
-            var remaining = timeout - Stopwatch.GetElapsedTime(started);
-            if (remaining <= TimeSpan.Zero && !_processExit.IsCompleted) throw new TimeoutException("Actual worker exit-task join exceeded its termination deadline.");
-            if (_processExit.IsCompleted) break;
-            await Task.WhenAny(_processExit, Task.Delay(remaining < TimeSpan.FromMilliseconds(100) ? remaining : TimeSpan.FromMilliseconds(100))).ConfigureAwait(false);
-        }
-        await _processExit.ConfigureAwait(false);
-    }
+    private Task WaitForActualExitAsync(TimeSpan timeout) => _nativeExit.WaitForRetirementAsync(timeout);
 
     private static long? SignalAge(long ticks) => ticks == 0 ? null : (long)Stopwatch.GetElapsedTime(ticks).TotalMilliseconds;
 
@@ -405,7 +404,8 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
             if (!_stopping) throw new InvalidOperationException("No stop attempt is in progress.");
             writes = _writes.ToArray();
         }
-        await _processExit.ConfigureAwait(false);
+        await _nativeExit.WaitForRetirementAsync(Timeout.InfiniteTimeSpan).ConfigureAwait(false);
+        await _processExit.ConfigureAwait(false); _nativeExit.Join();
         try { await Task.WhenAll(writes.Select(ObserveShutdownWriteAsync).Append(Completion)).ConfigureAwait(false); }
         finally { ReleaseResources(); }
     }
@@ -433,12 +433,12 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         lock (_disposalGate)
         {
             if (_resourcesReleased) { if (_releaseError is not null) throw _releaseError; return; }
-            if (!_processExit.IsCompletedSuccessfully || !Completion.IsCompleted || !_framePump.IsCompleted || !_diagnosticPump.IsCompleted || !_resourceMonitor.IsCompleted || _writes.Any(write => !write.IsCompleted))
+            if (!_processExit.IsCompletedSuccessfully || !_nativeExit.RetirementConfirmed || !Completion.IsCompleted || !_framePump.IsCompleted || !_diagnosticPump.IsCompleted || !_resourceMonitor.IsCompleted || _writes.Any(write => !write.IsCompleted))
                 throw new InvalidOperationException("Cannot release worker resources before actual exit, writes, pipe pumps and monitoring have joined.");
             _resourcesReleased = true;
             var failures = new List<Exception>();
             foreach (var close in new Action[] { _parent.Dispose, _writer.Dispose, _stopReading.Dispose, _stopMonitoring.Dispose,
-                () => _process.Exited -= _exitObserver, _process.Dispose, _executableLease.Dispose })
+                _process.Dispose, _executableLease.Dispose })
                 try { close(); } catch (Exception error) { failures.Add(error); }
             if (failures.Count != 0) { _releaseError = new AggregateException("Worker resource cleanup failed.", failures); throw _releaseError; }
         }

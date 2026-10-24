@@ -8,11 +8,21 @@ using Mpa.Processor.WorkerRuntime;
 using Mpa.Processor.TestSupport;
 
 // Synthetic child-process fixture only. Never included in the product installer/plugin registry.
-if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "partial-frame" or "malformed" or "exit-error" or "exit-clean" or "parent-launcher" or "startup-stall"))
+if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "partial-frame" or "malformed" or "exit-error" or "exit-clean" or "parent-launcher" or "startup-stall" or "native-exit-gate"))
     throw new ArgumentException("Expected a known synthetic scenario and an owned test directory.");
 var root = Path.GetFullPath(args[1]);
 if (!Directory.Exists(root) || !Path.GetFileName(root).StartsWith("MPA-Worker-Test-", StringComparison.Ordinal))
     throw new ArgumentException("Synthetic worker requires its dedicated test directory.");
+if (args[0] == "native-exit-gate")
+{
+    // Test-only direct child: hold a real preexisting input until explicit exit.
+    using var inputLease = new FileStream(Path.Combine(root, "worker-read-lease.bin"), FileMode.Open, FileAccess.Read, FileShare.None);
+    if (inputLease.ReadByte() != 42) throw new InvalidDataException("Synthetic native-wait input changed.");
+    await Console.Out.WriteLineAsync("native-exit-ready").ConfigureAwait(false);
+    await Console.Out.FlushAsync().ConfigureAwait(false);
+    return await Console.In.ReadLineAsync().ConfigureAwait(false) == "exit" ? 0 : 9;
+}
+
 if (args[0] == "parent-launcher")
 {
     Environment.SetEnvironmentVariable("MPA_SYNTHETIC_PARENT_SECRET", "test-marker-must-not-cross-worker-boundary");
