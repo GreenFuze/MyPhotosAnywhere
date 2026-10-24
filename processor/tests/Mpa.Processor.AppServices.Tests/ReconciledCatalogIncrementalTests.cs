@@ -230,8 +230,18 @@ public sealed partial class AccountServiceTests
         {
             if (generationWorkspace) ConfigureGenerationWorkspace(fixture); else ConfigureDependencyWorkspace(fixture);
             var readers = fixture.Setup.Accounts.Readers;
-            var inventory = readers.MetadataInventory!; var read = readers.MetadataRead!; var create = readers.WorkspaceCreate!;
-            readers.MetadataInventory = (folder, drive, next, token) => { FullInventories++; return inventory(folder, drive, next, token); };
+            var read = readers.MetadataRead!; var create = readers.WorkspaceCreate!;
+            readers.MetadataInventory = (folder, drive, next, token) =>
+            {
+                token.ThrowIfCancellationRequested(); FullInventories++; Assert.AreEqual("metadata", folder); Assert.IsNull(drive);
+                var offset = next is null ? 0 : int.Parse(next.AsSpan("metadata-".Length), CultureInfo.InvariantCulture);
+                var rows = fixture.Cloud.Values.OrderByDescending(item => item.FileId, StringComparer.Ordinal).ToArray();
+                Assert.IsTrue(offset >= 0 && offset < Math.Max(1, rows.Length)); var end = Math.Min(rows.Length, offset + 100);
+                return Task.FromResult(new DriveWorkspaceMetadataPage(new(rows.Skip(offset).Take(end - offset).Select(item =>
+                    new DriveWorkspaceMetadataCandidate(item.FileId, item.DriveVersion, item.Bytes.Length,
+                        fixture.MetadataMimeTypes.GetValueOrDefault(item.FileId, "application/json"))).ToList()),
+                    end < rows.Length ? "metadata-" + end.ToString(CultureInfo.InvariantCulture) : null, false));
+            };
             readers.MetadataRead = (folder, candidate, token) => { MetadataReads.Add(candidate.FileId); return read(folder, candidate, token); };
             readers.DocumentStart = (drive, _) => Task.FromResult(Cursor(drive, Events.Count));
             readers.DocumentChanges = async (cursor, token) =>

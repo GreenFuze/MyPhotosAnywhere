@@ -13,9 +13,8 @@ public sealed class TrustedProtocolActor
     public Guid LibraryId { get; }
     public Guid ActorId { get; }
     public long Epoch { get; }
-    private readonly byte[] _publicKey;
+    internal CanonicalProtocolPublicKey PublicKey { get; }
     private readonly HashSet<string> _kinds;
-    internal ReadOnlySpan<byte> PublicKey => _publicKey;
     internal bool CanPublish(string kind) => _kinds.Contains(kind);
 
     public TrustedProtocolActor(Guid libraryId, Guid actorId, long epoch, ReadOnlySpan<byte> publicKey, IEnumerable<string> allowedKinds)
@@ -23,8 +22,18 @@ public sealed class TrustedProtocolActor
         ArgumentNullException.ThrowIfNull(allowedKinds);
         if (libraryId == Guid.Empty || actorId == Guid.Empty || epoch < 1) throw new ArgumentException("Invalid approved actor context.");
         using var check = new ProtocolDocumentVerifier(publicKey);
-        _publicKey = publicKey.ToArray();
+        PublicKey = check.PublicKey;
         _kinds = new HashSet<string>(allowedKinds, StringComparer.Ordinal);
+        if (_kinds.Count is < 1 or > 32 || _kinds.Any(kind => !ProtocolDocumentReader.IsIdentifier(kind)))
+            throw new ArgumentException("Invalid approved document kinds.", nameof(allowedKinds));
+        LibraryId = libraryId; ActorId = actorId; Epoch = epoch;
+    }
+
+    internal TrustedProtocolActor(Guid libraryId, Guid actorId, long epoch, CanonicalProtocolPublicKey publicKey, IEnumerable<string> allowedKinds)
+    {
+        ArgumentNullException.ThrowIfNull(allowedKinds); ArgumentNullException.ThrowIfNull(publicKey);
+        if (libraryId == Guid.Empty || actorId == Guid.Empty || epoch < 1) throw new ArgumentException("Invalid approved actor context.");
+        PublicKey = publicKey; _kinds = new HashSet<string>(allowedKinds, StringComparer.Ordinal);
         if (_kinds.Count is < 1 or > 32 || _kinds.Any(kind => !ProtocolDocumentReader.IsIdentifier(kind)))
             throw new ArgumentException("Invalid approved document kinds.", nameof(allowedKinds));
         LibraryId = libraryId; ActorId = actorId; Epoch = epoch;

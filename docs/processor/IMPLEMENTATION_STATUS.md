@@ -1,5 +1,45 @@
 # MPA 0.6.0 implementation ledger
 
+## Measured large generation preparation and immutable public keys
+
+Actual 10k/100k fixtures now run real retained SQLite capture, compressed dependencies,
+the concrete current/private upload owner and full prepared-graph verification through
+a paged synthetic Drive adapter. A new photo arriving during upload remains visible
+in the current gallery while the frozen generation retains exactly its captured photos.
+Every native paging, import, graph and preservation assertion passes.
+
+Initial preparation measured 1,316,897ms/1,242,460ms. Profiling found repeated native
+public-key import/export/shape validation. An internal immutable canonical-key value
+now owns only validated public bytes and their computed key ID. Its sole factory keeps
+the native P-256, complete-consumption and canonical-export checks, exports once and
+closes every failed native owner. An approved actor retains that value; every received
+signature still uses a fresh owned native verifier and real VerifyData. Controller and
+publisher key IDs remain distinct. No signature, authority, scope, epoch, capability or
+high-water conclusion is cached, and no native key pool/global trust cache is added.
+
+The repeated run measured 1,063,887ms/996,760ms (about 19.2%/19.8% lower) and native gallery
+p95 205ms/188ms. Both fixtures generated 261 metadata objects, made 785 typed metadata
+reads and six inventory pages. Retained snapshots are 6.4MB/63.8MB. Cumulative shared-process
+allocations remain about 191GB/205GB: this is transient work, not retained memory, and
+remains a performance concern. Shared-host timings are observations rather than a
+controlled causal speed claim; baseline also had two bounded diagnostic samples.
+Neither run establishes live Drive, native UI, full processor or final-commit acceptance.
+
+Final immutable validation passes 342 Core, 309 existing AppServices, 26 Web, 80 Protocol
+and both new scale cases. Five locked strict builds have zero warnings/errors; complete
+logs/counters and matching component hashes are retained in preflight-060/
+canonical-key-validation.json with the earlier scale baseline. New tests preserve
+caller-array isolation, concurrent independent real verification, tampered/wrong-key/
+keyId/epoch/capability rejection, malformed/trailing/private/RSA/other-curve/size bounds.
+Every pre-existing assertion remains active.
+
+CI runs the two new measurements in a mandatory four-platform scale matrix with strict
+diagnostics, exact fixture-size/outcome checks, source/hash reports and archived evidence.
+The existing regression matrix retains its tests and budget. Each new fixture's original
+30-minute cancellation remains unchanged. This is not a timeout waiver or a warning,
+history or inventory-cap relaxation. Remaining CPU/allocation costs, reuse/retention and
+the distinct unresolved historical worker join still block declaring the release ready.
+
 ## Private incremental dependency reads
 
 The concrete generation owner now derives dependency inventories from its own actual

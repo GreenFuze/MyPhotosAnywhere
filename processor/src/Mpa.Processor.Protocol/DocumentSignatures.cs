@@ -35,32 +35,23 @@ public sealed class ProtocolDocumentVerifier : IDisposable
 {
     private readonly ECDsa _key;
     private readonly CanonicalJson _canonical;
-    public string KeyId { get; }
+    internal CanonicalProtocolPublicKey PublicKey { get; }
+    public string KeyId => PublicKey.KeyId;
 
     public ProtocolDocumentVerifier(ReadOnlySpan<byte> publicKeyInfo, int documentLimit = 256 * 1024)
     {
         if (publicKeyInfo.Length is < 1 or > 512) throw new ProtocolFormatException("Public key exceeds its encoding bound.");
         _canonical = new CanonicalJson(documentLimit);
-        var key = ECDsa.Create();
-        try
-        {
-            key.ImportSubjectPublicKeyInfo(publicKeyInfo, out var consumed);
-            if (consumed != publicKeyInfo.Length) throw new ProtocolFormatException("Trailing public-key data.");
-            SignatureEncoding.RequireP256(key);
-            if (!publicKeyInfo.SequenceEqual(key.ExportSubjectPublicKeyInfo())) throw new ProtocolFormatException("Non-canonical public-key data.");
-            KeyId = Convert.ToHexStringLower(SHA256.HashData(key.ExportSubjectPublicKeyInfo()));
-            _key = key;
-        }
-        catch (CryptographicException error)
-        {
-            key.Dispose();
-            throw new ProtocolFormatException("Invalid public-key encoding.", error);
-        }
-        catch
-        {
-            key.Dispose();
-            throw;
-        }
+        (PublicKey, _key) = CanonicalProtocolPublicKey.ImportAndValidate(publicKeyInfo);
+    }
+
+    // The immutable value was produced only by the strict native factory above.
+    // Each verifier still owns a fresh actual native key and verifies every signature.
+    internal ProtocolDocumentVerifier(CanonicalProtocolPublicKey publicKey, int documentLimit = 256 * 1024)
+    {
+        ArgumentNullException.ThrowIfNull(publicKey);
+        _canonical = new CanonicalJson(documentLimit);
+        PublicKey = publicKey; _key = publicKey.ImportForVerification();
     }
 
     public bool Verify(ReadOnlySpan<byte> document, DocumentSignature signature)

@@ -52,8 +52,7 @@ public sealed partial class CatalogPublicationReader
         catch (FormatException error) { throw new ProtocolFormatException("Invalid publisher public-key encoding.", error); }
         if (Convert.ToBase64String(publicKey) != encoded) throw new ProtocolFormatException("Publisher public key is not canonical base64.");
         using var verifier = new ProtocolDocumentVerifier(publicKey);
-        using var controller = new ProtocolDocumentVerifier(enrolledController.PublicKey);
-        if (keyId != verifier.KeyId || keyId == controller.KeyId) throw new ProtocolFormatException("The catalog publisher requires its own matching public signing key.");
-        return new(approval, _workspace, new(approval.LibraryId, actor, epoch, publicKey, ["catalog-commit"]), keyId, envelopeHash);
+        if (keyId != verifier.KeyId || keyId == enrolledController.PublicKey.KeyId) throw new ProtocolFormatException("The catalog publisher requires its own matching public signing key.");
+        return new(approval, _workspace, new(approval.LibraryId, actor, epoch, verifier.PublicKey, ["catalog-commit"]), keyId, envelopeHash);
     }
 }
