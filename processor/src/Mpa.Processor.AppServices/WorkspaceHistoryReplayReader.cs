@@ -113,7 +113,7 @@ public sealed class WorkspaceHistoryReplayReader(IGoogleWorkspaceChanges changes
         return new(cursor, next, page.AtEnd is not null, events.AsReadOnly(), candidates.Values.ToList().AsReadOnly(), changed);
     }
 
-    private static void ValidateChange(DriveObservedChange item)
+    internal static void ValidateChange(DriveObservedChange item)
     {
         if (item.Kind is not ("file" or "drive") || !Identity(item.Id) || item.Id == "root") throw new InvalidDataException("History replay returned an invalid observed identity.");
         if (item.File is { } file && (item.Kind != "file" || file.Version < 1 || file.Bytes < 0 || file.MimeType is not { Length: > 0 and <= 256 } ||

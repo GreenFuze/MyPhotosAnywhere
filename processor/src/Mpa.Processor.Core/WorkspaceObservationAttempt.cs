@@ -25,9 +25,22 @@ public sealed partial class WorkspaceObservationRepository
 
     /// <summary>Commit this fence before any network inspection. Failures leave the
     /// attempt incomplete without requiring another successful write to record failure.</summary>
-    public WorkspaceObservationAttempt BeginScan(WorkspaceObservationContext context)
+    public WorkspaceObservationAttempt BeginScan(WorkspaceObservationContext context) => BeginScan(context, null, null);
+
+    /// <summary>Atomically fence the exact currently completed observation before
+    /// starting a new incomplete attempt. This local transition is not an incremental
+    /// network read, signature proof or permission to publish; actual owners supply those.</summary>
+    public WorkspaceObservationAttempt BeginScanFromCompleted(WorkspaceInventoryCheckpoint completed, Guid expectedAttemptId)
+    {
+        ArgumentNullException.ThrowIfNull(completed);
+        if (expectedAttemptId == Guid.Empty) throw new ArgumentException("An actual completed scan identity is required.", nameof(expectedAttemptId));
+        return BeginScan(completed.Context, completed, expectedAttemptId);
+    }
+
+    private WorkspaceObservationAttempt BeginScan(WorkspaceObservationContext context, WorkspaceInventoryCheckpoint? expectedCompleted, Guid? expectedAttemptId)
     {
         using var transaction = _database.Connection.BeginTransaction(); AssertContext(context, transaction);
+        if (expectedCompleted is not null) AssertCompletedScan(expectedCompleted, expectedAttemptId, transaction);
         var previous = ReadAttempt(transaction); var checkpoint = ReadCheckpoint(transaction);
         if (previous is not null) AssertSameWorkspace(previous.Context, context);
         if (checkpoint is not null) AssertSameWorkspace(checkpoint.Context, context);

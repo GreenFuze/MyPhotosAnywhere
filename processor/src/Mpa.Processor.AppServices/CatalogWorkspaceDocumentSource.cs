@@ -51,6 +51,15 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource, I
             _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly, _allMetadata).CaptureAsync(previouslyKnownIds, ownedToken, observer), token);
     }
 
+    internal Task<WorkspaceDocumentInventory> CaptureIncrementalAsync(WorkspaceDocumentInventory baseline, WorkspacePublicationExpectation? expected,
+        IWorkspaceIncrementalInventoryObserver observer, CancellationToken token)
+    {
+        if (!_allMetadata || baseline.AccountId != _workspace.AccountId || baseline.FolderId != _workspace.FolderId || baseline.SharedDriveId != _sharedDriveId)
+            throw new ArgumentException("Incremental reconciliation substituted its actual workspace.", nameof(baseline));
+        return UseAsync((_, changes, ownedToken) => new WorkspaceIncrementalInventoryReader(changes, baseline, expected)
+            .CaptureAsync(observer, ownedToken), token);
+    }
+
     public Task<DriveChangeCursor> CheckUnchangedAsync(WorkspaceDocumentInventory inventory, CancellationToken token) =>
         UseAsync((documents, changes, ownedToken) => new WorkspaceDocumentInventoryReader(documents, changes,
             _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly, _allMetadata).CheckUnchangedAsync(inventory, ownedToken), token);

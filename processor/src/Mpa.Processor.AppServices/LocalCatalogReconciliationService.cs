@@ -42,7 +42,8 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
 
     public Task<ReconciledLocalCatalog> ReconcileAsync(CancellationToken cancellationToken) => ReconcileAsync(null, cancellationToken);
 
-    private async Task<ReconciledLocalCatalog> ReconcileAsync(CapturedCatalogCommitPlan? prepared, CancellationToken cancellationToken, Guid? renewedGenerationId = null)
+    private async Task<ReconciledLocalCatalog> ReconcileAsync(CapturedCatalogCommitPlan? prepared, CancellationToken cancellationToken,
+        Guid? renewedGenerationId = null, IncrementalBaseline? baseline = null)
     {
         CancellationTokenSource linked;
         lock (_gate) { ObjectDisposedException.ThrowIf(_stopping, this); linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token); }
@@ -66,9 +67,16 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
                 var context = new WorkspaceObservationContext(captured.Authority.LibraryId, captured.Authority.AccountId,
                     captured.Authority.FolderId, captured.Authority.AccountRevision, access.SharedDriveId);
                 var publications = await _state.ExecuteAsync(database => new WorkspacePublicationRepository(database, _budget).Inventory(context), linked.Token).ConfigureAwait(false);
-                var source = new CatalogWorkspaceDocumentSource(_state, _accounts, new(context.AccountId, context.FolderId), context.SharedDriveId, context.AccountRevision, allMetadata: true);
+                if (baseline is not null)
+                {
+                    if (prepared is not null || renewedGenerationId is not null) throw new InvalidOperationException("Prepared and renewed reads require complete inventory reconciliation.");
+                    await AssertIncrementalBaselineAsync(baseline, captured, publications, access, linked.Token).ConfigureAwait(false);
+                }
+                var full = new CatalogWorkspaceDocumentSource(_state, _accounts, new(context.AccountId, context.FolderId), context.SharedDriveId, context.AccountRevision, allMetadata: true);
+                var source = new CatalogReconciliationDocumentSource(full, baseline?.Read.Inventory, baseline?.Expected,
+                    baseline is null ? null : (candidate, token) => ReadBaselineBytesAsync(baseline, candidate, token));
                 var run = new Scan(this, captured, context, source, publications);
-                await using var scanner = new WorkspaceObservationService(_state, _budget, context, source);
+                await using var scanner = new WorkspaceObservationService(_state, _budget, context, source, baseline?.Read.Result.Observation, baseline?.Read.AttemptId);
                 var checkpoint = await scanner.ScanObservedAsync(run.ObserveAsync, linked.Token, async token =>
                 {
                     await run.VerifyHeadAsync(token).ConfigureAwait(false);
@@ -77,17 +85,20 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
                     if (after != access) throw new WorkspaceInventoryIncompleteException();
                     await AssertCapturedAsync(captured, publications, token).ConfigureAwait(false);
                 }).ConfigureAwait(false);
+                var attemptId = scanner.CompletedAttemptId ?? throw new InvalidOperationException("A completed scan lost its actual attempt identity.");
                 Check(linked.Token);
                 await AssertCapturedAsync(captured, publications, linked.Token).ConfigureAwait(false);
                 await _state.ExecuteAsync(database =>
                 {
-                    Check(linked.Token); new WorkspaceObservationRepository(database, _budget).AssertCompletedScan(checkpoint); return true;
+                    Check(linked.Token); new WorkspaceObservationRepository(database, _budget).AssertCompletedScan(checkpoint, attemptId); return true;
                 }, linked.Token).ConfigureAwait(false);
                 var result = run.Result(checkpoint);
+                var inventory = source.CompletedInventory ?? throw new InvalidOperationException("A completed scan lost its actual final inventory.");
+                var known = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).Known(context), linked.Token).ConfigureAwait(false);
                 lock (_gate)
                 {
                     Check(linked.Token); _failure = null;
-                    _completedRead = new(result, captured, publications, prepared); return _current = result;
+                    _completedRead = new(result, captured, publications, prepared, inventory, known, access, baseline is not null, attemptId); return _current = result;
                 }
             }
             catch (Exception error) { lock (_gate) { _current = null; _completedRead = null; _failure = error; } throw; }
@@ -125,7 +136,7 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
     private sealed record Access(long Version, bool Shared, string? SharedDriveId);
 
     private sealed partial class Scan(LocalCatalogReconciliationService owner, Captured captured, WorkspaceObservationContext context,
-        CatalogWorkspaceDocumentSource source, WorkspacePublicationInventory publications) : ICatalogObjectSource
+        IWorkspaceDocumentSource source, WorkspacePublicationInventory publications) : ICatalogObjectSource
     {
         private readonly Dictionary<string, WorkspaceDocumentObservation> _observed = new(StringComparer.Ordinal);
         private readonly HashSet<Guid> _signed = [];

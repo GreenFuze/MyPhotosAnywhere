@@ -1,5 +1,7 @@
+using System.Collections.ObjectModel;
 using System.Security.Cryptography;
 using Mpa.Processor.Core;
+using Mpa.Processor.GoogleDrive;
 using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.AppServices;
@@ -19,7 +21,8 @@ public sealed partial class LocalCatalogReconciliationService
 {
     private CompletedRead? _completedRead;
     private sealed record CompletedRead(ReconciledLocalCatalog Result, Captured Captured, WorkspacePublicationInventory Publications,
-        CapturedCatalogCommitPlan? Prepared = null);
+        CapturedCatalogCommitPlan? Prepared, WorkspaceDocumentInventory Inventory, ReadOnlyCollection<WorkspaceDocumentObservation> Known,
+        Access Access, bool Incremental, Guid AttemptId);
 
     internal async Task<CatalogObjectReference> StoreGenerationDependencyAsync(WorkspacePublicationScope scope, string role, string mime,
         ReadOnlyMemory<byte> payload, CancellationToken cancellationToken)
@@ -39,9 +42,9 @@ public sealed partial class LocalCatalogReconciliationService
         using (linked)
         {
             var token = linked.Token; await EnsureGenerationAccessAsync(scope.GenerationId, token).ConfigureAwait(false);
-            var current = await ReadCurrentAsync(token).ConfigureAwait(false);
+            var current = await ReadDependencyCurrentAsync(scope, null, token).ConfigureAwait(false);
             await _serial.WaitAsync(token).ConfigureAwait(false);
-            CatalogObjectReference reference; SingleUploadAdmission? grant = null;
+            CatalogObjectReference reference; SingleUploadAdmission? grant = null; IncrementalBaseline? afterUpload = null;
             try
             {
                 var proof = CurrentRead(current, token);
@@ -52,6 +55,7 @@ public sealed partial class LocalCatalogReconciliationService
                 // This private grant performs LOCAL checks only; no account reentry.
                 reference = await new CatalogGenerationWorkspaceSink(_state, _accounts, _budget, grant, scope, LocalAccessForScope(scope))
                     .StoreAsync(role, mime, owned, token).ConfigureAwait(false);
+                afterUpload = await grant.CaptureIncrementalBaselineAsync(token).ConfigureAwait(false);
             }
             catch (Exception error) { lock (_gate) _failure = error; throw; }
             finally
@@ -61,7 +65,7 @@ public sealed partial class LocalCatalogReconciliationService
             }
             // An earlier upload receipt is insufficient even for an identical retry.
             // Retire the write grant before reacquiring accounts for this actual read.
-            current = await ReadCurrentAsync(token).ConfigureAwait(false);
+            current = await ReadDependencyCurrentAsync(scope, afterUpload, token).ConfigureAwait(false);
             await _serial.WaitAsync(token).ConfigureAwait(false);
             try
             {
@@ -144,32 +148,43 @@ public sealed partial class LocalCatalogReconciliationService
         }
         public void Retire() { lock (_owner._gate) _retired = true; }
         public Task ValidateAsync(WorkspacePublicationScope scope, CancellationToken cancellationToken) =>
-            _owner._state.ExecuteAsync(database =>
+            _owner._state.ExecuteAsync(database => { _ = ValidateState(database, scope, cancellationToken); return true; }, cancellationToken);
+
+        public Task<IncrementalBaseline> CaptureIncrementalBaselineAsync(CancellationToken token) => _owner._state.ExecuteAsync(database =>
+        {
+            if (_expected.Role == "catalog-commit") throw new InvalidOperationException("Commit publication requires full reconciliation.");
+            var actual = ValidateState(database, _expected.Scope, token);
+            var expected = actual.Objects.Single(item => item.Id == _expected.Id);
+            if (expected.FileId is null || expected.VerifiedVersion is null) throw new WorkspacePublicationConflictException();
+            return new IncrementalBaseline(_proof, _generation, actual, expected);
+        }, token);
+
+        private WorkspacePublicationInventory ValidateState(ProcessorStateDatabase database, WorkspacePublicationScope scope, CancellationToken cancellationToken)
+        {
+            lock (_owner._gate) { _owner.Check(cancellationToken); if (_retired || scope != _expected.Scope) throw new WorkspacePublicationConflictException(); }
+            var generation = _expected.Role == "catalog-commit"
+                ? _owner.AssertCommitGeneration(database, _proof, scope, cancellationToken)
+                : _owner.AssertGeneration(database, _proof, scope, cancellationToken);
+            if (generation != _generation) throw new CatalogGenerationCaptureConflictException();
+            var actual = new WorkspacePublicationRepository(database, _owner._budget).Inventory(_proof.Publications.Context, _proof.Publications.Maximum);
+            var others = _proof.Publications.Objects.Where(item => item.Id != _expected.Id).ToDictionary(item => item.Id);
+            foreach (var item in actual.Objects.Where(item => item.Id != _expected.Id))
+                if (!others.Remove(item.Id, out var before) || before != item) throw new WorkspacePublicationInventoryChangedException();
+            if (others.Count != 0) throw new WorkspacePublicationInventoryChangedException();
+            var current = actual.Objects.SingleOrDefault(item => item.Id == _expected.Id);
+            if (current is null)
             {
-                lock (_owner._gate) { _owner.Check(cancellationToken); if (_retired || scope != _expected.Scope) throw new WorkspacePublicationConflictException(); }
-                var generation = _expected.Role == "catalog-commit"
-                    ? _owner.AssertCommitGeneration(database, _proof, scope, cancellationToken)
-                    : _owner.AssertGeneration(database, _proof, scope, cancellationToken);
-                if (generation != _generation) throw new CatalogGenerationCaptureConflictException();
-                var actual = new WorkspacePublicationRepository(database, _owner._budget).Inventory(_proof.Publications.Context, _proof.Publications.Maximum);
-                var others = _proof.Publications.Objects.Where(item => item.Id != _expected.Id).ToDictionary(item => item.Id);
-                foreach (var item in actual.Objects.Where(item => item.Id != _expected.Id))
-                    if (!others.Remove(item.Id, out var before) || before != item) throw new WorkspacePublicationInventoryChangedException();
-                if (others.Count != 0) throw new WorkspacePublicationInventoryChangedException();
-                var current = actual.Objects.SingleOrDefault(item => item.Id == _expected.Id);
-                if (current is null)
-                {
-                    if (_seen) throw new WorkspacePublicationInventoryChangedException();
-                }
-                else
-                {
-                    AssertIdentity(current);
-                    if (_file is not null && current.FileId != _file || _version is not null && current.VerifiedVersion != _version)
-                        throw new WorkspacePublicationInventoryChangedException();
-                    _seen = true; _file = current.FileId; _version = current.VerifiedVersion;
-                }
-                return true;
-            }, cancellationToken);
+                if (_seen) throw new WorkspacePublicationInventoryChangedException();
+            }
+            else
+            {
+                AssertIdentity(current);
+                if (_file is not null && current.FileId != _file || _version is not null && current.VerifiedVersion != _version)
+                    throw new WorkspacePublicationInventoryChangedException();
+                _seen = true; _file = current.FileId; _version = current.VerifiedVersion;
+            }
+            return actual;
+        }
 
         private void AssertIdentity(WorkspacePublicationExpectation actual)
         {

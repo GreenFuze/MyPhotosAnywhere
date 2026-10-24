@@ -11,12 +11,18 @@ namespace Mpa.Processor.AppServices;
 /// document and the final Drive change check succeed. Stored cursors never skip startup
 /// reconciliation. A checkpoint is evidence, not publication or catalog-head admission.</summary>
 public sealed class WorkspaceObservationService(ProcessorStateCoordinator state, StorageBudgetManager budget,
-    WorkspaceObservationContext context, IWorkspaceDocumentSource source) : IAsyncDisposable
+    WorkspaceObservationContext context, IWorkspaceDocumentSource source, WorkspaceInventoryCheckpoint? completedBaseline = null,
+    Guid? baselineAttemptId = null) : IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
     private readonly WorkspaceObservationContext _context = context ?? throw new ArgumentNullException(nameof(context));
     private readonly IWorkspaceDocumentSource _source = source ?? throw new ArgumentNullException(nameof(source));
+    private readonly WorkspaceInventoryCheckpoint? _completedBaseline = completedBaseline is null || completedBaseline.Context == context
+        ? completedBaseline : throw new ArgumentException("The completed baseline belongs to another scan context.", nameof(completedBaseline));
+    private readonly Guid? _baselineAttemptId = completedBaseline is null ? baselineAttemptId is null ? null :
+        throw new ArgumentException("A baseline scan identity needs its exact checkpoint.", nameof(baselineAttemptId)) :
+        baselineAttemptId is { } id && id != Guid.Empty ? id : throw new ArgumentException("The actual completed baseline identity is required.", nameof(baselineAttemptId));
     private readonly object _gate = new();
     private readonly SemaphoreSlim _serial = new(1, 1);
     private readonly CancellationTokenSource _stop = new();
@@ -24,6 +30,8 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
     private bool _exitConfirmed;
     private Task? _disposal;
     private Exception? _failure;
+    private Guid? _completedAttemptId;
+    internal Guid? CompletedAttemptId { get { lock (_gate) return _completedAttemptId; } }
     public bool ExitConfirmed { get { lock (_gate) return _exitConfirmed; } }
     public Exception? Failure { get { lock (_gate) return _failure; } }
 
@@ -46,8 +54,10 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
             await _serial.WaitAsync(linked.Token).ConfigureAwait(false);
             try
             {
-                lock (_gate) ObjectDisposedException.ThrowIf(_stopping, this); var token = linked.Token;
-                var attempt = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).BeginScan(_context), token).ConfigureAwait(false);
+                lock (_gate) { ObjectDisposedException.ThrowIf(_stopping, this); _completedAttemptId = null; } var token = linked.Token;
+                var attempt = await _state.ExecuteAsync(database => _completedBaseline is null
+                    ? new WorkspaceObservationRepository(database, _budget).BeginScan(_context)
+                    : new WorkspaceObservationRepository(database, _budget).BeginScanFromCompleted(_completedBaseline, _baselineAttemptId!.Value), token).ConfigureAwait(false);
                 ThrowIfCanceled(cancellationToken, token);
                 var known = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).KnownIdentities(_context), token).ConfigureAwait(false);
                 var publications = await _state.ExecuteAsync(database => new WorkspacePublicationRepository(database, _budget).Inventory(_context), token).ConfigureAwait(false);
@@ -121,7 +131,7 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                 ThrowIfCanceled(cancellationToken, token);
                 attempt = progress.CapturedAttempt();
                 var checkpoint = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).CompleteScan(attempt, cursor.Token, observed, publications), token).ConfigureAwait(false);
-                lock (_gate) { ThrowIfCanceled(cancellationToken, token); _failure = null; return checkpoint; }
+                lock (_gate) { ThrowIfCanceled(cancellationToken, token); _failure = null; _completedAttemptId = attempt.Id; return checkpoint; }
             }
             catch (Exception error) { lock (_gate) _failure = error; throw; }
             finally { _serial.Release(); }
@@ -129,7 +139,7 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
     }
 
     private sealed class InventoryProgress(WorkspaceObservationService owner, WorkspaceObservationAttempt attempt, CancellationToken caller,
-        CancellationToken run) : IWorkspaceInventoryObserver, IWorkspaceHistoryObserver, IWorkspaceRejectedFenceObserver
+        CancellationToken run) : IWorkspaceIncrementalInventoryObserver, IWorkspaceRejectedFenceObserver
     {
         private WorkspaceObservationAttempt _attempt = attempt;
         public void UpdateAttempt(WorkspaceObservationAttempt updated)

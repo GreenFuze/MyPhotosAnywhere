@@ -14,7 +14,7 @@ public sealed partial class LocalCatalogReconciliationService
             _keys.PublicIdentity != proof.Captured.Native) throw new StaleLibraryConfigurationException();
         _keys.AssertPublicationIdentity(proof.Captured.Pin, proof.Captured.Authority);
         new ProtocolSigningJournal(database, _budget).AssertInventoryUnchanged(proof.Captured.Signing);
-        new WorkspaceObservationRepository(database, _budget).AssertCompletedScan(proof.Result.Observation);
+        new WorkspaceObservationRepository(database, _budget).AssertCompletedScan(proof.Result.Observation, proof.AttemptId);
     }
 
     // These entry points own their actual reads. Neither a caller's summary nor a

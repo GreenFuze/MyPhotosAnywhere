@@ -1,5 +1,46 @@
 # MPA 0.6.0 implementation ledger
 
+## Private incremental dependency reads
+
+The concrete generation owner now derives dependency inventories from its own actual
+completed scan and a fully drained Drive change feed. Original capture identities and
+private one-upload admissions remain fixed. Ordinary public, startup, renewed-access,
+prepared-commit and completion reconciliation still use full actual inventories.
+
+Baseline startup atomically checks the exact completed scan ID, checkpoint, native
+signing/observation inventories and current original generation. An identical later
+checkpoint cannot substitute for that owned attempt. Current account, native keys,
+controller/source policy, complete outbox and root access are checked again. The one
+expected upload must appear in actual changes if absent from the baseline; missing
+notifications and unexpected changes require a new full read. Raw removal/ancestor
+observations stay durable before fallback and cannot be erased by coalesced responses.
+
+Unchanged local metadata bytes come from one integrity-checked native outbox record at
+a time, bound to the actual baseline version/hash/type/size and fresh changes. The new
+expected object and all nonlocal metadata use actual transport. No original/media path
+or aggregate payload cache is involved. Full signature, ancestry, coverage and facts
+verification still runs; cancellation/Exit joins the real account, I/O and native work.
+
+Four focused native cases and nineteen focused incremental/actual-owner cases pass,
+including original-ID recovery after allocation without creation, real frozen snapshot
+preparation with an import arriving during upload, full graph publication/completion,
+private unlink, next-generation catch-up, superseded identical checkpoints, unrelated
+native work, nonlocal outages, ancestor/removal recovery and joined held-feed Exit.
+The preceding 184 existing account/catalog regressions also pass. Final immutable
+validation passes all 342 Core, 309 AppServices, 26 Web and 77 Protocol cases.
+Five locked strict builds have zero warnings/errors; complete final logs are clean
+and component hashes match every test/Desktop output. Evidence is retained in
+preflight-060/incremental-owner-validation.json. The shared-host AppServices run took
+26m38s; a ten-second managed stack sample showed active native/cryptographic work.
+That diagnostic observation is not a performance benchmark or final release acceptance.
+
+A sixteen-dependency structural fixture uses eighteen metadata downloads and one full
+inventory after its basis, while public reconciliation rereads all eighteen documents.
+This is not a live-Drive or 10k/100k benchmark. Native inventory hashing/semantic walks,
+large-fixture measurements, cross-generation reuse and bounded history retention remain
+unfinished. No inventory cap, assertion or warning policy was relaxed. Schema13/Room12
+are unchanged. The distinct historical worker join failure remains a release blocker.
+
 ## Complete shell screenshot publication
 
 API37 CI40067938335 passed all 159 native tests but correctly failed screenshot validation.
@@ -17,8 +58,10 @@ preserved in preflight-060/ci-8588701-api37-failed-evidence with their independe
 
 Strict application/test APK assembly and lint pass with zero findings under the existing
 exact AGP gate. The application APK is byte-identical to the Gson-validated build; only
-the screenshot test changes. New native execution is still required on CI emulators;
-no local AVD exists and S23 remains reserved for final acceptance. Evidence:
+the screenshot test changes. Exact5844d09 passes every required Desktop/Protocol
+job across four platforms, Android checks and native API29/35/37 jobs. Their actual
+results are archived in preflight-060/ci-5844d09-*-status.json. New final-revision
+checks remain required; S23 stays reserved for final acceptance. Evidence:
 preflight-060/shell-completed-evidence-validation.json.
 
 ## Final Drive changes remain durable before rejection
