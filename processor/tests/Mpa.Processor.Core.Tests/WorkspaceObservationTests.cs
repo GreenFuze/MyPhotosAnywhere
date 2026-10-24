@@ -133,7 +133,7 @@ public sealed partial class LibraryAuthorityTests
         {
             fixture.PrepareLocalPublication(); claim = new CatalogGenerationCaptureRepository(fixture.Database, fixture.Budget)
                 .Begin(Scope(fixture.Store.CaptureLocalPublicationAuthority()), Guid.NewGuid(), Guid.NewGuid());
-            fixture.Sql("DROP TABLE catalog_generation_verification; DROP TABLE catalog_generation_publication; DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; CREATE TABLE workspace_inventory_checkpoint(notes TEXT); INSERT INTO workspace_inventory_checkpoint VALUES('Keep evidence'); PRAGMA user_version=9");
+            fixture.Sql("DROP TABLE catalog_generation_access_attempt; DROP TABLE catalog_generation_verification; DROP TABLE catalog_generation_publication; DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; CREATE TABLE workspace_inventory_checkpoint(notes TEXT); INSERT INTO workspace_inventory_checkpoint VALUES('Keep evidence'); PRAGMA user_version=9");
         }
         Assert.ThrowsExactly<SqliteException>(() => new ProcessorStateDatabase(root.Path));
         using (var sql = Open(root.Path))
@@ -144,6 +144,6 @@ public sealed partial class LibraryAuthorityTests
             command.CommandText = "DROP TABLE workspace_inventory_checkpoint"; command.ExecuteNonQuery();
         }
         using var recovered = new ProcessorStateDatabase(root.Path); Assert.AreEqual(claim, new CatalogGenerationCaptureRepository(recovered, new(new Space())).Read(claim.Scope.GenerationId));
-        using var connection = Open(root.Path); using var query = connection.CreateCommand(); query.CommandText = "PRAGMA user_version"; Assert.AreEqual(12L, query.ExecuteScalar());
+        using var connection = Open(root.Path); using var query = connection.CreateCommand(); query.CommandText = "PRAGMA user_version"; Assert.AreEqual(13L, query.ExecuteScalar());
     }
 }

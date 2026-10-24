@@ -65,7 +65,7 @@ public sealed class ProcessorStateDatabase : IDisposable
                 var objects = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
                 if (application != ApplicationId && !(application == 0 && version == 0 && objects == 0))
                     throw new InvalidDataException("Unknown database identity; preserve it and choose an empty Processor state directory.");
-                if (version is not (0 or 1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11 or 12)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
+                if (version is not (0 or 1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11 or 12 or 13)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
                 command.CommandText = "PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;";
                 command.ExecuteNonQuery();
                 command.CommandText = "PRAGMA journal_mode=WAL";
@@ -361,6 +361,25 @@ public sealed class ProcessorStateDatabase : IDisposable
                           document_hash TEXT NOT NULL CHECK(length(document_hash)=64)
                         ) STRICT;
                         PRAGMA user_version=12;
+                        """;
+                    migration.ExecuteNonQuery(); transaction.Commit();
+                }
+            }
+            using (var migration = connection.CreateCommand())
+            {
+                migration.CommandText = "PRAGMA user_version";
+                if (Convert.ToInt32(migration.ExecuteScalar(), CultureInfo.InvariantCulture) < 13)
+                {
+                    using var transaction = connection.BeginTransaction(); migration.Transaction = transaction;
+                    migration.CommandText = """
+                        CREATE TABLE catalog_generation_access_attempt(
+                          id TEXT PRIMARY KEY, generation_id TEXT NOT NULL REFERENCES catalog_generation_capture(id),
+                          account_revision INTEGER NOT NULL CHECK(account_revision>0),
+                          document TEXT NOT NULL CHECK(length(document) BETWEEN 1 AND 32768),
+                          document_hash TEXT NOT NULL CHECK(length(document_hash)=64),
+                          UNIQUE(generation_id,account_revision)
+                        ) STRICT;
+                        PRAGMA user_version=13;
                         """;
                     migration.ExecuteNonQuery(); transaction.Commit();
                 }

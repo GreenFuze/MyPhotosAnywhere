@@ -1,5 +1,47 @@
 # MPA 0.6.0 implementation ledger
 
+## Release blocker: intermittent worker exit-task join
+
+One complete native run failed the actual stubborn-child disposal case: the OS reported
+exit while the original asynchronous exit, diagnostic reader and supervision tasks still
+had not joined within the existing ten-second post-kill deadline. Ownership was retained;
+the test's recovery owner subsequently joined cleanup. The cause remains unidentified.
+No deadline, ownership assertion or warning gate was relaxed, and no exception is approved.
+
+Observation-only instrumentation now records the first native signal, actual Exited-event
+timing, diagnostic read/write/flush/disposal progress and thread-pool counts on failure.
+These observations cannot complete an exit task or release a resource. The instrumented
+full 328-case Core run, ten concurrent lifecycle cases and forty further cases from a
+separate immutable output copy pass. This does not establish a fix. Publication remains
+blocked while independent feature work continues.
+
+## Separate renewed-access journal; retry consumption pending
+
+Processor schema 13 adds a separate immutable access-attempt journal with original
+capture/snapshot/commit identities, actual renewed account revision, pinned native
+controller/publisher identities, completed observation and both inventory digests.
+It never rewrites the original scope or remints pending work. Native transactions fence
+current semantic policy, completed scans and complete inventories before recording.
+Retries retain the first attempt's provenance; later reconnects use separate records.
+Low storage and failed checkpoints retain original claims. Corrupt records are preserved
+and rejected, and bounded history fails explicitly rather than truncating earlier attempts.
+
+The concrete reconciler now owns actual current access/history reads before journaling
+an attempt. It checks original parent or exact own visible commit, original allocated
+membership, immutable pending work, native keys, current policy and both inventories.
+Its returned record is historical evidence, never a transferable write grant. Existing
+strict original-scope upload/signing/completion fences remain unchanged; consuming the
+new attempt through fresh private operation admission is the next integration step.
+No automatic retry after reconnect is claimed yet. All seven new native journal/migration
+cases and six actual reconnect cases pass, including failed native checkpoints, low
+storage, bounded history, restarts, original allocation membership, foreign heads and
+joined uncooperative reads. Complete instrumented immutable suites pass: 328 Core,
+275 AppServices, 26 Web and 77 Protocol cases; strict test/Desktop builds have zero
+warnings/errors and component hashes match every output. Earlier old-schema fixture
+omissions and one stale latest-version assertion were corrected while preserving their
+original preservation/rollback assertions. Their failed logs remain failed. The distinct
+historical worker timeout above remains an unresolved release blocker.
+
 ## Automatic engine generation catch-up
 
 Production DesktopWebRuntime now composes CatalogGenerationRuntime into the engine-owned

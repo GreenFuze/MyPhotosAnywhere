@@ -24,7 +24,7 @@ public sealed partial class LibraryAuthorityTests
         CollectionAssert.AreEqual(signed, new ProtocolSigningJournal(upgraded, budget).Read(retained.Capture.CommitIntentId)!.Envelope!.Value.ToArray());
         Assert.AreEqual(exactPlan, CompletionPlanText(root.Path));
         using var connection = Open(root.Path); using var query = connection.CreateCommand();
-        query.CommandText = "PRAGMA user_version"; Assert.AreEqual(12L, query.ExecuteScalar());
+        query.CommandText = "PRAGMA user_version"; Assert.AreEqual(13L, query.ExecuteScalar());
         query.CommandText = "SELECT captured_context FROM job"; StringAssert.Contains((string)query.ExecuteScalar()!, "Preserve human draft");
         query.CommandText = "PRAGMA foreign_key_check"; Assert.IsNull(query.ExecuteScalar());
         query.CommandText = "SELECT count(*) FROM workspace_publication WHERE verified_version IS NOT NULL"; Assert.AreEqual(2L, query.ExecuteScalar());
@@ -90,7 +90,7 @@ public sealed partial class LibraryAuthorityTests
     {
         using var sql = Open(root); using var transaction = sql.BeginTransaction(); using var query = sql.CreateCommand(); query.Transaction = transaction;
         query.CommandText = """
-            DROP TABLE catalog_generation_verification;
+            DROP TABLE catalog_generation_access_attempt; DROP TABLE catalog_generation_verification;
             ALTER TABLE catalog_generation_publication RENAME TO newer_publication;
             ALTER TABLE catalog_generation_capture RENAME TO newer_capture;
             CREATE TABLE catalog_generation_capture(

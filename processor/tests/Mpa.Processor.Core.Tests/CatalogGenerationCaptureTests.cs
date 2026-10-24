@@ -99,11 +99,11 @@ public sealed partial class LibraryAuthorityTests
             fixture.PrepareLocalPublication(); authority = fixture.Store.CaptureLocalPublicationAuthority(); installation = fixture.Database.InstallationId;
             new DurableJobRepository(fixture.Database).Create(Guid.NewGuid(), "takeout-import", "{\"caption\":\"Human draft remains\"}"u8);
         }
-        using (var old = Open(root.Path)) { using var command = old.CreateCommand(); command.CommandText = "DROP TABLE catalog_generation_verification; DROP TABLE catalog_generation_publication; DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; PRAGMA user_version=8"; command.ExecuteNonQuery(); }
+        using (var old = Open(root.Path)) { using var command = old.CreateCommand(); command.CommandText = "DROP TABLE catalog_generation_access_attempt; DROP TABLE catalog_generation_verification; DROP TABLE catalog_generation_publication; DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; PRAGMA user_version=8"; command.ExecuteNonQuery(); }
         using var upgraded = new ProcessorStateDatabase(root.Path); Assert.AreEqual(installation, upgraded.InstallationId);
         Assert.AreEqual(authority, new LibraryAuthorityRepository(upgraded).CaptureLocalPublicationAuthority());
         Assert.AreEqual(0, new CatalogGenerationCaptureRepository(upgraded, new(new Space())).Active().Count);
-        using var sql = Open(root.Path); using var query = sql.CreateCommand(); query.CommandText = "PRAGMA user_version"; Assert.AreEqual(12L, query.ExecuteScalar());
+        using var sql = Open(root.Path); using var query = sql.CreateCommand(); query.CommandText = "PRAGMA user_version"; Assert.AreEqual(13L, query.ExecuteScalar());
         query.CommandText = "SELECT captured_context FROM job"; StringAssert.Contains((string)query.ExecuteScalar()!, "Human draft remains");
     }
 
@@ -142,7 +142,7 @@ public sealed partial class LibraryAuthorityTests
         using (var fixture = new Fixture(root.Path))
         {
             fixture.PrepareLocalPublication();
-            fixture.Sql("DROP TABLE catalog_generation_verification; DROP TABLE catalog_generation_publication; DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; CREATE TABLE one_active_catalog_capture(notes TEXT); INSERT INTO one_active_catalog_capture VALUES('Preserve migration evidence'); PRAGMA user_version=8");
+            fixture.Sql("DROP TABLE catalog_generation_access_attempt; DROP TABLE catalog_generation_verification; DROP TABLE catalog_generation_publication; DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; CREATE TABLE one_active_catalog_capture(notes TEXT); INSERT INTO one_active_catalog_capture VALUES('Preserve migration evidence'); PRAGMA user_version=8");
         }
         Assert.ThrowsExactly<Microsoft.Data.Sqlite.SqliteException>(() => new ProcessorStateDatabase(root.Path));
         using (var sql = Open(root.Path))

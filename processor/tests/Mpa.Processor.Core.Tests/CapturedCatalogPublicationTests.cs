@@ -192,7 +192,7 @@ public sealed partial class LibraryAuthorityTests
         var work = new WorkspacePublicationRepository(upgraded, budget).Read(pending.Id)!;
         Assert.AreEqual(pending.Scope, work.Scope); Assert.AreEqual(pending.FileId, work.FileId); Assert.AreEqual(pending.Sha256, work.Sha256);
         CollectionAssert.AreEqual(pending.Payload.ToArray(), work.Payload.ToArray());
-        using var connection = Open(root.Path); using var query = connection.CreateCommand(); query.CommandText = "PRAGMA user_version"; Assert.AreEqual(12L, query.ExecuteScalar());
+        using var connection = Open(root.Path); using var query = connection.CreateCommand(); query.CommandText = "PRAGMA user_version"; Assert.AreEqual(13L, query.ExecuteScalar());
         query.CommandText = "SELECT captured_context FROM job"; StringAssert.Contains((string)query.ExecuteScalar()!, "Human draft");
         query.CommandText = "SELECT count(*) FROM signing_actor"; Assert.AreEqual(2L, query.ExecuteScalar());
     }
@@ -223,7 +223,7 @@ public sealed partial class LibraryAuthorityTests
     {
         using var connection = Open(root); using var transaction = connection.BeginTransaction(); using var query = connection.CreateCommand(); query.Transaction = transaction;
         query.CommandText = """
-            DROP TABLE catalog_generation_verification; DROP TABLE catalog_generation_publication;
+            DROP TABLE catalog_generation_access_attempt; DROP TABLE catalog_generation_verification; DROP TABLE catalog_generation_publication;
             ALTER TABLE catalog_generation_capture RENAME TO newer_capture;
             CREATE TABLE catalog_generation_capture(
               id TEXT PRIMARY KEY, library_id TEXT NOT NULL, snapshot_id TEXT NOT NULL UNIQUE,

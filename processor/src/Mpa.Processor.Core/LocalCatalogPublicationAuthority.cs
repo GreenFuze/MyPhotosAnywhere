@@ -34,7 +34,7 @@ public sealed partial class LibraryAuthorityRepository
             throw new StaleLibraryConfigurationException();
     }
 
-    private LocalCatalogPublicationAuthority ReadLocalPublicationAuthority(SqliteTransaction transaction)
+    internal LocalCatalogPublicationAuthority ReadLocalPublicationAuthority(SqliteTransaction transaction)
     {
         var pin = ReadPin(transaction) ?? throw new CatalogPublicationNotAuthorizedException();
         var publisherSequence = SelectedSequence(transaction) ?? throw new CatalogPublicationNotAuthorizedException();

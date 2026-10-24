@@ -124,13 +124,13 @@ public sealed partial class ProtocolSigningJournalTests
             new DurableJobRepository(fixture.Database).Create(Guid.NewGuid(), "takeout-import", "{\"destination\":\"captured\",\"caption\":\"Human caption\"}"u8);
         }
         using (var connection = Open(root.Path))
-        { using var sql = connection.CreateCommand(); sql.CommandText = "DROP TABLE catalog_generation_verification; DROP TABLE catalog_generation_publication; DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; DROP TABLE signing_intent; DROP TABLE signing_actor; PRAGMA user_version=7"; sql.ExecuteNonQuery(); }
+        { using var sql = connection.CreateCommand(); sql.CommandText = "DROP TABLE catalog_generation_access_attempt; DROP TABLE catalog_generation_verification; DROP TABLE catalog_generation_publication; DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; DROP TABLE signing_intent; DROP TABLE signing_actor; PRAGMA user_version=7"; sql.ExecuteNonQuery(); }
         using var database = new ProcessorStateDatabase(root.Path); var budget = new StorageBudgetManager(new Space()); var store = new LibraryAuthorityRepository(database, budget);
         Assert.AreEqual(pin, store.Controller());
         Assert.ThrowsExactly<InvalidDataException>(() => store.Bootstrap(pin.ActorId, pin.Epoch, new(pin.AccountId, pin.FolderId), 1, Convert.FromBase64String(pin.PublicKeySpki), publisher));
         using var read = Open(root.Path); using var query = read.CreateCommand(); query.CommandText = "SELECT captured_context FROM job";
         StringAssert.Contains((string)query.ExecuteScalar()!, "Human caption"); query.CommandText = "SELECT count(*) FROM signing_actor"; Assert.AreEqual(0L, query.ExecuteScalar());
-        query.CommandText = "PRAGMA user_version"; Assert.AreEqual(12L, query.ExecuteScalar());
+        query.CommandText = "PRAGMA user_version"; Assert.AreEqual(13L, query.ExecuteScalar());
     }
 
     [TestMethod]
