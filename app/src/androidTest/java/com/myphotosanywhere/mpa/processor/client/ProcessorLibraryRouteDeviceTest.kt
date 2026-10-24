@@ -1,6 +1,9 @@
 package com.myphotosanywhere.mpa.processor.client
 
 import androidx.compose.ui.test.*
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.test.platform.app.InstrumentationRegistry
+import com.myphotosanywhere.mpa.NativeScreenshotEvidence
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -28,5 +31,9 @@ class ProcessorLibraryRouteDeviceTest {
         compose.onNodeWithTag("processor:connection-code").performScrollTo().assertTextContains("mpa-library-v1:synthetic-draft")
         val restored=compose.runOnUiThread { ViewModelProvider(compose.activity)[ProcessorLibraryConnectionViewModel::class.java] }
         assertSame(model,restored);assertNull(restored.connection.state.value.accepted);assertNull(restored.connection.state.value.review)
+        compose.mainClock.advanceTimeBy(1000);compose.waitForIdle()
+        val image=compose.onRoot().captureToImage().asAndroidBitmap()
+        try { NativeScreenshotEvidence(InstrumentationRegistry.getInstrumentation().targetContext).write("processor-native-route",image) }
+        finally { image.recycle() }
     }
 }

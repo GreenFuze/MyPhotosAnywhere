@@ -1,5 +1,30 @@
 # MPA 0.6.0 implementation ledger
 
+## Native screenshot completion and exact journal CI
+
+Exact9b609eb217812c451247d41873cd95ec581329a8 passes Android40141224428 and all
+three Native40141224425 API29/35/37 jobs. Downloaded XML independently confirms166
+passing cases and107 mapped PNGs per API. The two actual journal/migration cases ran;
+the previously missing nine setup images are now archived and validated by the collector.
+This is emulator evidence, not S23 or live Google consent acceptance.
+
+Visual review of three API35 setup frames found that captures could record the enabled
+button's color animation before settlement; the isolated content fixture also lacked the
+system insets supplied by the real application scaffold. Test fixtures now advance the
+virtual animation clock before their single capture and provide safe drawing insets.
+Existing enabled/approval/48dp/retained-geometry assertions remain active. A tenth required
+image captures the actual MainActivity Shared library route after draft restoration;
+108 screenshots are now mandatory. No production UI change, assertion retry or test
+budget increase is used to obtain these frames. Corrected exact-source native execution
+and visual inspection remain required.
+
+Strict lint and both APK builds pass with only the approved AGP diagnostic. The application
+APK and all production/JVM-test sources are byte-identical to8d71913, whose full614-case
+regression remains valid. Native fixture changes compile; they were not locally executed
+because no AVD is installed. Hashes and limits are retained in
+preflight-060/native-library-screenshot-settlement-validation.json. Full0.6 catalog
+activation, processing/client/installers and final joint acceptance remain unfinished.
+
 ## Native bounded Google Drive workspace reads
 
 The catalog consumer now has a Google-only transport over the captured account gateway.

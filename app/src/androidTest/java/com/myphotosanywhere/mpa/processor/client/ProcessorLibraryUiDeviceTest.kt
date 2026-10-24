@@ -1,6 +1,7 @@
 package com.myphotosanywhere.mpa.processor.client
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
@@ -38,6 +39,8 @@ class ProcessorLibraryUiDeviceTest {
     }
     private data class Presentation(val dark: Boolean=false,val rtl: Boolean=false,val large: Boolean=false)
     private fun screenshot(label: String) {
+        compose.mainClock.advanceTimeBy(1000)
+        compose.waitForIdle()
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val bitmap=compose.onRoot().captureToImage().asAndroidBitmap()
         try { NativeScreenshotEvidence(context).write("processor-$label",bitmap) }
@@ -52,7 +55,7 @@ class ProcessorLibraryUiDeviceTest {
             val display=presentation.value; val density=LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,if(display.large) 1.8f else 1f),
                 LocalLayoutDirection provides if(display.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-                MaterialTheme(colorScheme=if(display.dark) darkColorScheme() else lightColorScheme()) { Surface(Modifier.fillMaxSize()) {
+                MaterialTheme(colorScheme=if(display.dark) darkColorScheme() else lightColorScheme()) { Surface(Modifier.fillMaxSize().safeDrawingPadding()) {
                     ProcessorLibraryConnectionContent(state.value,{},{ state.value=state.value.copy(acknowledged=it) },{ approvals++ },{},{},{})
                 } }
             }
@@ -73,7 +76,7 @@ class ProcessorLibraryUiDeviceTest {
         val accepted=ProcessorLibraryRegistration(descriptor,account)
         val state=mutableStateOf(ProcessorLibraryConnectionState(phase=ProcessorLibraryConnectionPhase.CHECKING,draft=descriptor.encode(),accepted=accepted))
         var refreshes=0
-        compose.setContent { MaterialTheme { Surface(Modifier.fillMaxSize()) {
+        compose.setContent { MaterialTheme { Surface(Modifier.fillMaxSize().safeDrawingPadding()) {
             ProcessorLibraryConnectionContent(state.value,{},{},{},{},{},{ refreshes++ })
         } } }
         compose.onNodeWithTag("processor:accepted").assertIsDisplayed()
