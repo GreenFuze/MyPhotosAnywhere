@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <Version>0.6.0</Version>
+    <AssemblyName>MPA.Processor</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="[12.1.4]" />
+    <PackageReference Include="Avalonia.Desktop" Version="[12.1.4]" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="[12.1.4]" />
+    <ProjectReference Include="../Mpa.Processor.Core/Mpa.Processor.Core.csproj" />
+    <ProjectReference Include="../Mpa.Processor.AppServices/Mpa.Processor.AppServices.csproj" />
+    <ProjectReference Include="../Mpa.Processor.Web/Mpa.Processor.Web.csproj" />
+    <AvaloniaResource Include="Assets/**" />
+    <Content Include="../../web/dist/**" Link="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="RequireBuiltWebInterface" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('../../web/dist/index.html') Or !Exists('../../web/dist/app.js')" Text="Build the locked web frontend in processor/web before building MPA Desktop." />
+  </Target>
+</Project>

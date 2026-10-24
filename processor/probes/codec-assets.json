@@ -1,0 +1,30 @@
+{
+  "status": "Stage 0 synthetic Linux CPU feasibility; redistribution and all-platform closure pending",
+  "publisherSigningFingerprint": "FCF986EA15E6E293A5644F10B4322F04D67658D8",
+  "assets": [
+    {
+      "file": "ffmpeg-9.0.2.tar.xz",
+      "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+      "bytes": 12040788,
+      "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
+    },
+    {
+      "file": "ffmpeg-9.0.2.tar.xz.asc",
+      "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz.asc",
+      "bytes": 520,
+      "sha256": "d617fd94ea354dadd2a8bb16243d37c44e1e9729b06b6ad58fe30bfb0fa943f2"
+    },
+    {
+      "file": "ffmpeg-devel.asc",
+      "url": "https://ffmpeg.org/ffmpeg-devel.asc",
+      "bytes": 1709,
+      "sha256": "397b3becedcd5a98769967ff1ff8501ddc89f8368b8f766e4701377d7dbaabe5"
+    },
+    {
+      "file": "nasm-3.02-0.fc43.x86_64.rpm",
+      "url": "https://www.nasm.us/pub/nasm/releasebuilds/3.02/linux/nasm-3.02-0.fc43.x86_64.rpm",
+      "bytes": 456032,
+      "sha256": "3ec2a05874a16ade98127cfcb0e84b528d38d3bfc87081bd0661c0ff2caf628b"
+    }
+  ]
+}

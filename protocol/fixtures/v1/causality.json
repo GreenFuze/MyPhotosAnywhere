@@ -1,0 +1,52 @@
+{
+  "note": "Independent Python canonical/hash reference; synthetic records.",
+  "operations": [
+    {
+      "body": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "actorId": "11111111-1111-4111-8111-111111111111",
+        "sequence": "1",
+        "targetId": "94a81164-e980-4ec1-a566-cec36475b839",
+        "field": "person.name",
+        "parents": [],
+        "value": "original"
+      },
+      "fingerprint": "aba04b1439259836b1d7dc34b06bb089adee4e9efa266ca31034a2720d905258"
+    },
+    {
+      "body": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "actorId": "11111111-1111-4111-8111-111111111111",
+        "sequence": "2",
+        "targetId": "94a81164-e980-4ec1-a566-cec36475b839",
+        "field": "person.name",
+        "parents": [
+          "00000000-0000-4000-8000-000000000001"
+        ],
+        "value": "Alice"
+      },
+      "fingerprint": "2609957ee975fe43a65b47d607824585e47bee53a5d585a40078ebaf80cad28f"
+    },
+    {
+      "body": {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "actorId": "22222222-2222-4222-8222-222222222222",
+        "sequence": "1",
+        "targetId": "94a81164-e980-4ec1-a566-cec36475b839",
+        "field": "person.name",
+        "parents": [
+          "00000000-0000-4000-8000-000000000001"
+        ],
+        "value": "Alicia"
+      },
+      "fingerprint": "cba4df306abdbff14a49a219f14d550bac02716bfc8366bcaf2f4a16c969049f"
+    }
+  ],
+  "frontier": [
+    "00000000-0000-4000-8000-000000000002",
+    "00000000-0000-4000-8000-000000000003"
+  ],
+  "commonPrior": [
+    "00000000-0000-4000-8000-000000000001"
+  ]
+}

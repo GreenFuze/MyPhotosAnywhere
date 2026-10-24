@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="[18.11.0]" />
+    <PackageReference Include="MSTest.TestFramework" Version="[4.5.1]" />
+    <PackageReference Include="MSTest.TestAdapter" Version="[4.5.1]" />
+    <ProjectReference Include="../../src/Mpa.Processor.Protocol/Mpa.Processor.Protocol.csproj" />
+    <None Include="../../../protocol/fixtures/v1/*.json" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

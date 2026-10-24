@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Version>0.6.0</Version></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Mpa.Processor.AppServices/Mpa.Processor.AppServices.csproj" />
+    <ProjectReference Include="../Mpa.Processor.Lan/Mpa.Processor.Lan.csproj" />
+  </ItemGroup>
+</Project>

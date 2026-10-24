@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Version>0.6.0</Version></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Mpa.Processor.Credentials/Mpa.Processor.Credentials.csproj" />
+    <ProjectReference Include="../Mpa.Processor.Protocol/Mpa.Processor.Protocol.csproj" />
+  </ItemGroup>
+</Project>
