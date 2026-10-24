@@ -12,6 +12,7 @@ public sealed record SourceDiscoveryStep(Guid JobId, Guid ItemId, bool Repair, b
 /// their durable leases. This runner does not itself start a timer or admit unselected sources.</summary>
 public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, ProcessorAccountService accounts, StorageBudgetManager? storage = null) : IAsyncDisposable
 {
+    public event Action? CatalogChanged;
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly ProcessorAccountService _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
     private readonly StorageBudgetManager? _storage = storage;
@@ -62,7 +63,17 @@ public sealed class SourceDiscoveryRunner(ProcessorStateCoordinator state, Proce
         return job;
     }, cancellationToken);
 
-    public Task<SourceDiscoveryStep?> RunNextAsync(CancellationToken cancellationToken) => ExecuteAsync<SourceDiscoveryStep?>(async token =>
+    public async Task<SourceDiscoveryStep?> RunNextAsync(CancellationToken cancellationToken)
+    {
+        var result = await RunNextCoreAsync(cancellationToken).ConfigureAwait(false);
+        if (result is not null)
+        {
+            try { CatalogChanged?.Invoke(); } // Every step's actual writes have committed, including coverage-only progress or failure.
+            catch (Exception error) { lock (_gate) _failure = error; throw; }
+        }
+        return result;
+    }
+    private Task<SourceDiscoveryStep?> RunNextCoreAsync(CancellationToken cancellationToken) => ExecuteAsync<SourceDiscoveryStep?>(async token =>
     {
         var captured = await StateAsync(database =>
         {

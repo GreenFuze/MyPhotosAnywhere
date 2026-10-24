@@ -28,6 +28,7 @@ public sealed class ProcessorSourceRuntime : IAsyncDisposable
     private int _commands;
     private readonly TaskCompletionSource _commandsDrained = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public event Action<Exception>? Failed;
+    public event Action? CatalogChanged;
     public ProcessorWorkGroup Work => _work ?? throw new InvalidOperationException("Source processing controls have not been prepared.");
     public StorageBudgetStatus? StorageAttention => _scheduler?.StorageAttention;
     public Exception? Failure { get { lock (_gate) return _failure ?? _work?.Failure ?? _runner.Failure; } }
@@ -36,7 +37,8 @@ public sealed class ProcessorSourceRuntime : IAsyncDisposable
     private ProcessorSourceRuntime(ProcessorStateCoordinator state, ProcessorAccountService accounts, ProcessorWorkSupervisor native, StorageBudgetManager storage)
     {
         ArgumentNullException.ThrowIfNull(storage);
-        _runner = new(state, accounts, storage); _native = native ?? throw new ArgumentNullException(nameof(native)); _state = state; _storage = storage;
+        _runner = new(state, accounts, storage); _runner.CatalogChanged += NotifyCatalogChanged;
+        _native = native ?? throw new ArgumentNullException(nameof(native)); _state = state; _storage = storage;
     }
     public static async Task<ProcessorSourceRuntime> CreatePausedAsync(ProcessorStateCoordinator state, ProcessorAccountService accounts,
         ProcessorWorkSupervisor native, StorageBudgetManager storage, CancellationToken cancellationToken)
@@ -78,6 +80,12 @@ public sealed class ProcessorSourceRuntime : IAsyncDisposable
         // A policy can finish committing while Exit stops background admission. Its
         // durable outbox remains valid for restart; a stopped dispatcher needs no wake.
         lock (_gate) { if (!_stopping && Failure is null) _scheduler!.NotifySourcesChanged(); }
+    }
+    private void NotifyCatalogChanged()
+    {
+        Action? notification;
+        lock (_gate) { if (_stopping) return; notification = CatalogChanged; }
+        notification?.Invoke();
     }
     public Task<SourceDiscoverySchedule> RequestScanAsync(SourceScanRequest request, CancellationToken cancellationToken) =>
         CommandAsync(database => new SourceDiscoveryRepository(database).RequestScan(request), cancellationToken);
@@ -150,6 +158,7 @@ public sealed class ProcessorSourceRuntime : IAsyncDisposable
         if (_work is not null) await _work.DisposeAsync().ConfigureAwait(false);
         await StopSchedulerAsync().ConfigureAwait(false);
         await _runner.DisposeAsync().ConfigureAwait(false);
+        _runner.CatalogChanged -= NotifyCatalogChanged;
         if (_monitor is not null) await _monitor.ConfigureAwait(false);
         Task? quiescence; lock (_gate) quiescence = _quiescence;
         if (quiescence is not null) await quiescence.ConfigureAwait(false);

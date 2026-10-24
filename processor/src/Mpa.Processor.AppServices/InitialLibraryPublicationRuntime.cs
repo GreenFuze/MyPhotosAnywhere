@@ -14,7 +14,8 @@ public sealed record InitialLibraryPublicationActivity(InitialLibraryPublication
 /// A historical completion advances this stage only; it is not a current catalog grant.
 /// Stop joins the actual attempt/uploader before borrowed keys/accounts/state may retire.</summary>
 public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator state, ProcessorAccountService accounts,
-    LibrarySigningIdentityOwner keys, StorageBudgetManager budget, LocalCatalogReconciliationService? catalog = null) : IAsyncDisposable
+    LibrarySigningIdentityOwner keys, StorageBudgetManager budget, LocalCatalogReconciliationService? catalog = null,
+    CatalogGenerationRuntime? generations = null) : IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
@@ -22,12 +23,17 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
     // Ownership transfers to this runtime; its attempt and the concrete reconciler
     // must both join before the composition root retires keys/accounts/state.
     private readonly LocalCatalogReconciliationService? _catalog = catalog;
+    private readonly CatalogGenerationRuntime? _generations = generations is null || catalog is not null && generations.Borrows(catalog)
+        ? generations : throw new ArgumentException("Generation work must borrow this runtime's owned current reconciler.", nameof(generations));
     private readonly object _gate = new();
     private readonly CancellationTokenSource _stop = new();
     private Task? _attempt;
     private Task? _disposal;
     private bool _stopping;
     private bool _exitConfirmed;
+    private bool _draining;
+    private long _requestedVersion;
+    private long _drainVersion;
     private Exception? _failure;
     private Exception? _lastAttemptFailure;
     private InitialLibraryPublicationActivity _activity = new(InitialLibraryPublicationStage.NeedsApproval, null, false);
@@ -48,16 +54,48 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
         {
             cancellationToken.ThrowIfCancellationRequested(); ObjectDisposedException.ThrowIf(_stopping, this);
             if (_failure is not null) throw new InvalidOperationException("Library setup stopped after an internal failure. Inspect it before restarting.", _failure);
-            if (_attempt is { IsCompleted: false } && _activity.Stage != InitialLibraryPublicationStage.NeedsAttention) return _activity;
-            var previous = _attempt;
+            _requestedVersion = checked(_requestedVersion + 1);
+            if (_draining && _activity.Stage != InitialLibraryPublicationStage.NeedsAttention) return _activity;
+            var previous = _attempt; var drain = _drainVersion = checked(_drainVersion + 1); _draining = true;
             _activity = new(InitialLibraryPublicationStage.Running, null, false); _lastAttemptFailure = null;
             // A retry can arrive after an error is visible but just before the old
             // Task completes. Retain that request and join the old attempt first.
             _attempt = Task.Run(async () =>
             {
                 if (previous is not null) await previous.ConfigureAwait(false);
-                await RunAsync().ConfigureAwait(false);
+                await DrainAsync(drain).ConfigureAwait(false);
             }, CancellationToken.None); return _activity;
+        }
+    }
+
+    /// <summary>Committed source data/coverage changes wake owned work, never a browser
+    /// task. Approval/recovery attention requires an explicit retry; ordinary progress
+    /// notifications cannot silently replace that decision or lose a late wake-up.</summary>
+    public void NotifyLocalCatalogChanged()
+    {
+        lock (_gate)
+        {
+            if (_stopping || _failure is not null || _activity.Stage is InitialLibraryPublicationStage.NeedsApproval or InitialLibraryPublicationStage.NeedsAttention) return;
+            _ = Request(CancellationToken.None);
+        }
+    }
+
+    private async Task DrainAsync(long drain)
+    {
+        while (true)
+        {
+            long requested;
+            lock (_gate) { if (drain != _drainVersion) return; requested = _requestedVersion; }
+            await RunAsync().ConfigureAwait(false);
+            lock (_gate)
+            {
+                // An explicit retry can be chained after attention is visible but
+                // before the previous task returns. That successor owns later wakes.
+                if (drain != _drainVersion) return;
+                if (!_stopping && _failure is null && _activity.Stage is not (InitialLibraryPublicationStage.NeedsApproval or InitialLibraryPublicationStage.NeedsAttention) &&
+                    requested != _requestedVersion) continue;
+                _draining = false; return;
+            }
         }
     }
 
@@ -90,7 +128,8 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
             if (readiness == InitialLibraryPublicationStage.PoliciesPublished && _catalog is not null)
             {
                 lock (_gate) { ThrowIfStopping(); _activity = new(InitialLibraryPublicationStage.Running, "Checking current library history.", false); }
-                while (true)
+                if (_generations is not null) await _generations.RunUntilCurrentAsync(_stop.Token).ConfigureAwait(false);
+                else while (true)
                 {
                     try { await _catalog.ReconcileAsync(_stop.Token).ConfigureAwait(false); break; }
                     // Each batch has committed real cursor progress. Continue the next
@@ -162,11 +201,12 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
         Exception? cancellationFailure = null;
         try { await _stop.CancelAsync().ConfigureAwait(false); } catch (Exception error) { cancellationFailure = error; }
         var publicationStop = _publication.DisposeAsync().AsTask(); Task attempt;
-        var catalogStop = _catalog?.DisposeAsync().AsTask() ?? Task.CompletedTask;
+        var generationStop = _generations?.DisposeAsync().AsTask() ?? Task.CompletedTask;
         lock (_gate) attempt = _attempt ?? Task.CompletedTask;
-        var joined = Task.WhenAll(publicationStop, catalogStop, attempt);
+        var joined = Task.WhenAll(publicationStop, generationStop, attempt);
         try { await joined.ConfigureAwait(false); }
         catch { if (joined.Exception is not null) throw joined.Exception; throw; }
+        if (_catalog is not null) await _catalog.DisposeAsync().ConfigureAwait(false); // All borrowers and their actual I/O have joined first.
         if (cancellationFailure is not null) throw new AggregateException("Library setup cancellation needs attention; retain its borrowed owners.", cancellationFailure);
         _stop.Dispose(); lock (_gate) { _exitConfirmed = true; _activity = new(InitialLibraryPublicationStage.Stopped, null, false); }
     }

@@ -1,5 +1,35 @@
 # MPA 0.6.0 implementation ledger
 
+## Automatic engine generation catch-up
+
+Production DesktopWebRuntime now composes CatalogGenerationRuntime into the engine-owned
+publication runtime. Original active captures resume before any new input selection.
+Bounded local input hints compare indexed discovery/configuration revisions, source
+coverage/progress and semantic authority without enumerating photo facts or subscribing
+to the whole library. Published hints reconstruct the exact retained signed coverage
+root/pages from original outbox bytes after private snapshot deletion. Hints only schedule:
+even unchanged-ready admission performs actual cloud/history reconciliation again.
+
+Changed observations run real preparation/publication/completion/retirement, then compare
+again so imports arriving during an upload receive their next generation. Committed source
+steps emit owned notifications, including coverage-only completion/failure without a changed
+photo revision. The publication runtime coalesces request versions and joins predecessor
+tasks, preserving late wake-ups and explicit attention retries. Browser cancellation cannot
+own admitted work. Generation borrowers retire before their current reconciler and keys.
+No notification silently dismisses approval or recovery attention.
+
+Six focused integration cases pass for unchanged suppression with an actual remote outage,
+imports during a commit, recreated-owner frozen recovery, browser-independent engine setup,
+real coverage-only source progress, and joined engine shutdown. Existing setup/history/retry
+regressions also pass. One new fixture initially omitted its empty source-page response;
+the corrected typed fixture passes without changing production checks or old assertions.
+All 321 Core, 269 AppServices, 26 Web and 77 Protocol cases pass on frozen binaries.
+All five strict test/Desktop Release builds have zero warnings/errors; complete final
+logs are clean and component hashes match every output. Exact parent 0ac9ca3 also passed
+every required CI job across four desktop platforms and Android APIs 29/35/37.
+Per-object full scans still need scale optimization; renewed-access recovery and the
+remaining release features are not claimed complete.
+
 ## Verified publisher completion and private snapshot retirement
 
 Processor schema 12 transactionally rebuilds both capture and its FK publication child,
