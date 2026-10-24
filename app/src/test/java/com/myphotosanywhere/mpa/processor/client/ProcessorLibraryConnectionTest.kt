@@ -58,8 +58,8 @@ class ProcessorLibraryConnectionTest {
         override suspend fun account(): ProcessorLibraryAccount { accountReads++; return ProcessorLibraryAccount(account,email) }
         override suspend fun workspace(id: String): ProcessorLibraryWorkspace { assertEquals(folder.id, id); read?.invoke(); return folder }
     }
-    private fun store(capacity: Capacity = Capacity()) = ProcessorLibraryPinStore(context, StorageBudget(capacity))
-    private fun sql(owner: ProcessorLibraryPinStore, command: String) {
+    private fun store(capacity: Capacity = Capacity()) = ProcessorLibraryStateStore(context, StorageBudget(capacity))
+    private fun sql(owner: ProcessorLibraryStateStore, command: String) {
         SQLiteDatabase.openDatabase(File(owner.directory,"connection.sqlite").absolutePath, null, SQLiteDatabase.OPEN_READWRITE).use { it.execSQL(command) }
     }
 
@@ -109,7 +109,7 @@ class ProcessorLibraryConnectionTest {
             val client = ProcessorLibraryConnection(pins,Reader(descriptor)); client.approve(client.review(descriptor.encode()),descriptor.documentSha256)
             assertEquals("synthetic@example.invalid",pins.registration()?.account?.email)
             SQLiteDatabase.openDatabase(File(pins.directory,"connection.sqlite").absolutePath,null,SQLiteDatabase.OPEN_READONLY).use { database ->
-                assertEquals(2,database.version)
+                assertEquals(3,database.version)
                 database.rawQuery("SELECT value FROM client_meta WHERE key='approved_pin_sha256'",null).use { row -> assertTrue(row.moveToFirst()); assertEquals(descriptor.documentSha256,row.getString(0)) }
             }
         } finally { pins.close() }

@@ -1,5 +1,47 @@
 # MPA 0.6.0 implementation ledger
 
+## Native controller authority history
+
+The native Drive-only client now has a private signed-controller journal alongside its
+approved connection and credential selector. Its serialized state owner has a preserving
+schema 1/2-to-3 migration; legacy Room12 and Processor13 remain unchanged. Migration
+requires the existing storage safety margin before schema writes. Existing pins/accounts
+survive migration, and missing selectors require fresh account approval before reception.
+
+Only the independently approved controller key/library/epoch can authorize publisher and
+source policies. Actual signed bytes and their digest are immutable, with one global
+sequence across both roles. Exact replay is idempotent; older arrivals cannot rewind a
+selection, including a publisher revocation. Current selections must name each role's
+highest accepted sequence. Missing anchors/evidence, changed digests, invalid saved
+signatures and rewound pointers stop the client. Neither parsing nor this journal grants
+device signing authority, original-file permission or catalog activation.
+
+Source history accepts either arrival order: neighboring signed revisions must be
+nondecreasing, and equal revisions require exactly the same canonical payload. A changed
+source binding cannot reuse a revision. Conflicts, failed SQLite transactions, cancellation
+and insufficient space preserve accepted state. History admits at most 4096 bounded signed
+documents, with no truncation or increased protocol limits. Retention/ack compaction and
+complete/current Drive observations still need implementation; this local journal alone
+cannot establish current cloud authority or activate a received catalog.
+
+The first candidate passes 25 focused SQLite cases, including eleven new signed-history
+cases. Corrected final validation passes all602 JVM/Robolectric cases across109 suites,
+zero lint issues and both app/native-test APK builds. Thirteen journal cases include fresh-
+account and cancellation regressions. Two additional actual-emulator journal/migration
+cases compile into the APK; no local AVD is available, so their execution remains required
+in exact-source CI. Eight screenshot utility tests also pass. Complete hashes, archived
+reports/logs, source/APK identities and explicit limits are retained in
+preflight-060/native-controller-journal-validation.json. The only diagnostic is the already
+approved exact AGP setVisible deprecation. No old assertion or warning policy changed.
+
+Exact parent3315b6d23e359bdd0d7c39a4da1c5ee784d810a1 now passes Android40130917688,
+all three Native40130917780 API29/35/37 jobs (164 cases each), and all12 cross-platform
+Protocol40130917706 jobs. Native setup/UI cases actually ran. Its nine new screenshots were
+written app-private and escaped the existing artifact collector, so no visual acceptance
+is claimed from those missing images. The corrected helper exports the same captured
+frame through the existing bounded MediaStore writer/readback; all nine images are now
+required by the native evidence map. Exact-source CI must prove that corrected collection.
+
 ## Native shared-library setup and foreground consent ownership
 
 Settings now includes a native Shared library destination without changing existing

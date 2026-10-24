@@ -49,7 +49,7 @@ internal class ProcessorLibraryConnectionReview internal constructor(
 /** A decoded code is merely a preview. Actual account/workspace reads are repeated
  * after the human approves its exact digest and before the immutable local pin commits.
  * This grants no device signing authority and does not activate a catalog. */
-internal class ProcessorLibraryConnection(private val pins: ProcessorLibraryPinStore, private val reader: ProcessorLibraryConnectionReader) {
+internal class ProcessorLibraryConnection(private val pins: ProcessorLibraryStateStore, private val reader: ProcessorLibraryConnectionReader) {
     suspend fun review(code: String): ProcessorLibraryConnectionReview {
         val descriptor = LibraryConnectionDescriptor.decode(code)
         val observed = observe(descriptor)

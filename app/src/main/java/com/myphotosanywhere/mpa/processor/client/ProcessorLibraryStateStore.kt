@@ -22,10 +22,10 @@ internal class ProcessorClientStorageUnavailable(cause: Exception? = null) : IOE
 internal class ProcessorLibraryStateCorrupt(message: String, cause: Exception? = null) : IllegalStateException(message,cause)
 internal data class ProcessorLibraryRegistration(val descriptor: LibraryConnectionDescriptor, val account: ProcessorLibraryAccount?)
 
-/** Serialized nontransferable public trust and credential-selector owner. A selector is
+/** Serialized nontransferable public trust, credential selector and signed-history owner. A selector is
  * an email, NEVER a token or authority: every Google connection still verifies permission
  * ID. Each operation joins SQLite work; close joins even from canceled callers. */
-internal class ProcessorLibraryPinStore(context: Context, private val storage: StorageBudget, stateDirectory: File? = null) {
+internal class ProcessorLibraryStateStore(context: Context, private val storage: StorageBudget, stateDirectory: File? = null) {
     private val application = context.applicationContext
     internal val directory = stateDirectory ?: File(application.noBackupFilesDir, "processor-client")
     init {
@@ -74,8 +74,9 @@ internal class ProcessorLibraryPinStore(context: Context, private val storage: S
         mutex.withLock { if (!closed) { helper?.close(); helper = null; closed = true } }
     }
 
-    private fun requireWriteBudget() {
-        try { storage.requireBytes(directory, WRITE_RESERVE, "Insufficient processor client state capacity.") }
+    internal fun requireWriteBudget(extraBytes: Long = 0) {
+        require(extraBytes in 0L..(3L * 256 * 1024 + 65536))
+        try { storage.requireBytes(directory, Math.addExact(WRITE_RESERVE,extraBytes), "Insufficient processor client state capacity.") }
         catch (error: IllegalArgumentException) { throw ProcessorClientStorageUnavailable(error) }
     }
     private suspend fun <T> access(action: suspend (SQLiteDatabase) -> T): T = withContext(Dispatchers.IO) {
@@ -86,7 +87,7 @@ internal class ProcessorLibraryPinStore(context: Context, private val storage: S
                 if (!directory.isDirectory && !directory.mkdirs()) throw ProcessorClientStorageUnavailable()
                 val path = File(directory,"connection.sqlite")
                 if (!path.exists()) requireWriteBudget()
-                PinDatabase(application,path.absolutePath).also { helper = it }
+                PinDatabase(application,path.absolutePath) { requireWriteBudget() }.also { helper = it }
             }
             action(owner.writableDatabase)
         }
@@ -107,12 +108,25 @@ internal class ProcessorLibraryPinStore(context: Context, private val storage: S
         state(account == null || pin != null && account.id == pin.workspace.accountId,"Saved Google account disagrees with accepted library trust.")
         return pin?.let { ProcessorLibraryRegistration(it,account) }
     }
+    internal suspend fun <T> controllerTransaction(action: (SQLiteDatabase,ProcessorLibraryRegistration)->T): T = access { database ->
+        database.beginTransaction()
+        try {
+            val registration = readRegistration(database) ?: throw IOException("Approve this device's library connection before reading shared policies.")
+            val result = action(database,registration)
+            currentCoroutineContext().ensureActive()
+            database.setTransactionSuccessful()
+            result
+        } finally { database.endTransaction() }
+    }
+    private fun hasControllerState(database: SQLiteDatabase): Boolean =
+        database.rawQuery("SELECT 1 FROM controller_anchor UNION ALL SELECT 1 FROM controller_document UNION ALL SELECT 1 FROM controller_selection UNION ALL SELECT 1 FROM client_meta WHERE key='controller_anchor_sha256' LIMIT 1",null).use { it.moveToFirst() }
+
     private fun readPin(database: SQLiteDatabase): LibraryConnectionDescriptor? {
         val marker = database.rawQuery("SELECT length(value),value FROM client_meta WHERE key='approved_pin_sha256'",null).use { row ->
             if (!row.moveToFirst()) null else { state(row.getLong(0) == 64L,"Approved pin marker is corrupt."); row.getString(1) }
         }
         val encoded = database.rawQuery("SELECT length(code),length(document_sha256) FROM approved_pin WHERE singleton=1",null).use { row ->
-            if (!row.moveToFirst()) { state(marker == null,"Accepted library pin is missing; never recreate trust over accepted state."); return null }
+            if (!row.moveToFirst()) { state(marker == null && !hasControllerState(database),"Accepted library pin is missing; never recreate trust over accepted state."); return null }
             state(row.getLong(0) in 1L..LibraryConnectionDescriptor.MAX_CODE_CHARACTERS.toLong() && row.getLong(1) == 64L,"Approved library pin exceeds its bounds.")
             database.rawQuery("SELECT code,document_sha256 FROM approved_pin WHERE singleton=1",null).use { content ->
                 state(content.moveToFirst(),"Approved library pin changed during its owned read."); content.getString(0) to content.getString(1)
@@ -124,15 +138,26 @@ internal class ProcessorLibraryPinStore(context: Context, private val storage: S
         return descriptor
     }
     private fun state(valid: Boolean, message: String) { if (!valid) throw ProcessorLibraryStateCorrupt(message) }
-    private class PinDatabase(context: Context, path: String) : SQLiteOpenHelper(context,path,null,2) {
+    private class PinDatabase(context: Context, path: String, private val requireMigrationBudget: () -> Unit) : SQLiteOpenHelper(context,path,null,3) {
         override fun onCreate(database: SQLiteDatabase) {
             database.execSQL("CREATE TABLE approved_pin(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),code TEXT NOT NULL CHECK(length(code) BETWEEN 1 AND 4096),document_sha256 TEXT NOT NULL CHECK(length(document_sha256)=64))")
             database.execSQL("CREATE TABLE client_meta(key TEXT NOT NULL PRIMARY KEY,value TEXT NOT NULL)")
             createSelector(database)
+            createControllerJournal(database)
         }
+        override fun onConfigure(database: SQLiteDatabase) { database.setForeignKeyConstraintsEnabled(true) }
         override fun onUpgrade(database: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            if (oldVersion == 1 && newVersion == 2) createSelector(database)
-            else error("Unsupported processor client pin schema upgrade: $oldVersion to $newVersion. Accepted state was preserved.")
+            if (oldVersion !in 1..2 || newVersion != 3)
+                error("Unsupported processor client state upgrade: $oldVersion to $newVersion. Accepted state was preserved.")
+            requireMigrationBudget()
+            if (oldVersion == 1) createSelector(database)
+            createControllerJournal(database)
+        }
+        private fun createControllerJournal(database: SQLiteDatabase) {
+            database.execSQL("CREATE TABLE controller_anchor(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),connection_sha256 TEXT NOT NULL CHECK(length(connection_sha256)=64))")
+            database.execSQL("CREATE TABLE controller_document(sequence INTEGER NOT NULL PRIMARY KEY CHECK(sequence>0),kind TEXT NOT NULL CHECK(kind IN ('library-publisher-authorization','library-source-configuration')),envelope BLOB NOT NULL CHECK(length(envelope) BETWEEN 1 AND 262144),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")
+            database.execSQL("CREATE INDEX controller_document_kind_sequence ON controller_document(kind,sequence)")
+            database.execSQL("CREATE TABLE controller_selection(kind TEXT NOT NULL PRIMARY KEY CHECK(kind IN ('library-publisher-authorization','library-source-configuration')),sequence INTEGER NOT NULL REFERENCES controller_document(sequence) ON DELETE RESTRICT)")
         }
         private fun createSelector(database: SQLiteDatabase) {
             database.execSQL("CREATE TABLE credential_selector(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),account_id TEXT NOT NULL CHECK(length(account_id) BETWEEN 1 AND 256),email TEXT NOT NULL CHECK(length(email) BETWEEN 1 AND 320))")

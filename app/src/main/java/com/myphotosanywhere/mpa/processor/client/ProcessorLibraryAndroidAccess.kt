@@ -74,8 +74,8 @@ internal class ProcessorLibraryAndroidAccess(context: Context) : ProcessorLibrar
             pins.registration() ?: throw ProcessorLibraryStateCorrupt("Approved library registration disappeared after its commit.")
         }
     }
-    private suspend fun <T> withPins(action: suspend (ProcessorLibraryPinStore) -> T): T {
-        val owner = ProcessorLibraryPinStore(application,budget)
+    private suspend fun <T> withPins(action: suspend (ProcessorLibraryStateStore) -> T): T {
+        val owner = ProcessorLibraryStateStore(application,budget)
         try { return action(owner) } finally { owner.close() }
     }
 }

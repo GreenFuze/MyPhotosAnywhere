@@ -1,6 +1,5 @@
 package com.myphotosanywhere.mpa.processor.client
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,9 +18,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.myphotosanywhere.mpa.NativeScreenshotEvidence
 import com.myphotosanywhere.mpa.processor.protocol.CatalogWorkspace
 import com.myphotosanywhere.mpa.processor.protocol.LibraryConnectionDescriptor
-import java.io.File
 import java.security.KeyPairGenerator
 import java.security.spec.ECGenParameterSpec
 import java.util.UUID
@@ -40,9 +39,8 @@ class ProcessorLibraryUiDeviceTest {
     private data class Presentation(val dark: Boolean=false,val rtl: Boolean=false,val large: Boolean=false)
     private fun screenshot(label: String) {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
-        val directory=File(checkNotNull(context.getExternalFilesDir(null)),"screenshots").apply { check(isDirectory || mkdirs()) }
         val bitmap=compose.onRoot().captureToImage().asAndroidBitmap()
-        try { File(directory,"processor-$label.png").outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it)) } }
+        try { NativeScreenshotEvidence(context).write("processor-$label",bitmap) }
         finally { bitmap.recycle() }
     }
     @Test fun allPresentationsRequireAnAccessibleExplicitApproval() {

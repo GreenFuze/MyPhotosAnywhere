@@ -39,11 +39,11 @@ class ProcessorLibraryConnectionDeviceTest {
     }
 
     @Test fun actualPrivateSqliteApprovalAndRecreationPreserveTheSamePinAndOriginalBytes() = runBlocking<Unit> {
-        val directory = directory(); val descriptor = descriptor(); var pins = ProcessorLibraryPinStore(context,StorageBudget(context),directory)
+        val directory = directory(); val descriptor = descriptor(); var pins = ProcessorLibraryStateStore(context,StorageBudget(context),directory)
         try {
             val client = ProcessorLibraryConnection(pins,Reader()); val review = client.review(descriptor.encode())
             assertNull(pins.current()); val original = File(directory,"preserved-original.jpg").apply { writeBytes(byteArrayOf(4,3,2,1)) }
-            client.approve(review,descriptor.documentSha256); pins.close(); pins = ProcessorLibraryPinStore(context,StorageBudget(context),directory)
+            client.approve(review,descriptor.documentSha256); pins.close(); pins = ProcessorLibraryStateStore(context,StorageBudget(context),directory)
             val recreated = ProcessorLibraryConnection(pins,Reader())
             assertEquals(descriptor.encode(),pins.current()?.encode())
             assertEquals(descriptor.encode(),recreated.approve(recreated.review(descriptor.encode()),descriptor.documentSha256).encode())
@@ -52,7 +52,7 @@ class ProcessorLibraryConnectionDeviceTest {
     }
 
     @Test fun canceledOwnerCleanupActuallyClosesAndMissingAcceptedNativePinFailsFast() = runBlocking<Unit> {
-        val directory = directory(); val descriptor = descriptor(); var pins = ProcessorLibraryPinStore(context,StorageBudget(context),directory)
+        val directory = directory(); val descriptor = descriptor(); var pins = ProcessorLibraryStateStore(context,StorageBudget(context),directory)
         try {
             val client = ProcessorLibraryConnection(pins,Reader()); client.approve(client.review(descriptor.encode()),descriptor.documentSha256)
             supervisorScope {
@@ -62,7 +62,7 @@ class ProcessorLibraryConnectionDeviceTest {
                 finally { owner.cancel(); try { owner.await(); fail("Canceled caller completed") } catch (_: CancellationException) { } }
             }
             try { pins.current(); fail("Canceled cleanup retained its SQLite owner") } catch (_: IllegalStateException) { }
-            pins = ProcessorLibraryPinStore(context,StorageBudget(context),directory)
+            pins = ProcessorLibraryStateStore(context,StorageBudget(context),directory)
             assertEquals(descriptor.encode(),pins.current()?.encode())
             SQLiteDatabase.openDatabase(File(directory,"connection.sqlite").absolutePath,null,SQLiteDatabase.OPEN_READWRITE).use { it.execSQL("DELETE FROM approved_pin") }
             try { pins.current(); fail("Missing accepted root was treated as fresh setup") } catch (_: IllegalStateException) { }
