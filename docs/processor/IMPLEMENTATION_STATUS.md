@@ -1,5 +1,39 @@
 # MPA 0.6.0 implementation ledger
 
+## Native bounded Google Drive workspace reads
+
+The catalog consumer now has a Google-only transport over the captured account gateway.
+It lists all metadata workspace children, including binary compressed chunks, with
+explicit bounded page tokens and incomplete-search rejection. Owned immutable metadata
+observations retain actual account/workspace/parent/version/MIME/length/checksum and
+availability. An old observed candidate cannot be silently substituted before its read.
+
+Reads verify actual Google identity and workspace membership before/after transfer.
+Original media MIME types, unavailable download permissions, foreign references, workspace
+aliases, changed revisions/principals, partial responses, truncation, overflow and wrong
+hashes fail while preserving the caller's previous content. Every request is GET-only.
+Account/file replies are bounded at 16KiB, pages at 1MiB/100 rows, JSON metadata at 256KiB
+and compressed objects at 4MiB. Provider error bodies are not consumed without bounds.
+Metadata JSON parses on I/O; body hashing runs off the UI dispatcher. No local original
+copy, image mutation or phone-to-desktop endpoint is introduced.
+
+The candidate's ten real HTTP fixture cases passed but review found caller-dispatcher
+parsing and account-body bounds gaps. The corrected twelve cases also verify denied
+reads, oversized account responses and ownership of immutable page data. Cross-thread
+fixture changes use safe publication; their HTTP pools/dispatchers actually retire.
+Full corrected regression passes all614 cases across110 suites, zero lint issues and
+both APK builds. Complete source/report/APK hashes and retained logs are recorded in
+preflight-060/native-workspace-objects-validation.json. The only upstream diagnostic
+remains the approved exact AGP setVisible call; no old assertions or warning policy changed.
+Legacy Room12, Processor13 and private native client schema3 are unchanged.
+
+This boundary supplies transport evidence and is not yet wired into runtime catalog
+activation. The next consumer owner must durably fence each incomplete inventory and
+retain candidates before downloading, reconcile changes, validate ancestry/coverage/full
+facts and atomically activate a staged generation. Live Google/native consent, API latency,
+S23 acceptance and the full joint release remain unverified. Per-object principal checks
+still need measured API-latency acceptance; correctness is not a performance claim.
+
 ## Native controller authority history
 
 The native Drive-only client now has a private signed-controller journal alongside its
