@@ -24,12 +24,23 @@ public sealed class WorkerProcessFailedException(int exitCode) : IOException("Fi
 public sealed record WorkerProcessFailure(Exception Primary, ReadOnlyCollection<Exception> Secondary);
 public sealed record WorkerTerminationObservation(int ProcessId, bool? NativeExitObserved, string? NativeObservationError,
     TaskStatus ExitBeforeNativeCheck, TaskStatus ExitAfterNativeCheck, TaskStatus Frames, TaskStatus Diagnostics,
-    TaskStatus Monitor, TaskStatus Supervision, long MillisecondsAfterKill);
+    TaskStatus Monitor, TaskStatus Supervision, long MillisecondsAfterKill)
+{
+    public long? MillisecondsSinceNativeSignal { get; init; }
+    public long? MillisecondsSinceExitEvent { get; init; }
+    public int DiagnosticReadStage { get; init; }
+    public int PoolThreads { get; init; }
+    public int AvailablePoolWorkers { get; init; }
+    public long PendingPoolWork { get; init; }
+}
 public sealed class WorkerTerminationTimeoutException(WorkerTerminationObservation observation, TimeoutException inner)
     : TimeoutException("Worker termination deadline expired; ownership is retained. Native exit=" + observation.NativeExitObserved +
         ", exit task=" + observation.ExitBeforeNativeCheck + "->" + observation.ExitAfterNativeCheck +
         ", frames=" + observation.Frames + ", diagnostics=" + observation.Diagnostics + ", monitor=" + observation.Monitor +
-        ", supervision=" + observation.Supervision + ", elapsed after kill=" + observation.MillisecondsAfterKill + "ms.", inner)
+        ", supervision=" + observation.Supervision + ", elapsed after kill=" + observation.MillisecondsAfterKill +
+        "ms, native signal age=" + observation.MillisecondsSinceNativeSignal + "ms, exit event age=" + observation.MillisecondsSinceExitEvent +
+        "ms, diagnostic stage=" + observation.DiagnosticReadStage + ", pool threads=" + observation.PoolThreads +
+        ", available workers=" + observation.AvailablePoolWorkers + ", pending work=" + observation.PendingPoolWork + ".", inner)
 {
     public WorkerTerminationObservation Observation { get; } = observation;
 }
@@ -50,6 +61,10 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     private readonly Task _framePump;
     private readonly Task _diagnosticPump;
     private readonly Task _processExit;
+    private readonly EventHandler _exitObserver;
+    private long _nativeExitObservedTicks;
+    private long _exitEventObservedTicks;
+    private int _diagnosticReadStage;
     private readonly Task _resourceMonitor;
     private readonly CancellationTokenSource _stopMonitoring = new();
     private readonly TaskCompletionSource _ownershipReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -85,6 +100,10 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         _process = process; _executableLease = executableLease; _parent = parent;
         ProcessId = process.Id;
         _writer = new WorkerFrameWriter(process.StandardInput.BaseStream);
+        // Diagnostic observation only; this event never completes an ownership task
+        // or permits release of native/process/pipe resources.
+        _exitObserver = (_, _) => Interlocked.CompareExchange(ref _exitEventObservedTicks, Stopwatch.GetTimestamp(), 0);
+        process.Exited += _exitObserver;
         _processExit = process.WaitForExitAsync();
         _framePump = PumpFramesAsync();
         _diagnosticPump = PumpDiagnosticsAsync(diagnostics);
@@ -211,16 +230,23 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
                 var buffer = new byte[4096];
                 long total = 0;
                 int count;
-                while ((count = await input.ReadAsync(buffer).ConfigureAwait(false)) != 0)
+                while (true)
                 {
+                    Volatile.Write(ref _diagnosticReadStage, 1); // Actual pipe read outstanding.
+                    count = await input.ReadAsync(buffer).ConfigureAwait(false);
+                    if (count == 0) break;
+                    Volatile.Write(ref _diagnosticReadStage, 2); // Actual diagnostic file write outstanding.
                     await destination.WriteAsync(buffer.AsMemory(0, count)).ConfigureAwait(false);
                     total += count;
                     if (total > 8 * 1024 * 1024) throw new InvalidDataException("Worker exceeded its diagnostic budget; evidence retained and work stopped.");
                 }
+                Volatile.Write(ref _diagnosticReadStage, 3);
                 await destination.FlushAsync().ConfigureAwait(false);
+                Volatile.Write(ref _diagnosticReadStage, 4); // Awaiting the real file-owner disposal.
             }
-            catch (Exception error) { RecordFault(error); throw; }
+            catch (Exception error) { Volatile.Write(ref _diagnosticReadStage, -1); RecordFault(error); throw; }
         }
+        Volatile.Write(ref _diagnosticReadStage, 5);
     }
 
     private async Task SuperviseAsync()
@@ -335,9 +361,16 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
             {
                 var before = _processExit.Status; bool? exited = null; string? nativeError = null;
                 try { exited = _process.HasExited; } catch (Exception observationError) { nativeError = observationError.GetType().Name; }
+                ThreadPool.GetAvailableThreads(out var available, out _);
                 throw new WorkerTerminationTimeoutException(new(ProcessId, exited, nativeError, before, _processExit.Status,
                     _framePump.Status, _diagnosticPump.Status, _resourceMonitor.Status, Completion.Status,
-                    (long)Stopwatch.GetElapsedTime(killed).TotalMilliseconds), error);
+                    (long)Stopwatch.GetElapsedTime(killed).TotalMilliseconds)
+                {
+                    MillisecondsSinceNativeSignal = SignalAge(Interlocked.Read(ref _nativeExitObservedTicks)),
+                    MillisecondsSinceExitEvent = SignalAge(Interlocked.Read(ref _exitEventObservedTicks)),
+                    DiagnosticReadStage = Volatile.Read(ref _diagnosticReadStage), PoolThreads = ThreadPool.ThreadCount,
+                    AvailablePoolWorkers = available, PendingPoolWork = ThreadPool.PendingWorkItemCount
+                }, error);
             }
         }
     }
@@ -351,7 +384,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
             // notification. The zero-time native wait checks the actual signal and
             // raises the existing exit event; its result NEVER substitutes for joining
             // the original async owner or any pipe/monitor task. Deadlines stay fixed.
-            _ = _process.WaitForExit(0);
+            if (_process.WaitForExit(0)) Interlocked.CompareExchange(ref _nativeExitObservedTicks, Stopwatch.GetTimestamp(), 0);
             var remaining = timeout - Stopwatch.GetElapsedTime(started);
             if (remaining <= TimeSpan.Zero && !_processExit.IsCompleted) throw new TimeoutException("Actual worker exit-task join exceeded its termination deadline.");
             if (_processExit.IsCompleted) break;
@@ -359,6 +392,8 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
         }
         await _processExit.ConfigureAwait(false);
     }
+
+    private static long? SignalAge(long ticks) => ticks == 0 ? null : (long)Stopwatch.GetElapsedTime(ticks).TotalMilliseconds;
 
     /// <summary>Recovery owner uses this if the bounded stop could not confirm exit. Keep the
     /// controller/reader leases alive and refuse clean Exit until this actual join completes.</summary>
@@ -402,7 +437,8 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
                 throw new InvalidOperationException("Cannot release worker resources before actual exit, writes, pipe pumps and monitoring have joined.");
             _resourcesReleased = true;
             var failures = new List<Exception>();
-            foreach (var close in new Action[] { _parent.Dispose, _writer.Dispose, _stopReading.Dispose, _stopMonitoring.Dispose, _process.Dispose, _executableLease.Dispose })
+            foreach (var close in new Action[] { _parent.Dispose, _writer.Dispose, _stopReading.Dispose, _stopMonitoring.Dispose,
+                () => _process.Exited -= _exitObserver, _process.Dispose, _executableLease.Dispose })
                 try { close(); } catch (Exception error) { failures.Add(error); }
             if (failures.Count != 0) { _releaseError = new AggregateException("Worker resource cleanup failed.", failures); throw _releaseError; }
         }
