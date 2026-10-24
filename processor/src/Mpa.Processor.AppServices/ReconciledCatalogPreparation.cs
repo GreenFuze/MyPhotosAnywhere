@@ -143,16 +143,25 @@ public sealed partial class LocalCatalogReconciliationService
             if (assets != plan.Basis.Snapshot.Assets) throw new CatalogGenerationCaptureConflictException();
         }
 
+        private Task<CatalogDependencyReference?> ReadDependencySelectionAsync(WorkspacePublicationScope scope, string file, CancellationToken token) =>
+            owner._state.ExecuteAsync(database => new CatalogDependencyReferenceRepository(database, owner._budget).ForFile(scope, file), token);
+
         private sealed class PreparedObjectSource(Scan scan, WorkspacePublicationScope scope, WorkspacePublicationInventory inventory) : ICatalogObjectSource
         {
-            public Task<ReadOnlyMemory<byte>> ReadAsync(CatalogObjectReference reference, CancellationToken cancellationToken)
+            public async Task<ReadOnlyMemory<byte>> ReadAsync(CatalogObjectReference reference, CancellationToken cancellationToken)
             {
                 var work = inventory.Objects.SingleOrDefault(item => item.FileId == reference.FileId);
-                if (work is null || work.Scope != scope || work.Bytes != reference.Bytes || work.Sha256 != reference.Sha256 || work.VerifiedVersion is null ||
+                if (work is not null && work.Scope != scope)
+                {
+                    var selected = await scan.ReadDependencySelectionAsync(scope, reference.FileId, cancellationToken).ConfigureAwait(false);
+                    if (selected?.OriginalPublicationId != work.Id || selected.Bytes != reference.Bytes || selected.Sha256 != reference.Sha256 ||
+                        selected.Role != work.Role || selected.MimeType != work.MimeType) throw new WorkspaceObservationConflictException();
+                }
+                if (work is null || work.Bytes != reference.Bytes || work.Sha256 != reference.Sha256 || work.VerifiedVersion is null ||
                     work.Role is not ("facts-index" or "facts-chunk" or "coverage-root" or "coverage-page") ||
                     !scan._observed.TryGetValue(reference.FileId, out var actual) || (actual.MimeType ?? "application/json") != work.MimeType)
                     throw new WorkspaceObservationConflictException();
-                return scan.ReadAsync(reference, cancellationToken);
+                return await scan.ReadAsync(reference, cancellationToken).ConfigureAwait(false);
             }
         }
     }

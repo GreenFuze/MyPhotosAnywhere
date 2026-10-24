@@ -196,8 +196,14 @@ public sealed partial class CatalogGenerationCaptureRepository
         using (var query = Command(transaction, "SELECT id FROM workspace_publication WHERE account_id=$account AND file_id=$file", ("$account", reference.AccountId), ("$file", reference.FileId)))
             id = query.ExecuteScalar() is string value ? ParseId(value) : throw new InvalidDataException("Prepared dependency has no retained outbox owner.");
         var record = new WorkspacePublicationRepository(_database, _budget).Read(id, transaction) ?? throw new InvalidDataException("The dependency outbox disappeared.");
-        if (record.Scope != capture.Scope || record.Role != role || record.MimeType != "application/json" || record.VerifiedVersion is null ||
-            record.Sha256 != reference.Sha256 || record.Payload.Length != reference.Bytes) throw new InvalidDataException("Prepared dependency changed its exact generation, role, receipt or immutable bytes.");
+        if (record.Role != role || record.MimeType != "application/json" || record.VerifiedVersion is null ||
+            record.Sha256 != reference.Sha256 || record.Payload.Length != reference.Bytes) throw new InvalidDataException("Prepared dependency changed its role, receipt or immutable bytes.");
+        if (record.Scope != capture.Scope)
+        {
+            var selected = new CatalogDependencyReferenceRepository(_database, _budget).ForFile(capture.Scope, reference.FileId, transaction);
+            if (selected?.OriginalPublicationId != record.Id || selected.Role != role || selected.Bytes != reference.Bytes || selected.Sha256 != reference.Sha256)
+                throw new InvalidDataException("Prepared dependency has no exact immutable selection for this generation.");
+        }
     }
     private static void AssertIntent(CatalogGenerationCapture capture, CapturedCatalogCommitPlan plan, ProtocolSigningIntent intent)
     {

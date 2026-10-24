@@ -61,9 +61,10 @@ jobs:
             dotnet restore $mpaProject.Path --locked-mode *> "build/protocol-tests/$mpaName-restore.log"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $mpaArguments = @($mpaProject.Path, '--no-restore', '-c', 'Release', '--logger', "trx;LogFileName=$mpaName.trx", '--results-directory', 'build/protocol-tests')
-            # Every existing assertion remains in this job. The new publication
-            # measurements run in the mandatory scale matrix below on this same SHA.
-            if ($mpaName -eq 'setup') { $mpaArguments += @('--filter', 'TestCategory!=LargeCatalogPublication') }
+            # Every pre-existing assertion remains here. The newly added publication
+            # measurements and immutable-reuse cases have separate mandatory matrices
+            # on this same SHA; none is dropped or made optional.
+            if ($mpaName -eq 'setup') { $mpaArguments += @('--filter', 'TestCategory!=LargeCatalogPublication&TestCategory!=ImmutableDependencyReuse') }
             dotnet test @mpaArguments *> "build/protocol-tests/$mpaName-test.log"
             $mpaContractExit = $LASTEXITCODE
             Get-Content "build/protocol-tests/$mpaName-test.log"
@@ -138,5 +139,64 @@ jobs:
         with:
           name: processor-catalog-scale-${{ matrix.runner }}
           path: processor/build/catalog-scale/
+          if-no-files-found: error
+          retention-days: 14
+  dependency-references:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: true
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    # Only the thirteen NEW immutable-reference cases run here. The preceding
+    # Windows regression matrix took 28m13s; preserve its existing 30m budget and
+    # every old assertion while adding these required native cases separately.
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.303'
+      - name: Locked immutable-reference recovery and preservation assertions
+        working-directory: processor
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force build/catalog-reference | Out-Null
+          $mpaProject = 'tests/Mpa.Processor.AppServices.Tests/Mpa.Processor.AppServices.Tests.csproj'
+          dotnet restore $mpaProject --locked-mode *> build/catalog-reference/restore.log
+          if ($LASTEXITCODE -ne 0) { Get-Content build/catalog-reference/restore.log; exit $LASTEXITCODE }
+          dotnet test $mpaProject --no-restore -c Release --filter 'TestCategory=ImmutableDependencyReuse' --logger 'trx;LogFileName=reference.trx' --results-directory build/catalog-reference *> build/catalog-reference/test.log
+          $mpaTestExit = $LASTEXITCODE
+          Get-Content build/catalog-reference/test.log
+          if ($mpaTestExit -ne 0) { exit $mpaTestExit }
+          $mpaDiagnostic = Get-ChildItem build/catalog-reference/*.log | Select-String -Pattern '\bwarning\b|\berror\s+[A-Z]+\d+\s*:'
+          if ($mpaDiagnostic) { $mpaDiagnostic; throw 'Reference diagnostics are blocking.' }
+          [xml]$mpaTrx = Get-Content build/catalog-reference/reference.trx
+          $mpaSummary = $mpaTrx.TestRun.ResultSummary
+          if ($mpaSummary.outcome -ne 'Completed' -or $mpaSummary.Counters.total -ne '13' -or $mpaSummary.Counters.passed -ne '13') {
+            throw 'All thirteen immutable-reference preservation cases must pass without skips.'
+          }
+          foreach ($mpaCounter in @('failed','error','warning','notExecuted','timeout','aborted','inconclusive')) {
+            if ([int]$mpaSummary.Counters.GetAttribute($mpaCounter) -ne 0) { throw "Unresolved reference outcome: $mpaCounter" }
+          }
+          $mpaCases = @($mpaTrx.TestRun.Results.UnitTestResult | ForEach-Object {
+            if ($_.outcome -ne 'Passed') { throw 'Unpassed immutable-reference case.' }
+            @{ Name = $_.testName; Outcome = $_.outcome }
+          })
+          @{ Source = '${{ github.sha }}'; Runner = '${{ matrix.runner }}'; Cases = $mpaCases;
+             Scope = 'Actual native exact references, current owner, changed facts and signed completion with synthetic Drive; live network, UI and release acceptance remain separate.';
+             TestAssemblySha256 = (Get-FileHash tests/Mpa.Processor.AppServices.Tests/bin/Release/net10.0/Mpa.Processor.AppServices.Tests.dll -Algorithm SHA256).Hash.ToLowerInvariant() } |
+            ConvertTo-Json -Depth 12 | Set-Content build/catalog-reference/report.json -Encoding utf8
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-catalog-reference-${{ matrix.runner }}
+          path: processor/build/catalog-reference/
           if-no-files-found: error
           retention-days: 14

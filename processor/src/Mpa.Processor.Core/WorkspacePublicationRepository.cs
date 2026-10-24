@@ -30,6 +30,8 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
         if (payload.Length is < 1 or > MaximumPayloadBytes) throw new ArgumentException("A bounded metadata payload is required.", nameof(payload));
         var owned = payload.ToArray(); var hash = Hash(owned); var scopeJson = EncodeScope(scope);
         using var transaction = _database.Connection.BeginTransaction();
+        using (var selected = Command(transaction, "SELECT 1 FROM processor_meta WHERE key=$key", ("$key", "catalog_dependency_reference_v1:" + id.ToString("D"))))
+            if (selected.ExecuteScalar() is not null) throw new WorkspacePublicationConflictException();
         var existing = Read(id, transaction);
         if (existing is not null)
         {

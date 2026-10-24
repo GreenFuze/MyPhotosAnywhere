@@ -1,5 +1,58 @@
 # MPA 0.6.0 implementation ledger
 
+## Immutable cross-generation dependency references
+
+The current owner can select a byte-identical completed dependency only under its own
+actual current scan. A separate immutable local reference journal binds the receiving
+generation's deterministic dependency ID to the exact original outbox/file, role,
+encoding, size, hash and fully validated completed provenance. Selection commits before
+the actual joined read; failed reads retain that choice. Existing pending upload IDs
+always win, and an upload cannot later claim a selected reference ID.
+
+Prepared-graph and native plan checkpoints accept an earlier-generation dependency only
+through that exact bound record. Full current source, signed history, graph and final
+completion checks remain mandatory. Completion checks current observations for all
+selected references. No old scope is reopened for writing, no payload is duplicated and
+no permission to collect metadata or mutate originals is introduced. Complete historical
+native provenance is verified before selection, then its exact immutable records are
+fingerprinted to avoid recursive generation walks. Private schema 13 is unchanged.
+
+The initial new full-next-generation test correctly failed the old same-generation
+prepared gate. That failed development result remains retained. With the explicit
+journal and gates in place, all five initial actual-owner cases pass, including full
+second-generation signed completion and retirement. Expanded validation passes actual
+third-generation completion, failed-read/recreated-owner recovery, low-storage and atomic
+checkpoint rollback, damaged evidence rejection and missing-original HTTP 404 without
+substitution. Two new fixture mistakes (invalid SQL digest length and dictionary lookup
+instead of the actual transport's HTTP error) remain recorded as failed development runs;
+their setup was corrected without weakening any pre-existing assertion.
+
+Seven strict frozen Release builds have zero warnings/errors. All six full suites pass
+on the same immutable application components: 342 Core, 321 AppServices, 26 Web, 80
+Protocol, 65 Google Drive and nine LAN cases (843 total). Complete logs, TRX counters and
+matching hashes are recorded in preflight-060/dependency-reference-validation.json.
+
+An additional mixed-generation case passes full publication of new facts while reusing
+the exact two unchanged compressed partitions. All thirteen new reference cases pass
+again in that test assembly (844 unique local passing cases in total, not 856).
+Its eighth strict build preserves every application DLL byte-for-byte; no pre-existing
+test assertion changes. The supplemental evidence records both test assemblies, complete
+logs, zero bad outcome counters and application component continuity.
+
+CI puts only the thirteen newly added cases in a separate mandatory four-platform
+matrix with strict reports/counters. The existing regression matrix and its 30-minute
+budget are preserved; its preceding Windows run took 28m13s. YAML and the exact new CI
+report parser pass locally against the actual thirteen-case TRX. Fresh exact-source
+CI, cross-generation large-library measurements and release acceptance remain required.
+This is unfinished work, not release acceptance. The historical worker join blocker,
+large-library costs, retention and the remaining 0.6 feature backlog remain unresolved.
+
+The preceding exact revision 93a4b621 passed Desktop40106241655, Android40106241654,
+device40106241664 on APIs29/35/37, and Protocol40106241772 with all four regression and
+all four scale jobs. Archived reports independently match that SHA. Synthetic preparation
+on those runners took about 161–421 seconds for 10k and 171–380 seconds for 100k; this
+does not replace current-source validation or live-network/UI acceptance.
+
 ## Measured large generation preparation and immutable public keys
 
 Actual 10k/100k fixtures now run real retained SQLite capture, compressed dependencies,

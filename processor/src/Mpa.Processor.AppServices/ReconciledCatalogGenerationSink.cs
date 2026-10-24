@@ -50,12 +50,21 @@ public sealed partial class LocalCatalogReconciliationService
                 var proof = CurrentRead(current, token);
                 var generation = await _state.ExecuteAsync(database => AssertGeneration(database, proof, scope, token), token).ConfigureAwait(false);
                 var expected = new WorkspacePublicationExpectation(id, scope, role, mime, owned.Length, hash, null, null);
-                grant = new(this, proof, generation, expected);
-                // The inner uploader also validates inside its serial account lease.
-                // This private grant performs LOCAL checks only; no account reentry.
-                reference = await new CatalogGenerationWorkspaceSink(_state, _accounts, _budget, grant, scope, LocalAccessForScope(scope))
-                    .StoreAsync(role, mime, owned, token).ConfigureAwait(false);
-                afterUpload = await grant.CaptureIncrementalBaselineAsync(token).ConfigureAwait(false);
+                var reused = await ReadReusableDependencyAsync(proof, generation, expected, token).ConfigureAwait(false);
+                if (reused is not null)
+                {
+                    reference = reused;
+                    afterUpload = new(proof, generation, proof.Publications, null);
+                }
+                else
+                {
+                    grant = new(this, proof, generation, expected);
+                    // The inner uploader also validates inside its serial account lease.
+                    // This private grant performs LOCAL checks only; no account reentry.
+                    reference = await new CatalogGenerationWorkspaceSink(_state, _accounts, _budget, grant, scope, LocalAccessForScope(scope))
+                        .StoreAsync(role, mime, owned, token).ConfigureAwait(false);
+                    afterUpload = await grant.CaptureIncrementalBaselineAsync(token).ConfigureAwait(false);
+                }
             }
             catch (Exception error) { lock (_gate) _failure = error; throw; }
             finally

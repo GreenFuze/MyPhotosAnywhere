@@ -124,6 +124,13 @@ public sealed partial class CatalogGenerationCaptureRepository
                 observed.Version < record.VerifiedVersion || observed.Bytes != record.Payload.Length || observed.Sha256 != record.Sha256 ||
                 (observed.MimeType ?? "application/json") != record.MimeType) throw new WorkspaceObservationConflictException();
         }
+        foreach (var selected in new CatalogDependencyReferenceRepository(_database, _budget).ForScope(scope, transaction))
+        {
+            var original = outbox.Read(selected.OriginalPublicationId, transaction) ?? throw new WorkspacePublicationConflictException();
+            if (!known.TryGetValue(selected.FileId, out var observed) || observed.Version < original.VerifiedVersion ||
+                observed.Bytes != selected.Bytes || observed.Sha256 != selected.Sha256 ||
+                (observed.MimeType ?? "application/json") != selected.MimeType) throw new WorkspaceObservationConflictException();
+        }
         if (publication.Basis.Parent is { } parent && (!known.TryGetValue(parent.FileId, out var old) || old.Bytes != parent.Bytes || old.Sha256 != parent.Sha256 ||
             (old.MimeType ?? "application/json") != "application/json")) throw new WorkspaceObservationConflictException();
         return new(scope.GenerationId, scope, capture.SnapshotId, capture.CommitIntentId, intent.Sequence,
