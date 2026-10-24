@@ -92,10 +92,11 @@ public sealed class WorkspaceDocumentInventoryReader
         foreach (var candidate in inventory.Documents)
             if (!known.Add(candidate.FileId)) throw new InvalidDataException("Workspace inventory aliases a present or missing identity.");
         if (known.Count > MaximumDocuments * 2) throw new InvalidDataException("Workspace observation identities exceed their bound.");
-        return DrainUnchangedAsync(inventory.Cursor, known, observer, token);
+        return DrainUnchangedAsync(inventory.Cursor, known, observer, token, inventory);
     }
 
-    private async Task<DriveChangeCursor> DrainUnchangedAsync(DriveChangeCursor cursor, HashSet<string> known, IWorkspaceInventoryObserver? observer, CancellationToken token)
+    private async Task<DriveChangeCursor> DrainUnchangedAsync(DriveChangeCursor cursor, HashSet<string> known, IWorkspaceInventoryObserver? observer, CancellationToken token,
+        WorkspaceDocumentInventory? completedInventory = null)
     {
         var visited = new HashSet<string>(StringComparer.Ordinal) { cursor.Token };
         for (var number = 0; number < MaximumPages; number++)
@@ -103,6 +104,22 @@ public sealed class WorkspaceDocumentInventoryReader
             token.ThrowIfCancellationRequested();
             var page = await _changes.ReadChangesAsync(cursor, token).ConfigureAwait(false); token.ThrowIfCancellationRequested();
             if (page.Changes.Count > 100 || (page.Next is null) == (page.AtEnd is null)) throw new InvalidDataException("Change page lost its bounded explicit continuation.");
+            var next = page.Next ?? page.AtEnd!; CheckCursor(next);
+            if (_includeBinaryMetadata && completedInventory is not null)
+            {
+                var present = completedInventory.Documents.ToDictionary(item => item.FileId, StringComparer.Ordinal);
+                var evidence = WorkspaceHistoryReplayReader.Evidence(completedInventory, present, known, cursor, next, page, observeFolderChanges: true);
+                if (evidence.Events.Count != 0)
+                {
+                    // Keep the entire actual rejected page before failure. Changes
+                    // can be coalesced later; an observed removal must not disappear.
+                    if (observer is IWorkspaceRejectedFenceObserver rejected)
+                        await rejected.RejectedAsync(evidence, token).ConfigureAwait(false);
+                    else if (observer is not null)
+                        await observer.PageAsync(evidence.Candidates, token).ConfigureAwait(false);
+                    token.ThrowIfCancellationRequested(); throw new WorkspaceInventoryIncompleteException();
+                }
+            }
             foreach (var change in page.Changes)
             {
                 if (!Identity(change.Id) || change.Kind is not ("file" or "drive")) throw new InvalidDataException("Invalid observed change identity or kind.");
@@ -125,7 +142,6 @@ public sealed class WorkspaceDocumentInventoryReader
                     throw new WorkspaceInventoryIncompleteException();
                 }
             }
-            var next = page.Next ?? page.AtEnd!; CheckCursor(next);
             if (page.AtEnd is not null) return next;
             if (!visited.Add(next.Token)) throw new WorkspaceInventoryIncompleteException();
             cursor = next;

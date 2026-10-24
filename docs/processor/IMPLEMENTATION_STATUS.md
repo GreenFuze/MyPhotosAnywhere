@@ -1,5 +1,51 @@
 # MPA 0.6.0 implementation ledger
 
+## Complete shell screenshot publication
+
+API37 CI40067938335 passed all 159 native tests but correctly failed screenshot validation.
+The shell image saved on the device and both independent transfers have the same 16,469
+bytes/hash, two complete IDAT chunks and no PNG ending. This is a bad saved artifact,
+not repaired evidence or a passing native bundle. The exact encoder/storage cause is
+unproven. Other matrix jobs canceled by fail-fast are not passes.
+
+ShellNavigationDeviceTest now uses the existing CompletedScreenshotEvidence owner:
+one bounded captured frame is encoded and checked before publishing; pending MediaStore
+output is synced, closed and read back byte-for-byte before becoming visible. Names,
+capture points and every UI assertion stay unchanged. There is no replacement frame,
+assertion retry, collector relaxation or new warning exception. The failed bytes remain
+preserved in preflight-060/ci-8588701-api37-failed-evidence with their independent review.
+
+Strict application/test APK assembly and lint pass with zero findings under the existing
+exact AGP gate. The application APK is byte-identical to the Gson-validated build; only
+the screenshot test changes. New native execution is still required on CI emulators;
+no local AVD exists and S23 remains reserved for final acceptance. Evidence:
+preflight-060/shell-completed-evidence-validation.json.
+
+## Final Drive changes remain durable before rejection
+
+Reviewing incremental-read safety found a gap in the current full read: inherited
+folder permissions can change without child events, and a final rejected change page
+was not retained as complete history before failure. General metadata final fences now
+close conservatively on any folder change in their captured corpus and persist every
+relevant record in the actual rejected page before returning the existing operational
+failure. A later coalesced response cannot erase an observed removal.
+
+The native journal atomically retains history, supported candidates and an incomplete
+replay fence without advancing the original replay cursor. Even non-recovery changes
+require a new actual full read; removals remain sticky across restart and empty later
+responses. Failed writes and low storage roll back together. Actual callback work is
+joined before cancellation is acknowledged. Processor schema13 and Room12 are unchanged.
+
+Three new native cases and seventeen focused actual-source/inventory cases pass,
+including original inventory/history assertions, concrete current-owner ancestor and
+removal rejection, full refetch after an ancestor event, native restart, atomic failure,
+and joined uncooperative evidence persistence. Full immutable validation passes all
+338 Core, 290 AppServices, 26 Web and 77 Protocol cases; five locked strict builds have
+zero warnings/errors, complete final logs are clean and component binaries match every
+output. Evidence is retained in preflight-060/rejected-final-validation.json.
+This is a correctness prerequisite; incremental catalog reads are not implemented yet.
+Permission-inheritance behavior was checked against [Google's change documentation](https://developers.google.com/workspace/drive/api/guides/about-changes).
+
 ## Explicit human reconnect scheduling and late-access rejection
 
 Successful host-browser Connect/Resume now synchronously schedules engine-owned retry

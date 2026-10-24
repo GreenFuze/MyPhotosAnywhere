@@ -49,6 +49,39 @@ public sealed class WorkspaceDocumentInventoryReaderTests
         Assert.AreEqual("new-policy", progress.Candidates.Single().FileId); Assert.AreEqual("observe:new-policy", fixture.Calls[^1]);
     }
 
+    [TestMethod]
+    public async Task FinalRejectionJoinsActualEvidencePersistenceBeforeAcknowledgingCancellation()
+    {
+        var fixture = new Fixture(); fixture.Documents.Enqueue(Page([])); fixture.Changes.Enqueue(Changes([], end: "listed-end"));
+        var reader = new WorkspaceDocumentInventoryReader(fixture, fixture, "account", "workspace", null, includeBinaryMetadata: true);
+        var inventory = await reader.CaptureAsync([], CancellationToken.None).ConfigureAwait(false);
+        fixture.Changes.Enqueue(Changes([new("file", "unclassifiable-removal", true, null)], end: "final-end"));
+        var observer = new HeldRejection(); using var cancel = new CancellationTokenSource();
+        var reading = reader.CheckUnchangedAsync(inventory, cancel.Token, observer);
+        try
+        {
+            await observer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+            await cancel.CancelAsync().ConfigureAwait(false); Assert.IsFalse(reading.IsCompleted);
+            Assert.AreEqual("unclassifiable-removal", observer.Page!.Events.Single().Id); Assert.IsTrue(observer.Page.Events.Single().RecoveryRequired);
+        }
+        finally { observer.Release.TrySetResult(); }
+        await Assert.ThrowsAsync<OperationCanceledException>(() => reading).ConfigureAwait(false);
+        Assert.IsTrue(observer.Joined);
+    }
+
+    private sealed class HeldRejection : IWorkspaceInventoryObserver, IWorkspaceRejectedFenceObserver
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public WorkspaceHistoryPageEvidence? Page { get; private set; }
+        public bool Joined { get; private set; }
+        public async Task RejectedAsync(WorkspaceHistoryPageEvidence page, CancellationToken token)
+        { Page = page; Entered.TrySetResult(); await Release.Task.ConfigureAwait(false); Joined = true; }
+        public Task StartedAsync(DriveChangeCursor cursor, CancellationToken token) => throw new InvalidOperationException("Final fence cannot start another inventory.");
+        public Task PageAsync(IReadOnlyCollection<DriveWorkspaceDocumentCandidate> candidates, CancellationToken token) =>
+            throw new InvalidOperationException("Whole rejected evidence must be retained before candidate-only callbacks.");
+    }
+
     private sealed class Progress(List<string> calls) : IWorkspaceInventoryObserver
     {
         public bool FailStart { get; init; }

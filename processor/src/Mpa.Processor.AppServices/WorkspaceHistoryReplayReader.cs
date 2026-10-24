@@ -20,6 +20,13 @@ public interface IWorkspaceHistoryObserver
     Task PageAsync(WorkspaceHistoryPageEvidence page, CancellationToken token);
 }
 
+/// <summary>Durable rejection callback inside the joined account lease. Never reenter
+/// that account or acknowledge completion after the callback fails.</summary>
+public interface IWorkspaceRejectedFenceObserver
+{
+    Task RejectedAsync(WorkspaceHistoryPageEvidence page, CancellationToken token);
+}
+
 public interface IWorkspaceHistoryDocumentSource
 {
     bool RequiresHistoryReplay { get; }
@@ -60,8 +67,8 @@ public sealed class WorkspaceHistoryReplayReader(IGoogleWorkspaceChanges changes
         throw new WorkspaceHistoryReplayPendingException();
     }
 
-    private static WorkspaceHistoryPageEvidence Evidence(WorkspaceDocumentInventory inventory, Dictionary<string, DriveWorkspaceDocumentCandidate> present,
-        HashSet<string> known, DriveChangeCursor cursor, DriveChangeCursor next, DriveChangePage page)
+    internal static WorkspaceHistoryPageEvidence Evidence(WorkspaceDocumentInventory inventory, Dictionary<string, DriveWorkspaceDocumentCandidate> present,
+        HashSet<string> known, DriveChangeCursor cursor, DriveChangeCursor next, DriveChangePage page, bool observeFolderChanges = false)
     {
         var events = new List<WorkspaceHistoryEvent>(); var candidates = new Dictionary<string, DriveWorkspaceDocumentCandidate>(StringComparer.Ordinal); var changed = false;
         foreach (var item in page.Changes)
@@ -69,7 +76,18 @@ public sealed class WorkspaceHistoryReplayReader(IGoogleWorkspaceChanges changes
             ValidateChange(item); var file = item.File;
             var relevant = item.Kind == "drive" && (inventory.SharedDriveId is null || item.Id == inventory.SharedDriveId) || item.Kind == "file" &&
                 (item.Removed || file is null || item.Id == inventory.FolderId || known.Contains(item.Id) || file.Parents.Contains(inventory.FolderId, StringComparer.Ordinal));
-            if (!relevant) continue;
+            if (!relevant)
+            {
+                // Inherited permissions may change through an ancestor without child
+                // entries. Conservatively require a full refetch for any folder in
+                // this corpus; do not invent a permanent recovery verdict for it.
+                if (observeFolderChanges && file?.MimeType == "application/vnd.google-apps.folder")
+                {
+                    var folderBytes = new CanonicalJson(8192).Encode(JsonSerializer.SerializeToUtf8Bytes(item));
+                    events.Add(new(item.Kind, item.Id, false, Convert.ToHexStringLower(SHA256.HashData(folderBytes)))); changed = true;
+                }
+                continue;
+            }
             var recovery = item.Kind == "drive" || item.Id == inventory.FolderId || item.Removed || file is null || file.Trashed ||
                 !file.Parents.Contains(inventory.FolderId, StringComparer.Ordinal) || file.CanDownload == false || file.Bytes is null or < 1 ||
                 file.MimeType is not ("application/json" or "application/gzip" or "application/octet-stream");

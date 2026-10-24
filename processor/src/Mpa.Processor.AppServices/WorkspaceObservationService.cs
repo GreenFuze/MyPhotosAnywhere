@@ -129,7 +129,7 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
     }
 
     private sealed class InventoryProgress(WorkspaceObservationService owner, WorkspaceObservationAttempt attempt, CancellationToken caller,
-        CancellationToken run) : IWorkspaceInventoryObserver, IWorkspaceHistoryObserver
+        CancellationToken run) : IWorkspaceInventoryObserver, IWorkspaceHistoryObserver, IWorkspaceRejectedFenceObserver
     {
         private WorkspaceObservationAttempt _attempt = attempt;
         public void UpdateAttempt(WorkspaceObservationAttempt updated)
@@ -152,6 +152,16 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                 throw new InvalidDataException("History progress changed its owned account or drive.");
             _attempt = await owner._state.ExecuteAsync(database => new WorkspaceObservationRepository(database, owner._budget).RememberHistoryPage(_attempt,
                 page.From.Token, page.Next.Token, page.AtEnd, page.Events, page.Candidates.Select(CandidateObservation).ToArray()), token).ConfigureAwait(false);
+            owner.ThrowIfCanceled(caller, run);
+        }
+        public async Task RejectedAsync(WorkspaceHistoryPageEvidence page, CancellationToken token)
+        {
+            owner.ThrowIfCanceled(caller, run); token.ThrowIfCancellationRequested();
+            if (page.From.AccountId != owner._context.AccountId || page.From.SharedDriveId != owner._context.SharedDriveId ||
+                page.Next.AccountId != owner._context.AccountId || page.Next.SharedDriveId != owner._context.SharedDriveId)
+                throw new InvalidDataException("Rejected final changes substituted their captured corpus.");
+            _attempt = await owner._state.ExecuteAsync(database => new WorkspaceObservationRepository(database, owner._budget).RememberRejectedFence(_attempt,
+                page.Events, page.Candidates.Select(CandidateObservation).ToArray()), token).ConfigureAwait(false);
             owner.ThrowIfCanceled(caller, run);
         }
         public async Task StartedAsync(DriveChangeCursor cursor, CancellationToken token)
