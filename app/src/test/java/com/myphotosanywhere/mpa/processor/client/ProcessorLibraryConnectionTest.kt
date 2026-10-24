@@ -51,10 +51,11 @@ class ProcessorLibraryConnectionTest {
     }
     private class Reader(value: LibraryConnectionDescriptor) : ProcessorLibraryConnectionReader {
         var account = value.workspace.accountId
+        var email = "synthetic@example.invalid"
         var folder = ProcessorLibraryWorkspace(value.workspace.folderId, "Library metadata", 7, true, false)
         var accountReads = 0
         var read: (suspend () -> Unit)? = null
-        override suspend fun accountId(): String { accountReads++; return account }
+        override suspend fun account(): ProcessorLibraryAccount { accountReads++; return ProcessorLibraryAccount(account,email) }
         override suspend fun workspace(id: String): ProcessorLibraryWorkspace { assertEquals(folder.id, id); read?.invoke(); return folder }
     }
     private fun store(capacity: Capacity = Capacity()) = ProcessorLibraryPinStore(context, StorageBudget(capacity))
@@ -78,6 +79,64 @@ class ProcessorLibraryConnectionTest {
         } catch (error: Exception) {
             val file = File(pins.directory,"connection.sqlite")
             throw AssertionError("Native SQLite failed during $stage; pathLength=${file.absolutePath.length}; parentExists=${pins.directory.isDirectory}; fileExists=${file.exists()}; path=${file.absolutePath}",error)
+        } finally { pins.close() }
+    }
+
+    @Test fun selectorSurvivesReopenWithoutBecomingAnAuthority() = runBlocking {
+        val descriptor = descriptor(); val reader = Reader(descriptor); var pins = store()
+        try {
+            val client = ProcessorLibraryConnection(pins,reader); val review = client.review(descriptor.encode())
+            client.approve(review,descriptor.documentSha256); pins.close(); pins = store()
+            assertEquals(review.account,pins.registration()?.account)
+            assertEquals(descriptor.encode(),pins.registration()?.descriptor?.encode())
+            sql(pins,"UPDATE credential_selector SET account_id='another-permission'")
+            try { pins.registration(); fail("A selector changed library authority") } catch (_: ProcessorLibraryStateCorrupt) { }
+        } finally { pins.close() }
+    }
+
+    @Test fun migratedPinKeepsItsMarkerAndNeedsFreshAccountApproval() = runBlocking {
+        val descriptor = descriptor(); val pins = store()
+        try {
+            assertTrue(pins.directory.isDirectory || pins.directory.mkdirs())
+            SQLiteDatabase.openOrCreateDatabase(File(pins.directory,"connection.sqlite"),null).use { database ->
+                database.execSQL("CREATE TABLE approved_pin(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),code TEXT NOT NULL CHECK(length(code) BETWEEN 1 AND 4096),document_sha256 TEXT NOT NULL CHECK(length(document_sha256)=64))")
+                database.execSQL("CREATE TABLE client_meta(key TEXT NOT NULL PRIMARY KEY,value TEXT NOT NULL)")
+                database.execSQL("INSERT INTO approved_pin VALUES(1,?,?)",arrayOf(descriptor.encode(),descriptor.documentSha256))
+                database.execSQL("INSERT INTO client_meta VALUES('approved_pin_sha256',?)",arrayOf(descriptor.documentSha256))
+                database.version=1
+            }
+            assertEquals(descriptor.encode(),pins.registration()?.descriptor?.encode()); assertNull(pins.registration()?.account)
+            val client = ProcessorLibraryConnection(pins,Reader(descriptor)); client.approve(client.review(descriptor.encode()),descriptor.documentSha256)
+            assertEquals("synthetic@example.invalid",pins.registration()?.account?.email)
+            SQLiteDatabase.openDatabase(File(pins.directory,"connection.sqlite").absolutePath,null,SQLiteDatabase.OPEN_READONLY).use { database ->
+                assertEquals(2,database.version)
+                database.rawQuery("SELECT value FROM client_meta WHERE key='approved_pin_sha256'",null).use { row -> assertTrue(row.moveToFirst()); assertEquals(descriptor.documentSha256,row.getString(0)) }
+            }
+        } finally { pins.close() }
+    }
+
+    @Test fun failedSelectorUpdatePreservesPinAndEarlierAccount() = runBlocking {
+        val descriptor = descriptor(); val reader = Reader(descriptor); val pins = store()
+        try {
+            val client = ProcessorLibraryConnection(pins,reader); client.approve(client.review(descriptor.encode()),descriptor.documentSha256)
+            reader.email="renamed@example.invalid"; val review = client.review(descriptor.encode())
+            sql(pins,"CREATE TRIGGER reject_selector BEFORE UPDATE ON credential_selector BEGIN SELECT RAISE(ABORT,'synthetic selector failure'); END")
+            try { client.approve(review,descriptor.documentSha256); fail("Failed selector commit was acknowledged") } catch (_: SQLiteException) { }
+            assertEquals("synthetic@example.invalid",pins.registration()?.account?.email); assertEquals(descriptor.encode(),pins.current()?.encode())
+            sql(pins,"DROP TRIGGER reject_selector"); client.approve(review,descriptor.documentSha256)
+            assertEquals(reader.email,pins.registration()?.account?.email); assertEquals(descriptor.encode(),pins.current()?.encode())
+        } finally { pins.close() }
+    }
+
+    @Test fun changedEmailCannotApproveAnEarlierAccountReview() = runBlocking {
+        val descriptor = descriptor(); val reader = Reader(descriptor); val pins = store()
+        try {
+            val client = ProcessorLibraryConnection(pins,reader); val review = client.review(descriptor.encode())
+            reader.email="different@example.invalid"
+            try { client.approve(review,descriptor.documentSha256); fail("Changed credential selector was accepted") } catch (_: IOException) { }
+            assertNull(pins.registration())
+            val refreshed = client.review(descriptor.encode()); client.approve(refreshed,descriptor.documentSha256)
+            assertEquals(reader.email,pins.registration()?.account?.email)
         } finally { pins.close() }
     }
 
@@ -132,7 +191,7 @@ class ProcessorLibraryConnectionTest {
                 reader.folder = folder
                 // An actual adapter can return a wrong ID; it must be rejected rather than followed.
                 val adapter = object : ProcessorLibraryConnectionReader {
-                    override suspend fun accountId() = descriptor.workspace.accountId
+                    override suspend fun account() = ProcessorLibraryAccount(descriptor.workspace.accountId,"synthetic@example.invalid")
                     override suspend fun workspace(id: String) = folder
                 }
                 try { ProcessorLibraryConnection(pins,adapter).review(descriptor.encode()); fail("Invalid folder was accepted") } catch (_: IOException) { }
@@ -178,7 +237,7 @@ class ProcessorLibraryConnectionTest {
         try {
             val client = ProcessorLibraryConnection(pins,Reader(descriptor)); val review = client.review(descriptor.encode())
             capacity.bytes = 1
-            try { client.approve(review,descriptor.documentSha256); fail("Low storage commit was acknowledged") } catch (_: IllegalArgumentException) { }
+            try { client.approve(review,descriptor.documentSha256); fail("Low storage commit was acknowledged") } catch (_: ProcessorClientStorageUnavailable) { }
             assertNull(pins.current()); capacity.bytes = 1024L * 1024 * 1024
             client.approve(review,descriptor.documentSha256); pins.close(); capacity.bytes = 1; pins = store(capacity)
             assertEquals(descriptor.encode(),pins.current()?.encode())

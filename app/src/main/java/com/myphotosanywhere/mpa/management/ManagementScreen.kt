@@ -34,6 +34,7 @@ internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,
     MotionSwap(destination) { target ->
     holder.SaveableStateProvider(target.id) {
         if(target==ShellDestination.STORAGE) DriveStorageScreen(photos,{ onOpen(ShellDestination.ACTIVITY) },{ onOpen(ShellDestination.IMPORTS) },{ onOpen(ShellDestination.SETTINGS) },onFreeSpace={ onOpen(ShellDestination.CACHE) })
+        else if(target==ShellDestination.SHARED_LIBRARY) com.myphotosanywhere.mpa.processor.client.ProcessorLibraryConnectionScreen()
         else Column(Modifier.fillMaxSize().background(if(target in listOf(ShellDestination.SETTINGS,ShellDestination.PREFERENCES)) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(20.dp).testTag("management:${target.id}").semantics { paneTitle=target.title },verticalArrangement=Arrangement.spacedBy(14.dp)) {
             if(target in listOf(ShellDestination.SETTINGS,ShellDestination.PREFERENCES))
                 Text(target.title,style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(vertical=16.dp).semantics { heading() })
@@ -95,8 +96,9 @@ internal fun ManagementScreen(destination: ShellDestination,photos: List<Photo>,
 
 /** Menu ownership stays in presentation; opening a section cannot mutate settings. */
 private object SettingsMenu {
-    val destinations=listOf(ShellDestination.PREFERENCES,ShellDestination.ANNOTATIONS,ShellDestination.CACHE,ShellDestination.PRIVACY,ShellDestination.ABOUT)
+    val destinations=listOf(ShellDestination.PREFERENCES,ShellDestination.ANNOTATIONS,ShellDestination.CACHE,ShellDestination.PRIVACY,ShellDestination.ABOUT,ShellDestination.SHARED_LIBRARY)
     fun summary(destination: ShellDestination)=when(destination) {
+        ShellDestination.SHARED_LIBRARY -> R.string.menu_shared_library_summary
         ShellDestination.PREFERENCES -> R.string.menu_preferences_summary
         ShellDestination.CACHE -> R.string.menu_storage_summary
         ShellDestination.ANNOTATIONS -> R.string.menu_annotations_summary
@@ -105,6 +107,7 @@ private object SettingsMenu {
         else -> error("No settings summary for $destination")
     }
     fun icon(destination: ShellDestination)=when(destination) {
+        ShellDestination.SHARED_LIBRARY -> R.drawable.ic_shell_account
         ShellDestination.PREFERENCES -> R.drawable.ic_action_settings
         ShellDestination.CACHE -> R.drawable.ic_shell_offline
         ShellDestination.RECOGNITION -> R.drawable.ic_shell_people

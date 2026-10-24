@@ -69,5 +69,11 @@ approval/store are implemented. The Android owner rechecks actual account/folder
 metadata around review, requires the approved document digest, atomically stores
 the code and its approval marker in private nontransferable SQLite, rejects changed
 pins, and joins cancellation/cleanup. It does not activate a catalog or issue a grant.
-Android connection UI, actual independent Drive catalog adoption, device write grants
-and final end-to-end acceptance are still unfinished.
+The native Android connection UI performs actual account/folder review and requires an
+explicit source acknowledgment before approval. Its private schema-2 account selector
+migrates schema 1 without replacing accepted pins, remains excluded from transfer and
+never supplies authority or stores a Google token. Foreground launcher attachments have
+exact lifetime identities and transfer ownership before activation; pending consent is
+memory-only. Process recreation requires fresh review rather than restoring approval.
+Actual independent Drive catalog adoption, device write grants and final end-to-end
+acceptance remain unfinished.

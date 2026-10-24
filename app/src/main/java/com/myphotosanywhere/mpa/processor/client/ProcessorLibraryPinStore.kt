@@ -3,8 +3,10 @@ package com.myphotosanywhere.mpa.processor.client
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import androidx.core.content.contentValuesOf
 import com.myphotosanywhere.mpa.data.StorageBudget
 import com.myphotosanywhere.mpa.processor.protocol.LibraryConnectionDescriptor
+import com.myphotosanywhere.mpa.processor.protocol.ProcessorProtocolException
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -16,11 +18,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 internal class ProcessorLibraryPinConflict : IOException("This device already trusts a different library connection. Its accepted state was preserved.")
+internal class ProcessorClientStorageUnavailable(cause: Exception? = null) : IOException("Free some device space before saving this library connection. Existing photos and accepted state were kept.",cause)
+internal class ProcessorLibraryStateCorrupt(message: String, cause: Exception? = null) : IllegalStateException(message,cause)
+internal data class ProcessorLibraryRegistration(val descriptor: LibraryConnectionDescriptor, val account: ProcessorLibraryAccount?)
 
-/** Serial owner of an independently approved public pin, excluded from backup/transfer.
- * No credentials, writable source access, accepted policy or catalog activation lives here.
- * Every call joins its own SQLite operation. Close waits for admitted operations and then
- * fences later callers; the borrowing client must join its network callers before close. */
+/** Serialized nontransferable public trust and credential-selector owner. A selector is
+ * an email, NEVER a token or authority: every Google connection still verifies permission
+ * ID. Each operation joins SQLite work; close joins even from canceled callers. */
 internal class ProcessorLibraryPinStore(context: Context, private val storage: StorageBudget, stateDirectory: File? = null) {
     private val application = context.applicationContext
     internal val directory = stateDirectory ?: File(application.noBackupFilesDir, "processor-client")
@@ -33,83 +37,105 @@ internal class ProcessorLibraryPinStore(context: Context, private val storage: S
     private var helper: PinDatabase? = null
     private var closed = false
 
-    suspend fun current(): LibraryConnectionDescriptor? = access { database ->
+    suspend fun current(): LibraryConnectionDescriptor? = registration()?.descriptor
+    suspend fun registration(): ProcessorLibraryRegistration? = access { database ->
         database.beginTransactionNonExclusive()
-        try { read(database).also { database.setTransactionSuccessful() } }
+        try { readRegistration(database).also { database.setTransactionSuccessful() } }
         finally { database.endTransaction() }
     }
 
     internal suspend fun approve(review: ProcessorLibraryConnectionReview): LibraryConnectionDescriptor = access { database ->
         database.beginTransaction()
         try {
-            val current = read(database)
-            if (current != null) {
-                if (current.encode() != review.descriptor.encode()) throw ProcessorLibraryPinConflict()
-                database.setTransactionSuccessful()
-                current
-            } else {
-                storage.requireBytes(directory, WRITE_RESERVE, "Free some device space before approving this library. Existing photos were kept.")
+            val current = readRegistration(database)
+            if (current != null && current.descriptor.encode() != review.descriptor.encode()) throw ProcessorLibraryPinConflict()
+            check(review.account.id == review.descriptor.workspace.accountId) { "Reviewed account and approved workspace disagree." }
+            if (current == null || current.account != review.account) {
+                requireWriteBudget()
                 currentCoroutineContext().ensureActive()
-                database.execSQL("INSERT INTO approved_pin(singleton,code,document_sha256) VALUES(1,?,?)",
-                    arrayOf(review.descriptor.encode(), review.descriptor.documentSha256))
-                database.execSQL("INSERT INTO client_meta(key,value) VALUES('approved_pin_sha256',?)", arrayOf(review.descriptor.documentSha256))
+                if (current == null) {
+                    database.execSQL("INSERT INTO approved_pin(singleton,code,document_sha256) VALUES(1,?,?)",
+                        arrayOf(review.descriptor.encode(), review.descriptor.documentSha256))
+                    database.execSQL("INSERT INTO client_meta(key,value) VALUES('approved_pin_sha256',?)", arrayOf(review.descriptor.documentSha256))
+                }
+                val selector = contentValuesOf("account_id" to review.account.id,"email" to review.account.email)
+                if (database.update("credential_selector",selector,"singleton=1",null) == 0) {
+                    selector.put("singleton",1)
+                    database.insertOrThrow("credential_selector",null,selector)
+                }
                 currentCoroutineContext().ensureActive()
-                database.setTransactionSuccessful()
-                review.descriptor
             }
+            database.setTransactionSuccessful()
+            current?.descriptor ?: review.descriptor
         } finally { database.endTransaction() }
     }
 
     suspend fun close() = withContext(NonCancellable + Dispatchers.IO) {
-        mutex.withLock {
-            if (!closed) { helper?.close(); helper = null; closed = true }
-        }
+        mutex.withLock { if (!closed) { helper?.close(); helper = null; closed = true } }
     }
 
+    private fun requireWriteBudget() {
+        try { storage.requireBytes(directory, WRITE_RESERVE, "Insufficient processor client state capacity.") }
+        catch (error: IllegalArgumentException) { throw ProcessorClientStorageUnavailable(error) }
+    }
     private suspend fun <T> access(action: suspend (SQLiteDatabase) -> T): T = withContext(Dispatchers.IO) {
         mutex.withLock {
             check(!closed) { "Processor client pin owner is closed." }
             currentCoroutineContext().ensureActive()
             val owner = helper ?: run {
-                check(directory.isDirectory || directory.mkdirs()) { "Processor client state directory is unavailable." }
-                val path = File(directory, "connection.sqlite")
-                if (!path.exists()) storage.requireBytes(directory, WRITE_RESERVE, "Free some device space before opening library state. Existing photos were kept.")
-                PinDatabase(application, path.absolutePath).also { helper = it }
+                if (!directory.isDirectory && !directory.mkdirs()) throw ProcessorClientStorageUnavailable()
+                val path = File(directory,"connection.sqlite")
+                if (!path.exists()) requireWriteBudget()
+                PinDatabase(application,path.absolutePath).also { helper = it }
             }
             action(owner.writableDatabase)
         }
     }
 
-    private fun read(database: SQLiteDatabase): LibraryConnectionDescriptor? {
-        val marker = database.rawQuery("SELECT length(value),value FROM client_meta WHERE key='approved_pin_sha256'", null).use { row ->
+    private fun readRegistration(database: SQLiteDatabase): ProcessorLibraryRegistration? {
+        val pin = readPin(database)
+        val account = database.rawQuery("SELECT length(account_id),length(email) FROM credential_selector WHERE singleton=1",null).use { row ->
             if (!row.moveToFirst()) null else {
-                check(row.getLong(0) == 64L) { "Approved pin marker is corrupt." }
-                row.getString(1)
+                state(row.getLong(0) in 1L..256L && row.getLong(1) in 1L..320L,"Saved Google account exceeds its bounds.")
+                database.rawQuery("SELECT account_id,email FROM credential_selector WHERE singleton=1",null).use { content ->
+                    state(content.moveToFirst(),"Saved Google account changed during its owned read.")
+                    try { ProcessorLibraryAccount(content.getString(0),content.getString(1)) }
+                    catch (error: IOException) { throw ProcessorLibraryStateCorrupt("Saved Google account cannot be decoded.",error) }
+                }
             }
         }
-        val encoded = database.rawQuery("SELECT length(code),length(document_sha256) FROM approved_pin WHERE singleton=1", null).use { row ->
-            if (!row.moveToFirst()) {
-                check(marker == null) { "Accepted library pin is missing; never recreate trust over accepted state." }
-                return null
-            }
-            check(row.getLong(0) in 1L..LibraryConnectionDescriptor.MAX_CODE_CHARACTERS.toLong() && row.getLong(1) == 64L) { "Approved library pin exceeds its bounds." }
-            database.rawQuery("SELECT code,document_sha256 FROM approved_pin WHERE singleton=1", null).use { content ->
-                check(content.moveToFirst()) { "Approved library pin changed during its owned read." }
-                content.getString(0) to content.getString(1)
+        state(account == null || pin != null && account.id == pin.workspace.accountId,"Saved Google account disagrees with accepted library trust.")
+        return pin?.let { ProcessorLibraryRegistration(it,account) }
+    }
+    private fun readPin(database: SQLiteDatabase): LibraryConnectionDescriptor? {
+        val marker = database.rawQuery("SELECT length(value),value FROM client_meta WHERE key='approved_pin_sha256'",null).use { row ->
+            if (!row.moveToFirst()) null else { state(row.getLong(0) == 64L,"Approved pin marker is corrupt."); row.getString(1) }
+        }
+        val encoded = database.rawQuery("SELECT length(code),length(document_sha256) FROM approved_pin WHERE singleton=1",null).use { row ->
+            if (!row.moveToFirst()) { state(marker == null,"Accepted library pin is missing; never recreate trust over accepted state."); return null }
+            state(row.getLong(0) in 1L..LibraryConnectionDescriptor.MAX_CODE_CHARACTERS.toLong() && row.getLong(1) == 64L,"Approved library pin exceeds its bounds.")
+            database.rawQuery("SELECT code,document_sha256 FROM approved_pin WHERE singleton=1",null).use { content ->
+                state(content.moveToFirst(),"Approved library pin changed during its owned read."); content.getString(0) to content.getString(1)
             }
         }
-        val descriptor = LibraryConnectionDescriptor.decode(encoded.first)
-        check(descriptor.documentSha256 == encoded.second && marker == encoded.second) { "Accepted library pin disagrees with its approval marker." }
+        val descriptor = try { LibraryConnectionDescriptor.decode(encoded.first) }
+            catch (error: ProcessorProtocolException) { throw ProcessorLibraryStateCorrupt("Saved library pin cannot be decoded.",error) }
+        state(descriptor.documentSha256 == encoded.second && marker == encoded.second,"Accepted library pin disagrees with its approval marker.")
         return descriptor
     }
-
-    private class PinDatabase(context: Context, path: String) : SQLiteOpenHelper(context, path, null, 1) {
+    private fun state(valid: Boolean, message: String) { if (!valid) throw ProcessorLibraryStateCorrupt(message) }
+    private class PinDatabase(context: Context, path: String) : SQLiteOpenHelper(context,path,null,2) {
         override fun onCreate(database: SQLiteDatabase) {
             database.execSQL("CREATE TABLE approved_pin(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),code TEXT NOT NULL CHECK(length(code) BETWEEN 1 AND 4096),document_sha256 TEXT NOT NULL CHECK(length(document_sha256)=64))")
             database.execSQL("CREATE TABLE client_meta(key TEXT NOT NULL PRIMARY KEY,value TEXT NOT NULL)")
+            createSelector(database)
         }
         override fun onUpgrade(database: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            error("Unsupported processor client pin schema upgrade: $oldVersion to $newVersion. Accepted state was preserved.")
+            if (oldVersion == 1 && newVersion == 2) createSelector(database)
+            else error("Unsupported processor client pin schema upgrade: $oldVersion to $newVersion. Accepted state was preserved.")
+        }
+        private fun createSelector(database: SQLiteDatabase) {
+            database.execSQL("CREATE TABLE credential_selector(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),account_id TEXT NOT NULL CHECK(length(account_id) BETWEEN 1 AND 256),email TEXT NOT NULL CHECK(length(email) BETWEEN 1 AND 320))")
         }
     }
     private companion object { const val WRITE_RESERVE = 64L * 1024 * 1024 }

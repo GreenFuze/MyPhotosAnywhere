@@ -1,5 +1,61 @@
 # MPA 0.6.0 implementation ledger
 
+## Native shared-library setup and foreground consent ownership
+
+Settings now includes a native Shared library destination without changing existing
+navigation IDs. Its account picker and Google consent flow use Drive directly; they do
+not enter legacy folder browsing or schedule legacy imports. The screen displays actual
+account/folder review and the controller fingerprint, then requires an explicit source
+acknowledgment and approval. Process recreation restores bounded draft/pending context,
+never a token, pending intent or human approval. Current accepted context stays visible
+during loading and operational failure; saved-state reads can retry without replacing trust.
+
+Private connection schema 2 adds a credential selector through a preserving 1-to-2
+migration. It stores the actual Google permission ID/email atomically with approved trust;
+the email only selects Google authorization and grants no authority. Actual ID and folder
+checks still run before every approval. Changed selectors need a fresh reviewed approval.
+Low-storage and failed selector updates preserve the previous pin/account. Corruption
+stops this client; unexpected internal errors propagate. Legacy Room12 is unchanged.
+
+Each native operation owns its temporary SQLite handle and joins close in finally.
+Google SDK tasks retire before cancellation; access grants have redacted string output.
+Command ownership transfers before activation, and successor commands join predecessors,
+so an earlier finally cannot clear a newer busy operation. A foreground lifecycle owner
+registers the consent launcher, obtains its exact identity before activation, detaches on
+stop/destroy/close and fences replacement hosts. Pending consent waits in memory for a
+started screen. A retained ViewModel never calls an obsolete composition's launcher.
+
+Review found real rotation/foreground and reentrant-close defects despite passing
+candidate tests. Full584 pre-host results remain explicitly candidate evidence. Twenty-
+eight host cases passed before transfer-order review; a deliberate late-transfer control
+then failed the new actual closed-host assertion, expected one callback but receiving two.
+Restoring registration/ownership/activation ordering passes all29 focused cases. No old
+assertion, stop budget, warning severity or exception policy was weakened.
+
+The UI uses merged checkbox semantics, 48dp targets and the existing progress animation
+inside a stable reserved slot. Three additional emulator cases cover eight theme/RTL/font
+presentations, retained-context geometry and actual Settings/ViewModel/draft rotation.
+They are not locally executed: no local AVD is available. The corrected full run passes
+all589 JVM/Robolectric cases across108 suites, zero lint findings and app/native-test APK
+builds. The sole upstream diagnostic is the already approved exact AGP setVisible call.
+Room12 bytes are unchanged; source/resource UTF-8 and all three native test classes in the
+APK are independently checked. Complete logs/counters/source/report/APK hashes are retained
+in preflight-060/native-library-ui-validation.json. Fresh exact-source native CI, live
+Google/native consent, independent catalog adoption and final S23/installer/release
+acceptance remain required.
+
+A default Windows CP1252 read temporarily damaged two unrelated MainActivity glyphs and
+new resource punctuation. MainActivity was restored from HEAD's strict UTF-8 with only
+the intended destination change; new resource arrows/dash were restored. The validation
+record independently compares both. Subsequent file operations use explicit UTF-8.
+
+The exact parent55a04545155874c2a3fc6c544c7546db7ff76ed4 passes Desktop40125462374
+on four platforms, Android40125462365, all three API29/35/37 jobs in device40125462290,
+and all12 Protocol40125462307 regression/reference/scale jobs. Archived results match its
+SHA. Those results include the prior two real pin SQLite cases, not these new UI cases.
+This remains unfinished joint 0.6 work, not a completed native/desktop product.
+
+
 ## Drive-only connection export and Android public-pin approval
 
 Both clients consume the same bounded public connection code: the library, approved

@@ -29,7 +29,7 @@ class ProcessorLibraryConnectionDeviceTest {
         return LibraryConnectionDescriptor(UUID.randomUUID(),UUID.randomUUID(),1,CatalogWorkspace("synthetic-permission","synthetic-workspace"),key)
     }
     private class Reader : ProcessorLibraryConnectionReader {
-        override suspend fun accountId() = "synthetic-permission"
+        override suspend fun account() = ProcessorLibraryAccount("synthetic-permission","synthetic@example.invalid")
         override suspend fun workspace(id: String) = ProcessorLibraryWorkspace(id,"Synthetic metadata",7,true,false)
     }
     private fun directory() = File(context.noBackupFilesDir,"processor-pin-test-${UUID.randomUUID()}")
