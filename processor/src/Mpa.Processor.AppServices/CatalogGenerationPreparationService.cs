@@ -23,7 +23,7 @@ public sealed class CatalogGenerationPreparationService : IAsyncDisposable
         StorageBudgetManager budget, LocalCatalogReconciliationService current, LibrarySigningIdentityOwner keys)
     {
         _current = current ?? throw new ArgumentNullException(nameof(current));
-        _capture = new(state, stateDirectory, installationId, budget, new LocalCapturePermission(state, keys, budget));
+        _capture = new(state, stateDirectory, installationId, budget, new LocalCapturePermission(state, keys, budget, current));
     }
     public bool ExitConfirmed { get { lock (_gate) return _exitConfirmed; } }
 
@@ -61,12 +61,14 @@ public sealed class CatalogGenerationPreparationService : IAsyncDisposable
 
     // Private local capture permission only. Never passed to an uploader or returned
     // as a cloud grant. Actual writes use the concrete reconciler's one-object owner.
-    private sealed class LocalCapturePermission(ProcessorStateCoordinator state, LibrarySigningIdentityOwner keys, StorageBudgetManager budget) : IWorkspacePublicationAuthority
+    private sealed class LocalCapturePermission(ProcessorStateCoordinator state, LibrarySigningIdentityOwner keys, StorageBudgetManager budget,
+        LocalCatalogReconciliationService current) : IWorkspacePublicationAuthority, ICatalogGenerationLocalAccessProvider
     {
+        public CatalogGenerationLocalAccess? ForScope(WorkspacePublicationScope scope) => current.LocalAccessForScope(scope);
         public Task ValidateAsync(WorkspacePublicationScope scope, CancellationToken cancellationToken) => state.ExecuteAsync(database =>
         {
             cancellationToken.ThrowIfCancellationRequested(); var authority = new LibraryAuthorityRepository(database, budget);
-            authority.AssertLocalPublicationScope(scope);
+            authority.AssertLocalPublicationScope(scope, current.LocalAccessForScope(scope));
             keys.AssertPublicationIdentity(authority.Controller() ?? throw new CatalogPublicationNotAuthorizedException(), authority.CaptureLocalPublicationAuthority());
             return true;
         }, cancellationToken);

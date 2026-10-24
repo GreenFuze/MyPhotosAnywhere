@@ -15,7 +15,43 @@ full 328-case Core run, ten concurrent lifecycle cases and forty further cases f
 separate immutable output copy pass. This does not establish a fix. Publication remains
 blocked while independent feature work continues.
 
-## Separate renewed-access journal; retry consumption pending
+## Renewed access preserves original captured publication
+
+The actual reconciler now consumes renewed credentials through an opaque run-owned
+LOCAL context, while every upload still requires its independent private current
+cloud admission. Default original-scope APIs remain strict. The context borrows one
+actual native database owner, fences current semantic policy, controller/publisher,
+credential revision, original immutable attempt and active generation, and retires
+only after joined operations. No original scope, snapshot, commit ID, target file,
+payload, signature or previously recorded verification receipt is rewritten.
+
+A lost outbox checkpoint after native sealing has a narrow private read-only recovery
+path for that exact captured intent. Ordinary reads and write grants still reject a
+missing signing history. A different pending sealed intent cannot be grandfathered.
+After renewal, the exact original outbox is reconstructed before a new ordinary full
+current read and private one-object admission. Local capture callbacks never reenter
+the account/network owner. Historical journal records alone cannot grant a write.
+
+Six actual integration cases pass for interrupted dependencies, sealed-without-outbox
+and uncertain commit replies, unrelated signing history, recreated engine catch-up
+through later imports, and Exit joining uncooperative actual I/O before context/key
+retirement while rejecting late receipts. Seven native local-context cases and the
+full 335-case Core suite pass. Complete immutable validation also passes all 281
+AppServices, 26 Web and 77 Protocol cases. The five locked strict builds have zero
+warnings/errors, complete final logs are clean and component binaries match every
+output. Evidence is retained in preflight-060/generation-local-access-validation.json.
+This is not independent-client activation or release acceptance; the worker blocker
+above remains unresolved.
+
+The preceding 1da6539 revision passed all four desktop and protocol platform jobs and
+all Android device jobs on APIs 29/35/37. Its Android build correctly failed the strict
+dependency gate after Gson 2.15.0 was released on October 24. The exact stable pin is
+updated. All 557 Android unit tests pass, lint has zero findings and the debug APK builds
+through the existing strict gate, accepting only the already approved exact AGP warning.
+The [official release](https://github.com/google/gson/releases/tag/gson-parent-2.15.0)
+was checked; no check was weakened. This is not new device or signing acceptance.
+
+## Separate renewed-access journal
 
 Processor schema 13 adds a separate immutable access-attempt journal with original
 capture/snapshot/commit identities, actual renewed account revision, pinned native
@@ -30,9 +66,9 @@ The concrete reconciler now owns actual current access/history reads before jour
 an attempt. It checks original parent or exact own visible commit, original allocated
 membership, immutable pending work, native keys, current policy and both inventories.
 Its returned record is historical evidence, never a transferable write grant. Existing
-strict original-scope upload/signing/completion fences remain unchanged; consuming the
-new attempt through fresh private operation admission is the next integration step.
-No automatic retry after reconnect is claimed yet. All seven new native journal/migration
+strict original-scope upload/signing/completion fences remain the default; the explicit
+local-context integration described above supplies renewed credentials separately.
+Successful human reconnect still needs explicit engine retry routing. All seven native journal/migration
 cases and six actual reconnect cases pass, including failed native checkpoints, low
 storage, bounded history, restarts, original allocation membership, foreign heads and
 joined uncooperative reads. Complete instrumented immutable suites pass: 328 Core,

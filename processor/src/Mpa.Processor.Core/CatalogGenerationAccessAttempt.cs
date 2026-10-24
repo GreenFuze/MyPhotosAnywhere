@@ -67,7 +67,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         var result = ReadAccessAttempt(capture, accountRevision, transaction); transaction.Commit(); return result;
     }
 
-    private CatalogGenerationAccessAttempt? ReadAccessAttempt(CatalogGenerationCapture capture, long revision, SqliteTransaction transaction)
+    private CatalogGenerationAccessAttempt? ReadAccessAttempt(CatalogGenerationCapture capture, long revision, SqliteTransaction? transaction)
     {
         string id, encoded, digest;
         using (var query = Command(transaction, """

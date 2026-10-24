@@ -44,7 +44,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         return capture is null ? null : ReadPublication(capture, null);
     }
 
-    public CapturedCatalogPublication CapturePublicationBasis(Guid generationId, CapturedCatalogBasis basis)
+    public CapturedCatalogPublication CapturePublicationBasis(Guid generationId, CapturedCatalogBasis basis, CatalogGenerationLocalAccess? localAccess = null)
     {
         Id(generationId); ArgumentNullException.ThrowIfNull(basis);
         using var transaction = _database.Connection.BeginTransaction(); var capture = RequiredCapture(generationId, transaction);
@@ -57,7 +57,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         }
         if (capture.Phase != "frozen") throw new CatalogGenerationCaptureConflictException();
         AssertNoPublicationWork(capture, transaction);
-        new LibraryAuthorityRepository(_database, _budget).AssertLocalPublicationScope(capture.Scope, transaction);
+        new LibraryAuthorityRepository(_database, _budget).AssertLocalPublicationScope(capture.Scope, transaction, localAccess);
         // This read is local. Complete current cloud/high-water verification is separate.
         var approved = new LibraryAuthorityRepository(_database).CurrentSourceConfiguration(transaction) ?? throw new CatalogPublicationNotAuthorizedException();
         if (approved.EnvelopeSha256 != basis.SourcePolicySha256 || approved.Configuration.LibraryId != capture.Scope.LibraryId ||
@@ -73,7 +73,7 @@ public sealed partial class CatalogGenerationCaptureRepository
     /// <summary>Call after the actual dependency owner has read back and verified the
     /// complete graph. This checkpoint independently binds root/coverage to this exact
     /// generation's retained, verified outbox bytes; receipts alone are not current reads.</summary>
-    public CapturedCatalogPublication SealDependencies(Guid generationId, CapturedCatalogCommitPlan plan)
+    public CapturedCatalogPublication SealDependencies(Guid generationId, CapturedCatalogCommitPlan plan, CatalogGenerationLocalAccess? localAccess = null)
     {
         Id(generationId); ArgumentNullException.ThrowIfNull(plan);
         using var transaction = _database.Connection.BeginTransaction(); var capture = RequiredCapture(generationId, transaction);
@@ -87,7 +87,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         }
         if (capture.Phase != "publication-planned" || new ProtocolSigningJournal(_database, _budget).Read(capture.CommitIntentId, transaction) is not null)
             throw new CatalogGenerationCaptureConflictException();
-        new LibraryAuthorityRepository(_database).AssertLocalPublicationScope(capture.Scope, transaction);
+        new LibraryAuthorityRepository(_database).AssertLocalPublicationScope(capture.Scope, transaction, localAccess);
         AssertDependency(capture, plan.RootIndex, "facts-index", transaction);
         AssertDependency(capture, plan.SourceCoverage, "coverage-root", transaction);
         var encoded = PublicationEncode(plan); using var reservation = _budget.Reserve(131072); reservation.RecheckBeforeWrite(reservation.Bytes);

@@ -42,7 +42,7 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
 
     public Task<ReconciledLocalCatalog> ReconcileAsync(CancellationToken cancellationToken) => ReconcileAsync(null, cancellationToken);
 
-    private async Task<ReconciledLocalCatalog> ReconcileAsync(CapturedCatalogCommitPlan? prepared, CancellationToken cancellationToken)
+    private async Task<ReconciledLocalCatalog> ReconcileAsync(CapturedCatalogCommitPlan? prepared, CancellationToken cancellationToken, Guid? renewedGenerationId = null)
     {
         CancellationTokenSource linked;
         lock (_gate) { ObjectDisposedException.ThrowIf(_stopping, this); linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token); }
@@ -58,8 +58,9 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
                     var pin = authority.Controller() ?? throw new CatalogPublicationNotAuthorizedException();
                     var local = authority.CaptureLocalPublicationAuthority(); _keys.AssertPublicationIdentity(pin, local);
                     var sharing = authority.BootstrapSources() ?? throw new CatalogPublicationNotAuthorizedException();
-                    return new Captured(pin, local, _keys.PublicIdentity,
-                        new ProtocolSigningJournal(database, _budget).Inventory(local.LibraryId), sharing.AllowSharedMetadata);
+                    var signing = new ProtocolSigningJournal(database, _budget).Inventory(local.LibraryId);
+                    return new Captured(pin, local, _keys.PublicIdentity, signing, sharing.AllowSharedMetadata,
+                        renewedGenerationId is { } generationId ? CapturePendingRenewedSignature(database, generationId, local, signing) : null);
                 }, linked.Token).ConfigureAwait(false);
                 var access = await InspectAsync(captured, linked.Token).ConfigureAwait(false);
                 var context = new WorkspaceObservationContext(captured.Authority.LibraryId, captured.Authority.AccountId,
@@ -120,7 +121,7 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
         }, token);
 
     private sealed record Captured(LibraryControllerPin Pin, LocalCatalogPublicationAuthority Authority,
-        LibrarySigningPublicIdentity Native, ProtocolSigningInventory Signing, bool AllowShared);
+        LibrarySigningPublicIdentity Native, ProtocolSigningInventory Signing, bool AllowShared, PendingCapturedSignature? Recovery);
     private sealed record Access(long Version, bool Shared, string? SharedDriveId);
 
     private sealed partial class Scan(LocalCatalogReconciliationService owner, Captured captured, WorkspaceObservationContext context,
@@ -174,6 +175,9 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
             {
                 if (_signed.Contains(intent.Id)) continue;
                 if (intent.EnvelopeSha256 is null) { _pendingSigning.Add(intent.Id); continue; }
+                if (captured.Recovery is { } recovery && recovery.IntentId == intent.Id && recovery.BodySha256 == intent.BodySha256 &&
+                    recovery.EnvelopeSha256 == intent.EnvelopeSha256 && recovery.EnvelopeBytes == intent.EnvelopeBytes)
+                { _pendingSigning.Add(intent.Id); continue; }
                 var role = intent.Kind switch { "catalog-commit" => "catalog-commit", "library-publisher-authorization" => "publisher-authorization", "library-source-configuration" => "source-configuration", _ => throw new ProtocolSigningConflictException() };
                 if (!publications.Objects.Any(item => item.Sha256 == intent.EnvelopeSha256 && item.Bytes == intent.EnvelopeBytes && item.Role == role &&
                     item.MimeType == "application/json" && item.VerifiedVersion is null)) throw new SigningHistoryRecoveryRequiredException();
@@ -271,6 +275,7 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
         try
         {
             if (cancellationFailure is not null) throw new AggregateException("Catalog reconciliation cancellation needs attention; retain borrowed owners.", cancellationFailure);
+            lock (_gate) { _localAccess?.Context.Dispose(); _localAccess = null; }
             _stop.Dispose(); lock (_gate) _exitConfirmed = true;
         }
         finally { _serial.Release(); }

@@ -38,7 +38,8 @@ public sealed partial class LocalCatalogReconciliationService
         lock (_gate) { ObjectDisposedException.ThrowIf(_stopping, this); linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token); }
         using (linked)
         {
-            var token = linked.Token; var current = await ReadCurrentAsync(token).ConfigureAwait(false);
+            var token = linked.Token; await EnsureGenerationAccessAsync(scope.GenerationId, token).ConfigureAwait(false);
+            var current = await ReadCurrentAsync(token).ConfigureAwait(false);
             await _serial.WaitAsync(token).ConfigureAwait(false);
             CatalogObjectReference reference; SingleUploadAdmission? grant = null;
             try
@@ -49,7 +50,7 @@ public sealed partial class LocalCatalogReconciliationService
                 grant = new(this, proof, generation, expected);
                 // The inner uploader also validates inside its serial account lease.
                 // This private grant performs LOCAL checks only; no account reentry.
-                reference = await new CatalogGenerationWorkspaceSink(_state, _accounts, _budget, grant, scope)
+                reference = await new CatalogGenerationWorkspaceSink(_state, _accounts, _budget, grant, scope, LocalAccessForScope(scope))
                     .StoreAsync(role, mime, owned, token).ConfigureAwait(false);
             }
             catch (Exception error) { lock (_gate) _failure = error; throw; }
@@ -101,7 +102,7 @@ public sealed partial class LocalCatalogReconciliationService
     private CapturedCatalogPublication AssertGeneration(ProcessorStateDatabase database, CompletedRead proof, WorkspacePublicationScope scope, CancellationToken token, bool allowPrepared = false)
     {
         AssertReadProof(database, proof, token);
-        new LibraryAuthorityRepository(database, _budget).AssertLocalPublicationScope(scope);
+        AssertLocalGenerationScope(database, scope, token);
         var observations = new WorkspaceObservationRepository(database, _budget); observations.AssertCompletedScan(proof.Result.Observation);
         var generation = new CatalogGenerationCaptureRepository(database, _budget).Publication(scope.GenerationId)
             ?? throw new CatalogGenerationCaptureConflictException();

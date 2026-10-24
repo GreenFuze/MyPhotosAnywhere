@@ -23,7 +23,8 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
     private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
     private const string Columns = "id,account_id,scope,context_hash,role,mime_type,payload_hash,file_id,verified_version,length(payload),payload";
 
-    public WorkspacePublicationRecord Prepare(Guid id, WorkspacePublicationScope scope, string role, string mimeType, ReadOnlySpan<byte> payload)
+    public WorkspacePublicationRecord Prepare(Guid id, WorkspacePublicationScope scope, string role, string mimeType, ReadOnlySpan<byte> payload,
+        CatalogGenerationLocalAccess? localAccess = null)
     {
         CheckId(id); ValidateScope(scope); ValidateContent(role, mimeType);
         if (payload.Length is < 1 or > MaximumPayloadBytes) throw new ArgumentException("A bounded metadata payload is required.", nameof(payload));
@@ -36,7 +37,7 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
                 !existing.Payload.Span.SequenceEqual(owned)) throw new WorkspacePublicationConflictException();
             transaction.Commit(); return existing;
         }
-        CheckCurrent(scope, transaction);
+        CheckCurrent(scope, transaction, localAccess);
         // Includes payload, WAL copy and bounded page overhead. Actual writes still fail
         // explicitly if another process consumes disk space; no cleanup/reset is inferred.
         using var reservation = _budget.Reserve(checked(owned.LongLength * 3 + 65536));
@@ -71,14 +72,15 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
 
     /// <summary>Fence current account/configuration before writes or receipt admission.
     /// Existing retry data remains readable after reconnection; it is never retargeted.</summary>
-    public void AssertCurrent(Guid id)
+    public void AssertCurrent(Guid id, CatalogGenerationLocalAccess? localAccess = null)
     {
         CheckId(id); var record = Read(id) ?? throw new InvalidOperationException("The captured publication is missing.");
-        CheckCurrent(record.Scope, null);
+        CheckCurrent(record.Scope, null, localAccess);
     }
 
-    private void CheckCurrent(WorkspacePublicationScope scope, SqliteTransaction? transaction)
+    private void CheckCurrent(WorkspacePublicationScope scope, SqliteTransaction? transaction, CatalogGenerationLocalAccess? localAccess = null)
     {
+        if (localAccess is not null) { localAccess.AssertCurrent(_database, scope, transaction); return; }
         using var command = Command(transaction, """
             SELECT 1 FROM drive_account a JOIN library_configuration c ON c.id=1
             JOIN processor_meta m ON m.key='library_id'
@@ -117,14 +119,15 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
 
     /// <summary>Called only after transport independently verifies downloaded bytes,
     /// actual membership/type and revision. This local receipt is not catalog activation.</summary>
-    public WorkspacePublicationRecord ConfirmVerified(Guid id, string accountId, string folderId, string fileId, string sha256, long bytes, long driveVersion)
+    public WorkspacePublicationRecord ConfirmVerified(Guid id, string accountId, string folderId, string fileId, string sha256, long bytes, long driveVersion,
+        CatalogGenerationLocalAccess? localAccess = null)
     {
         CheckId(id); ArgumentOutOfRangeException.ThrowIfLessThan(driveVersion, 1L);
         using var transaction = _database.Connection.BeginTransaction(); var captured = Required(id, transaction);
         if (captured.Scope.AccountId != accountId || captured.Scope.FolderId != folderId || captured.FileId is null || captured.FileId != fileId ||
             captured.Sha256 != sha256 || captured.Payload.Length != bytes || captured.VerifiedVersion is not null && captured.VerifiedVersion != driveVersion)
             throw new WorkspacePublicationConflictException();
-        CheckCurrent(captured.Scope, transaction);
+        CheckCurrent(captured.Scope, transaction, localAccess);
         if (captured.VerifiedVersion is null)
         {
             using var update = Command(transaction, "UPDATE workspace_publication SET verified_version=$version WHERE id=$id AND verified_version IS NULL",

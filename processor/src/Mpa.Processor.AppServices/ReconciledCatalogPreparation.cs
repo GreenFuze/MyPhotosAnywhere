@@ -5,9 +5,10 @@ namespace Mpa.Processor.AppServices;
 
 public sealed partial class LocalCatalogReconciliationService
 {
-    private void AssertReadProof(ProcessorStateDatabase database, CompletedRead proof, CancellationToken token)
+    private void AssertReadProof(ProcessorStateDatabase database, CompletedRead proof, CancellationToken token, bool allowPendingSignatureRecovery = false)
     {
         _ = CurrentRead(proof.Result, token);
+        if (proof.Captured.Recovery is not null && !allowPendingSignatureRecovery) throw new CatalogGenerationCaptureConflictException();
         var authority = new LibraryAuthorityRepository(database, _budget);
         if (authority.Controller() != proof.Captured.Pin || authority.CaptureLocalPublicationAuthority() != proof.Captured.Authority ||
             _keys.PublicIdentity != proof.Captured.Native) throw new StaleLibraryConfigurationException();
@@ -20,6 +21,7 @@ public sealed partial class LocalCatalogReconciliationService
     // previously returned record can choose identities or checkpoint a prepared graph.
     internal async Task<CatalogGenerationCapture> BeginCurrentGenerationAsync(CancellationToken token)
     {
+        await EnsureActiveGenerationAccessAsync(token).ConfigureAwait(false);
         var read = await ReadCurrentAsync(token).ConfigureAwait(false);
         await _serial.WaitAsync(token).ConfigureAwait(false);
         try
@@ -35,7 +37,7 @@ public sealed partial class LocalCatalogReconciliationService
                     throw new CatalogGenerationInProgressException();
                 if (retained is not null)
                 {
-                    new LibraryAuthorityRepository(database).AssertLocalPublicationScope(retained.Scope);
+                    AssertLocalGenerationScope(database, retained.Scope, token);
                     if (retained.Phase == "publication-planned") _ = AssertGeneration(database, proof, retained.Scope, token);
                     return retained;
                 }
@@ -50,6 +52,7 @@ public sealed partial class LocalCatalogReconciliationService
 
     internal async Task<(CapturedCatalogPublication Publication, AcceptedSourceConfiguration Sources)> CaptureCurrentBasisAsync(Guid generationId, CancellationToken token)
     {
+        await EnsureGenerationAccessAsync(generationId, token).ConfigureAwait(false);
         var read = await ReadCurrentAsync(token).ConfigureAwait(false);
         await _serial.WaitAsync(token).ConfigureAwait(false);
         try
@@ -61,7 +64,7 @@ public sealed partial class LocalCatalogReconciliationService
                 new WorkspacePublicationRepository(database, _budget).AssertInventoryUnchanged(proof.Publications);
                 var journal = new CatalogGenerationCaptureRepository(database, _budget);
                 var capture = journal.Read(generationId) ?? throw new CatalogGenerationCaptureConflictException();
-                new LibraryAuthorityRepository(database).AssertLocalPublicationScope(capture.Scope);
+                AssertLocalGenerationScope(database, capture.Scope, token);
                 if (read.PendingSigning.Count != 0 || read.PendingPublications.Any(id => proof.Publications.Objects.Single(item => item.Id == id).Scope != capture.Scope))
                     throw new CatalogGenerationInProgressException();
                 var publication = journal.Publication(generationId);
@@ -69,7 +72,7 @@ public sealed partial class LocalCatalogReconciliationService
                 if (publication is null)
                 {
                     if (capture.Snapshot is null || capture.Phase != "frozen") throw new CatalogGenerationCaptureConflictException();
-                    publication = journal.CapturePublicationBasis(generationId, new(capture.Snapshot, read.Parent, read.Sequence, sources.EnvelopeSha256, 0, 1));
+                    publication = journal.CapturePublicationBasis(generationId, new(capture.Snapshot, read.Parent, read.Sequence, sources.EnvelopeSha256, 0, 1), LocalAccessForScope(capture.Scope));
                 }
                 if (publication.Basis.SourcePolicySha256 != sources.EnvelopeSha256) throw new CatalogGenerationCaptureConflictException();
                 if (capture.Phase == "publication-planned") _ = AssertGeneration(database, proof, capture.Scope, token);
@@ -81,6 +84,7 @@ public sealed partial class LocalCatalogReconciliationService
 
     internal async Task<CapturedCatalogPublication> SealCurrentDependenciesAsync(Guid generationId, CapturedCatalogCommitPlan plan, CancellationToken token)
     {
+        await EnsureGenerationAccessAsync(generationId, token).ConfigureAwait(false);
         ReconciledLocalCatalog read;
         while (true)
         {
@@ -98,7 +102,7 @@ public sealed partial class LocalCatalogReconciliationService
                 var generation = new CatalogGenerationCaptureRepository(database, _budget).Publication(generationId)
                     ?? throw new CatalogGenerationCaptureConflictException();
                 _ = AssertGeneration(database, proof, generation.Capture.Scope, token, allowPrepared: true);
-                return new CatalogGenerationCaptureRepository(database, _budget).SealDependencies(generationId, plan);
+                return new CatalogGenerationCaptureRepository(database, _budget).SealDependencies(generationId, plan, LocalAccessForScope(generation.Capture.Scope));
             }, token).ConfigureAwait(false);
         }
         finally { _serial.Release(); }
@@ -114,7 +118,7 @@ public sealed partial class LocalCatalogReconciliationService
                     ?? throw new CatalogGenerationCaptureConflictException();
                 var publication = new CatalogGenerationCaptureRepository(database, owner._budget).Publication(active.Scope.GenerationId)
                     ?? throw new CatalogGenerationCaptureConflictException();
-                new LibraryAuthorityRepository(database).AssertLocalPublicationScope(active.Scope);
+                owner.AssertLocalGenerationScope(database, active.Scope, token);
                 if (!(active.Phase == "publication-planned" && publication.Plan is null || active.Phase is "dependencies-ready" or "commit-sealed" or "commit-verified" or "complete" && publication.Plan == plan) ||
                     publication.Basis != plan.Basis)
                     throw new CatalogGenerationCaptureConflictException();

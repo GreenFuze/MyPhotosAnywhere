@@ -26,12 +26,13 @@ public sealed partial class CatalogGenerationCaptureRepository
     /// <summary>The joined concrete owner calls this only after current full graph and
     /// ancestry verification. Independently checks the exact retained signature/outbox,
     /// completed actual observation and original scope inside the checkpoint transaction.</summary>
-    public CatalogGenerationVerification ConfirmCurrentCommitVerified(Guid generationId, WorkspaceInventoryCheckpoint checkpoint, CatalogObjectReference committed)
+    public CatalogGenerationVerification ConfirmCurrentCommitVerified(Guid generationId, WorkspaceInventoryCheckpoint checkpoint, CatalogObjectReference committed,
+        CatalogGenerationLocalAccess? localAccess = null)
     {
         Id(generationId); ArgumentNullException.ThrowIfNull(checkpoint); ArgumentNullException.ThrowIfNull(committed);
         using var transaction = _database.Connection.BeginTransaction(); var capture = RequiredCapture(generationId, transaction);
         if (capture.Phase is not ("commit-sealed" or "commit-verified" or "complete")) throw new CatalogGenerationCaptureConflictException();
-        var actual = CurrentVerification(capture, checkpoint, committed, transaction);
+        var actual = CurrentVerification(capture, checkpoint, committed, transaction, localAccess);
         var retained = ReadVerification(capture, transaction);
         if (retained is not null) { transaction.Commit(); return retained; }
         if (capture.Phase != "commit-sealed") throw new InvalidDataException("Verified generation lost its original receipt.");
@@ -46,11 +47,12 @@ public sealed partial class CatalogGenerationCaptureRepository
     /// <summary>Atomically completes this publisher's exact head and generation. This
     /// is not independent-client catalog activation. A prior receipt is historical only;
     /// current local policy, completed scan and every generation object are rechecked.</summary>
-    public PublishedCatalogHead CompleteCurrentGeneration(Guid generationId, WorkspaceInventoryCheckpoint checkpoint, CatalogObjectReference committed)
+    public PublishedCatalogHead CompleteCurrentGeneration(Guid generationId, WorkspaceInventoryCheckpoint checkpoint, CatalogObjectReference committed,
+        CatalogGenerationLocalAccess? localAccess = null)
     {
         Id(generationId); using var transaction = _database.Connection.BeginTransaction(); var capture = RequiredCapture(generationId, transaction);
         if (capture.Phase is not ("commit-verified" or "complete")) throw new CatalogGenerationCaptureConflictException();
-        _ = CurrentVerification(capture, checkpoint, committed, transaction);
+        _ = CurrentVerification(capture, checkpoint, committed, transaction, localAccess);
         var receipt = ReadVerification(capture, transaction) ?? throw new InvalidDataException("Completion lost its original verification.");
         var publication = ReadPublication(capture, transaction)!; var previous = ReadPublishedHead(transaction);
         if (capture.Phase == "complete")
@@ -100,14 +102,16 @@ public sealed partial class CatalogGenerationCaptureRepository
         ChangePhase(capture, "retired", transaction); transaction.Commit(); actual.Confirm(); return capture with { Phase = "retired" };
     }
 
-    private CatalogGenerationVerification CurrentVerification(CatalogGenerationCapture capture, WorkspaceInventoryCheckpoint checkpoint, CatalogObjectReference committed, SqliteTransaction transaction)
+    private CatalogGenerationVerification CurrentVerification(CatalogGenerationCapture capture, WorkspaceInventoryCheckpoint checkpoint, CatalogObjectReference committed,
+        SqliteTransaction transaction, CatalogGenerationLocalAccess? localAccess)
     {
-        new LibraryAuthorityRepository(_database).AssertLocalPublicationScope(capture.Scope, transaction);
+        new LibraryAuthorityRepository(_database).AssertLocalPublicationScope(capture.Scope, transaction, localAccess);
         var publication = ReadPublication(capture, transaction) ?? throw new CatalogGenerationCaptureConflictException();
         var intent = new ProtocolSigningJournal(_database, _budget).Read(capture.CommitIntentId, transaction) ?? throw new CatalogGenerationCaptureConflictException();
         var work = CommitWork(capture, intent, transaction);
         var context = checkpoint.Context; var scope = capture.Scope;
-        if (context.LibraryId != scope.LibraryId || context.AccountId != scope.AccountId || context.FolderId != scope.FolderId || context.AccountRevision != scope.AccountRevision ||
+        if (context.LibraryId != scope.LibraryId || context.AccountId != scope.AccountId || context.FolderId != scope.FolderId ||
+            context.AccountRevision != (localAccess?.AccountRevision ?? scope.AccountRevision) ||
             committed != new CatalogObjectReference(scope.AccountId, work.FileId!, scope.FolderId, work.Payload.Length, work.Sha256)) throw new WorkspaceObservationConflictException();
         var observations = new WorkspaceObservationRepository(_database, _budget); observations.AssertCompletedScan(checkpoint, null, transaction);
         var known = observations.Known(context, transaction).ToDictionary(item => item.FileId, StringComparer.Ordinal);
@@ -164,7 +168,7 @@ public sealed partial class CatalogGenerationCaptureRepository
             var work = CommitWork(capture, intent, transaction);
             if (receipt.Scope != capture.Scope || receipt.GenerationId != capture.Scope.GenerationId || receipt.SnapshotId != capture.SnapshotId || receipt.CommitIntentId != capture.CommitIntentId ||
                 receipt.Sequence != intent.Sequence || receipt.Assets != capture.Snapshot!.Assets || receipt.Observation?.Context is not { } context || receipt.Commit is null ||
-                context.LibraryId != capture.Scope.LibraryId || context.AccountId != capture.Scope.AccountId || context.FolderId != capture.Scope.FolderId || context.AccountRevision != capture.Scope.AccountRevision ||
+                !VerificationAccessMatches(capture, context, transaction) ||
                 receipt.Observation.Revision < 1 || receipt.Observation.Documents is < 1 or > WorkspaceObservationRepository.MaximumDocuments ||
                 receipt.Observation.Cursor is not { Length: > 0 and <= 4096 } || receipt.Observation.Cursor.Any(char.IsControl) || !Digest(receipt.Observation.InventorySha256) ||
                 receipt.Commit.FileId != work.FileId || receipt.Commit.Version < work.VerifiedVersion || receipt.Commit.Bytes != work.Payload.Length || receipt.Commit.Sha256 != work.Sha256 ||
@@ -175,6 +179,18 @@ public sealed partial class CatalogGenerationCaptureRepository
         catch (Exception error) when (error is JsonException or ArgumentException or ProtocolFormatException or OverflowException)
         { throw new InvalidDataException("Generation verification cannot be decoded safely.", error); }
     }
+    private bool VerificationAccessMatches(CatalogGenerationCapture capture, WorkspaceObservationContext context, SqliteTransaction? transaction)
+    {
+        var scope = capture.Scope;
+        if (context.LibraryId != scope.LibraryId || context.AccountId != scope.AccountId || context.FolderId != scope.FolderId || context.AccountRevision < scope.AccountRevision)
+            return false;
+        if (context.AccountRevision == scope.AccountRevision) return true;
+        // Historical verification may retain the original scope and actual renewed
+        // observation only through its exact immutable access-attempt binding. This
+        // read is not current access. Use the already-read capture to avoid recursion.
+        return ReadAccessAttempt(capture, context.AccountRevision, transaction)?.Observation.Context == context;
+    }
+
     private WorkspacePublicationRecord CommitWork(CatalogGenerationCapture capture, ProtocolSigningIntent intent, SqliteTransaction? transaction)
     {
         var publication = ReadPublication(capture, transaction) ?? throw new InvalidDataException("Commit verification lost its publication basis.");

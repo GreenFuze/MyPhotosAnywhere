@@ -18,12 +18,13 @@ public interface IWorkspacePublicationAuthority
 /// owns scheduling; no route/background task is enabled here. Actual network operations
 /// remain joined during cancellation, credential retirement and shutdown.</summary>
 public sealed class WorkspacePublicationUploader(ProcessorStateCoordinator state, ProcessorAccountService accounts,
-    StorageBudgetManager budget, IWorkspacePublicationAuthority authority)
+    StorageBudgetManager budget, IWorkspacePublicationAuthority authority, CatalogGenerationLocalAccess? localAccess = null)
 {
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly ProcessorAccountService _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
     private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
     private readonly IWorkspacePublicationAuthority _authority = authority ?? throw new ArgumentNullException(nameof(authority));
+    private readonly CatalogGenerationLocalAccess? _localAccess = localAccess;
 
     public async Task<WorkspacePublicationRecord> UploadAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -35,7 +36,7 @@ public sealed class WorkspacePublicationUploader(ProcessorStateCoordinator state
         if (captured.VerifiedVersion is not null) return captured;
         return await _accounts.ReadDriveAsync(captured.Scope.AccountId, async (connection, revision, token) =>
         {
-            if (revision != captured.Scope.AccountRevision) throw new StaleLibraryConfigurationException();
+            if (revision != (_localAccess?.AccountRevision ?? captured.Scope.AccountRevision)) throw new StaleLibraryConfigurationException();
             if (connection is not IGoogleWorkspacePublication writer) throw new InvalidOperationException("The owned Drive connection does not support metadata publication.");
             // Another caller may have completed this same work while this caller waited
             // for the shared account lease. Re-read before allocating another identity.
@@ -65,8 +66,8 @@ public sealed class WorkspacePublicationUploader(ProcessorStateCoordinator state
             return await _state.ExecuteAsync(database =>
             {
                 token.ThrowIfCancellationRequested(); cancellationToken.ThrowIfCancellationRequested();
-                var journal = new WorkspacePublicationRepository(database, _budget); journal.AssertCurrent(id);
-                return journal.ConfirmVerified(id, result.AccountId, result.FolderId, result.FileId, captured.Sha256, result.Bytes.Length, result.DriveVersion);
+                var journal = new WorkspacePublicationRepository(database, _budget); journal.AssertCurrent(id, _localAccess);
+                return journal.ConfirmVerified(id, result.AccountId, result.FolderId, result.FileId, captured.Sha256, result.Bytes.Length, result.DriveVersion, _localAccess);
             }, token).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
     }
@@ -76,7 +77,7 @@ public sealed class WorkspacePublicationUploader(ProcessorStateCoordinator state
         token.ThrowIfCancellationRequested();
         await _authority.ValidateAsync(captured.Scope, token).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
-        await _state.ExecuteAsync(database => { new WorkspacePublicationRepository(database, _budget).AssertCurrent(captured.Id); return true; }, token).ConfigureAwait(false);
+        await _state.ExecuteAsync(database => { new WorkspacePublicationRepository(database, _budget).AssertCurrent(captured.Id, _localAccess); return true; }, token).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
     }
 }

@@ -45,7 +45,8 @@ public sealed class JournaledProtocolSigner(ProcessorStateCoordinator state, Lib
     /// <summary>Generation signing always reconstructs its body from the durable fixed
     /// plan under the serial state owner. A lost phase checkpoint replays the exact sealed
     /// intent. This grants no cloud upload or activation authority.</summary>
-    public async Task<ProtocolSigningIntent> SignCapturedCatalogAsync(Guid generationId, CancellationToken cancellationToken)
+    public async Task<ProtocolSigningIntent> SignCapturedCatalogAsync(Guid generationId, CancellationToken cancellationToken,
+        CatalogGenerationLocalAccess? localAccess = null)
     {
         var id = await _state.ExecuteAsync(database => new CatalogGenerationCaptureRepository(database, _budget).Read(generationId)?.CommitIntentId
             ?? throw new InvalidOperationException("The generation capture is missing."), cancellationToken).ConfigureAwait(false);
@@ -57,7 +58,7 @@ public sealed class JournaledProtocolSigner(ProcessorStateCoordinator state, Lib
             if (capture.CommitIntentId != id || capture.Phase is not ("dependencies-ready" or "commit-sealed") ||
                 capture.Scope.LibraryId != identity.LibraryId || capture.Scope.ActorId != identity.PublisherId || capture.Scope.ActorEpoch != identity.PublisherEpoch)
                 throw new CatalogGenerationCaptureConflictException();
-            new LibraryAuthorityRepository(database).AssertLocalPublicationScope(capture.Scope);
+            new LibraryAuthorityRepository(database).AssertLocalPublicationScope(capture.Scope, localAccess);
             return sequence => plan.EncodeBody(capture.Scope, sequence);
         }, cancellationToken).ConfigureAwait(false);
         await _state.ExecuteAsync(database => new CatalogGenerationCaptureRepository(database, _budget).ConfirmCommitSealed(generationId), cancellationToken).ConfigureAwait(false);

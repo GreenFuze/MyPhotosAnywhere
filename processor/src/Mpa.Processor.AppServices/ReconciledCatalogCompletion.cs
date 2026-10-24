@@ -16,6 +16,7 @@ public sealed partial class LocalCatalogReconciliationService
             var token = linked.Token;
             try
             {
+                await EnsureGenerationAccessAsync(generationId, token).ConfigureAwait(false);
                 var captured = await _state.ExecuteAsync(database => new CatalogGenerationCaptureRepository(database, _budget).Publication(generationId)
                     ?? throw new CatalogGenerationCaptureConflictException(), token).ConfigureAwait(false);
                 if (captured.Capture.Phase is not ("commit-sealed" or "commit-verified" or "complete") || captured.Plan is null)
@@ -33,14 +34,14 @@ public sealed partial class LocalCatalogReconciliationService
                             ?? throw new CatalogGenerationCaptureConflictException();
                         var reference = new Mpa.Processor.Protocol.CatalogObjectReference(work.Scope.AccountId,
                             work.FileId ?? throw new WorkspacePublicationConflictException(), work.Scope.FolderId, work.Payload.Length, work.Sha256);
-                        _ = new CatalogGenerationCaptureRepository(database, _budget).ConfirmCurrentCommitVerified(generationId, proof.Result.Observation, reference);
+                        _ = new CatalogGenerationCaptureRepository(database, _budget).ConfirmCurrentCommitVerified(generationId, proof.Result.Observation, reference, LocalAccessForScope(captured.Capture.Scope));
                         return reference;
                     }, token).ConfigureAwait(false);
                     var result = await _state.ExecuteAsync(database =>
                     {
                         _ = AssertCommitGeneration(database, proof, captured.Capture.Scope, token, requireVisible: true);
                         new WorkspacePublicationRepository(database, _budget).AssertInventoryUnchanged(proof.Publications);
-                        return new CatalogGenerationCaptureRepository(database, _budget).CompleteCurrentGeneration(generationId, proof.Result.Observation, committed);
+                        return new CatalogGenerationCaptureRepository(database, _budget).CompleteCurrentGeneration(generationId, proof.Result.Observation, committed, LocalAccessForScope(captured.Capture.Scope));
                     }, token).ConfigureAwait(false);
                     Check(token); return result;
                 }

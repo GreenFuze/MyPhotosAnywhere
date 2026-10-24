@@ -22,6 +22,7 @@ public sealed partial class LocalCatalogReconciliationService
 
     private async Task<CatalogObjectReference> PublishCapturedCommitCoreAsync(Guid generationId, CancellationToken token)
     {
+        await EnsureGenerationAccessAsync(generationId, token).ConfigureAwait(false);
         var captured = await RecoverSealedCommitOutboxAsync(generationId, token).ConfigureAwait(false);
         var plan = captured.Plan ?? throw new CatalogGenerationCaptureConflictException();
         var read = await ReadPreparedCurrentAsync(plan, token).ConfigureAwait(false);
@@ -34,7 +35,7 @@ public sealed partial class LocalCatalogReconciliationService
                 _ = AssertCommitGeneration(database, proof, captured.Capture.Scope, token);
                 new WorkspacePublicationRepository(database, _budget).AssertInventoryUnchanged(proof.Publications); return true;
             }, token).ConfigureAwait(false);
-            _ = await new JournaledProtocolSigner(_state, _keys, _budget).SignCapturedCatalogAsync(generationId, token).ConfigureAwait(false);
+            _ = await new JournaledProtocolSigner(_state, _keys, _budget).SignCapturedCatalogAsync(generationId, token, LocalAccessForScope(captured.Capture.Scope)).ConfigureAwait(false);
             captured = await PrepareSealedCommitOutboxAsync(generationId, token).ConfigureAwait(false);
         }
         finally { lock (_gate) { _current = null; _completedRead = null; } _serial.Release(); }
@@ -55,10 +56,11 @@ public sealed partial class LocalCatalogReconciliationService
             }, token).ConfigureAwait(false);
             var work = prepared.Work;
             grant = new(this, proof, prepared.Generation, new(work.Id, work.Scope, work.Role, work.MimeType, work.Payload.Length, work.Sha256, work.FileId, work.VerifiedVersion));
-            var uploaded = await new WorkspacePublicationUploader(_state, _accounts, _budget, grant).UploadAsync(work.Id, token).ConfigureAwait(false);
+            var localAccess = LocalAccessForScope(work.Scope);
+            var uploaded = await new WorkspacePublicationUploader(_state, _accounts, _budget, grant, localAccess).UploadAsync(work.Id, token).ConfigureAwait(false);
             if (uploaded.FileId is null || uploaded.VerifiedVersion is null) throw new WorkspacePublicationConflictException();
             reference = new(uploaded.Scope.AccountId, uploaded.FileId, uploaded.Scope.FolderId, uploaded.Payload.Length, uploaded.Sha256);
-            var actual = await new CatalogWorkspaceObjectSource(_state, _accounts, new(uploaded.Scope.AccountId, uploaded.Scope.FolderId), uploaded.Scope.AccountRevision)
+            var actual = await new CatalogWorkspaceObjectSource(_state, _accounts, new(uploaded.Scope.AccountId, uploaded.Scope.FolderId), localAccess?.AccountRevision ?? uploaded.Scope.AccountRevision)
                 .ReadAsync(reference, token).ConfigureAwait(false);
             if (actual.Length != reference.Bytes || !CryptographicOperations.FixedTimeEquals(SHA256.HashData(actual.Span), Convert.FromHexString(reference.Sha256)))
                 throw new WorkspaceObservationConflictException();
@@ -105,7 +107,7 @@ public sealed partial class LocalCatalogReconciliationService
                 Check(token); var publication = new CatalogGenerationCaptureRepository(database, _budget).Publication(generationId)
                     ?? throw new CatalogGenerationCaptureConflictException();
                 if (publication.Plan is null || publication.Capture.Phase is not ("dependencies-ready" or "commit-sealed")) throw new CatalogGenerationCaptureConflictException();
-                var authority = new LibraryAuthorityRepository(database, _budget); authority.AssertLocalPublicationScope(publication.Capture.Scope);
+                var authority = new LibraryAuthorityRepository(database, _budget); AssertLocalGenerationScope(database, publication.Capture.Scope, token);
                 _keys.AssertPublicationIdentity(authority.Controller() ?? throw new CatalogPublicationNotAuthorizedException(), authority.CaptureLocalPublicationAuthority());
                 var intent = new ProtocolSigningJournal(database, _budget).Read(publication.Capture.CommitIntentId);
                 return (Publication: publication, Sealed: intent?.Envelope is not null);
@@ -118,21 +120,21 @@ public sealed partial class LocalCatalogReconciliationService
     private Task<CapturedCatalogPublication> PrepareSealedCommitOutboxAsync(Guid generationId, CancellationToken token) => _state.ExecuteAsync(database =>
     {
         Check(token); var publication = new CatalogGenerationCaptureRepository(database, _budget).ConfirmCommitSealed(generationId);
-        var scope = publication.Capture.Scope; var authority = new LibraryAuthorityRepository(database, _budget); authority.AssertLocalPublicationScope(scope);
+        var scope = publication.Capture.Scope; var authority = new LibraryAuthorityRepository(database, _budget); AssertLocalGenerationScope(database, scope, token);
         _keys.AssertPublicationIdentity(authority.Controller() ?? throw new CatalogPublicationNotAuthorizedException(), authority.CaptureLocalPublicationAuthority());
         var intent = new ProtocolSigningJournal(database, _budget).Read(publication.Capture.CommitIntentId) ?? throw new CatalogGenerationCaptureConflictException();
         // The same explicitly fixed ID is used in both journals. Neither a retry nor
         // a lost phase checkpoint allocates a new signing or metadata-object identity.
         var outbox = new WorkspacePublicationRepository(database, _budget); var identities = outbox.Identities(WorkspaceObservationRepository.MaximumDocuments);
         if (!identities.Contains(intent.Id) && identities.Count == WorkspaceObservationRepository.MaximumDocuments) throw new CatalogTraversalLimitException();
-        _ = outbox.Prepare(intent.Id, scope, "catalog-commit", "application/json", intent.Envelope!.Value.Span);
+        _ = outbox.Prepare(intent.Id, scope, "catalog-commit", "application/json", intent.Envelope!.Value.Span, LocalAccessForScope(scope));
         return publication;
     }, token);
 
     private CapturedCatalogPublication AssertCommitGeneration(ProcessorStateDatabase database, CompletedRead proof, WorkspacePublicationScope scope,
         CancellationToken token, bool requireVisible = false)
     {
-        AssertReadProof(database, proof, token); new LibraryAuthorityRepository(database, _budget).AssertLocalPublicationScope(scope);
+        AssertReadProof(database, proof, token); AssertLocalGenerationScope(database, scope, token);
         var publication = new CatalogGenerationCaptureRepository(database, _budget).Publication(scope.GenerationId)
             ?? throw new CatalogGenerationCaptureConflictException();
         var capture = publication.Capture; var plan = publication.Plan ?? throw new CatalogGenerationCaptureConflictException();

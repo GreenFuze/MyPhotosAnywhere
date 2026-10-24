@@ -17,21 +17,23 @@ public sealed class CatalogGenerationWorkspaceSink : ICatalogGenerationObjectSin
     private readonly WorkspacePublicationScope _scope;
     private readonly WorkspacePublicationUploader _uploader;
     private readonly CatalogWorkspaceObjectSource _readback;
+    private readonly CatalogGenerationLocalAccess? _localAccess;
 
     public CatalogGenerationWorkspaceSink(ProcessorStateCoordinator state, ProcessorAccountService accounts,
-        StorageBudgetManager budget, IWorkspacePublicationAuthority authority, WorkspacePublicationScope scope)
+        StorageBudgetManager budget, IWorkspacePublicationAuthority authority, WorkspacePublicationScope scope, CatalogGenerationLocalAccess? localAccess = null)
     {
         _state = state ?? throw new ArgumentNullException(nameof(state));
         _budget = budget ?? throw new ArgumentNullException(nameof(budget));
         _authority = authority ?? throw new ArgumentNullException(nameof(authority));
         _scope = scope ?? throw new ArgumentNullException(nameof(scope));
+        _localAccess = localAccess;
         ArgumentNullException.ThrowIfNull(accounts);
         if (scope.LibraryId == Guid.Empty || scope.ActorId == Guid.Empty || scope.GenerationId == Guid.Empty || scope.ActorEpoch < 1 ||
             scope.AccountRevision < 1 || scope.ConfigurationRevision < 1 || !Identity(scope.AccountId) || !Identity(scope.FolderId) || scope.FolderId == "root" ||
             scope.AuthoritySha256 is not { Length: 64 } || scope.AuthoritySha256.Any(value => value is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
             throw new ArgumentException("A complete captured publication scope is required.", nameof(scope));
-        _uploader = new(state, accounts, budget, authority);
-        _readback = new(state, accounts, new(scope.AccountId, scope.FolderId), scope.AccountRevision);
+        _uploader = new(state, accounts, budget, authority, localAccess);
+        _readback = new(state, accounts, new(scope.AccountId, scope.FolderId), localAccess?.AccountRevision ?? scope.AccountRevision);
     }
 
     public async Task<CatalogObjectReference> StoreAsync(string role, string mimeType, ReadOnlyMemory<byte> payload, CancellationToken cancellationToken)
@@ -49,7 +51,7 @@ public sealed class CatalogGenerationWorkspaceSink : ICatalogGenerationObjectSin
         var hash = Convert.ToHexStringLower(SHA256.HashData(owned)); var id = ObjectId(_scope, role, mimeType, hash);
         await _authority.ValidateAsync(_scope, cancellationToken).ConfigureAwait(false); cancellationToken.ThrowIfCancellationRequested();
         var prepared = await _state.ExecuteAsync(database => new WorkspacePublicationRepository(database, _budget)
-            .Prepare(id, _scope, role, mimeType, owned), cancellationToken).ConfigureAwait(false);
+            .Prepare(id, _scope, role, mimeType, owned, _localAccess), cancellationToken).ConfigureAwait(false);
         var uploaded = await _uploader.UploadAsync(prepared.Id, cancellationToken).ConfigureAwait(false); cancellationToken.ThrowIfCancellationRequested();
         if (uploaded.Scope != _scope || uploaded.Id != id || uploaded.Role != role || uploaded.MimeType != mimeType || uploaded.Sha256 != hash ||
             uploaded.FileId is null || uploaded.VerifiedVersion is null || uploaded.Payload.Length != owned.Length)
@@ -61,7 +63,7 @@ public sealed class CatalogGenerationWorkspaceSink : ICatalogGenerationObjectSin
         if (current.Length != owned.Length || !CryptographicOperations.FixedTimeEquals(SHA256.HashData(current.Span), Convert.FromHexString(hash)))
             throw new InvalidDataException("The dependency's current read-back differs from its captured bytes.");
         await _authority.ValidateAsync(_scope, cancellationToken).ConfigureAwait(false); cancellationToken.ThrowIfCancellationRequested();
-        await _state.ExecuteAsync(database => { new WorkspacePublicationRepository(database, _budget).AssertCurrent(id); return true; }, cancellationToken).ConfigureAwait(false);
+        await _state.ExecuteAsync(database => { new WorkspacePublicationRepository(database, _budget).AssertCurrent(id, _localAccess); return true; }, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested(); return reference;
     }
 

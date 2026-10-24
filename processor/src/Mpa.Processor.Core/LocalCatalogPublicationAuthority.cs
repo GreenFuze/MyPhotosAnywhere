@@ -19,14 +19,15 @@ public sealed partial class LibraryAuthorityRepository
         transaction.Commit(); return result;
     }
 
-    public void AssertLocalPublicationScope(WorkspacePublicationScope scope)
+    public void AssertLocalPublicationScope(WorkspacePublicationScope scope, CatalogGenerationLocalAccess? localAccess = null)
     {
         ArgumentNullException.ThrowIfNull(scope); using var transaction = _database.Connection.BeginTransaction();
-        AssertLocalPublicationScope(scope, transaction); transaction.Commit();
+        AssertLocalPublicationScope(scope, transaction, localAccess); transaction.Commit();
     }
 
-    internal void AssertLocalPublicationScope(WorkspacePublicationScope scope, SqliteTransaction transaction)
+    internal void AssertLocalPublicationScope(WorkspacePublicationScope scope, SqliteTransaction transaction, CatalogGenerationLocalAccess? localAccess = null)
     {
+        if (localAccess is not null) { localAccess.AssertCurrent(_database, scope, transaction); return; }
         var current = ReadLocalPublicationAuthority(transaction);
         if (scope.LibraryId != current.LibraryId || scope.ActorId != current.ActorId || scope.ActorEpoch != current.ActorEpoch ||
             scope.AccountId != current.AccountId || scope.AccountRevision != current.AccountRevision || scope.FolderId != current.FolderId ||

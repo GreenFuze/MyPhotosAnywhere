@@ -130,7 +130,7 @@ public sealed partial class LibraryAuthorityTests
         var current = fixture.Store.CaptureLocalPublicationAuthority();
         var context = new WorkspaceObservationContext(current.LibraryId,current.AccountId,current.FolderId,current.AccountRevision,null);
         var observations = new WorkspaceObservationRepository(fixture.Database, fixture.Budget);
-        var checkpoint = observations.CompleteScan(observations.BeginScan(context), "actual-renewed-read", []);
+        var checkpoint = observations.CompleteScan(observations.BeginScan(context), "actual-renewed-read", observations.Known(context));
         return (current, checkpoint, new ProtocolSigningJournal(fixture.Database, fixture.Budget).Inventory(current.LibraryId),
             new WorkspacePublicationRepository(fixture.Database, fixture.Budget).Inventory(context));
     }

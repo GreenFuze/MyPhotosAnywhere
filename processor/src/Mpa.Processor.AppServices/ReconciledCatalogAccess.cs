@@ -16,14 +16,14 @@ public sealed partial class LocalCatalogReconciliationService
             var token = linked.Token;
             try
             {
-                var read = await ReadCurrentAsync(token).ConfigureAwait(false);
+                var read = await ReadRenewedCurrentAsync(generationId, token).ConfigureAwait(false);
                 await _serial.WaitAsync(token).ConfigureAwait(false);
                 try
                 {
                     var proof = CurrentRead(read, token);
                     return await _state.ExecuteAsync(database =>
                     {
-                        AssertReadProof(database, proof, token);
+                        AssertReadProof(database, proof, token, allowPendingSignatureRecovery: true);
                         new WorkspacePublicationRepository(database, _budget).AssertInventoryUnchanged(proof.Publications);
                         var journal = new CatalogGenerationCaptureRepository(database, _budget);
                         var capture = journal.Active().SingleOrDefault() ?? throw new CatalogGenerationCaptureConflictException();
@@ -61,6 +61,21 @@ public sealed partial class LocalCatalogReconciliationService
                             }
                         }
                         var result = journal.RecordRenewedAccess(generationId, proof.Captured.Authority, read.Observation, proof.Captured.Signing, proof.Publications);
+                        lock (_gate)
+                        {
+                            Check(token);
+                            if (_localAccess is { } retained && retained.Scope == result.Scope && retained.Context.AccountRevision == result.AccountRevision)
+                            {
+                                new LibraryAuthorityRepository(database, _budget).AssertLocalPublicationScope(result.Scope, retained.Context);
+                                return result;
+                            }
+                        }
+                        var local = journal.OpenLocalAccess(generationId, result.AccountRevision, read.Observation, proof.Captured.Signing, proof.Publications, _stop.Token);
+                        try
+                        {
+                            lock (_gate) { Check(token); var old = _localAccess; _localAccess = new(result.Scope, local); old?.Context.Dispose(); }
+                        }
+                        catch { local.Dispose(); throw; }
                         Check(token); return result;
                     }, token).ConfigureAwait(false);
                 }

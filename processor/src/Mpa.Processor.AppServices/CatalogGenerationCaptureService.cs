@@ -2,6 +2,14 @@ using Mpa.Processor.Core;
 
 namespace Mpa.Processor.AppServices;
 
+// Local native-copy validation only. It is never an upload/availability capability.
+// The private provider resolves the current owned context inside the serial state
+// callback, so a copy cannot retain a context retired by a reconciled credential change.
+internal interface ICatalogGenerationLocalAccessProvider
+{
+    CatalogGenerationLocalAccess? ForScope(WorkspacePublicationScope scope);
+}
+
 /// <summary>Serial application owner of journaled capture and retained readers. The
 /// caller supplies the generation's original identities and complete current authority;
 /// this service grants no cloud reconciliation, head scheduling or publication rights.
@@ -89,7 +97,11 @@ public sealed class CatalogGenerationCaptureService : IAsyncDisposable
     private async Task ValidateAsync(WorkspacePublicationScope scope, CancellationToken token)
     {
         token.ThrowIfCancellationRequested(); await _authority.ValidateAsync(scope, token).ConfigureAwait(false);
-        await _state.ExecuteAsync(database => { new LibraryAuthorityRepository(database).AssertLocalPublicationScope(scope); return true; }, token).ConfigureAwait(false);
+        await _state.ExecuteAsync(database =>
+        {
+            var local = (_authority as ICatalogGenerationLocalAccessProvider)?.ForScope(scope);
+            new LibraryAuthorityRepository(database).AssertLocalPublicationScope(scope, local); return true;
+        }, token).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
     }
     private async Task OpenStoreAsync(CancellationToken token)
