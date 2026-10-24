@@ -81,6 +81,8 @@ public sealed partial class AccountServiceTests
         Assert.AreEqual(InitialLibraryPublicationStage.NeedsApproval, runtime.Activity.Stage);
         runtime.Request(CancellationToken.None); await runtime.WaitForCurrentAttemptAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
         Assert.AreEqual(InitialLibraryPublicationStage.NeedsApproval, runtime.Activity.Stage); Assert.IsFalse(runtime.Activity.CanRetry);
+        var connected = await setup.Accounts.Service.ConnectAsync("permission-A", new NoBrowser(), CancellationToken.None).ConfigureAwait(false);
+        runtime.NotifyAccountConnected(connected); Assert.AreEqual(InitialLibraryPublicationStage.NeedsApproval, runtime.Activity.Stage);
         Assert.IsNull(await setup.Setup.CurrentAsync(CancellationToken.None).ConfigureAwait(false)); Assert.AreEqual(0, setup.Accounts.Readers.DocumentCalls);
     }
 

@@ -93,10 +93,11 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
     public async Task AccountAsync(DesktopAccountCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+        DriveAccountRecord? connected = null;
         switch (command.Operation)
         {
             case DesktopAccountOperation.Connect:
-                await _accounts.ConnectAsync(command.AccountId, new SystemAuthorizationBrowser(), cancellationToken).ConfigureAwait(false); break;
+                connected = await _accounts.ConnectAsync(command.AccountId, new SystemAuthorizationBrowser(), cancellationToken).ConfigureAwait(false); break;
             case DesktopAccountOperation.Check:
                 if (await _accounts.CheckAsync(command.AccountId ?? throw new ArgumentException("Account identity required."), cancellationToken).ConfigureAwait(false) is null)
                     throw new HttpRequestException("Google Drive authorization requires reconnection.", null, System.Net.HttpStatusCode.Unauthorized);
@@ -105,14 +106,21 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
                 await _accounts.DisconnectAsync(command.AccountId ?? throw new ArgumentException("Account identity required."),
                     command.ExpectedRevision ?? throw new ArgumentException("Account revision required."), cancellationToken).ConfigureAwait(false); break;
             case DesktopAccountOperation.Resume:
-                await _accounts.ResumePendingAsync(command.PendingId ?? throw new ArgumentException("Pending identity required."), new SystemAuthorizationBrowser(), cancellationToken).ConfigureAwait(false); break;
+                connected = await _accounts.ResumePendingAsync(command.PendingId ?? throw new ArgumentException("Pending identity required."), new SystemAuthorizationBrowser(), cancellationToken).ConfigureAwait(false); break;
             case DesktopAccountOperation.Abandon:
                 await _accounts.AbandonPendingAsync(command.PendingId ?? throw new ArgumentException("Pending identity required."), cancellationToken).ConfigureAwait(false); break;
             case DesktopAccountOperation.Cleanup: break;
             default: throw new ArgumentOutOfRangeException(nameof(command));
         }
+        if (connected is not null)
+        {
+            // Promotion is durable. Neither browser cancellation nor credential
+            // cleanup may lose its engine-owned wake-up after successful consent.
+            _publication?.NotifyAccountConnected(connected);
+            _sources?.NotifySourcesChanged();
+        }
         await _accounts.CleanCredentialsAsync(cancellationToken).ConfigureAwait(false);
-        _sources?.NotifySourcesChanged();
+        if (connected is null) _sources?.NotifySourcesChanged();
     }
 
     public Task<LibrarySourceSnapshot> SourcesAsync(CancellationToken cancellationToken) => _state.ExecuteAsync(database => new LibrarySourceRepository(database).Snapshot(), cancellationToken);

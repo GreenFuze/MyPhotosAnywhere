@@ -36,6 +36,7 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
     private long _drainVersion;
     private Exception? _failure;
     private Exception? _lastAttemptFailure;
+    private string? _workspaceAccountId;
     private InitialLibraryPublicationActivity _activity = new(InitialLibraryPublicationStage.NeedsApproval, null, false);
     public event Action<Exception>? Failed;
     public Exception? Failure { get { lock (_gate) return _failure; } }
@@ -80,6 +81,23 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
         }
     }
 
+    /// <summary>A committed human Google connection is an explicit retry of access
+    /// attention for this workspace, not a policy/recovery approval or cloud grant.
+    /// Scheduling is synchronous and engine-owned even if its browser closes next.</summary>
+    public void NotifyAccountConnected(DriveAccountRecord account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        lock (_gate)
+        {
+            if (_stopping || _failure is not null || !account.Connected || account.PermissionId != _workspaceAccountId ||
+                _activity.Stage == InitialLibraryPublicationStage.NeedsApproval) return;
+            if (_activity.Stage == InitialLibraryPublicationStage.NeedsAttention && _lastAttemptFailure is not
+                (TokenResponseException or CredentialVaultException or StaleDriveConnectionException or StaleLibraryConfigurationException or
+                HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized })) return;
+            _ = Request(CancellationToken.None);
+        }
+    }
+
     private async Task DrainAsync(long drain)
     {
         while (true)
@@ -115,8 +133,10 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
             var readiness = await _state.ExecuteAsync(database =>
             {
                 ThrowIfStopping(); var authority = new LibraryAuthorityRepository(database, _budget);
+                var controller = authority.Controller();
+                lock (_gate) { ThrowIfStopping(); _workspaceAccountId = controller?.AccountId; }
                 if (authority.InitialPublicationCompletion() is not null) return InitialLibraryPublicationStage.PoliciesPublished;
-                if (authority.Controller() is null || authority.BootstrapSources() is null) return InitialLibraryPublicationStage.NeedsApproval;
+                if (controller is null || authority.BootstrapSources() is null) return InitialLibraryPublicationStage.NeedsApproval;
                 authority.AssertBootstrapSourcesCurrent(); return InitialLibraryPublicationStage.Running;
             }, _stop.Token).ConfigureAwait(false);
             ThrowIfStopping();
@@ -168,7 +188,7 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
         return error switch
         {
             InsufficientStorageBudgetException => "Free space on this computer, then retry library setup.",
-            TokenResponseException or HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized } => "Reconnect Google Drive in Settings, then retry library setup. Saved progress has been kept.",
+            TokenResponseException or HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized } => "Reconnect Google Drive in Settings. Saved library work will resume after authorization.",
             CredentialVaultException => "Unlock this computer’s credential storage, then retry library setup. Saved progress has been kept.",
             StaleDriveConnectionException or StaleLibraryConfigurationException => "Google Drive access or the approved source settings changed. Review them before retrying.",
             LibraryWorkspaceApprovalException => "Review this workspace’s sharing permission before publishing private metadata.",

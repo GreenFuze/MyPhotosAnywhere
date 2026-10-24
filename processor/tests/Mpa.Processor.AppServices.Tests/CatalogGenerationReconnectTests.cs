@@ -6,6 +6,133 @@ namespace Mpa.Processor.AppServices.Tests;
 public sealed partial class AccountServiceTests
 {
     [TestMethod]
+    public async Task SuccessfulHumanReconnectWakesAccessAttentionWhileBackgroundProgressAndForeignConnectionsCannot()
+    {
+        await using var fixture = await InitialPublicationFixture.CreateAsync(addSource: true).ConfigureAwait(false);
+        await fixture.Owner.PublishAsync(CancellationToken.None).ConfigureAwait(false); ConfigureGenerationWorkspace(fixture);
+        await AddPreparationPhotoAsync(fixture, "original-photo").ConfigureAwait(false);
+        var create = fixture.Setup.Accounts.Readers.WorkspaceCreate!;
+        fixture.Setup.Accounts.Readers.WorkspaceCreate = async (folder, file, mime, bytes, hash, token) =>
+        {
+            var stored = await create(folder, file, mime, bytes, hash, token).ConfigureAwait(false);
+            if (mime == "application/gzip") throw new HttpRequestException("Synthetic expired authorization after actual create.", null, System.Net.HttpStatusCode.Unauthorized);
+            return stored;
+        };
+        var current = CatalogReconciler(fixture); var generations = await GenerationRuntimeAsync(fixture, current).ConfigureAwait(false);
+        await using var runtime = new InitialLibraryPublicationRuntime(fixture.Setup.Accounts.State, fixture.Setup.Accounts.Service,
+            fixture.Setup.Keys, fixture.Budget, current, generations);
+        runtime.Request(CancellationToken.None);
+        await runtime.WaitForCurrentAttemptAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(90)).ConfigureAwait(false);
+        var failure = runtime.LastAttemptFailure; Assert.IsNotNull(failure); Assert.IsNull(runtime.Failure);
+        Assert.AreEqual(InitialLibraryPublicationStage.NeedsAttention, runtime.Activity.Stage);
+        var original = await fixture.Setup.Accounts.State.ExecuteAsync(database => new CatalogGenerationCaptureRepository(database, fixture.Budget).Active().Single(), CancellationToken.None).ConfigureAwait(false);
+        var before = (fixture.Allocations, fixture.Creates);
+        runtime.NotifyLocalCatalogChanged();
+        var account = await fixture.Setup.Accounts.Service.ConnectAsync("permission-A", new NoBrowser(), CancellationToken.None).ConfigureAwait(false);
+        runtime.NotifyAccountConnected(account with { PermissionId = "unrelated-account" });
+        Assert.AreSame(failure, runtime.LastAttemptFailure); Assert.AreEqual(before, (fixture.Allocations, fixture.Creates));
+        fixture.Setup.Accounts.Readers.WorkspaceCreate = create;
+        runtime.NotifyAccountConnected(account);
+        await runtime.WaitForCurrentAttemptAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(90)).ConfigureAwait(false);
+        Assert.IsNull(runtime.LastAttemptFailure); Assert.IsNull(runtime.Failure);
+        // The old capture completes first. A second generation reports this source's
+        // renewed account revision/pending scan without changing its original photos.
+        Assert.AreEqual(InitialLibraryPublicationStage.PoliciesPublished, runtime.Activity.Stage); Assert.AreEqual(2L, runtime.CurrentCatalog!.Sequence);
+        await fixture.Setup.Accounts.State.ExecuteAsync(database =>
+        {
+            var journal = new CatalogGenerationCaptureRepository(database, fixture.Budget); var actual = journal.Read(original.Scope.GenerationId)!;
+            Assert.AreEqual("retired", actual.Phase); Assert.AreEqual(original.Scope, actual.Scope); Assert.AreEqual(original.SnapshotId, actual.SnapshotId);
+            var receipt = journal.Verification(actual.Scope.GenerationId)!;
+            Assert.AreEqual(1L, receipt.Sequence); Assert.AreEqual(account.Revision, receipt.Observation.Context.AccountRevision); return true;
+        }, CancellationToken.None).ConfigureAwait(false);
+        var allocations = fixture.Allocations;
+        runtime.NotifyAccountConnected(account); runtime.NotifyAccountConnected(account);
+        await runtime.WaitForCurrentAttemptAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+        Assert.IsNull(runtime.LastAttemptFailure); Assert.AreEqual(2L, runtime.CurrentCatalog!.Sequence); Assert.AreEqual(allocations, fixture.Allocations);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task HumanReconnectDoesNotDismissSharingAttentionOrRestartAnInternalInvariant(bool invariant)
+    {
+        await using var fixture = await InitialPublicationFixture.CreateAsync(addSource: true).ConfigureAwait(false);
+        await fixture.Owner.PublishAsync(CancellationToken.None).ConfigureAwait(false); ConfigureGenerationWorkspace(fixture);
+        var current = CatalogReconciler(fixture); var generations = await GenerationRuntimeAsync(fixture, current).ConfigureAwait(false);
+        await using var runtime = new InitialLibraryPublicationRuntime(fixture.Setup.Accounts.State, fixture.Setup.Accounts.Service,
+            fixture.Setup.Keys, fixture.Budget, current, generations);
+        Exception error = invariant ? new InvalidOperationException("Synthetic internal invariant.") : new LibraryWorkspaceApprovalException("Synthetic sharing review required.");
+        fixture.Setup.Accounts.Readers.WorkspaceInspect = (_, _) => throw error;
+        runtime.Request(CancellationToken.None);
+        await runtime.WaitForCurrentAttemptAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+        Assert.AreSame(error, runtime.LastAttemptFailure);
+        var before = (fixture.Allocations, fixture.Creates);
+        var account = await fixture.Setup.Accounts.Service.ConnectAsync("permission-A", new NoBrowser(), CancellationToken.None).ConfigureAwait(false);
+        runtime.NotifyAccountConnected(account);
+        Assert.AreEqual(InitialLibraryPublicationStage.NeedsAttention, runtime.Activity.Stage); Assert.AreSame(error, runtime.LastAttemptFailure);
+        Assert.AreEqual(invariant, runtime.Failure is not null); Assert.AreEqual(before, (fixture.Allocations, fixture.Creates));
+    }
+
+    [TestMethod]
+    [DataRow("allocation")]
+    [DataRow("create")]
+    [DataRow("readback")]
+    public async Task AnotherReconnectDuringActualPublicationRetainsOriginalAllocationAndRejectsLateAdmission(string stage)
+    {
+        await using var fixture = await InitialPublicationFixture.CreateAsync(addSource: true).ConfigureAwait(false);
+        await fixture.Owner.PublishAsync(CancellationToken.None).ConfigureAwait(false); ConfigureGenerationWorkspace(fixture);
+        await using var current = CatalogReconciler(fixture);
+        await using var preparation = await PreparationOwnerAsync(fixture, current).ConfigureAwait(false);
+        var prepared = await preparation.PrepareAsync(CancellationToken.None).ConfigureAwait(false);
+        var first = await fixture.Setup.Accounts.Service.ConnectAsync("permission-A", new NoBrowser(), CancellationToken.None).ConfigureAwait(false);
+        _ = await current.ReconcileRenewedAccessAsync(prepared.Capture.Scope.GenerationId, CancellationToken.None).ConfigureAwait(false);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allocate = fixture.Setup.Accounts.Readers.WorkspaceAllocate!; var create = fixture.Setup.Accounts.Readers.WorkspaceCreate!;
+        var read = fixture.Setup.Accounts.Readers.WorkspaceRead!; string? allocated = null;
+        fixture.Setup.Accounts.Readers.WorkspaceAllocate = async token =>
+        { allocated = await allocate(token).ConfigureAwait(false); if (stage == "allocation") { entered.TrySetResult(); await release.Task.ConfigureAwait(false); } return allocated; };
+        fixture.Setup.Accounts.Readers.WorkspaceCreate = async (folder, file, mime, bytes, hash, token) =>
+        { var result = await create(folder, file, mime, bytes, hash, token).ConfigureAwait(false); if (stage == "create") { entered.TrySetResult(); await release.Task.ConfigureAwait(false); } return result; };
+        fixture.Setup.Accounts.Readers.WorkspaceRead = async (folder, file, bytes, hash, token) =>
+        {
+            var result = await read(folder, file, bytes, hash, token).ConfigureAwait(false);
+            if (stage == "readback" && file == allocated) { entered.TrySetResult(); await release.Task.ConfigureAwait(false); }
+            return result;
+        };
+        var pending = current.PublishCapturedCommitAsync(prepared.Capture.Scope.GenerationId, CancellationToken.None); DriveAccountRecord second;
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+            second = await fixture.Setup.Accounts.Service.ConnectAsync("permission-A", new NoBrowser(), CancellationToken.None).ConfigureAwait(false);
+            Assert.IsTrue(second.Revision > first.Revision); Assert.IsFalse(pending.IsCompleted);
+        }
+        finally { release.TrySetResult(); }
+        await Assert.ThrowsExactlyAsync<StaleLibraryConfigurationException>(() => pending).ConfigureAwait(false); Assert.IsNull(current.Current);
+        var original = await fixture.Setup.Accounts.State.ExecuteAsync(database =>
+        {
+            var journal = new CatalogGenerationCaptureRepository(database, fixture.Budget); Assert.IsNull(journal.PublishedHead());
+            var work = new WorkspacePublicationRepository(database, fixture.Budget).Read(prepared.Capture.CommitIntentId)!;
+            Assert.AreEqual(allocated, work.FileId); Assert.AreEqual(prepared.Capture.Scope, work.Scope);
+            Assert.AreEqual(stage == "readback", work.VerifiedVersion is not null);
+            Assert.IsNull(journal.AccessAttempt(prepared.Capture.Scope.GenerationId, second.Revision));
+            return work;
+        }, CancellationToken.None).ConfigureAwait(false);
+        fixture.Setup.Accounts.Readers.WorkspaceAllocate = allocate; fixture.Setup.Accounts.Readers.WorkspaceCreate = create; fixture.Setup.Accounts.Readers.WorkspaceRead = read;
+        var allocations = fixture.Allocations;
+        await using var completion = new CatalogGenerationCompletionService(fixture.Setup.Accounts.State, fixture.Budget, current);
+        var head = await completion.FinishAsync(prepared.Capture.Scope.GenerationId, CancellationToken.None).ConfigureAwait(false);
+        Assert.AreEqual(1L, head.Sequence); Assert.AreEqual(original.FileId, head.Commit.FileId); Assert.AreEqual(allocations, fixture.Allocations);
+        await fixture.Setup.Accounts.State.ExecuteAsync(database =>
+        {
+            var journal = new CatalogGenerationCaptureRepository(database, fixture.Budget);
+            Assert.AreEqual(prepared.Capture.Scope, journal.Read(head.GenerationId)!.Scope);
+            Assert.IsNotNull(journal.AccessAttempt(head.GenerationId, first.Revision)); Assert.IsNotNull(journal.AccessAttempt(head.GenerationId, second.Revision));
+            CollectionAssert.AreEqual(original.Payload.ToArray(), new WorkspacePublicationRepository(database, fixture.Budget).Read(original.Id)!.Payload.ToArray()); return true;
+        }, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    [TestMethod]
     [DataRow("dependency")]
     [DataRow("sealed-without-outbox")]
     [DataRow("uncertain-commit")]

@@ -1,5 +1,32 @@
 # MPA 0.6.0 implementation ledger
 
+## Explicit human reconnect scheduling and late-access rejection
+
+Successful host-browser Connect/Resume now synchronously schedules engine-owned retry
+before browser cancellation or credential cleanup can lose that wake-up. Only the
+workspace's account and recoverable access attention qualify. Reconnect cannot infer
+workspace approval, dismiss sharing/history review or restart an internal invariant.
+Every admitted retry still executes actual current reconciliation and original-work
+recovery. Ordinary source notifications continue to preserve attention.
+
+Seven focused actual cases pass, including the existing no-inferred-approval case,
+successful OAuth recovery, foreign connection filtering, sharing/invariant attention,
+and another real reconnect during allocation, create and readback. Stale completions
+are rejected; original allocated target, scope, bytes and signature remain available.
+A successful create receipt from before a later access loss remains historical, while
+head completion is blocked until fresh admission. Renewal retries reuse the target.
+
+The new routing fixture initially expected a single generation after reconnect.
+Actual source coverage correctly changes its account revision, so the test now checks
+the original sequence-one frozen generation and the sequence-two coverage catch-up,
+then proves repeated reconnect notifications allocate no third generation. Its failed
+development log remains failed; no production fence or existing assertion was weakened.
+Complete frozen validation passes all 335 Core, 287 AppServices, 26 Web and 77 Protocol
+cases. All five locked strict builds have zero warnings/errors, complete final logs are
+clean and every output has matching component binaries. Evidence is retained in
+preflight-060/generation-reconnect-routing-validation.json. This does not resolve the
+historical worker blocker or establish live Google/physical acceptance.
+
 ## Release blocker: intermittent worker exit-task join
 
 One complete native run failed the actual stubborn-child disposal case: the OS reported
@@ -68,7 +95,7 @@ membership, immutable pending work, native keys, current policy and both invento
 Its returned record is historical evidence, never a transferable write grant. Existing
 strict original-scope upload/signing/completion fences remain the default; the explicit
 local-context integration described above supplies renewed credentials separately.
-Successful human reconnect still needs explicit engine retry routing. All seven native journal/migration
+Successful human reconnect now has the explicit guarded scheduling described above. All seven native journal/migration
 cases and six actual reconnect cases pass, including failed native checkpoints, low
 storage, bounded history, restarts, original allocation membership, foreign heads and
 joined uncooperative reads. Complete instrumented immutable suites pass: 328 Core,
