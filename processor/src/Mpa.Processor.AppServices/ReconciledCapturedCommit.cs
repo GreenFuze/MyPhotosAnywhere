@@ -136,7 +136,7 @@ public sealed partial class LocalCatalogReconciliationService
         var publication = new CatalogGenerationCaptureRepository(database, _budget).Publication(scope.GenerationId)
             ?? throw new CatalogGenerationCaptureConflictException();
         var capture = publication.Capture; var plan = publication.Plan ?? throw new CatalogGenerationCaptureConflictException();
-        if (capture.Scope != scope || capture.Phase is not ("dependencies-ready" or "commit-sealed") || proof.Prepared != plan ||
+        if (capture.Scope != scope || capture.Phase is not ("dependencies-ready" or "commit-sealed" or "commit-verified" or "complete") || proof.Prepared != plan ||
             proof.Result.PendingSigning.Any(id => id != capture.CommitIntentId) || proof.Result.PendingPublications.Any(id => id != capture.CommitIntentId))
             throw new CatalogGenerationCaptureConflictException();
         var intent = new ProtocolSigningJournal(database, _budget).Read(capture.CommitIntentId);
@@ -153,7 +153,7 @@ public sealed partial class LocalCatalogReconciliationService
         if (work is null && proof.Publications.Objects.Count == proof.Publications.Maximum) throw new CatalogTraversalLimitException();
         if (intent?.Envelope is { } sealedEnvelope)
         {
-            if (capture.Phase != "commit-sealed" || work is null || work.Scope != scope || work.Role != "catalog-commit" || work.MimeType != "application/json" ||
+            if (capture.Phase is not ("commit-sealed" or "commit-verified" or "complete") || work is null || work.Scope != scope || work.Role != "catalog-commit" || work.MimeType != "application/json" ||
                 work.Sha256 != intent.EnvelopeSha256 || !work.Payload.Span.SequenceEqual(sealedEnvelope.Span)) throw new WorkspacePublicationConflictException();
             if (ownVisible && (work.FileId is null || !observations.Any(item => item.FileId == work.FileId && item.Bytes == work.Payload.Length && item.Sha256 == work.Sha256 &&
                 (item.MimeType ?? "application/json") == "application/json"))) throw new WorkspaceObservationConflictException();

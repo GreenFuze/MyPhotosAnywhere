@@ -6,7 +6,7 @@ namespace Mpa.Processor.Core;
 /// Its claims come from the durable state journal. Disposal retains claimed files;
 /// recovery deletes only validated generated files absent from ALL active claims.
 /// Never accepts media paths or recursively deletes a directory.</summary>
-public sealed class CatalogGenerationSnapshotStore : IDisposable
+public sealed partial class CatalogGenerationSnapshotStore : IDisposable
 {
     private const string DirectoryName = "catalog-generation-snapshots";
     private static readonly object AccountingGate = new();
@@ -54,7 +54,7 @@ public sealed class CatalogGenerationSnapshotStore : IDisposable
             foreach (var claim in _claims.Values)
             {
                 var path = SnapshotPath(claim.SnapshotId);
-                if (claim.Snapshot is not null && (!File.Exists(path) || new FileInfo(path).Length != claim.Snapshot.Bytes))
+                if (claim.Snapshot is not null && (File.Exists(path) ? new FileInfo(path).Length != claim.Snapshot.Bytes : claim.Phase != "snapshot-retiring"))
                     throw new InvalidDataException("A claimed frozen snapshot is missing or changed; no recovery file was removed.");
                 if (claim.Snapshot is not null && File.Exists(path + "-journal")) throw new InvalidDataException("A sealed snapshot has an unconfirmed transaction journal; preserve it for recovery.");
             }

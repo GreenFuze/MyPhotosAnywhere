@@ -34,7 +34,8 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
             transaction.Commit(); return old; // Read/recover captured work even after a disconnect; live use requires fresh admission.
         }
         new LibraryAuthorityRepository(_database).AssertLocalPublicationScope(scope, transaction);
-        using (var active = Command(transaction, "SELECT 1 FROM catalog_generation_capture WHERE library_id=$library AND phase!='abandoned'", ("$library", scope.LibraryId.ToString("D"))))
+        ValidateRetiredHistory(transaction);
+        using (var active = Command(transaction, "SELECT 1 FROM catalog_generation_capture WHERE library_id=$library AND phase NOT IN('abandoned','retired')", ("$library", scope.LibraryId.ToString("D"))))
             if (active.ExecuteScalar() is not null) throw new CatalogGenerationInProgressException();
         using (var work = Command(transaction, """
             SELECT (SELECT count(*) FROM signing_intent WHERE id=$intent)+
@@ -57,11 +58,13 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
     {
         // This installation owns one library. Retain a bounded identity inventory and
         // validate every row before any caller decides which private files to clean.
+        using var transaction = _database.Connection.BeginTransaction(); ValidateRetiredHistory(transaction);
         var ids = new List<Guid>();
-        using (var command = Command(null, "SELECT id FROM catalog_generation_capture WHERE phase!='abandoned' ORDER BY id LIMIT 3"))
+        using (var command = Command(transaction, "SELECT id FROM catalog_generation_capture WHERE phase NOT IN('abandoned','retired') ORDER BY id LIMIT 3"))
         using (var reader = command.ExecuteReader()) while (reader.Read()) ids.Add(ParseId(reader.GetString(0)));
         if (ids.Count > 1) throw new InvalidDataException("More than one active catalog capture violates single-library ownership.");
-        return ids.Select(id => Read(id) ?? throw new InvalidDataException("An active catalog capture disappeared.")).ToList().AsReadOnly();
+        var result = ids.Select(id => Read(id, transaction) ?? throw new InvalidDataException("An active catalog capture disappeared.")).ToList().AsReadOnly();
+        transaction.Commit(); return result;
     }
 
     /// <summary>Called only after the actual private SQLite owner closes and flushes its
@@ -86,7 +89,7 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
     public CatalogGenerationCapture AbandonUnpublished(Guid generationId)
     {
         Id(generationId); using var transaction = _database.Connection.BeginTransaction(); var current = Read(generationId, transaction) ?? throw new InvalidOperationException("The generation capture is missing.");
-        if (current.Phase is "dependencies-ready" or "commit-sealed") throw new InvalidOperationException("Prepared publication work must be recovered; its snapshot claim cannot be abandoned.");
+        if (current.Phase is "dependencies-ready" or "commit-sealed" or "commit-verified" or "complete" or "snapshot-retiring" or "retired") throw new InvalidOperationException("Prepared publication work must be recovered; its snapshot claim cannot be abandoned.");
         using (var work = Command(transaction, """
             SELECT (SELECT count(*) FROM signing_intent WHERE id=$intent)+
               (SELECT count(*) FROM workspace_publication WHERE json_extract(scope,'$.GenerationId')=$id)
@@ -135,7 +138,7 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
             if (reader.GetString(0) != generationId.ToString("D") || scope.GenerationId != generationId || reader.GetString(1) != scope.LibraryId.ToString("D") ||
                 reader.IsDBNull(11) || reader.GetString(11) != scope.LibraryId.ToString("D") || WorkspacePublicationRepository.EncodeScope(scope) != encoded ||
                 reader.GetString(6) != ContextHash(encoded, snapshotId, intent)) throw new InvalidDataException("Captured generation identity/scope integrity failed.");
-            var phase = reader.GetString(7); if (phase is not ("capturing" or "frozen" or "publication-planned" or "dependencies-ready" or "commit-sealed" or "abandoned") || reader.IsDBNull(9) != reader.IsDBNull(10)) throw new InvalidDataException("Captured generation phase or snapshot proof is invalid.");
+            var phase = reader.GetString(7); if (phase is not ("capturing" or "frozen" or "publication-planned" or "dependencies-ready" or "commit-sealed" or "commit-verified" or "complete" or "snapshot-retiring" or "retired" or "abandoned") || reader.IsDBNull(9) != reader.IsDBNull(10)) throw new InvalidDataException("Captured generation phase or snapshot proof is invalid.");
             CatalogSnapshotDescriptor? snapshot = null;
             if (!reader.IsDBNull(9))
             {
@@ -143,9 +146,9 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
                 if (data != Encode(snapshot) || reader.GetString(10) != Hash(Encoding.UTF8.GetBytes(data))) throw new InvalidDataException("Retained snapshot descriptor integrity failed.");
                 MatchDescriptor(new(scope, snapshotId, intent, phase, null), snapshot);
             }
-            if (phase is "frozen" or "publication-planned" or "dependencies-ready" or "commit-sealed" && snapshot is null || phase == "capturing" && snapshot is not null) throw new InvalidDataException("Captured generation phase disagrees with its frozen file proof.");
+            if (phase is "frozen" or "publication-planned" or "dependencies-ready" or "commit-sealed" or "commit-verified" or "complete" or "snapshot-retiring" or "retired" && snapshot is null || phase == "capturing" && snapshot is not null) throw new InvalidDataException("Captured generation phase disagrees with its frozen file proof.");
             var capture = new CatalogGenerationCapture(scope, snapshotId, intent, phase, snapshot);
-            reader.Close(); ValidatePublicationState(capture, transaction); return capture;
+            reader.Close(); ValidatePublicationState(capture, transaction); ValidateVerificationState(capture, transaction); return capture;
         }
         catch (Exception error) when (error is JsonException or ArgumentException or ProtocolFormatException or CatalogGenerationCaptureConflictException)
         { throw new InvalidDataException("Retained generation metadata is invalid; preserve it for recovery.", error); }

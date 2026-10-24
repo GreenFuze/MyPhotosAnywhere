@@ -124,7 +124,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         var publication = ReadPublication(capture, transaction);
         if (capture.Phase == "publication-planned" && publication is null)
             throw new InvalidDataException("Planned generation lost its immutable publication basis; preserve its claim.");
-        if (capture.Phase is "dependencies-ready" or "commit-sealed" && publication?.Plan is null)
+        if (capture.Phase is "dependencies-ready" or "commit-sealed" or "commit-verified" or "complete" or "snapshot-retiring" or "retired" && publication?.Plan is null)
             throw new InvalidDataException("Prepared generation lost its immutable publication plan; preserve its claim.");
     }
     private CapturedCatalogPublication? ReadPublication(CatalogGenerationCapture capture, SqliteTransaction? transaction)
@@ -155,7 +155,7 @@ public sealed partial class CatalogGenerationCaptureRepository
                 AssertDependency(capture, plan.SourceCoverage, "coverage-root", transaction);
                 var intent = new ProtocolSigningJournal(_database, _budget).Read(capture.CommitIntentId, transaction);
                 if (intent is not null) AssertIntent(capture, plan, intent);
-                if (capture.Phase == "commit-sealed" && intent?.Envelope is null) throw new InvalidDataException("Sealed generation lost its retained signature.");
+                if (capture.Phase is "commit-sealed" or "commit-verified" or "complete" or "snapshot-retiring" or "retired" && intent?.Envelope is null) throw new InvalidDataException("Sealed generation lost its retained signature.");
             }
             if (capture.Phase is "capturing" or "frozen" || (capture.Phase is "publication-planned" or "abandoned") != (plan is null))
                 throw new InvalidDataException("Publication plan disagrees with its retained generation phase.");

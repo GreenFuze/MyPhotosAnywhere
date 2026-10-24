@@ -1,5 +1,44 @@
 # MPA 0.6.0 implementation ledger
 
+## Verified publisher completion and private snapshot retirement
+
+Processor schema 12 transactionally rebuilds both capture and its FK publication child,
+preserving original scopes/IDs/descriptors/plan hashes. Actual native migration tests
+verify success and full rollback after a deliberate final-table conflict. New immutable
+verification receipts bind the original native-signed commit, outbox identity, scope,
+captured count and actual completed observation. Verification and publisher-head completion
+are separately fenced transactions; a failed head write retains commit-verified and the
+same immutable receipt. The exact head pointer and complete phase commit atomically.
+Historical receipts never replace fresh private actual graph/ancestry/current admission.
+
+Completion keeps the exclusive snapshot claim through complete and snapshot-retiring.
+Only the real private snapshot-store owner can return an opaque retirement token after
+checking the original generated regular file/descriptor/hash and joining native SQLite
+ownership before unlink. The token retains a native-use/directory lease through the
+retirement checkpoint. No media path is accepted. A missing file is recoverable only in
+persisted snapshot-retiring, covering a lost unlink checkpoint. Actual confirmed retirement
+then releases admission for the next generation. Corrupt replacements remain untouched;
+an open native reader prevents retirement. Retired history/receipt corruption cannot hide
+an invalid claim from a new admission. Completed private cleanup needs no Google access.
+
+CatalogGenerationCompletionService now joins exact publication, private actual completion
+and native-file retirement, preserving original phase/IDs across failures and cancellation.
+Five actual lifecycle cases pass for empty/nonempty successive generations, disconnected
+cleanup/corrupt-file protection, lost native checkpoint/low storage and borrowed-reader
+ownership. Two more pass for an actual failed head transaction resumed with new owners
+after later discovery, and Exit joining uncooperative account I/O without retiring borrowed
+owners. Twelve focused native migration/checkpoint cases pass, including old migrations,
+low storage, failed head writes, incomplete scans, corrupt receipts and invalid later phases.
+Earlier development setup errors remain recorded, including a missing captured revision
+argument in the new disconnect test; existing assertions and warning gates are intact.
+
+All 321 Core, 263 AppServices, 26 Web and 77 Protocol cases pass on frozen binaries.
+All five strict test/Desktop builds have zero warnings/errors, complete final logs are
+clean and the actual component binaries match across every output. This publisher
+completion is not independent-client decoded catalog activation. Automatic engine scheduling,
+measured incremental admission/retention, renewed-access recovery, independent enrollment,
+processing plugins, full Android/web features, installers and exact release remain pending.
+
 ## Captured commit publication and actual current readback
 
 The concrete reconciler now publishes only the durable capture's original commit.

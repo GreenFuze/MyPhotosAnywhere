@@ -65,7 +65,7 @@ public sealed class ProcessorStateDatabase : IDisposable
                 var objects = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
                 if (application != ApplicationId && !(application == 0 && version == 0 && objects == 0))
                     throw new InvalidDataException("Unknown database identity; preserve it and choose an empty Processor state directory.");
-                if (version is not (0 or 1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
+                if (version is not (0 or 1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11 or 12)) throw new InvalidDataException("Unsupported Processor state version; update the Processor without deleting its state.");
                 command.CommandText = "PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;";
                 command.ExecuteNonQuery();
                 command.CommandText = "PRAGMA journal_mode=WAL";
@@ -320,6 +320,47 @@ public sealed class ProcessorStateDatabase : IDisposable
                           CHECK((plan IS NULL)=(plan_hash IS NULL))
                         ) STRICT;
                         PRAGMA user_version=11;
+                        """;
+                    migration.ExecuteNonQuery(); transaction.Commit();
+                }
+            }
+            using (var migration = connection.CreateCommand())
+            {
+                migration.CommandText = "PRAGMA user_version";
+                if (Convert.ToInt32(migration.ExecuteScalar(), CultureInfo.InvariantCulture) < 12)
+                {
+                    using var transaction = connection.BeginTransaction(); migration.Transaction = transaction;
+                    migration.CommandText = """
+                        CREATE TABLE catalog_generation_capture_v12(
+                          id TEXT PRIMARY KEY, library_id TEXT NOT NULL, snapshot_id TEXT NOT NULL UNIQUE,
+                          commit_intent_id TEXT NOT NULL UNIQUE, scope TEXT NOT NULL CHECK(length(scope) BETWEEN 1 AND 4096), context_hash TEXT NOT NULL,
+                          phase TEXT NOT NULL CHECK(phase IN('capturing','frozen','publication-planned','dependencies-ready','commit-sealed','commit-verified','complete','snapshot-retiring','retired','abandoned')),
+                          snapshot TEXT CHECK(length(snapshot) BETWEEN 1 AND 4096), snapshot_hash TEXT,
+                          CHECK((snapshot IS NULL)=(snapshot_hash IS NULL)),
+                          CHECK(phase NOT IN('frozen','publication-planned','dependencies-ready','commit-sealed','commit-verified','complete','snapshot-retiring','retired') OR snapshot IS NOT NULL)
+                        ) STRICT;
+                        INSERT INTO catalog_generation_capture_v12(id,library_id,snapshot_id,commit_intent_id,scope,context_hash,phase,snapshot,snapshot_hash)
+                          SELECT id,library_id,snapshot_id,commit_intent_id,scope,context_hash,phase,snapshot,snapshot_hash FROM catalog_generation_capture;
+                        CREATE TABLE catalog_generation_publication_v12(
+                          id TEXT PRIMARY KEY REFERENCES catalog_generation_capture_v12(id),
+                          basis TEXT NOT NULL CHECK(length(basis) BETWEEN 1 AND 16384), basis_hash TEXT NOT NULL CHECK(length(basis_hash)=64),
+                          plan TEXT CHECK(length(plan) BETWEEN 1 AND 16384), plan_hash TEXT,
+                          CHECK((plan IS NULL)=(plan_hash IS NULL))
+                        ) STRICT;
+                        INSERT INTO catalog_generation_publication_v12(id,basis,basis_hash,plan,plan_hash)
+                          SELECT id,basis,basis_hash,plan,plan_hash FROM catalog_generation_publication;
+                        DROP TABLE catalog_generation_publication;
+                        DROP INDEX one_active_catalog_capture;
+                        DROP TABLE catalog_generation_capture;
+                        ALTER TABLE catalog_generation_capture_v12 RENAME TO catalog_generation_capture;
+                        ALTER TABLE catalog_generation_publication_v12 RENAME TO catalog_generation_publication;
+                        CREATE UNIQUE INDEX one_active_catalog_capture ON catalog_generation_capture(library_id) WHERE phase NOT IN('abandoned','retired');
+                        CREATE TABLE catalog_generation_verification(
+                          id TEXT PRIMARY KEY REFERENCES catalog_generation_capture(id),
+                          document TEXT NOT NULL CHECK(length(document) BETWEEN 1 AND 49152),
+                          document_hash TEXT NOT NULL CHECK(length(document_hash)=64)
+                        ) STRICT;
+                        PRAGMA user_version=12;
                         """;
                     migration.ExecuteNonQuery(); transaction.Commit();
                 }

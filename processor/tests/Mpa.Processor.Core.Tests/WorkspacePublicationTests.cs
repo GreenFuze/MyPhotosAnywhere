@@ -169,12 +169,12 @@ public sealed class WorkspacePublicationTests
         }
         var original = Path.Combine(root.Path, "retained-original.bin"); File.WriteAllBytes(original, Payload);
         using (var sql = Open(root.Path))
-        { using var command = sql.CreateCommand(); command.CommandText = "DROP TABLE catalog_generation_publication; DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; DROP TABLE signing_intent; DROP TABLE signing_actor; DROP TABLE workspace_publication; PRAGMA user_version=6"; command.ExecuteNonQuery(); }
+        { using var command = sql.CreateCommand(); command.CommandText = "DROP TABLE catalog_generation_verification; DROP TABLE catalog_generation_publication; DROP TABLE workspace_inventory_checkpoint; DROP TABLE workspace_document_observation; DROP INDEX workspace_publication_generation; DROP TABLE catalog_generation_capture; DROP TABLE signing_intent; DROP TABLE signing_actor; DROP TABLE workspace_publication; PRAGMA user_version=6"; command.ExecuteNonQuery(); }
         using var upgraded = new Fixture(root.Path);
         Assert.AreEqual(library, upgraded.Scope.LibraryId); Assert.AreEqual(installation, upgraded.Database.InstallationId);
         Assert.AreEqual(0, upgraded.Journal.Pending().Count); Assert.AreEqual(0, new DurableJobRepository(upgraded.Database).Summary(job).Failed);
         CollectionAssert.AreEqual(Payload, File.ReadAllBytes(original));
-        using var connection = Open(root.Path); using var query = connection.CreateCommand(); query.CommandText = "PRAGMA user_version"; Assert.AreEqual(11L, query.ExecuteScalar());
+        using var connection = Open(root.Path); using var query = connection.CreateCommand(); query.CommandText = "PRAGMA user_version"; Assert.AreEqual(12L, query.ExecuteScalar());
         query.CommandText = "SELECT captured_context FROM job WHERE id=$job"; query.Parameters.AddWithValue("$job", job.ToString("D"));
         StringAssert.Contains((string)query.ExecuteScalar()!, "Human caption");
     }
