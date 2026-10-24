@@ -66,3 +66,37 @@ test('canceling a progress read propagates cancellation without sending a setup 
   }, async api => { await assert.rejects(api.libraryPublication(controller.signal), { name: 'AbortError' }); });
   assert.equal(requests, 1);
 });
+
+
+test('connection export is an abortable same-origin read and never sends a setup command', async () => {
+  const controller = new AbortController(); let requests = 0;
+  const connection = { code: 'mpa-library-v1:eyJmb3JtYXQiOiJzeW50aGV0aWMifQ', documentSha256: 'a'.repeat(64), controllerKeyId: 'b'.repeat(64) };
+  await withBrowser(async (url, options) => {
+    requests++; assert.equal(url, '/api/library-connection'); assert.equal(options.credentials, 'same-origin'); assert.equal(options.signal, controller.signal);
+    assert.equal(options.method, undefined); assert.equal(options.body, undefined); return json({ connection: requests === 1 ? null : connection });
+  }, async api => {
+    assert.equal(await api.libraryConnection(controller.signal), null);
+    assert.deepEqual(await api.libraryConnection(controller.signal), connection);
+  });
+  assert.equal(requests, 2);
+});
+
+test('malformed connection responses are rejected before the browser offers a code', async () => {
+  const valid = { code: 'mpa-library-v1:e30', documentSha256: 'a'.repeat(64), controllerKeyId: 'b'.repeat(64) };
+  const invalid = [null, {}, { connection: false }, { connection: { ...valid, code: 'https://processor.local/' } },
+    { connection: { ...valid, code: 'mpa-library-v1:' } }, { connection: { ...valid, code: 'mpa-library-v1:e30=' } },
+    { connection: { ...valid, code: 'mpa-library-v1:' + 'a'.repeat(4096) } },
+    { connection: { ...valid, documentSha256: 'A'.repeat(64) } }, { connection: { ...valid, controllerKeyId: '' } }];
+  for (const value of invalid) await withBrowser(async () => json(value), async api => {
+    await assert.rejects(api.libraryConnection(new AbortController().signal), /invalid library connection/);
+  });
+});
+
+test('canceling connection export never creates a client enrollment or setup request', async () => {
+  const controller = new AbortController(); controller.abort(); let requests = 0;
+  await withBrowser(async (url, options) => {
+    requests++; assert.equal(url, '/api/library-connection'); assert.equal(options.signal, controller.signal);
+    assert.equal(options.method, undefined); throw new DOMException('Read canceled', 'AbortError');
+  }, async api => { await assert.rejects(api.libraryConnection(controller.signal), { name: 'AbortError' }); });
+  assert.equal(requests, 1);
+});

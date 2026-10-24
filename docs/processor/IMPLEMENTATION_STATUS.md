@@ -1,5 +1,60 @@
 # MPA 0.6.0 implementation ledger
 
+## Drive-only connection export and Android public-pin approval
+
+Both clients consume the same bounded public connection code: the library, approved
+controller/epoch/P-256 public key and opaque Drive account/workspace identities. Three
+valid and 52 invalid independent wire fixtures exercise canonical bytes, hashes, native
+key validation and bounds. Parsing carries no authority, Google token, endpoint, device
+grant or original-write permission.
+
+An authenticated desktop host-owner browser can display/select the code from the exact
+approved local pin. Anonymous and LAN sessions cannot export it. Exports never approve,
+publish or enroll anything. Browser reads cancel on departure, reject malformed response
+fields and show the controller fingerprint separately from publication progress.
+
+Android now has a separate serialized public-pin owner under noBackupFilesDir. Its
+private SQLite schema starts at 1; legacy Room schema 12 is unchanged. Exact approval
+and its hash marker commit atomically. Different accepted roots/epochs/workspaces cannot
+be replaced. Missing accepted pins and corrupt markers fail fast. Existing-pin reads
+remain available under low storage. Actual transactions arbitrate competing owners;
+close joins I/O even from a canceled caller before fencing later access.
+
+The read-only DriveGateway adapter observes actual permission ID and exact folder
+metadata. Review checks the account before/after that read; approval repeats those reads
+and requires the exact human-approved document hash and unchanged folder revision. It
+creates no phone-to-desktop connection, device signing grant or catalog activation.
+Android UI wiring and independent published-catalog adoption remain unfinished.
+
+Seven strict .NET Release builds have zero findings. All 855 full cases pass on matching
+immutable application components: Core349, AppServices322, Web27, Protocol83, Google65
+and LAN9. Complete logs/TRX/component hashes are retained in
+preflight-060/library-connection-dotnet-validation.json. The browser build passes strict
+TypeScript/esbuild and seven API cases. Ten new Android native-SQLite/actual REST owner
+cases pass, including rollback, competing owners, low storage, cancellation, canceled
+cleanup, corruption fencing, exact recreation and GET-only account/folder requests.
+The final expanded Android run passes all 570 tests across 107 suites, with zero lint
+findings, debug app and native-test APK builds. Its only upstream diagnostic is the
+already approved exact AGP setVisible deprecation. Room12 bytes match the preceding
+revision exactly. Complete counts, source/APK/report hashes and limits are recorded in
+preflight-060/library-connection-android-validation.json. Two new actual emulator cases
+are compiled into the test APK but have not run yet. Fresh exact-source CI and final
+acceptance remain required; no release readiness is inferred.
+
+Failed new setup evidence is retained: an unsupported generic argument to Robolectric's
+getApplication prevented the first compile. The corrected run exposed a test-only
+260-character Windows native SQLite path before its first open. Shortening the new
+method name keeps its temporary path below that limit; native SQLite and every assertion
+remain active. Cleanup review also added the canceled-caller regression before accepting
+the owner. One reused Protocol TRX filename generated an overwrite diagnostic and replaced
+the earlier Debug report. The unchanged frozen Release suite was rerun with a fresh unique
+name; the diagnostic is retained and no warning was suppressed. Two pre-existing ledger
+Windows-1252 dash bytes were converted to the same characters in UTF-8.
+
+Full connection UI, independent catalog adoption, operation grants, processing/plugins,
+complete clients, installers and the remaining joint release work are still unfinished.
+
+
 ## Native worker exit and startup-recovery ownership
 
 A deterministic real-child test now holds event dispatch beyond the old ten-second
@@ -40,8 +95,12 @@ and nine LAN. Seven strict Release builds have zero warnings/errors, complete lo
 TRX counters are clean, and application component hashes match every test/Desktop output.
 Evidence is retained in preflight-060/native-exit-owner-corrected-validation.json.
 
-Fresh exact-source four-platform CI and final acceptance remain required. The historical
-host trigger remains unidentified; this change removes its event-owned wait mechanism
+Exact 29312f971fc7e0bb5ae6ebc47347153cb2b0be59 passes Desktop40121750611 on
+all four platforms, Android40121750563, device40121750631 on APIs29/35/37 and all
+12 Protocol40121750582 regression/reference/scale jobs. Archived results independently
+match that SHA and every actual job succeeded. New connection changes still need fresh
+exact-source CI and final acceptance. The historical host trigger remains unidentified;
+this change removes its event-owned wait mechanism
 and tests that failure class without claiming a diagnosis of the old host. No release
 readiness or physical-device result is inferred from these local tests.
 
@@ -95,7 +154,7 @@ large-library costs, retention and the remaining 0.6 feature backlog remain unre
 The preceding exact revision 93a4b621 passed Desktop40106241655, Android40106241654,
 device40106241664 on APIs29/35/37, and Protocol40106241772 with all four regression and
 all four scale jobs. Archived reports independently match that SHA. Synthetic preparation
-on those runners took about 161–421 seconds for 10k and 171–380 seconds for 100k; this
+on those runners took about 161â€“421 seconds for 10k and 171â€“380 seconds for 100k; this
 does not replace current-source validation or live-network/UI acceptance.
 
 ## Measured large generation preparation and immutable public keys

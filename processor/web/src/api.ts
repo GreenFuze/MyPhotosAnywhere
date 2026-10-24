@@ -10,6 +10,7 @@ export interface Sources { revision: number; sources: Source[] }
 export interface Folder { id: string; name: string; canListChildren: boolean }
 export interface FolderLocation { current: Folder; children: Folder[]; nextCursor: string | null; incompleteSearch: boolean }
 export interface LibraryController { libraryId: string; actorId: string; epoch: number; accountId: string; folderId: string; publicKeySpki: string; keyId: string }
+export interface LibraryConnection { code: string; documentSha256: string; controllerKeyId: string }
 export interface WorkspaceInspection {
   workspace: { accountId: string; folderId: string; name: string; driveVersion: number; shared: boolean; verifiedEmpty: boolean };
   accountRevision: number; sources: Sources;
@@ -96,6 +97,18 @@ export class DesktopApi {
   }
   async sources(signal: AbortSignal): Promise<Sources> { return await this.get<Sources>('/api/sources', signal); }
   async library(signal: AbortSignal): Promise<{ controller: LibraryController | null }> { return await this.get('/api/library', signal); }
+  async libraryConnection(signal: AbortSignal): Promise<LibraryConnection | null> {
+    const value = await this.get<unknown>('/api/library-connection', signal);
+    const invalid = () => new Error('MPA returned an invalid library connection. Your saved setup was retained.');
+    if (typeof value !== 'object' || value === null || !('connection' in value)) throw invalid();
+    if (value.connection === null) return null;
+    const result = value.connection;
+    if (typeof result !== 'object' || !('code' in result) || typeof result.code !== 'string' || result.code.length > 4096 ||
+      !/^mpa-library-v1:[A-Za-z0-9_-]+$/.test(result.code) ||
+      !('documentSha256' in result) || typeof result.documentSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(result.documentSha256) ||
+      !('controllerKeyId' in result) || typeof result.controllerKeyId !== 'string' || !/^[a-f0-9]{64}$/.test(result.controllerKeyId)) throw invalid();
+    return result as LibraryConnection;
+  }
   async libraryPublication(signal: AbortSignal): Promise<LibraryPublication> {
     return this.publicationStatus(await this.get<unknown>('/api/library-publication', signal));
   }

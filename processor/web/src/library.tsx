@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Account, DesktopApi, Folder, LibraryController, LibraryPublication, WorkspaceInspection } from './api';
+import type { Account, DesktopApi, Folder, LibraryConnection, LibraryController, LibraryPublication, WorkspaceInspection } from './api';
 import { FolderPicker } from './sources';
 
 const message = (error: unknown): string => error instanceof Error ? error.message : 'MPA could not finish library setup.';
@@ -16,12 +16,16 @@ export function LibrarySettings({ api, accounts, back }: { api: DesktopApi; acco
   const [publicationRefresh, setPublicationRefresh] = useState(0);
   const [publicationLoading, setPublicationLoading] = useState(true);
   const [publicationReadError, setPublicationReadError] = useState(false);
+  const [connection, setConnection] = useState<LibraryConnection | null>(null);
+  const [connectionLoading, setConnectionLoading] = useState(false);
+  const connectionRead = useRef<AbortController | null>(null);
+  const connectionText = useRef<HTMLTextAreaElement | null>(null);
   const inspection = useRef<AbortController | null>(null);
   useEffect(() => {
     const request = new AbortController();
     api.library(request.signal).then(result => { if (!request.signal.aborted) setController(result.controller); })
       .catch(error => { if (!request.signal.aborted) setNotice(message(error)); });
-    return () => { request.abort(); inspection.current?.abort(); };
+    return () => { request.abort(); inspection.current?.abort(); connectionRead.current?.abort(); };
   }, [api]);
   useEffect(() => {
     if (!controller) return;
@@ -47,6 +51,19 @@ export function LibrarySettings({ api, accounts, back }: { api: DesktopApi; acco
     setPreview(result); setShared(false); setAssociated(false);
     setNotice(null); setPicker(false);
   }
+  async function showConnection() {
+    connectionRead.current?.abort(); const request = new AbortController(); connectionRead.current = request;
+    setConnectionLoading(true); setNotice(null);
+    try {
+      const result = await api.libraryConnection(request.signal);
+      if (!request.signal.aborted) {
+        setConnection(result);
+        if (!result) setNotice('Approve a library workspace before connecting another client.');
+      }
+    } catch (error) { if (!request.signal.aborted) setNotice(message(error)); }
+    finally { if (!request.signal.aborted) setConnectionLoading(false); }
+  }
+  function selectConnection() { connectionText.current?.focus(); connectionText.current?.select(); }
   async function retryPublication() {
     if (busy) return; setBusy(true); setNotice(null);
     try { setPublication(await api.retryLibraryPublication()); setPublicationRefresh(value => value + 1); }
@@ -80,6 +97,15 @@ export function LibrarySettings({ api, accounts, back }: { api: DesktopApi; acco
       {publication?.stage === 'NeedsAttention' && <p role="alert">{publication.detail ?? 'Library setup needs attention. Saved work has been preserved.'}</p>}
       {(publication?.stage === 'Stopping' || publication?.stage === 'Stopped') && <p role="status">Library setup has stopped. Saved progress will be checked when MPA starts again.</p>}
       {publication?.canRetry && <button disabled={busy} onClick={() => { void retryPublication(); }}>{busy ? 'Requesting retry…' : 'Retry library setup'}</button>}
+      <button disabled={busy || connectionLoading} onClick={() => { void showConnection(); }}>{connectionLoading ? 'Loading connection code…' : 'Show library connection code'}</button>
+      {connection && <div className="library-connection"><h3>Connect another MPA client</h3>
+        <p>Use this code in another MPA client and approve the library there. Both clients use Google Drive. This code does not connect your phone to this computer.</p>
+        <label htmlFor="library-connection-code">Library connection code</label>
+        <textarea id="library-connection-code" ref={connectionText} rows={4} readOnly value={connection.code} spellCheck={false} />
+        <button onClick={selectConnection}>Select code to copy</button>
+        <p className="connection-fingerprint">Controller fingerprint: <span>{connection.controllerKeyId}</span></p>
+        <p className="muted">This identifies your library; it contains no sign-in token. A receiving client must still sign in to Google Drive and verify the published catalog. Showing the code does not confirm that publication has finished.</p>
+      </div>}
       {publicationReadError && <button disabled={busy} onClick={() => { setNotice(null); setPublicationRefresh(value => value + 1); }}>Refresh setup progress</button>}
     </section>}
     {(controller === null || preview !== null) && <>

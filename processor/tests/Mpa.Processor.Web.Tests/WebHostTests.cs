@@ -14,6 +14,35 @@ namespace Mpa.Processor.Web.Tests;
 public sealed class WebHostTests
 {
     [TestMethod]
+    public async Task PublicConnectionExportRequiresAnAuthenticatedHostAndNeverApprovesOrPublishes()
+    {
+        using var assets = new Assets(); var engine = new Engine();
+        await using var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
+        using var http = Client(host.LocalEndpoint); var diagnostics = new List<Exception>(); host.Diagnostic += diagnostics.Add;
+        using (var anonymous = await http.GetAsync("api/library-connection").ConfigureAwait(false)) Assert.AreEqual(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false); login.EnsureSuccessStatusCode();
+        using (var absent = await http.GetAsync("api/library-connection").ConfigureAwait(false))
+        {
+            absent.EnsureSuccessStatusCode(); var body = await absent.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false);
+            Assert.AreEqual(JsonValueKind.Null, body.GetProperty("connection").ValueKind); Assert.AreEqual(1, body.EnumerateObject().Count());
+        }
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256); var publicKey = key.ExportSubjectPublicKeyInfo();
+        using var verifier = new Mpa.Processor.Protocol.ProtocolDocumentVerifier(publicKey);
+        engine.ControllerPin = new(Guid.NewGuid(), Guid.NewGuid(), 7, "permission-A", "workspace-A", Convert.ToBase64String(publicKey), verifier.KeyId);
+        for (var read = 0; read < 2; read++)
+        {
+            using var response = await http.GetAsync("api/library-connection").ConfigureAwait(false); response.EnsureSuccessStatusCode();
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false);
+            Assert.AreEqual(1, body.EnumerateObject().Count()); var connection = body.GetProperty("connection"); Assert.AreEqual(3, connection.EnumerateObject().Count());
+            var decoded = Mpa.Processor.Protocol.LibraryConnectionDescriptor.Decode(connection.GetProperty("code").GetString()!);
+            Assert.AreEqual(engine.ControllerPin.LibraryId, decoded.LibraryId); Assert.AreEqual(engine.ControllerPin.ActorId, decoded.ControllerId);
+            Assert.AreEqual(7L, decoded.ControllerEpoch); Assert.AreEqual("permission-A", decoded.Workspace.AccountId); Assert.AreEqual("workspace-A", decoded.Workspace.FolderId);
+            Assert.AreEqual(verifier.KeyId, connection.GetProperty("controllerKeyId").GetString()); Assert.AreEqual(decoded.DocumentSha256, connection.GetProperty("documentSha256").GetString());
+        }
+        Assert.IsNull(engine.WorkspaceApproval); Assert.AreEqual(0, engine.PublicationRequests); Assert.AreEqual(0, diagnostics.Count); Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
+    }
+
+    [TestMethod]
     public async Task LibraryPublicationStatusAndRetryRequireHostSessionAndCsrfWithoutExposingEngineDiagnostics()
     {
         using var assets = new Assets(); var engine = new Engine();
@@ -143,7 +172,7 @@ public sealed class WebHostTests
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/accounts") { Content = JsonContent.Create(new { operation = "connect" }) };
         request.Headers.Add("Origin", host.HttpsEndpoint.GetLeftPart(UriPartial.Authority)); request.Headers.Add("X-MPA-CSRF", session.GetProperty("csrf").GetString());
         using var denied = await http.SendAsync(request).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
-        foreach (var path in new[] { "api/library", "api/workspace-inspection?account=account&folder=metadata", "api/library-publication" })
+        foreach (var path in new[] { "api/library", "api/workspace-inspection?account=account&folder=metadata", "api/library-publication", "api/library-connection" })
         { using var setup = await http.GetAsync(path).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, setup.StatusCode); }
         var approval = new Mpa.Processor.AppServices.ApproveLibraryWorkspace("account", "metadata", 1, 7, 1, new string('a', 64), false, true);
         using (var setup = await SourceMutationAsync(http, host.HttpsEndpoint, HttpMethod.Post, approval, session.GetProperty("csrf").GetString(), "api/library").ConfigureAwait(false))
@@ -352,7 +381,9 @@ public sealed class WebHostTests
         public Mpa.Processor.AppServices.ApproveLibraryWorkspace? WorkspaceApproval { get; private set; }
         public bool RejectWorkspace { get; set; }
         public Exception? WorkspaceFailure { get; set; }
-        public Task<Mpa.Processor.Core.LibraryControllerPin?> LibraryAsync(CancellationToken cancellationToken) => Task.FromResult<Mpa.Processor.Core.LibraryControllerPin?>(null);
+        public Mpa.Processor.Core.LibraryControllerPin? ControllerPin { get; set; }
+        public Task<Mpa.Processor.Core.LibraryControllerPin?> LibraryAsync(CancellationToken cancellationToken)
+        { cancellationToken.ThrowIfCancellationRequested(); return Task.FromResult(ControllerPin); }
         public Task<Mpa.Processor.AppServices.LibraryWorkspaceInspection> InspectWorkspaceAsync(string accountId, string folderId, CancellationToken cancellationToken) => Task.FromResult(
             new Mpa.Processor.AppServices.LibraryWorkspaceInspection(new(accountId, folderId, "Metadata", 7, false, true), 1, new(1, []),
                 new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, "synthetic-public-controller", new string('a', 64), Guid.NewGuid(), 1, "synthetic-public-publisher", new string('b', 64)), null));

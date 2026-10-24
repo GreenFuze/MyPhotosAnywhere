@@ -261,6 +261,11 @@ public sealed class DesktopWebHost : IAsyncDisposable
             case ("GET", "/api/library"):
                 if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
                 await context.Response.WriteAsJsonAsync(new { controller = await _application.LibraryAsync(token).ConfigureAwait(false) }, token).ConfigureAwait(false); break;
+            case ("GET", "/api/library-connection"):
+                if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
+                var connection = (await _application.LibraryAsync(token).ConfigureAwait(false))?.ConnectionDescriptor();
+                await context.Response.WriteAsJsonAsync(new { connection = connection is null ? null : new { code = connection.Encode(),
+                    documentSha256 = connection.DocumentSha256, controllerKeyId = connection.ControllerKeyId } }, token).ConfigureAwait(false); break;
             case ("GET", "/api/library-publication"):
                 if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
                 await context.Response.WriteAsJsonAsync(await _application.LibraryPublicationAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;

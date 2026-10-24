@@ -78,3 +78,7 @@ key is never an authorized product actor. C# and Kotlin consume identical fixtur
 
 Publication/recovery schemas, deterministic aliases, closed approved-action scopes,
 worker IPC and staged-generation indexes are the remaining Stage 1 contracts.
+
+Public connection export and its separate receiving-client trust requirements are
+specified in [library-connection-v1.md](library-connection-v1.md). Parsing this public
+code never enrolls a controller or activates a catalog.

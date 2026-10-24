@@ -16,3 +16,5 @@
 .gallery-pagination { display: flex; justify-content: center; flex-wrap: wrap; gap: .75rem; padding: 1.5rem; }
 .viewer-message { margin: 0; padding: .6rem 1.5rem; text-align: center; color: #c5cbd8; background: #171a20; }
 @media(max-width:650px) { .gallery-tools { top: 72px; } }
+
+.library-connection{margin-top:24px}.library-connection textarea{display:block;width:100%;margin:12px 0;padding:12px;border:1px solid var(--muted);border-radius:12px;background:var(--panel);color:inherit;font:inherit;resize:vertical;overflow-wrap:anywhere}.library-connection textarea:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.connection-fingerprint span{overflow-wrap:anywhere;font-family:monospace}

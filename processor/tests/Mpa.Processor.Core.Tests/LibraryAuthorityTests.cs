@@ -10,6 +10,21 @@ namespace Mpa.Processor.Core.Tests;
 public sealed partial class LibraryAuthorityTests
 {
     [TestMethod]
+    public void ConnectionExportUsesOnlyTheExactApprovedPinAndNeverChangesAuthority()
+    {
+        using var fixture = new Fixture(); Assert.IsNull(fixture.Store.Controller());
+        var pin = fixture.Bootstrap(); var code = pin.ConnectionDescriptor();
+        var decoded = LibraryConnectionDescriptor.Decode(code.Encode());
+        Assert.AreEqual(pin.LibraryId, decoded.LibraryId); Assert.AreEqual(pin.ActorId, decoded.ControllerId);
+        Assert.AreEqual(pin.Epoch, decoded.ControllerEpoch); Assert.AreEqual(pin.AccountId, decoded.Workspace.AccountId);
+        Assert.AreEqual(pin.FolderId, decoded.Workspace.FolderId); Assert.AreEqual(pin.PublicKeySpki, decoded.ControllerPublicKeySpki);
+        Assert.AreEqual(pin.KeyId, decoded.ControllerKeyId); Assert.AreEqual(code.DocumentSha256, decoded.DocumentSha256);
+        Assert.ThrowsExactly<InvalidDataException>(() => (pin with { KeyId = new string('0', 64) }).ConnectionDescriptor());
+        Assert.ThrowsExactly<ProtocolFormatException>(() => (pin with { FolderId = "root" }).ConnectionDescriptor());
+        Assert.AreEqual(pin, fixture.Store.Controller()); Assert.IsNull(fixture.Store.CurrentPublisherPolicy());
+    }
+
+    [TestMethod]
     public void IndependentlyBootstrappedPublicRootAndRevocationSurviveRestart()
     {
         using var root = new WorkerProcessTests.WorkerTestDirectory(); LibraryControllerPin pin; Guid installation;

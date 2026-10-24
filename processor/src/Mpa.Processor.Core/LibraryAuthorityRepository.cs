@@ -7,7 +7,17 @@ using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.Core;
 
-public sealed record LibraryControllerPin(Guid LibraryId, Guid ActorId, long Epoch, string AccountId, string FolderId, string PublicKeySpki, string KeyId);
+public sealed record LibraryControllerPin(Guid LibraryId, Guid ActorId, long Epoch, string AccountId, string FolderId, string PublicKeySpki, string KeyId)
+{
+    /// <summary>Exports only this independently approved public pin. Receiving the code
+    /// is not enrollment, and never grants access to credentials or original writes.</summary>
+    public LibraryConnectionDescriptor ConnectionDescriptor()
+    {
+        var descriptor = new LibraryConnectionDescriptor(LibraryId, ActorId, Epoch, new(AccountId, FolderId), Convert.FromBase64String(PublicKeySpki));
+        if (descriptor.ControllerKeyId != KeyId) throw new InvalidDataException("Pinned controller fingerprint changed during connection export.");
+        return descriptor;
+    }
+}
 public sealed class ControllerAuthorityConflictException() : InvalidOperationException("Controller authority conflicts with previously accepted library state. Retain the agreed state and reconcile explicitly.");
 
 /// <summary>Serial local public trust/selection store. Bootstrap is exclusively for an
