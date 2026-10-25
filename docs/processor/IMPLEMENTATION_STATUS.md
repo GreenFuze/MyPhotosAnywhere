@@ -1,5 +1,23 @@
 # MPA 0.6.0 implementation ledger
 
+## Absent face crops remain absent previews
+
+Four people-screen face images now use the existing blank/provider-safe preview
+loader. An empty crop path produces a null image model instead of resolving a File
+against the process working directory. The existing device diagnostic case deliberately
+contains an empty crop; the old direct models match the three root-directory SELinux
+read denials in the retained API29/35/37 logs. No original, crop or human metadata is
+removed, and existing preview guards and device assertions remain unchanged.
+
+All713 JVM cases across117 suites pass; lint has zero findings and both development
+APKs build. The established warning gate accepts only the previously approved exact
+AGP9.4.1/Gradle9.8.2 Configuration.setVisible diagnostic (15 records). Full raw logs,
+all JUnit/lint/problem reports, source and APK hashes are frozen in
+preflight-060/native-empty-crop-validation.json. Absence of the actual runtime denials
+still requires fresh API29/35/37 device artifacts. Other0.6 diagnostics and final S23,
+signing, installer and joint-release acceptance remain pending. This development
+build retains0.5.33/code44 and does not claim a published0.6 release.
+
 ## Discovery SQL belongs to one bounded batch
 
 Each discovery transaction now prepares its prior-row, upsert and source-membership
@@ -452,7 +470,7 @@ retire. Caller cancellation also joins uncooperative I/O. Fenced evidence remain
 future graph reads must join this lifetime before atomic canonical activation. A restarted
 reader requires a fresh capture; persisted fenced state alone grants no current authority.
 
-Private schema7 adds two tables and preserves1ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“6;6->7 does not rewrite old controller or
+Private schema7 adds two tables and preserves1ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ6;6->7 does not rewrite old controller or
 workspace bodies. Genuine migration tests retain approval, account, pending evidence and
 original bytes. Historical migration fixtures drop only the new tables when constructing
 older versions; every existing preservation assertion remains. Room12 and Processor13
@@ -702,7 +720,7 @@ Exact3f9f8e9312e48415ed7ea971c636289eda835ce6 passes Android40148403416 and the
 API35/37 jobs in Native40148403400. API29's job fails its uninterrupted runtime-capture
 gate after the native tests and108 screenshot collection: its continuous log ends before
 the tests because the confirmed API29 preparation restarted adbd/framework after the
-stream had been opened. The retained heap profile proves the narrow16mÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢configured576m
+stream had been opened. The retained heap profile proves the narrow16mÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢configured576m
 zygote repair, without raising the existing AVD heap. This is incomplete runtime
 evidence, not an accepted warning or passing API29 release result.
 
@@ -1074,7 +1092,7 @@ large-library costs, retention and the remaining 0.6 feature backlog remain unre
 The preceding exact revision 93a4b621 passed Desktop40106241655, Android40106241654,
 device40106241664 on APIs29/35/37, and Protocol40106241772 with all four regression and
 all four scale jobs. Archived reports independently match that SHA. Synthetic preparation
-on those runners took about 161ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“421 seconds for 10k and 171ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“380 seconds for 100k; this
+on those runners took about 161ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ421 seconds for 10k and 171ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ380 seconds for 100k; this
 does not replace current-source validation or live-network/UI acceptance.
 
 ## Measured large generation preparation and immutable public keys
