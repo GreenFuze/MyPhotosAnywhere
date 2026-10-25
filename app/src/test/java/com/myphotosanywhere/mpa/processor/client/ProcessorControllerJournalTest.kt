@@ -262,4 +262,35 @@ class ProcessorControllerJournalTest {
     }
 
     private fun keys() = KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp256r1")) }.generateKeyPair()
+    @Test fun borrowedPolicyHashSurvivesReplayAndReopen() = runBlocking {
+        var store = store();try {
+            println("MPA_NATIVE_POLICY_FIXTURE pathChars=${File(store.directory,"connection.sqlite").absolutePath.length}")
+            approve(store);var journal = ProcessorLibraryControllerJournal(store);val first = source(2,1);val latest = source(5,2)
+            journal.accept(policy(1));journal.accept(first);journal.accept(latest)
+            fun digest(bytes: ByteArray) = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 255) }
+            val snapshot = store.controllerTransaction { database,registration -> ProcessorLibraryControllerJournal.currentIn(database,registration) }
+            assertEquals(5L,snapshot.sourceSequence);assertEquals(digest(latest),snapshot.sourceEnvelopeSha256);assertEquals(digest(latest),journal.accept(first).sourceEnvelopeSha256)
+            store.close();store = store();journal = ProcessorLibraryControllerJournal(store)
+            assertEquals(snapshot.sourceEnvelopeSha256,journal.current().sourceEnvelopeSha256);assertEquals(snapshot.publisher?.envelopeSha256,journal.current().publisher?.envelopeSha256)
+        } finally { store.close() }
+    }
+    @Test fun borrowedSnapshotRejectsMissingTransactionAndRollsBackWithItsCaller() = runBlocking {
+        val store = store();try {
+            approve(store);val journal = ProcessorLibraryControllerJournal(store);val bytes = source(2,1);journal.accept(policy(1));journal.accept(bytes)
+            val before = journal.current();val registration = checkNotNull(store.registration())
+            SQLiteDatabase.openDatabase(File(store.directory,"connection.sqlite").absolutePath,null,SQLiteDatabase.OPEN_READWRITE).use { db ->
+                assertFalse(db.inTransaction());assertThrows(IllegalStateException::class.java) { ProcessorLibraryControllerJournal.currentIn(db,registration) }
+            }
+            try {
+                store.controllerTransaction { database,actual ->
+                    database.execSQL("INSERT INTO client_meta(key,value) VALUES('synthetic_staging','pending')")
+                    database.execSQL("DELETE FROM controller_selection WHERE kind='library-source-configuration'")
+                    ProcessorLibraryControllerJournal.currentIn(database,actual)
+                };fail("Damaged selected authority did not fail in the caller's transaction")
+            } catch (_: ProcessorLibraryStateCorrupt) { }
+            assertEquals(before.sourceEnvelopeSha256,journal.current().sourceEnvelopeSha256)
+            store.controllerTransaction { database,_ -> database.rawQuery("SELECT 1 FROM client_meta WHERE key='synthetic_staging'",null).use { assertFalse(it.moveToFirst()) } }
+        } finally { store.close() }
+    }
+
 }

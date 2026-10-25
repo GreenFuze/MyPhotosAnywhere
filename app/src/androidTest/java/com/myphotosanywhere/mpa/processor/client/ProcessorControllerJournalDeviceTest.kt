@@ -82,4 +82,27 @@ class ProcessorControllerJournalDeviceTest {
             sql(directory) { assertEquals(5,it.version) }
         } finally { store.close(); cleanup(directory) }
     }
+    @Test fun nativeBorrowedPolicySnapshotSharesAtomicRollbackAndExactEnvelope() = runBlocking<Unit> {
+        val directory = File(context.noBackupFilesDir,"controller-test-${UUID.randomUUID()}");var store = store(directory)
+        try {
+            approve(store);var journal = ProcessorLibraryControllerJournal(store);val source = envelope(2,true)
+            journal.accept(envelope(1));journal.accept(source)
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(source).joinToString("") { "%02x".format(it.toInt() and 255) }
+            store.controllerTransaction { database,registration ->
+                val snapshot = ProcessorLibraryControllerJournal.currentIn(database,registration)
+                assertEquals(2L,snapshot.sourceSequence);assertEquals(digest,snapshot.sourceEnvelopeSha256);assertNull(snapshot.publisher?.publisher)
+            }
+            try {
+                store.controllerTransaction { database,registration ->
+                    database.execSQL("INSERT INTO client_meta(key,value) VALUES('synthetic_staging','pending')")
+                    database.execSQL("DELETE FROM controller_selection WHERE kind='library-source-configuration'")
+                    ProcessorLibraryControllerJournal.currentIn(database,registration)
+                };fail("Native caller acknowledged a damaged selected source")
+            } catch (_: ProcessorLibraryStateCorrupt) { }
+            store.close();store = store(directory);journal = ProcessorLibraryControllerJournal(store)
+            assertEquals(digest,journal.current().sourceEnvelopeSha256)
+            sql(directory) { database -> database.rawQuery("SELECT 1 FROM client_meta WHERE key='synthetic_staging'",null).use { assertFalse(it.moveToFirst()) } }
+        } finally { store.close();cleanup(directory) }
+    }
+
 }

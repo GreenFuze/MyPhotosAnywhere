@@ -1,5 +1,45 @@
 # MPA 0.6.0 implementation ledger
 
+## Native signed ancestry and transaction-bound local policy reads
+
+The native consumer can now enumerate one independently approved publisher's entire
+signed predecessor chain. Actual account/workspace, bounded envelope length/SHA,
+ECDSA/library/actor/epoch/capability, contiguous stream sequence, generation identity
+and commit/dependency aliasing are verified before yielding each entry. The4096 bound
+matches the existing primary consumer. No read prefetches past the consumer's persistence;
+cancellation joins an uncooperative read and rejects its late result. Exposed envelope
+bytes and verified capability lists cannot rewrite the retained observation.
+
+The local controller journal exposes the exact selected source-envelope SHA and a read
+inside its caller's existing serialized SQLite transaction. It requires that transaction,
+opens no second owner, verifies the same pin/signatures/selected maxima and participates
+in caller rollback. It remains LOCAL accepted history: neither API certifies cloud-current
+authority, retired-epoch admission, full graph/coverage, canonical activation or gallery
+readiness. Those integrations are still unfinished.
+
+Final strict regression passes663 cases across113 suites, zero findings in lint and both
+APK builds. Eight new real-signature ancestry cases and two actual SQLite policy cases
+pass; one new native snapshot/rollback case compiles but needs exact-source API29/35/37
+execution. Private client5, legacy Room12 and Processor13 remain unchanged. Complete
+source/report/APK hashes and113 archived XMLs are recorded in preflight-060/
+native-ancestry-policy-validation.json. Only the approved exact AGP diagnostic remains.
+
+The first new-test build caught a Long/Int comparison. A later32-case focused run passed
+31 but rejected a260-character Windows native-SQLite fixture path. Isolated reproduction
+retained that failure; shortening only the new test method name produces215 characters
+and preserves every replay/reopen assertion. All663 final cases pass. Failed compile/log/
+XML evidence is retained; no deadline, warning gate, history cap or old assertion changed.
+
+## Exact screenshot correction verified on every emulator API
+
+Exactb174e3835450b7bd2b9c00a7a4efb75aa7d8518b passes Android40159949284 and all three
+Native40159949290 API29/35/37 jobs. Downloaded artifacts independently verify171 unique
+passing cases, every process-bound runtime event and108 complete mapped PNGs on each
+API. The previously incomplete dark/RTL search capture is now a valid97134-byte image
+on API37, from the original single capture. No recapture or assertion retry qualified it.
+These are emulator checks; final S23/live Google/complete0.6 acceptance remain pending.
+
+
 ## Search screenshot publication and exact history execution
 
 Exact29e2c34608e9bd7f92c48fc9f0435a15cd0d8441 passes Android40150551312 and Native

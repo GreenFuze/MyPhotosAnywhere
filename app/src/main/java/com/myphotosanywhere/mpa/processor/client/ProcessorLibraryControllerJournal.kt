@@ -26,6 +26,7 @@ internal data class ProcessorControllerState(
     val publisher: CatalogPublisherAuthorization?,
     val sourceSequence: Long?,
     val sources: CatalogSourceConfiguration?,
+    val sourceEnvelopeSha256: String? = null,
 )
 
 /** Borrows the serialized private state owner. No network, original-file writes, device
@@ -33,7 +34,7 @@ internal data class ProcessorControllerState(
  * evidence commit in the same SQLite transaction as the independently approved pin. */
 internal class ProcessorLibraryControllerJournal(private val store: ProcessorLibraryStateStore) {
     suspend fun current(): ProcessorControllerState = store.controllerTransaction { database, registration ->
-        Session(database,registration.descriptor).current()
+        currentIn(database,registration)
     }
 
     suspend fun accept(envelope: ByteArray): ProcessorControllerState {
@@ -98,7 +99,7 @@ internal class ProcessorLibraryControllerJournal(private val store: ProcessorLib
             state(anchor == pin.documentSha256 && marker == anchor,"Accepted controller history lost its approved connection anchor.")
             val publisher = selected(PUBLISHER)
             val sources = selected(SOURCES)
-            return ProcessorControllerState(pin,publisher?.publisher,sources?.header?.sequence,sources?.sources)
+            return ProcessorControllerState(pin,publisher?.publisher,sources?.header?.sequence,sources?.sources,sources?.let { hash(it.bytes) })
         }
 
         private fun selected(kind: String): Policy? {
@@ -163,12 +164,19 @@ internal class ProcessorLibraryControllerJournal(private val store: ProcessorLib
         }
     }
     private class Policy(val bytes: ByteArray,val header: VerifiedProtocolDocument,val publisher: CatalogPublisherAuthorization?,val sources: CatalogSourceConfiguration?)
-    private companion object {
-        const val PUBLISHER = "library-publisher-authorization"
-        const val SOURCES = "library-source-configuration"
-        val KINDS = setOf(PUBLISHER,SOURCES)
-        const val MAX_DOCUMENTS = 4096
-        fun hash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 255) }
-        fun state(valid: Boolean,message: String) { if (!valid) throw ProcessorLibraryStateCorrupt(message) }
+    internal companion object {
+        /** Borrow the caller's exact owned SQLite transaction. This is LOCAL accepted
+         * history only, ready for comparison in a future atomic catalog admission;
+         * it never opens another transaction or certifies cloud-current authority. */
+        fun currentIn(database: SQLiteDatabase,registration: ProcessorLibraryRegistration): ProcessorControllerState {
+            check(database.inTransaction()) { "A policy snapshot requires the caller's exact owned state transaction." }
+            return Session(database,registration.descriptor).current()
+        }
+        private const val PUBLISHER = "library-publisher-authorization"
+        private const val SOURCES = "library-source-configuration"
+        private val KINDS = setOf(PUBLISHER,SOURCES)
+        private const val MAX_DOCUMENTS = 4096
+        private fun hash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 255) }
+        private fun state(valid: Boolean,message: String) { if (!valid) throw ProcessorLibraryStateCorrupt(message) }
     }
 }
