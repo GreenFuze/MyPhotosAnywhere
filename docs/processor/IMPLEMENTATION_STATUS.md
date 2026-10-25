@@ -1,5 +1,31 @@
 # MPA 0.6.0 implementation ledger
 
+## Search screenshot publication and exact history execution
+
+Exact29e2c34608e9bd7f92c48fc9f0435a15cd0d8441 passes Android40150551312 and Native
+40150551282 API29/35. Downloaded XML independently confirms171 cases, zero nonpass and
+complete process-bound runtime tracing on all three APIs; the three new recovery/fence/
+schema4-migration cases actually ran. API29's capture-order correction is verified by
+all171 real started/finished identities. API29/35 each have108 valid mapped PNGs.
+
+API37's job remains FAILED: one actual device search screenshot is61bytes containing
+IHDR/sBIT/sRGB only. Pull, device hash and same-file reread agree; this is not transport
+corruption. Its other107 mapped PNGs validate. The encoder/provider cause remains
+unverified, and passing XML/runtime alone does not qualify that CI run for release.
+The source failure and independent checks are recorded in preflight-060/
+ci-29e2c34-native-png-failure-observation.json and ci-29e2c34-native-validation.json.
+
+SearchChrome now passes its same single captured frame to the existing owned ARGB,
+bounded complete-encoding, synced-descriptor and readback-verified publication helper.
+All setup,48dp, clearing, line-count, filter/video and scrolling assertions are unchanged.
+Strict lint has zero findings and both APK builds pass with only the approved exact AGP
+diagnostic. Production and JVM-test sources and the application APK are byte-identical
+to the653-case revision; those frozen unit results are reused, not falsely reported as
+a new run. Source/APK/report hashes are saved in preflight-060/
+native-search-chrome-evidence-validation.json. Fresh exact-source emulator runs remain
+required. No recapture, test retry, exception or weakened capture gate is introduced.
+
+
 ## Native actual Drive history replay and immutable recovery
 
 The native Google-only reader now captures account/corpus-bound change cursors and
