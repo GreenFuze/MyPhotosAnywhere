@@ -1,8 +1,11 @@
 from pathlib import Path
 import os
+import hashlib
+import io
+from unittest.mock import patch
 import tempfile
 import unittest
-from ci_android_sdk import InstalledAndroidSdk
+from ci_android_sdk import AndroidSdkSetup, InstalledAndroidSdk
 
 
 class InstalledAndroidSdkTest(unittest.TestCase):
@@ -70,6 +73,36 @@ class InstalledAndroidSdkTest(unittest.TestCase):
                       'platform-tools@37.0.+', 'platform-tools@037.0.1', 'platform-tools@37.0.1-beta'):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as root, self.assertRaises(ValueError):
                 InstalledAndroidSdk(root).verify([value])
+
+
+class AndroidCliPinTest(unittest.TestCase):
+    def test_changed_download_cannot_write_or_execute_an_unreviewed_cli(self):
+        with tempfile.TemporaryDirectory() as root:
+            directory = Path(root)
+            with patch.dict(os.environ, {'ANDROID_HOME':str(directory/'sdk'),'RUNNER_TEMP':str(directory/'tools')}), \
+                 patch('ci_android_sdk.urllib.request.urlopen', return_value=io.BytesIO(b'changed-download')), \
+                 patch('ci_android_sdk.subprocess.check_output') as execute:
+                setup = AndroidSdkSetup()
+                with self.assertRaisesRegex(RuntimeError, 'Android CLI changed'):
+                    setup.install()
+                self.assertFalse(setup.cli.exists())
+                execute.assert_not_called()
+
+    def test_matching_binary_with_wrong_version_cannot_start_sdk_installation(self):
+        binary = b'synthetic-reviewed-cli'
+        with tempfile.TemporaryDirectory() as root:
+            directory = Path(root)
+            with patch.dict(os.environ, {'ANDROID_HOME':str(directory/'sdk'),'RUNNER_TEMP':str(directory/'tools')}), \
+                 patch.object(AndroidSdkSetup, 'CLI_SHA256', hashlib.sha256(binary).hexdigest()), \
+                 patch('ci_android_sdk.urllib.request.urlopen', return_value=io.BytesIO(binary)), \
+                 patch('ci_android_sdk.subprocess.check_output', return_value='unreviewed-version\n') as execute, \
+                 patch.object(AndroidSdkSetup, 'run') as install:
+                setup = AndroidSdkSetup()
+                with self.assertRaisesRegex(RuntimeError, 'Unexpected Android CLI version'):
+                    setup.install()
+                self.assertEqual(binary, setup.cli.read_bytes())
+                execute.assert_called_once_with([str(setup.cli), '--no-metrics', '--version'], text=True)
+                install.assert_not_called()
 
 
 if __name__ == '__main__':

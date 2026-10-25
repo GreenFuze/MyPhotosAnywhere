@@ -1,5 +1,29 @@
 # MPA 0.6.0 implementation ledger
 
+## Reviewed Android CLI pin after upstream replacement
+
+Exact80ed3e0f3ede63f7d134124380f9b1b6138081c8 CI Android40164405339 and Native
+40164405372 stop at SDK setup before any application/native tests: Google's mutable
+latest CLI endpoint changed after the preceding successful matrix. The digest/version
+gate correctly rejects the unreviewed tool. Local663-case application evidence remains
+valid; these failed workflows provide no new native acceptance.
+
+Google's [official release notes](https://developer.android.com/tools/agents/android-cli/release-notes)
+identify stable1.1.16717390. The exact new Linux ELF was downloaded from the
+[official endpoint](https://developer.android.com/tools/agents/android-cli/download),
+SHA25643204dcc42955f4698b7a7ca945f26c26f594f9239f5f8e11b3b73d4ceaa11ae.
+That same binary reports1.1.16717390 in the existing Ubuntu runtime and its SDK-install
+help retains exact package specs. Its review cache stays in the task workspace;
+no SDK package was installed and no user computation stopped for this probe.
+
+CI now pins that reviewed SHA/version. All SDK/platform/build-tools/NDK/emulator/image
+pins and verification remain unchanged. Eight SDK regression cases pass, including new
+changed-download/no-execution and wrong-version/no-installation checks. Artifact, logs,
+headers and source references are recorded in preflight-060/android-cli-1-1-review.json.
+Full SDK installation and exact-source build/native execution remain required. This is
+a tool pin update, not a warning waiver or a completed0.6 release.
+
+
 ## Native signed ancestry and transaction-bound local policy reads
 
 The native consumer can now enumerate one independently approved publisher's entire

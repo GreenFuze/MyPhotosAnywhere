@@ -66,8 +66,8 @@ class InstalledAndroidSdk:
 
 
 class AndroidSdkSetup:
-    CLI_SHA256 = "c8f88b14aa00e44a542dd3597cbdcb015e55511e33c2dd69920f41f5b086e228"
-    CLI_VERSION = "1.0.16625370"
+    CLI_SHA256 = "43204dcc42955f4698b7a7ca945f26c26f594f9239f5f8e11b3b73d4ceaa11ae"
+    CLI_VERSION = "1.1.16717390"
 
     def __init__(self):
         self.sdk = Path(os.environ["ANDROID_HOME"])
