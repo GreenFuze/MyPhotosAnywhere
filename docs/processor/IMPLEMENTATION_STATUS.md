@@ -1,5 +1,31 @@
 # MPA 0.6.0 implementation ledger
 
+## Joined current-file identity allocation
+
+The new serial allocation owner captures ready native keys, current local publisher/
+source/account authority and the immutable control plan before provider I/O. The actual
+account lease is checked again before GenerateIds. One returned ID/original account
+revision is retained and checkpointed even when cancellation or selector retirement
+arrives during the provider call. Post-I/O authority changes deny successful result
+admission after retaining that historical identity. No file is created or signed.
+
+Concurrent calls and a reopened owner reuse the same durable ID. A failed SQL/storage
+checkpoint keeps the known live receipt for unchanged retry before another provider call.
+Stop denies new admission, joins physical I/O and persists the pending receipt. Failed
+retirement leaves exit unconfirmed and borrowed resources retained until the same receipt
+can persist. GenerateIds creates no file: unobserved unused IDs after a hard crash are
+not claimed exactly-once, and signature/export/create remain forbidden before durability.
+
+Validation passes13 focused cases and all322 ordinary AppServices CI-subset cases, zero
+failed/skipped; Desktop builds with zero warnings/errors. Nine new allocation cases
+cover concurrency/reopen, low storage, joined cancellation/exit, stale authority before
+and during I/O, and failed-retirement recovery. Frozen source/log/TRX hashes are in
+preflight-060/current-allocation-validation.json. Schemas and existing tests/budgets/
+warning gates remain unchanged. Runtime composition, actual signed-current publication,
+initial-phase handoff, v2 export and canonical activation remain pending; a returned slot
+is historical identity evidence, not cloud availability or setup readiness.
+
+
 ## Actual Drive media conditions and retained-identity recovery
 
 The isolated Windows feasibility probe now verifies conditional v2 media writes on a

@@ -37,7 +37,8 @@ same control object, and reconcile a lost acknowledgement by exact bytes and act
 version. It must never resolve an ambiguous update by creating another current object or
 selecting an equal copy. Plugin workers receive no controller key or publication owner.
 The producer now has a durable local slot and shares the existing root signing journal;
-actual provider allocation and mutable publication remain pending. Pure serialization,
+the joined allocation owner is implemented, while runtime composition and mutable
+publication remain pending. Pure serialization,
 reservation and signing are not publication.
 
 ## Consumer sequence
@@ -132,3 +133,12 @@ export/import UX, full graph/control lifetime integration, high-water admission 
 with canonical staging/atomic activation, and native gallery integration remain required.
 No current-control document is published by this change. Legacy Room12 and Processor13
 schemas remain unchanged. Fenced persisted state is not fresh authority after restart.
+
+The joined allocation service captures current native/local authority and exact account
+revision before GenerateIds and fences authority again afterward. Known returned IDs
+checkpoint without caller cancellation and cannot be replaced on a live retry. Source/
+account changes prevent successful result admission after historical receipt retention.
+Close joins physical provider I/O; a failed pending checkpoint keeps exit unconfirmed
+and borrowed resources alive until retry. It creates no file and exposes no setup-ready
+state. GenerateIds alone creates no file, so an unknown unused ID after a hard crash
+before result durability cannot be described as an exactly-once published identity.
