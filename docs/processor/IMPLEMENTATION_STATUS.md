@@ -1,5 +1,34 @@
 # MPA 0.6.0 implementation ledger
 
+## Selected producer policies share the current-reader lifetime
+
+The captured producer reader now fetches only the exact Root-selected publisher and
+source references. Actual metadata/type/length/parent/corpus and known immutable
+version/digest floors precede the body; complete bytes/SHA and Root signature/sequence
+checks precede typed return. Invalid publisher signatures stop before source I/O.
+Revocation works without an active publisher. No scan, history or current authority is
+inferred from returned semantics; full graph and atomic admission remain unfinished.
+
+Each callback/return rechecks one reader/nonce/pin/account/native-key lifetime. Foreign,
+superseded or fenced captures deny I/O. Close/cancellation join actual uncooperative
+policy bodies and retain borrowed owners. Envelopes return owned copies. Repeated reads
+do not modify legacy inventory or its completion receipt. Source/history admission must
+still be composed before final fencing and canonical activation.
+
+The initial new test compile failure assumed a source configuration had a Root Sequence
+property; actual source semantics expose Revision and the selected head owns Sequence.
+The corrected assertion preserves both distinctions. Final source passes all33 focused
+cases with every19 previous current-reader identity retained and a strict Desktop build
+with zero warnings/errors. The ownership assertion mutates the actual returned-memory
+backing arrays, then requires later reads to preserve the original envelopes. Source,
+TRX and full-log hashes are frozen in preflight-060/local-current-policies-validation.json.
+Fourteen new cases cover exact references, MIME/parents/corpus,
+length/minimum versions, changed bytes, invalid Root signatures, revocation, ownership,
+nonce/disconnect races, final fencing and joined physical cancellation/close. Full374
+ordinary AppServices and mandatory scale/reference categories remain required in fresh
+exact-source CI. Room12/Processor13/native private7 and budgets are unchanged; no runtime
+composition, original write, canonical activation or final0.6 release is enabled.
+
 ## Producer Root observations persist before semantic admission
 
 The new producer reader begins a nonce before network work and composes actual Google

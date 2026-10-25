@@ -176,6 +176,9 @@ public sealed partial class AccountServiceTests
     private sealed class CurrentReadHttp(InitialPublicationFixture data) : HttpMessageHandler
     {
         public Func<Task>? BeforeBody {get;set;}
+        public Func<string,Task>? BeforeFileBody {get;set;}
+        public Func<string,string,string>? MetadataJson {get;set;}
+        public List<string> BodyFiles {get;}=[];
         public int MetadataReads {get;private set;}
         public int BodyReads {get;private set;}
         public bool Disposed {get;private set;}
@@ -185,14 +188,18 @@ public sealed partial class AccountServiceTests
             Assert.AreEqual("https",request.RequestUri.Scheme);Assert.AreEqual("synthetic-access",request.Headers.Authorization!.Parameter);
             if(request.RequestUri.AbsolutePath=="/drive/v3/about") return Json("""{"user":{"permissionId":"permission-A","displayName":"Synthetic"}}""");
             StringAssert.Contains(request.RequestUri.Query,"supportsAllDrives=true");
-            if(request.RequestUri.AbsolutePath=="/drive/v3/files/captured-3")
+            var file=Uri.UnescapeDataString(request.RequestUri.AbsolutePath[(request.RequestUri.AbsolutePath.LastIndexOf('/')+1)..]);
+            Assert.IsTrue(data.Cloud.ContainsKey(file),"Only exact owned fixture identities may be read.");
+            if(request.RequestUri.AbsolutePath=="/drive/v3/files/"+file)
             {
                 StringAssert.Contains(request.RequestUri.Query,"alt=media");BodyReads++;if(BeforeBody is not null) await BeforeBody().ConfigureAwait(false);
-                return new(HttpStatusCode.OK) {Content=new ByteArrayContent(data.Cloud["captured-3"].Bytes.ToArray())};
+                BodyFiles.Add(file);if(BeforeFileBody is not null) await BeforeFileBody(file).ConfigureAwait(false);
+                return new(HttpStatusCode.OK) {Content=new ByteArrayContent(data.Cloud[file].Bytes.ToArray())};
             }
-            Assert.AreEqual("/drive/v2/files/captured-3",request.RequestUri.AbsolutePath);MetadataReads++;var actual=data.Cloud["captured-3"];
-            return Json(JsonSerializer.Serialize(new {id=actual.FileId,version=actual.DriveVersion.ToString(CultureInfo.InvariantCulture),etag="\"actual-"+actual.DriveVersion.ToString(CultureInfo.InvariantCulture)+"\"",
-                fileSize=actual.Bytes.Length.ToString(CultureInfo.InvariantCulture),mimeType="application/json",parents=new[]{new {id=actual.FolderId}},labels=new {trashed=false},capabilities=new {canDownload=true,canEdit=true}}));
+            Assert.AreEqual("/drive/v2/files/"+file,request.RequestUri.AbsolutePath);MetadataReads++;var actual=data.Cloud[file];
+            var raw=JsonSerializer.Serialize(new {id=actual.FileId,version=actual.DriveVersion.ToString(CultureInfo.InvariantCulture),etag="\"actual-"+actual.DriveVersion.ToString(CultureInfo.InvariantCulture)+"\"",
+                fileSize=actual.Bytes.Length.ToString(CultureInfo.InvariantCulture),mimeType="application/json",parents=new[]{new {id=actual.FolderId}},labels=new {trashed=false},capabilities=new {canDownload=true,canEdit=true}});
+            return Json(MetadataJson?.Invoke(file,raw) ?? raw);
         }
         private static HttpResponseMessage Json(string body)=>new(HttpStatusCode.OK) {Content=new StringContent(body,Encoding.UTF8,"application/json")};
         protected override void Dispose(bool disposing) {if(disposing) Disposed=true;base.Dispose(disposing);}

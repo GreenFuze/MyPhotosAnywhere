@@ -242,3 +242,23 @@ lifetime before atomic admission. General fixed Root transitions/CAS/lost-ack re
 and the legacy inventory/current-selection handoff remain required. Persisted fenced
 state becomes historical after restart; it cannot authorize a new process. Processor
 schema13, Room12, native private7 and existing operational budgets remain unchanged.
+
+
+## Producer selected-policy lifetime
+
+The same joined reader now reads only the publisher/source IDs, byte lengths and SHA
+references selected by its captured Root head. Actual JSON MIME, account/workspace,
+parent/corpus, positive version and exact declared length precede a policy body. Known
+immutable version/digest floors are checked without changing the legacy scan. Complete
+owned bytes must match the signed reference; policy Root signatures and selected
+sequences are verified. A bad publisher stops before the source request. Revocation
+remains readable when no publisher is active.
+
+Callbacks and return admission recheck the live private reader identity, nonce, account
+revision, independent pin/slot and native Root possession. Foreign readers, superseded
+captures and already-fenced captures cannot start policy I/O. Cancellation/close join an
+uncooperative physical policy body before borrowed owners retire. Returned envelopes
+are owned copies. A successful holder remains pending: it does not update legacy
+inventory or mark a scan/current generation complete. Full retained policy/history,
+approved-source/publisher admission, selected ancestry/coverage/facts and atomic
+activation still need integration under this same lifetime before the final fence.

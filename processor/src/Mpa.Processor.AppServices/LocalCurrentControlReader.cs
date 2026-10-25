@@ -35,7 +35,7 @@ public sealed class LocalCurrentControlFence
 /// retained local Root signatures may advance high-water. Root observation never needs
 /// an active publisher. Graph reads must join this same lifetime before activation is
 /// added; current capture/fence alone are not complete policy/catalog admission.</summary>
-public sealed class LocalCurrentControlReader(ProcessorStateCoordinator state,ProcessorAccountService accounts,
+public sealed partial class LocalCurrentControlReader(ProcessorStateCoordinator state,ProcessorAccountService accounts,
     LibrarySigningIdentityOwner keys,StorageBudgetManager budget) : IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state=state ?? throw new ArgumentNullException(nameof(state));
