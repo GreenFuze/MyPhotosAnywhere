@@ -80,15 +80,21 @@ if [[ "$mpa_booted" != true ]]; then
   printf 'Emulator did not complete boot\n' >&2
   exit 1
 fi
-# Keep the complete stream: a final bounded-buffer dump can lose early tests
-# and allocation traces. Cleanup must never overwrite a started capture.
-adb logcat -v threadtime > build/diagnostics/logcat.txt 2> build/diagnostics/logcat-reader.txt &
-mpa_logcat_pid=$!
-mpa_logcat_started=true
+# Preparation can intentionally restart adbd/framework for the narrowly verified
+# API29 boot-time heap mismatch. Preserve its diagnostics separately; a streaming
+# connection opened before adb root can terminate before any app test starts.
+# Start the owned, uninterrupted TEST stream only after preparation actually joins.
+adb logcat -d -v threadtime > build/diagnostics/logcat-before-preparation.txt
 python3 scripts/test_emulator_heap.py
 if [[ "$mpa_api" == "29" ]]; then
   python3 scripts/emulator_heap.py "$mpa_api"
 fi
+adb logcat -d -v threadtime > build/diagnostics/logcat-after-preparation.txt
+# Keep every test event/allocation trace. An unexpected disconnect during tests
+# remains blocking; never reconnect, truncate, retry tests or replace this stream.
+adb logcat -v threadtime > build/diagnostics/logcat.txt 2> build/diagnostics/logcat-reader.txt &
+mpa_logcat_pid=$!
+mpa_logcat_started=true
 adb shell settings put global window_animation_scale 0
 adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
