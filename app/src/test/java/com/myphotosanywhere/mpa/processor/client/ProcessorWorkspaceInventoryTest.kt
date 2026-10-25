@@ -210,7 +210,7 @@ class ProcessorWorkspaceInventoryTest {
             assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
             val observations = ProcessorWorkspaceObservations(store);assertNull(observations.lastAttempt())
             assertEquals(1L,observations.begin(pin.documentSha256).revision)
-            sql(store) { assertEquals(5,it.version) }
+            sql(store) { assertEquals(6,it.version) }
         } finally { store.close() }
     }
 

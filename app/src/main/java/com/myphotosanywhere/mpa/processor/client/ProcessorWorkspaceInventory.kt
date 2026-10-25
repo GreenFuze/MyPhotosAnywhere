@@ -16,6 +16,9 @@ internal interface ProcessorWorkspaceInventorySource {
     suspend fun page(token: String? = null): DriveWorkspacePage
     suspend fun readCaptured(expected: DriveWorkspaceMetadata): ByteArray
 }
+internal interface ProcessorWorkspaceCapturedSource : ProcessorWorkspaceInventorySource {
+    suspend fun capture(fileId: String): DriveWorkspaceMetadata
+}
 /** Listed/read evidence awaiting change replay and full graph/authority admission.
  * It is always pending; no UI may interpret this value as a ready/activated library. */
 internal class ProcessorWorkspacePrepared(val attempt: ProcessorWorkspaceAttempt,reads: List<ProcessorWorkspaceRead>) {

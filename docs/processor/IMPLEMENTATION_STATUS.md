@@ -1,5 +1,52 @@
 # MPA 0.6.0 implementation ledger
 
+## Observed catalog reads and an explicit final-fence phase
+
+Catalog ancestry and covered-facts reads now use one durable prepared/replayed read set.
+The adapter admits only the exact captured account/workspace/file ID/length/SHA; it never
+looks for an equal copy. Version, encoding, corpus, parents, downloadability and actual
+read bytes are checked before a semantic consumer receives them. A replaced attempt or
+canceled physical read cannot return its late result; borrowed I/O joins before retirement.
+
+The final unchanged check atomically records an explicit fenced phase. That phase closes
+all catalog metadata reads, including attempts to create another adapter or repeat the
+fence. A full validated replay context rejects active, changed or sticky-recovery state
+before transport. The read set grants staging access only: current controller/retired-
+epoch/head admission, approved-source/full-graph canonical staging, atomic generation
+activation and gallery integration remain unfinished.
+
+Private schema6 preserves schema1/2/3/4/5. Schema5 requires no table/body rewrite; its
+legacy replay JSON defaults to pending, never an accepted final fence. A historical5
+fixture preserves its complete valid old role/global event chain, raw event bytes, pin,
+account, read identities and original. A separate changed-body/event mismatch fails
+closed. Legacy Room12 and Processor13 remain unchanged; no existing preservation
+assertion or4096-document/16384-event bound is relaxed.
+
+Focused90 cases pass, followed by11 new catalog cases with zero lint issues and both
+APK builds. The additional integration verifies real signed ancestry and the complete
+coverage/GZip/facts tree through retained SQLite receipts, exact sequential reads and
+retirement at the final fence. Final full regression passes674 cases across114 suites,
+zero failures/errors/skips, zero lint findings and both APK builds. Only the approved
+exact AGP diagnostic remains. Source/report/APK hashes and114 uniquely archived reports
+are saved in preflight-060/native-observed-objects-validation.json.
+
+Two new native cases compile for final-fence retirement and preserving schema5 migration;
+exact-source API29/35/37 execution remains required. The first full-check action was not
+executed when automatic approval review temporarily hit a usage limit. Once the account
+reported ordinary usage available, the identical action passed the same approval path.
+No approval bypass, credit reset, warning waiver, test retry or larger deadline was used.
+
+## Reviewed SDK and policy snapshot verified across emulator APIs
+
+Exact66e65ad1e9c374b891d6f996dc023c54212139a0 passes Android40165064081 and Native
+40165064110 on API29/35/37. Downloaded artifacts independently verify172 unique passing
+cases, complete process-bound runtime traces and108 valid mapped PNGs per API. The new
+caller-owned SQL snapshot/rollback case actually ran. Installation records verify the
+reviewed CLI1.1.16717390 and all six exact SDK/image packages on every emulator runner.
+These results predate the newer schema6 read adapter and are not its native acceptance,
+S23/live Google acceptance or a completed0.6 client/release.
+
+
 ## Reviewed Android CLI pin after upstream replacement
 
 Exact80ed3e0f3ede63f7d134124380f9b1b6138081c8 CI Android40164405339 and Native

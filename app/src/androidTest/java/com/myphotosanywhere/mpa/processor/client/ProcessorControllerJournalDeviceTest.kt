@@ -79,7 +79,7 @@ class ProcessorControllerJournalDeviceTest {
             val state = ProcessorLibraryControllerJournal(store).accept(envelope(1,true))
             assertEquals(1L,state.sourceSequence); assertEquals(1L,state.sources?.revision)
             assertArrayEquals(byteArrayOf(8,6,4,2),original.readBytes())
-            sql(directory) { assertEquals(5,it.version) }
+            sql(directory) { assertEquals(6,it.version) }
         } finally { store.close(); cleanup(directory) }
     }
     @Test fun nativeBorrowedPolicySnapshotSharesAtomicRollbackAndExactEnvelope() = runBlocking<Unit> {

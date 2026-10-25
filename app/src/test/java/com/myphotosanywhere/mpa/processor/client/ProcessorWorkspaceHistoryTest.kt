@@ -225,7 +225,7 @@ class ProcessorWorkspaceHistoryTest {
                 db.execSQL("CREATE INDEX workspace_event_lookup ON workspace_event(kind,file_id,sequence)");db.execSQL("INSERT INTO workspace_event SELECT * FROM old_events");db.execSQL("DROP TABLE old_events");db.version = 4
             }
             store.close();store = store();val restored = ProcessorWorkspaceObservations(store);assertEquals(ready.attempt,restored.lastAttempt());assertEquals(pin.encode(),store.current()?.encode())
-            sql(store) { db -> assertEquals(5,db.version);db.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> var index = 0;while(rows.moveToNext()) assertArrayEquals(priorEvents[index++],rows.getBlob(0));assertEquals(priorEvents.size,index) } }
+            sql(store) { db -> assertEquals(6,db.version);db.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> var index = 0;while(rows.moveToNext()) assertArrayEquals(priorEvents[index++],rows.getBlob(0));assertEquals(priorEvents.size,index) } }
             val next = restored.begin(pin.documentSha256);rejects { restored.start(next,cursor("later",drive="new-drive")) };assertNull(restored.lastAttempt()?.unresolvedDriveId)
             val started = restored.start(next,cursor("later"));assertEquals("start",started.firstUnresolved)
         } finally { store.close() }

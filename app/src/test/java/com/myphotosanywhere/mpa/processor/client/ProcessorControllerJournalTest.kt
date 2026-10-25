@@ -211,7 +211,7 @@ class ProcessorControllerJournalTest {
             assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
             assertNull(ProcessorLibraryControllerJournal(store).current().publisher)
             assertEquals(1L,ProcessorLibraryControllerJournal(store).accept(policy(1)).publisher?.sequence)
-            SQLiteDatabase.openDatabase(path.absolutePath,null,SQLiteDatabase.OPEN_READONLY).use { assertEquals(5,it.version) }
+            SQLiteDatabase.openDatabase(path.absolutePath,null,SQLiteDatabase.OPEN_READONLY).use { assertEquals(6,it.version) }
         } finally { store.close() }
     }
 

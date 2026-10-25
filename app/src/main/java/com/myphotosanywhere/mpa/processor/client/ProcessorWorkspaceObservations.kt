@@ -63,7 +63,7 @@ internal class ProcessorWorkspaceObservations(private val store: ProcessorLibrar
             unresolvedDriveId=previous?.unresolvedDriveId,historySha256=previous?.historySha256 ?: initial(pin,HISTORY),replaySha256=previous?.replaySha256 ?: initial(pin,REPLAY))
         store.requireWriteBudget();putMeta(database,"workspace_attempt_revision",attempt.revision.toString())
         val replay = state.replay()
-        val next = if(replay == null) attempt else append(database,attempt,REPLAY,REPLAY_ID,codec.replay(replay.copy(owner=attempt.id,active=false,atEnd=false,batchPages=0,inventoryChanged=false)))
+        val next = if(replay == null) attempt else append(database,attempt,REPLAY,REPLAY_ID,codec.replay(replay.copy(owner=attempt.id,active=false,atEnd=false,batchPages=0,inventoryChanged=false,fenced=false)))
         save(database,next);next
     }
     suspend fun start(attempt: ProcessorWorkspaceAttempt,cursor: DriveWorkspaceCursor): ProcessorWorkspaceAttempt = change(attempt) { database,state ->
@@ -126,14 +126,24 @@ internal class ProcessorWorkspaceObservations(private val store: ProcessorLibrar
     }
     suspend fun reads(attempt: ProcessorWorkspaceAttempt): List<ProcessorWorkspaceRead> = transaction { database,registration,cancellation ->
         val state = load(database,registration,true,cancellation);current(attempt,state)
-        if (!attempt.inventoryListed || state.candidateCount != state.readCount) throw ProcessorWorkspaceConflict()
-        val result = state.allIds(CANDIDATE).map { id ->
-            val value = state.read(id) ?: throw ProcessorWorkspaceConflict()
-            if (value.candidate != state.candidate(id)) throw ProcessorWorkspaceConflict()
-            value
-        }
-        Collections.unmodifiableList(result)
+        state.completeReads()
     }
+    /** A transport-only staging context. A final fence explicitly retires its read
+     * permission; it does not grant current policy or catalog activation authority. */
+    suspend fun replayedContext(batch: ProcessorWorkspaceReplayBatch): ProcessorCatalogReadContext = transaction { database,registration,cancellation ->
+        val snapshot = load(database,registration,true,cancellation);current(batch.attempt,snapshot)
+        replayContext(batch,snapshot)
+        if(snapshot.allIds(HISTORY).any { checkNotNull(snapshot.history(it)).recoveryRequired }) throw ProcessorWorkspaceHistoryRecovery()
+        ProcessorCatalogReadContext(batch,registration.descriptor.workspace,snapshot.completeReads())
+    }
+    suspend fun assertCatalogRead(context: ProcessorCatalogReadContext,expected: ProcessorWorkspaceRead) = transaction { database,registration,cancellation ->
+        val snapshot = load(database,registration,false,cancellation);current(context.batch.attempt,snapshot);replayContext(context.batch,snapshot)
+        if(registration.descriptor.workspace != context.workspace || snapshot.read(expected.candidate.fileId) != expected || snapshot.candidate(expected.candidate.fileId) != expected.candidate) throw ProcessorWorkspaceConflict()
+    }
+    private fun replayContext(batch: ProcessorWorkspaceReplayBatch,snapshot: Snapshot) {
+        if(snapshot.replay() != batch.state || batch.state.active || !batch.state.atEnd || batch.state.inventoryChanged || batch.state.fenced) throw ProcessorWorkspaceConflict()
+    }
+
     suspend fun workspaceFolder(attempt: ProcessorWorkspaceAttempt): String = transaction { database,registration,cancellation ->
         current(attempt,load(database,registration,false,cancellation));registration.descriptor.workspace.folderId
     }
@@ -151,7 +161,7 @@ internal class ProcessorWorkspaceObservations(private val store: ProcessorLibrar
     }
     suspend fun rememberHistoryPage(batch: ProcessorWorkspaceReplayBatch,page: ProcessorWorkspaceHistoryEvidence,rejectedFence: Boolean): ProcessorWorkspaceReplayBatch = transaction { database,registration,cancellation ->
         val snapshot = load(database,registration,false,cancellation);current(batch.attempt,snapshot)
-        if(snapshot.replay() != batch.state || page.from != batch.state.cursor || !page.next.sameScope(batch.state.start) ||
+        if(snapshot.replay() != batch.state || batch.state.fenced || page.from != batch.state.cursor || !page.next.sameScope(batch.state.start) ||
             !rejectedFence && (!batch.state.active || batch.state.atEnd || batch.state.batchPages >= 128) ||
             rejectedFence && (!batch.state.atEnd || batch.state.active)) throw ProcessorWorkspaceConflict()
         if(!page.atEnd && page.next.token == page.from.token) throw ProcessorWorkspaceConflict()
@@ -180,12 +190,13 @@ internal class ProcessorWorkspaceObservations(private val store: ProcessorLibrar
         current.copy(active=false)
     }
     suspend fun rememberUnchanged(batch: ProcessorWorkspaceReplayBatch,page: ProcessorWorkspaceHistoryEvidence): ProcessorWorkspaceReplayBatch = replayState(batch) { current ->
-        if(!current.atEnd || current.active || current.inventoryChanged || page.from != current.cursor || !page.atEnd || !page.next.sameScope(current.cursor) || page.events.isNotEmpty() || page.inventoryChanged) throw ProcessorWorkspaceConflict()
-        current.copy(cursor=page.next,totalPages=Math.addExact(current.totalPages,1))
+        if(!current.atEnd || current.active || current.inventoryChanged || current.fenced || page.from != current.cursor || !page.atEnd || !page.next.sameScope(current.cursor) || page.events.isNotEmpty() || page.inventoryChanged) throw ProcessorWorkspaceConflict()
+        current.copy(cursor=page.next,totalPages=Math.addExact(current.totalPages,1),fenced=true)
     }
     private suspend fun replayState(batch: ProcessorWorkspaceReplayBatch,action: (ProcessorWorkspaceReplayState)->ProcessorWorkspaceReplayState): ProcessorWorkspaceReplayBatch = transaction { database,registration,cancellation ->
         val snapshot = load(database,registration,true,cancellation);current(batch.attempt,snapshot)
         if(snapshot.replay() != batch.state) throw ProcessorWorkspaceConflict()
+        if(snapshot.allIds(HISTORY).any { checkNotNull(snapshot.history(it)).recoveryRequired }) throw ProcessorWorkspaceHistoryRecovery()
         val state = action(batch.state);val next = append(database,batch.attempt,REPLAY,REPLAY_ID,codec.replay(state));save(database,next)
         ProcessorWorkspaceReplayBatch(next,state)
     }
@@ -241,6 +252,15 @@ internal class ProcessorWorkspaceObservations(private val store: ProcessorLibrar
         private fun decodeRead(id: String,bytes: ByteArray): ProcessorWorkspaceRead = decode { codec.read(bytes) }.also { value ->
             val captured = candidate(id)
             state(value.candidate.fileId == id && captured != null && sameContent(value.candidate,captured) && value.candidate.version <= captured.version,"Saved read lost its candidate.");readCache[id] = value
+        }
+        fun completeReads(): List<ProcessorWorkspaceRead> {
+            if(attempt?.inventoryListed != true || candidateCount != readCount) throw ProcessorWorkspaceConflict()
+            val result = allIds(CANDIDATE).map { id ->
+                val value = read(id) ?: throw ProcessorWorkspaceConflict()
+                if(value.candidate != candidate(id)) throw ProcessorWorkspaceConflict()
+                value
+            }
+            return Collections.unmodifiableList(result)
         }
         fun allIds(kind: String): List<String> = database.rawQuery("SELECT file_id FROM ${table(kind)} ORDER BY file_id LIMIT 4097",null).use { rows ->
             val result = arrayListOf<String>()
@@ -371,18 +391,20 @@ private class WorkspaceObservationCodec {
     }
     fun replay(value: ProcessorWorkspaceReplayState): ByteArray = encode(JsonObject().apply {
         addProperty("owner",value.owner.toString());add("start",cursor(value.start));add("cursor",cursor(value.cursor));addProperty("total",value.totalPages.toString())
-        addProperty("batch",value.batchPages.toString());addProperty("active",value.active);addProperty("end",value.atEnd);addProperty("changed",value.inventoryChanged)
+        addProperty("batch",value.batchPages.toString());addProperty("active",value.active);addProperty("end",value.atEnd);addProperty("changed",value.inventoryChanged);addProperty("fenced",value.fenced)
     })
     fun replay(bytes: ByteArray): ProcessorWorkspaceReplayState {
-        val root = parse(bytes,setOf("owner","start","cursor","total","batch","active","end","changed"))
+        val legacy = setOf("owner","start","cursor","total","batch","active","end","changed")
+        val root = parseEither(bytes,legacy,legacy + "fenced")
         val owner = text(root,"owner")
         if(!owner.matches(Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))) throw IOException("Saved replay owner is invalid.")
         val id = UUID.fromString(owner)
         if(id.toString() != owner || id == UUID(0,0)) throw IOException("Saved replay owner is invalid.")
         val start = cursor(root.asJsonObject["start"]);val current = cursor(root.asJsonObject["cursor"])
         val total = number(root,"total",true);val batch = number(root,"batch",true);val active = boolean(root,"active");val end = boolean(root,"end");val changed = boolean(root,"changed")
-        if(!start.sameScope(current) || batch !in 0..128L || total < batch || active && (end || changed)) throw IOException("Saved replay lost its exact bounded phase.")
-        return ProcessorWorkspaceReplayState(id,start,current,total,batch.toInt(),active,end,changed)
+        val fenced = if(root.asJsonObject.keySet() == legacy) false else boolean(root,"fenced")
+        if(!start.sameScope(current) || batch !in 0..128L || total < batch || active && (end || changed || fenced) || fenced && (!end || changed)) throw IOException("Saved replay lost its exact bounded phase.")
+        return ProcessorWorkspaceReplayState(id,start,current,total,batch.toInt(),active,end,changed,fenced)
     }
     private fun cursor(value: DriveWorkspaceCursor) = JsonObject().apply { addProperty("account",value.accountId);addProperty("drive",value.sharedDriveId);addProperty("token",value.token) }
     private fun cursor(root: JsonElement): DriveWorkspaceCursor {

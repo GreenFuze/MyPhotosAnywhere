@@ -71,7 +71,7 @@ class ProcessorWorkspaceObservationDeviceTest {
             store = store(directory);assertEquals(pin.encode(),store.current()?.encode());assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
             val prepared = ProcessorWorkspaceInventory(ProcessorWorkspaceObservations(store),source(listOf("a"))).prepare { _,_ -> }
             assertEquals(1,prepared.reads.size);assertArrayEquals(byteArrayOf(7,5,3,1),original.readBytes())
-            sql(directory) { assertEquals(5,it.version) }
+            sql(directory) { assertEquals(6,it.version) }
         } finally { store.close();cleanup(directory) }
     }
     @Test fun nativeRemovedHistoryPersistsAndCannotBeWashedAfterRestart() = runBlocking<Unit> {
@@ -128,7 +128,40 @@ class ProcessorWorkspaceObservationDeviceTest {
             store.close();store = store(directory);val restored = ProcessorWorkspaceObservations(store)
             assertEquals(ready.attempt,restored.lastAttempt());assertEquals(ready.reads,restored.reads(ready.attempt));assertNull(restored.lastAttempt()?.unresolvedDriveId)
             assertEquals(pin.encode(),store.current()?.encode());assertEquals("synthetic@example.invalid",store.registration()?.account?.email);assertArrayEquals(byteArrayOf(9,7,5,3),original.readBytes())
-            sql(directory) { db -> assertEquals(5,db.version);db.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> var index = 0;while(rows.moveToNext()) assertArrayEquals(events[index++],rows.getBlob(0));assertEquals(events.size,index) } }
+            sql(directory) { db -> assertEquals(6,db.version);db.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> var index = 0;while(rows.moveToNext()) assertArrayEquals(events[index++],rows.getBlob(0));assertEquals(events.size,index) } }
+        } finally { store.close();cleanup(directory) }
+    }
+
+    @Test fun nativeFenceRetiresCatalogTransport() = runBlocking<Unit> {
+        val directory = directory();val store = store(directory)
+        try {
+            approve(store);val observations = ProcessorWorkspaceObservations(store);var captures = 0
+            val source = object : ProcessorWorkspaceCapturedSource,ProcessorWorkspaceHistorySource {
+                override val connectionSha256 = pin.documentSha256
+                override suspend fun cursor() = DriveWorkspaceCursor(pin.workspace.accountId,null,"cursor")
+                override suspend fun page(token: String?) = DriveWorkspacePage(listOf(metadata("a")),null,false)
+                override suspend fun capture(fileId: String): DriveWorkspaceMetadata { captures++;return metadata(fileId) }
+                override suspend fun readCaptured(expected: DriveWorkspaceMetadata) = "{}".toByteArray()
+                override suspend fun changes(cursor: DriveWorkspaceCursor) = DriveWorkspaceChangesPage(emptyList(),null,cursor.copy(token="end"))
+            }
+            val prepared = ProcessorWorkspaceInventory(observations,source).prepare { _,_ -> };val batch = ProcessorWorkspaceHistory(observations,source).replay(prepared)
+            val objects = ProcessorCatalogObservedObjects.create(observations,source,batch)
+            val reference = com.myphotosanywhere.mpa.processor.protocol.CatalogObjectReference(pin.workspace.accountId,"a",pin.workspace.folderId,2,prepared.reads.single().sha256)
+            assertArrayEquals("{}".toByteArray(),objects.read(reference));assertEquals(1,captures)
+            val fenced = ProcessorWorkspaceHistory(observations,source).checkUnchanged(batch,prepared.reads);assertTrue(fenced.state.fenced)
+            try { objects.read(reference);fail("Native transport outlived its final fence") } catch (_: ProcessorWorkspaceConflict) { }
+            try { ProcessorCatalogObservedObjects.create(observations,source,fenced);fail("Native final fence reopened a catalog reader") } catch (_: ProcessorWorkspaceConflict) { }
+            assertEquals(1,captures)
+        } finally { store.close();cleanup(directory) }
+    }
+    @Test fun nativeSchemaFiveKeepsApprovalAndOriginal() = runBlocking<Unit> {
+        val directory = directory();var store = store(directory)
+        try {
+            approve(store);val original = File(directory,"original.jpg").apply { writeBytes(byteArrayOf(6,4,2)) };store.close()
+            sql(directory) { it.version = 5 }
+            store = store(directory);assertEquals(pin.encode(),store.current()?.encode());assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
+            assertArrayEquals(byteArrayOf(6,4,2),original.readBytes());assertNull(ProcessorWorkspaceObservations(store).lastAttempt())
+            sql(directory) { assertEquals(6,it.version) }
         } finally { store.close();cleanup(directory) }
     }
 

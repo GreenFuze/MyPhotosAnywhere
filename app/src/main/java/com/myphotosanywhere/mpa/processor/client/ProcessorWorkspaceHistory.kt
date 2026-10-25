@@ -23,7 +23,7 @@ internal data class ProcessorWorkspaceHistorySummary(val kind: String,val id: St
     val key: String get() = ProcessorWorkspaceObservations.hash((kind + ":" + id).toByteArray(Charsets.UTF_8))
 }
 internal data class ProcessorWorkspaceReplayState(val owner: UUID,val start: DriveWorkspaceCursor,val cursor: DriveWorkspaceCursor,
-    val totalPages: Long,val batchPages: Int,val active: Boolean,val atEnd: Boolean,val inventoryChanged: Boolean)
+    val totalPages: Long,val batchPages: Int,val active: Boolean,val atEnd: Boolean,val inventoryChanged: Boolean,val fenced: Boolean = false)
 internal data class ProcessorWorkspaceReplayBatch(val attempt: ProcessorWorkspaceAttempt,val state: ProcessorWorkspaceReplayState)
 internal data class ProcessorWorkspaceHistoryEvent(val kind: String,val id: String,val recoveryRequired: Boolean,val sha256: String) {
     init {
@@ -66,7 +66,7 @@ internal class ProcessorWorkspaceHistory(private val observations: ProcessorWork
     /** A rejected final fence records the actual page without advancing its cursor.
      * An unchanged result is only evidence for a later atomic authority/graph admission. */
     suspend fun checkUnchanged(batch: ProcessorWorkspaceReplayBatch,reads: List<ProcessorWorkspaceRead>): ProcessorWorkspaceReplayBatch = withContext(Dispatchers.IO) {
-        if(!batch.state.atEnd || batch.state.active || reads != observations.reads(batch.attempt)) throw ProcessorWorkspaceConflict()
+        if(reads != observations.replayedContext(batch).reads) throw ProcessorWorkspaceConflict()
         val workspace = observations.workspaceFolder(batch.attempt)
         val evidence = evidence(workspace,reads.associate { it.candidate.fileId to it.candidate },batch.state.cursor,source.changes(batch.state.cursor),true)
         if(evidence.events.isNotEmpty() || evidence.inventoryChanged || !evidence.atEnd) {

@@ -138,7 +138,7 @@ internal class ProcessorLibraryStateStore(context: Context, private val storage:
         return descriptor
     }
     private fun state(valid: Boolean, message: String) { if (!valid) throw ProcessorLibraryStateCorrupt(message) }
-    private class PinDatabase(context: Context, path: String, private val requireMigrationBudget: () -> Unit) : SQLiteOpenHelper(context,path,null,5) {
+    private class PinDatabase(context: Context, path: String, private val requireMigrationBudget: () -> Unit) : SQLiteOpenHelper(context,path,null,6) {
         override fun onCreate(database: SQLiteDatabase) {
             database.execSQL("CREATE TABLE approved_pin(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),code TEXT NOT NULL CHECK(length(code) BETWEEN 1 AND 4096),document_sha256 TEXT NOT NULL CHECK(length(document_sha256)=64))")
             database.execSQL("CREATE TABLE client_meta(key TEXT NOT NULL PRIMARY KEY,value TEXT NOT NULL)")
@@ -149,19 +149,19 @@ internal class ProcessorLibraryStateStore(context: Context, private val storage:
         }
         override fun onConfigure(database: SQLiteDatabase) { database.setForeignKeyConstraintsEnabled(true) }
         override fun onUpgrade(database: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            if (oldVersion !in 1..4 || newVersion != 5)
+            if (oldVersion !in 1..5 || newVersion != 6)
                 error("Unsupported processor client state upgrade: $oldVersion to $newVersion. Accepted state was preserved.")
             requireMigrationBudget()
             if (oldVersion == 1) createSelector(database)
             if (oldVersion < 3) createControllerJournal(database)
-            if(oldVersion < 4) createWorkspaceObservation(database) else {
+            if(oldVersion < 4) createWorkspaceObservation(database) else if(oldVersion == 4) {
                 database.execSQL("ALTER TABLE workspace_event RENAME TO workspace_event_v4")
                 database.execSQL("DROP INDEX workspace_event_lookup")
                 createWorkspaceEvents(database)
                 database.execSQL("INSERT INTO workspace_event SELECT sequence,kind,file_id,document,sha256 FROM workspace_event_v4")
                 database.execSQL("DROP TABLE workspace_event_v4")
             }
-            createWorkspaceReplay(database)
+            if(oldVersion < 5) createWorkspaceReplay(database)
         }
         private fun createControllerJournal(database: SQLiteDatabase) {
             database.execSQL("CREATE TABLE controller_anchor(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),connection_sha256 TEXT NOT NULL CHECK(length(connection_sha256)=64))")

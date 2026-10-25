@@ -22,7 +22,7 @@ import kotlinx.coroutines.ensureActive
  * are transport evidence, NOT a completed observation fence, controller acceptance or
  * catalog activation. The caller must persist each listed candidate before reading it.
  * No original-file mutation, local media copy or desktop/LAN endpoint is created. */
-internal class ProcessorLibraryDriveObjects(private val gateway: DriveGateway,private val pin: LibraryConnectionDescriptor) : CatalogObjectSource, ProcessorWorkspaceInventorySource, ProcessorWorkspaceHistorySource {
+internal class ProcessorLibraryDriveObjects(private val gateway: DriveGateway,private val pin: LibraryConnectionDescriptor) : CatalogObjectSource, ProcessorWorkspaceCapturedSource, ProcessorWorkspaceHistorySource {
     private val scopeLock = Mutex()
     private var boundScope: Pair<String,String?>? = null
     override val connectionSha256: String get() = pin.documentSha256
@@ -49,7 +49,7 @@ internal class ProcessorLibraryDriveObjects(private val gateway: DriveGateway,pr
         return result
     }
 
-    suspend fun capture(fileId: String): DriveWorkspaceMetadata {
+    override suspend fun capture(fileId: String): DriveWorkspaceMetadata {
         DriveWorkspaceMetadata.opaque(fileId)
         if (fileId == pin.workspace.folderId) throw IOException("A catalog object cannot alias its workspace.")
         account(); workspace()
