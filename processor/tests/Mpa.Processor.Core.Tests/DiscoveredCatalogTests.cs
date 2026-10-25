@@ -6,7 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Mpa.Processor.Core.Tests;
 
 [TestClass]
-public sealed class DiscoveredCatalogTests
+public sealed partial class DiscoveredCatalogTests
 {
     [TestMethod]
     public void OverlappingSourcesShareAnIdentityButDistinctAccountFilesNeverMerge()

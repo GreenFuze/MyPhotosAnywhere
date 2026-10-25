@@ -59,39 +59,55 @@ public sealed class DiscoveredCatalogRepository
             if (!reader.Read()) throw new StaleLibraryConfigurationException();
             accountId = reader.GetString(0); descendants = reader.GetBoolean(1);
         }
+        // Statements belong to this captured batch/transaction only. Reuse their
+        // compiled SQL while resetting every item-specific parameter, then dispose
+        // them before releasing the serialized database owner. No cross-batch cache.
+        using var prior = Command(transaction, "SELECT drive_version,facts_hash FROM discovered_asset WHERE id=$id", ("$id", ""));
+        prior.Prepare();
+        using var upsert = Command(transaction, """
+            INSERT INTO discovered_asset VALUES($id,$account,$file,$version,$name,$mime,$width,$height,$captured,$raw,$modified,$unknown,$sort,$hash)
+            ON CONFLICT(id) DO UPDATE SET drive_version=excluded.drive_version,name=excluded.name,mime_type=excluded.mime_type,
+              width=excluded.width,height=excluded.height,captured_utc=excluded.captured_utc,raw_capture=excluded.raw_capture,
+              modified_utc=excluded.modified_utc,date_unknown=excluded.date_unknown,date_sort=excluded.date_sort,facts_hash=excluded.facts_hash
+            """, ("$id", ""), ("$account", accountId), ("$file", ""), ("$version", 1L), ("$name", ""), ("$mime", ""),
+            ("$width", null), ("$height", null), ("$captured", null), ("$raw", null), ("$modified", null),
+            ("$unknown", true), ("$sort", 0L), ("$hash", ""));
+        upsert.Prepare();
+        using var membership = Command(transaction, """
+            INSERT INTO source_asset VALUES($source,$asset,$depth)
+            ON CONFLICT(source_id,asset_id) DO UPDATE SET depth=excluded.depth WHERE depth<>excluded.depth
+            """, ("$source", sourceId.ToString("D")), ("$asset", ""), ("$depth", 0));
+        membership.Prepare();
         var changed = 0;
         foreach (var item in facts)
         {
             if (!descendants && item.Depth != 0) throw new StaleLibraryConfigurationException();
             var id = _identity.Derive(accountId, item.FileId).ToString("D");
             var hash = FactsHash(item); long? priorVersion = null; string? priorHash = null;
-            using (var prior = Command(transaction, "SELECT drive_version,facts_hash FROM discovered_asset WHERE id=$id", ("$id", id)))
-            {
-                using var reader = prior.ExecuteReader();
+            prior.Parameters["$id"].Value = id;
+            using (var reader = prior.ExecuteReader())
                 if (reader.Read()) { priorVersion = reader.GetInt64(0); priorHash = reader.GetString(1); }
-            }
             if (priorVersion == item.DriveVersion && priorHash != hash) throw new ConflictingDiscoveryException();
             var itemChanged = false;
             if (priorVersion is null || priorVersion < item.DriveVersion)
             {
                 var effective = item.CapturedUtc ?? item.ModifiedUtc;
-                using var upsert = Command(transaction, """
-                    INSERT INTO discovered_asset VALUES($id,$account,$file,$version,$name,$mime,$width,$height,$captured,$raw,$modified,$unknown,$sort,$hash)
-                    ON CONFLICT(id) DO UPDATE SET drive_version=excluded.drive_version,name=excluded.name,mime_type=excluded.mime_type,
-                      width=excluded.width,height=excluded.height,captured_utc=excluded.captured_utc,raw_capture=excluded.raw_capture,
-                      modified_utc=excluded.modified_utc,date_unknown=excluded.date_unknown,date_sort=excluded.date_sort,facts_hash=excluded.facts_hash
-                    """, ("$id", id), ("$account", accountId), ("$file", item.FileId), ("$version", item.DriveVersion),
-                    ("$name", item.Name), ("$mime", item.MimeType), ("$width", item.Width), ("$height", item.Height),
-                    ("$captured", item.CapturedUtc), ("$raw", item.RawCapture), ("$modified", item.ModifiedUtc),
-                    ("$unknown", effective is null), ("$sort", effective is null ? 0L : -effective.Value), ("$hash", hash));
+                upsert.Parameters["$id"].Value = id; upsert.Parameters["$file"].Value = item.FileId;
+                upsert.Parameters["$version"].Value = item.DriveVersion; upsert.Parameters["$name"].Value = item.Name;
+                upsert.Parameters["$mime"].Value = item.MimeType;
+                upsert.Parameters["$width"].Value = (object?)item.Width ?? DBNull.Value;
+                upsert.Parameters["$height"].Value = (object?)item.Height ?? DBNull.Value;
+                upsert.Parameters["$captured"].Value = (object?)item.CapturedUtc ?? DBNull.Value;
+                upsert.Parameters["$raw"].Value = (object?)item.RawCapture ?? DBNull.Value;
+                upsert.Parameters["$modified"].Value = (object?)item.ModifiedUtc ?? DBNull.Value;
+                upsert.Parameters["$unknown"].Value = effective is null;
+                upsert.Parameters["$sort"].Value = effective is null ? 0L : -effective.Value;
+                upsert.Parameters["$hash"].Value = hash;
                 if (upsert.ExecuteNonQuery() != 1) throw new InvalidOperationException("Catalog upsert did not affect one identity.");
                 itemChanged = true;
             }
-            using (var membership = Command(transaction, """
-                INSERT INTO source_asset VALUES($source,$asset,$depth)
-                ON CONFLICT(source_id,asset_id) DO UPDATE SET depth=excluded.depth WHERE depth<>excluded.depth
-                """, ("$source", sourceId.ToString("D")), ("$asset", id), ("$depth", item.Depth)))
-                itemChanged |= membership.ExecuteNonQuery() != 0;
+            membership.Parameters["$asset"].Value = id; membership.Parameters["$depth"].Value = item.Depth;
+            itemChanged |= membership.ExecuteNonQuery() != 0;
             if (itemChanged) changed++;
         }
         if (changed != 0)

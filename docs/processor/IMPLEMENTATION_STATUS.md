@@ -1,5 +1,26 @@
 # MPA 0.6.0 implementation ledger
 
+## Discovery SQL belongs to one bounded batch
+
+Each discovery transaction now prepares its prior-row, upsert and source-membership
+statements once and reuses them only for that captured batch. Every nullable and
+item-specific parameter is reassigned; account/source parameters belong to the batch.
+Readers and commands retire with the serialized database operation. SQL constraints,
+identity/hash/version rules, one revision advance, atomic rollback, the250-row cap,
+FULL-WAL durability, schema and SQLite cache size are unchanged.
+
+All367 Core cases pass, preserving every365 preceding identity, together with all12
+discovery cases and a zero-warning/error strict Desktop build. Two new cases cover
+null/value transitions, stale versions and overlapping/different-account sources,
+and a final membership SQL failure that rolls back earlier upserts/memberships and
+allows the same batch to retry. Frozen source/report/full-log hashes and unchanged
+10k/100k observations are in preflight-060/discovery-prepared-commands-validation.json.
+Concurrent host workload makes those observations unsuitable for a controlled speed
+claim. The preceding Windows30-minute contract deadline failure is still unresolved
+until a complete new exact-source run passes. No deadline or fixture is relaxed.
+Full393 ordinary AppServices, mandatory scale/reference and final joint acceptance
+remain required; this optimization does not complete the0.6 product.
+
 ## Complete selected graph stays under the joined current reader
 
 The producer now walks only the Root-selected catalog ancestry and its source-covered
@@ -431,7 +452,7 @@ retire. Caller cancellation also joins uncooperative I/O. Fenced evidence remain
 future graph reads must join this lifetime before atomic canonical activation. A restarted
 reader requires a fresh capture; persisted fenced state alone grants no current authority.
 
-Private schema7 adds two tables and preserves1Ã¢â‚¬â€œ6;6->7 does not rewrite old controller or
+Private schema7 adds two tables and preserves1ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“6;6->7 does not rewrite old controller or
 workspace bodies. Genuine migration tests retain approval, account, pending evidence and
 original bytes. Historical migration fixtures drop only the new tables when constructing
 older versions; every existing preservation assertion remains. Room12 and Processor13
@@ -681,7 +702,7 @@ Exact3f9f8e9312e48415ed7ea971c636289eda835ce6 passes Android40148403416 and the
 API35/37 jobs in Native40148403400. API29's job fails its uninterrupted runtime-capture
 gate after the native tests and108 screenshot collection: its continuous log ends before
 the tests because the confirmed API29 preparation restarted adbd/framework after the
-stream had been opened. The retained heap profile proves the narrow16mÃ¢â€ â€™configured576m
+stream had been opened. The retained heap profile proves the narrow16mÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢configured576m
 zygote repair, without raising the existing AVD heap. This is incomplete runtime
 evidence, not an accepted warning or passing API29 release result.
 
@@ -1053,7 +1074,7 @@ large-library costs, retention and the remaining 0.6 feature backlog remain unre
 The preceding exact revision 93a4b621 passed Desktop40106241655, Android40106241654,
 device40106241664 on APIs29/35/37, and Protocol40106241772 with all four regression and
 all four scale jobs. Archived reports independently match that SHA. Synthetic preparation
-on those runners took about 161Ã¢â‚¬â€œ421 seconds for 10k and 171Ã¢â‚¬â€œ380 seconds for 100k; this
+on those runners took about 161ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“421 seconds for 10k and 171ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“380 seconds for 100k; this
 does not replace current-source validation or live-network/UI acceptance.
 
 ## Measured large generation preparation and immutable public keys
