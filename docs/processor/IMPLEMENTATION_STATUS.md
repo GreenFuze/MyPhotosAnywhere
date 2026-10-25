@@ -1,5 +1,38 @@
 # MPA 0.6.0 implementation ledger
 
+## Producer Root observations persist before semantic admission
+
+The new producer reader begins a nonce before network work and composes actual Google
+metadata/body callbacks with bounded local persistence. Actual metadata commits before
+the body; exact bytes/SHA/version commit before Root parsing. Malformed content,
+same-version rewrites, Root rollback and missing older signing history fail closed.
+Only already-retained native Root envelopes may advance observed high-water; valid
+foreign-to-local history requires recovery instead of counter adoption. Publisher
+revocation does not prevent Root observation. Captures/fences bind one live reader,
+nonce, pin/slot and account revision. Close/cancellation join physical I/O and retain
+borrowed owners. Changed final metadata blocks before another body download; no I/O
+follows the final byte checkpoint.
+
+Private history references4096 signing intents through canonical pages of at most1000,
+without enlarging the wire codec cap or duplicating Root bodies. Load verifies every
+actual Root envelope and successor. Full Int64 versions use canonical strings; SQL
+bounds actual UTF8 bytes. Five new codec cases include1001/4096 identities, malformed
+splits, duplicates, bounds, defensive ownership and required rejection of the old
+single-array representation. Initial local-current test compilation/analyzer failures
+are retained and corrected without suppressions or weakened prior assertions.
+
+The full earlier candidate passes97 Google,357 Core and360 ordinary AppServices cases
+with a strict zero-warning Desktop build. That candidate predates the private-history
+paging correction and is frozen separately, never relabeled as final-source proof.
+Final paged source passes all362 Core,97 Google and19 affected AppServices cases,
+with every preceding identity retained and a strict zero-warning Desktop build. Frozen
+source/log/TRX evidence is in preflight-060/local-current-reader-paged-validation.json.
+Fresh full exact-source platform CI remains required, including all360 ordinary
+AppServices and mandatory scale/reference categories. Runtime composition, selected-policy/
+full-graph admission, canonical activation, fixed Root CAS/recovery and the complete0.6
+product remain unfinished.
+No live application current file/original is written. Schemas and budgets are unchanged.
+
 ## Network admission closes before asynchronous token delivery
 
 Exact43a4c30 CI exposed a Linux shutdown race: the actual conditional write joined and
@@ -18,9 +51,14 @@ write completion checks the boundary before any readback can start.
 All90 Google cases pass locally, including every89 preceding identity and the unchanged
 exact3-read assertion. An additional case closes the owner from inside its admitted
 write callback and requires joined retirement, no readback and disposed responses.
-Strict Desktop builds with zero warnings/errors. Fresh platform CI remains required;
-no assertion, cancellation deadline, warning gate or resource-ownership rule is relaxed.
-The broader current/CAS runtime and full0.6 product remain unfinished.
+Strict Desktop builds with zero warnings/errors. Exact0aa7a0c then passes all four
+push workflows, including every contract, scale and dependency-reference job on all
+four desktop platforms. Independently downloaded contract artifacts verify95 Protocol,
+357 Core,90 Google and341 ordinary AppServices cases per platform, plus LAN/web; the
+previous exact failed assertion and new close-inside-write case execute on each.
+No assertion, cancellation deadline, warning gate or resource-ownership rule is relaxed.
+These preceding artifacts do not validate later source changes or final0.6. The broader
+current/CAS runtime and full product remain unfinished.
 
 ## Actual strong-condition JSON transport
 

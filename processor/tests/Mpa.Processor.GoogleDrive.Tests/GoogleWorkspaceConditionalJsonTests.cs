@@ -9,7 +9,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Mpa.Processor.GoogleDrive.Tests;
 
 [TestClass]
-public sealed class GoogleWorkspaceConditionalJsonTests
+public sealed partial class GoogleWorkspaceConditionalJsonTests
 {
     private static readonly byte[] Initial="{\"head\":1}"u8.ToArray();
     private static readonly byte[] Next="{\"head\":2}"u8.ToArray();

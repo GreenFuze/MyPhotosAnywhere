@@ -46,7 +46,7 @@ public sealed class InitialCurrentControlPublicationRepository(ProcessorStateDat
         transaction.Commit();return receipt;
     }
 
-    private InitialCurrentControlPublicationReceipt? ReadIn(SqliteTransaction transaction)
+    internal InitialCurrentControlPublicationReceipt? ReadIn(SqliteTransaction transaction)
     {
         var body=ReadValue(Key,2048,transaction);var hash=ReadValue(Key+":sha256",64,transaction);var claim=ReadValue(Key+":claim",64,transaction);
         if (body is null && hash is null && claim is null) return null;

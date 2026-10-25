@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Data.Sqlite;
 using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.Core;
@@ -13,9 +14,17 @@ public sealed partial class ProtocolSigningJournal
     /// subset or empty inventory is never a complete publication admission proof.</summary>
     public ProtocolSigningIntent AssertRetainedCloudEnvelope(Guid actorId, long epoch, ReadOnlySpan<byte> signedEnvelope)
     {
+        CheckId(actorId);ArgumentOutOfRangeException.ThrowIfLessThan(epoch,1L);
+        if (signedEnvelope.Length is <1 or >ProtocolDocumentReader.MaximumDocumentBytes) throw new ArgumentException("A bounded signed cloud envelope is required.",nameof(signedEnvelope));
+        using var transaction = _database.Connection.BeginTransaction();
+        var retained=AssertRetainedCloudEnvelope(actorId,epoch,signedEnvelope,transaction);transaction.Commit();return retained;
+    }
+
+    internal ProtocolSigningIntent AssertRetainedCloudEnvelope(Guid actorId,long epoch,ReadOnlySpan<byte> signedEnvelope,SqliteTransaction transaction)
+    {
         CheckId(actorId); ArgumentOutOfRangeException.ThrowIfLessThan(epoch, 1L);
         if (signedEnvelope.Length is < 1 or > ProtocolDocumentReader.MaximumDocumentBytes) throw new ArgumentException("A bounded signed cloud envelope is required.", nameof(signedEnvelope));
-        using var transaction = _database.Connection.BeginTransaction(); var actor = Actor(actorId, epoch, transaction);
+        var actor = Actor(actorId, epoch, transaction);
         var verified = new SignedProtocolDocuments(Capabilities).VerifyAndRead(signedEnvelope, Authority(actor));
         // A restored old database may have a perfectly consistent *shorter* journal.
         // Only a verified cloud signature can establish this recovery requirement;
@@ -32,6 +41,6 @@ public sealed partial class ProtocolSigningJournal
         var retained = Read(id, transaction) ?? throw new InvalidDataException("The observed signing intent disappeared.");
         if (retained.Envelope is null) throw new SigningHistoryRecoveryRequiredException();
         if (retained.Kind != verified.Kind || !retained.Envelope.Value.Span.SequenceEqual(signedEnvelope)) throw new ProtocolSigningConflictException();
-        transaction.Commit(); return retained;
+        return retained;
     }
 }

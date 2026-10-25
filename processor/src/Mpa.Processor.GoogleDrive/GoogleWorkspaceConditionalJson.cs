@@ -2,10 +2,46 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Google.Apis.Auth.OAuth2;
 
 namespace Mpa.Processor.GoogleDrive;
+
+/// <summary>Actual validated metadata, not Root or publication authority. The joined
+/// observer may checkpoint it before a body is downloaded, without doing network I/O.</summary>
+public sealed class DriveWorkspaceConditionalMetadata
+{
+    public string AccountId { get; }
+    public string FolderId { get; }
+    public string FileId { get; }
+    public long Version { get; }
+    public int ByteLength { get; }
+    public string EntityTag { get; }
+    public string ParentsSha256 { get; }
+    public string? SharedDriveId { get; }
+    public bool CanEdit { get; }
+    internal DriveWorkspaceConditionalMetadata(string account,string folder,string file,long version,int length,string tag,string parents,string? drive,bool edit)
+    {
+        AccountId=account;FolderId=folder;FileId=file;Version=version;ByteLength=length;EntityTag=tag;SharedDriveId=drive;CanEdit=edit;
+        ParentsSha256=Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes("mpa-drive-parents-v1\n"+parents)));
+    }
+}
+
+/// <summary>Callbacks are awaited inside the same owned connection operation. They
+/// may perform bounded local persistence only, never recursively use Google/network
+/// or retire borrowed resources. A failed metadata checkpoint prevents the body read.
+/// Complete byte evidence is delivered before any semantic interpretation by callers.</summary>
+public interface IGoogleWorkspaceConditionalObserver
+{
+    Task RememberMetadataAsync(DriveWorkspaceConditionalMetadata metadata,CancellationToken cancellationToken);
+    Task RememberBytesAsync(DriveWorkspaceConditionalJson observation,CancellationToken cancellationToken);
+}
+public interface IGoogleWorkspaceConditionalObservation
+{
+    Task<DriveWorkspaceConditionalJson> ObserveConditionalWorkspaceJsonAsync(string folderId,string fileId,
+        IGoogleWorkspaceConditionalObserver observer,CancellationToken cancellationToken);
+}
 
 /// <summary>Owned actual JSON observation and strong provider condition. The private
 /// connection identity cannot be reconstructed by callers from an ETag/file name.
@@ -26,12 +62,14 @@ public sealed class DriveWorkspaceConditionalJson
     public string Sha256 { get; }
     public int ByteLength=>_bytes.Length;
     public ReadOnlyMemory<byte> Bytes=>_bytes.ToArray();
+    public DriveWorkspaceConditionalMetadata Metadata { get; }
 
     internal DriveWorkspaceConditionalJson(object owner,string account,string folder,string file,long version,string tag,
         string parents,string? drive,bool canEdit,byte[] bytes)
     {
         Owner=owner;AccountId=account;FolderId=folder;FileId=file;Version=version;EntityTag=tag;Parents=parents;
         SharedDriveId=drive;CanEdit=canEdit;_bytes=bytes.ToArray();Sha256=Convert.ToHexStringLower(SHA256.HashData(_bytes));
+        Metadata=new(account,folder,file,version,_bytes.Length,tag,parents,drive,canEdit);
     }
 }
 
@@ -42,7 +80,7 @@ public interface IGoogleWorkspaceConditionalJson
         ReadOnlyMemory<byte> bytes,string sha256,CancellationToken cancellationToken);
 }
 
-public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditionalJson
+public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditionalJson,IGoogleWorkspaceConditionalObservation
 {
     private readonly object _jsonConditions=new();
     // No v3 conditional fallback: the isolated live probe proved that v3 ignored
@@ -57,6 +95,18 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditiona
         {
             var credential=await MediaCredentialAsync(token).ConfigureAwait(false);
             return await CaptureConditionalJsonCoreAsync(credential,account,folderId,fileId,token).ConfigureAwait(false);
+        },cancellationToken);
+    }
+
+    public Task<DriveWorkspaceConditionalJson> ObserveConditionalWorkspaceJsonAsync(string folderId,string fileId,
+        IGoogleWorkspaceConditionalObserver observer,CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(observer);CheckConditionalIdentities(folderId,fileId);
+        var account=_expectedPermissionId ?? throw new InvalidOperationException("Observed JSON requires a captured actual Google account.");
+        return ExecuteAsync(async token=>
+        {
+            var credential=await MediaCredentialAsync(token).ConfigureAwait(false);
+            return await CaptureConditionalJsonCoreAsync(credential,account,folderId,fileId,token,observer).ConfigureAwait(false);
         },cancellationToken);
     }
 
@@ -99,9 +149,13 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditiona
         },cancellationToken);
     }
 
-    private async Task<DriveWorkspaceConditionalJson> CaptureConditionalJsonCoreAsync(UserCredential credential,string account,string folder,string file,CancellationToken token)
+    private async Task<DriveWorkspaceConditionalJson> CaptureConditionalJsonCoreAsync(UserCredential credential,string account,string folder,string file,CancellationToken token,
+        IGoogleWorkspaceConditionalObserver? observer=null)
     {
         var before=await ReadConditionalJsonMetadataAsync(credential,folder,file,token).ConfigureAwait(false);
+        CheckNetworkActive(token);
+        if (observer is not null) await observer.RememberMetadataAsync(new(account,folder,file,before.Version,checked((int)before.Bytes),before.Tag,
+            before.Parents,before.Drive,before.CanEdit),token).ConfigureAwait(false);
         // No checksum-bearing v3 metadata request inside this exact v2 window.
         // JSON MIME/scope/size are checked before any body. No original can qualify.
         var body=await MediaGetAsync(credential,new("https://www.googleapis.com/drive/v3/files/"+Uri.EscapeDataString(file)+
@@ -109,8 +163,10 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditiona
         if (body.LongLength!=before.Bytes) throw new DriveWorkspaceObjectChangedException();
         var after=await ReadConditionalJsonMetadataAsync(credential,folder,file,token).ConfigureAwait(false);
         if (before!=after) throw new DriveWorkspaceObjectChangedException();
-        token.ThrowIfCancellationRequested();
-        return new(_jsonConditions,account,folder,file,after.Version,after.Tag,after.Parents,after.Drive,after.CanEdit,body);
+        CheckNetworkActive(token);
+        var result=new DriveWorkspaceConditionalJson(_jsonConditions,account,folder,file,after.Version,after.Tag,after.Parents,after.Drive,after.CanEdit,body);
+        if (observer is not null) await observer.RememberBytesAsync(result,token).ConfigureAwait(false);
+        CheckNetworkActive(token);return result;
     }
 
     private async Task<ConditionalJsonMetadata> ReadConditionalJsonMetadataAsync(UserCredential credential,string folder,string file,CancellationToken token)

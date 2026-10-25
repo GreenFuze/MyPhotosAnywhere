@@ -210,3 +210,35 @@ media capability, not live acceptance of this application adapter. Its complete8
 synthetic transport regression and strict Desktop build pass. Native Root verification,
 durable signed pending-work/observed-head ownership, cross-process recovery and runtime
 composition remain mandatory; this lower interface alone grants no write authority.
+
+
+## Producer observation and durable Root high-water
+
+The joined producer reader now begins a durable nonce before any Google request. Its
+actual conditional transport awaits local metadata persistence before downloading the
+body and complete-byte persistence before Root interpretation. Metadata, digest and
+version floors survive malformed content, cancellation and restart. Another nonce
+invalidates earlier captures; changed final metadata commits a blocked phase before
+another body request. A successful final byte callback runs after all transport I/O.
+
+Only exact already-retained native Root signatures can advance producer high-water.
+A valid cloud signature missing from the local signing journal requires recovery; it
+cannot advance a signing counter. The retained initial-publication receipt supplies a
+historical floor, never fresh authority. Private history stores at most4096 distinct
+signing-intent IDs in canonical pages of at most1000, under the unchanged wire codec
+limits. Load checks every referenced envelope, signature and successor, including older
+observed prefixes. Root bodies remain in the immutable signing journal. Full Int64
+Drive versions are canonical decimal strings; SQL checks actual UTF8 byte bounds.
+
+Capture and fence objects bind one private live-reader identity, exact nonce, approved
+pin/slot, account revision and native Root possession. Closing denies admission, joins
+uncooperative physical I/O and retains borrowed account/key/state owners until exit.
+Observation and revocation do not depend on an active publisher. A same-owner final
+fence still grants no graph completeness, canonical activation or write permission.
+
+This producer reader is intentionally not yet composed into runtime publication. The
+selected policies, complete ancestry/covered facts and final fence must share its
+lifetime before atomic admission. General fixed Root transitions/CAS/lost-ack recovery
+and the legacy inventory/current-selection handoff remain required. Persisted fenced
+state becomes historical after restart; it cannot authorize a new process. Processor
+schema13, Room12, native private7 and existing operational budgets remain unchanged.

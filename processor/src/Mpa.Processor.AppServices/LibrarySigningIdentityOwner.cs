@@ -36,6 +36,18 @@ public sealed class LibrarySigningIdentityOwner : IAsyncDisposable
     public DocumentSignature SignControllerDocument(ReadOnlySpan<byte> canonicalDocument) { lock (_gate) return Ready().Sign(true, canonicalDocument); }
     public DocumentSignature SignCatalogDocument(ReadOnlySpan<byte> canonicalDocument) { lock (_gate) return Ready().Sign(false, canonicalDocument); }
 
+    /// <summary>Root possession only; observation and revocation must remain possible
+    /// when no publisher is active. No cloud freshness or publication grant is implied.</summary>
+    public void AssertControllerIdentity(LibraryControllerPin controller)
+    {
+        ArgumentNullException.ThrowIfNull(controller);
+        lock(_gate)
+        {
+            var identity=Ready().Public;
+            if (!ControllerMatches(controller,identity)) throw new InvalidDataException("The pinned Root does not match the ready native controller identity.");
+        }
+    }
+
     /// <summary>Possession fence only. Its caller obtains both records from the serial
     /// local authority store and separately proves cloud history and head admission.</summary>
     public void AssertPublicationIdentity(LibraryControllerPin controller, LocalCatalogPublicationAuthority authority)
@@ -44,13 +56,16 @@ public sealed class LibrarySigningIdentityOwner : IAsyncDisposable
         lock (_gate)
         {
             var identity = Ready().Public;
-            if (controller.LibraryId != identity.LibraryId || controller.ActorId != identity.ControllerId || controller.Epoch != identity.ControllerEpoch ||
-                controller.KeyId != identity.ControllerKeyId || controller.PublicKeySpki != identity.ControllerPublicKeySpki ||
+            if (!ControllerMatches(controller,identity) ||
                 authority.LibraryId != identity.LibraryId || authority.ActorId != identity.PublisherId || authority.ActorEpoch != identity.PublisherEpoch ||
                 authority.PublisherKeyId != identity.PublisherKeyId || authority.AccountId != controller.AccountId || authority.FolderId != controller.FolderId)
                 throw new InvalidDataException("Current publication authority does not match the ready native controller/publisher identity.");
         }
     }
+
+    private static bool ControllerMatches(LibraryControllerPin controller,LibrarySigningPublicIdentity identity)=>
+        controller.LibraryId==identity.LibraryId && controller.ActorId==identity.ControllerId && controller.Epoch==identity.ControllerEpoch &&
+        controller.KeyId==identity.ControllerKeyId && controller.PublicKeySpki==identity.ControllerPublicKeySpki;
 
     public Task InitializeAsync(CancellationToken cancellationToken)
     {
