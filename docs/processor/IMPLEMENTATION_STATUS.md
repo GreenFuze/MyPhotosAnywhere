@@ -1,5 +1,35 @@
 # MPA 0.6.0 implementation ledger
 
+## Selected native policies share the captured control lifetime
+
+The native current reader now fetches only the exact publisher/source IDs, lengths and
+SHA references selected by its captured Root head. It checks actual account/workspace,
+JSON type, positive version, length, parent/corpus, downloadability and optional provider
+checksum before a body, then checks complete owned bytes and Root signatures/sequences.
+A bad publisher stops before another role request. No listing, changes-feed scan, equal
+copy lookup, original or credential read is introduced.
+
+Policy semantics and defensively copied envelopes remain PENDING. They share the same
+serial reader/nonce as the control head: final fencing prevents later policy I/O; close
+and cancellation join an uncooperative physical body and reject late results. Another
+valid head cannot be attached to the captured nonce: identity, connection, sequence,
+actual content SHA and metadata version/corpus must agree with durable observations.
+Full graph, approved-source/current-publisher/retired-epoch admission and atomic canonical
+activation remain required; this policy holder is not a readiness/activation grant.
+
+Validation passes713 Android unit cases across117 suites, zero lint findings and both
+APK builds; only the approved exact AGP diagnostic remains. Eight new cases cover exact
+shared vectors, ownership, metadata/corpus/MIME/digest guards, replacement bytes/foreign
+signatures, selector changes, joined close/cancellation and substituted heads. The first
+new-test compile failure assumed metadata was a data class; explicit immutable-object
+construction preserves every negative assertion and passes29 focused cases before the
+full713. Reports and sources are frozen in preflight-060/native-selected-policies-validation.json.
+One additional actual-EC native policy/byte/fence case compiles for API29/35/37 execution,
+expected177 cases per API; it has not run locally. Existing native assertions remain.
+Private schema7, Room12 and Processor13 are unchanged; no actual current file, original,
+canonical generation or final0.6 release is written/published.
+
+
 ## Joined current-file identity allocation
 
 The new serial allocation owner captures ready native keys, current local publisher/

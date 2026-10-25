@@ -3,6 +3,9 @@ package com.myphotosanywhere.mpa.processor.client
 import com.myphotosanywhere.mpa.drive.DriveWorkspaceMetadata
 import com.myphotosanywhere.mpa.processor.protocol.LibraryConnectionDescriptor
 import com.myphotosanywhere.mpa.processor.protocol.LibraryCurrentControl
+import com.myphotosanywhere.mpa.processor.protocol.CatalogObjectReference
+import com.myphotosanywhere.mpa.processor.protocol.CatalogPublisherAuthorization
+import com.myphotosanywhere.mpa.processor.protocol.CatalogSourceConfiguration
 import com.myphotosanywhere.mpa.processor.protocol.ProtocolDocumentReader
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +19,21 @@ import kotlinx.coroutines.withContext
 /** An exact captured root head, still PENDING. This never grants activation or writes. */
 internal class ProcessorControlCapture internal constructor(internal val owner: Any,internal val attempt: ProcessorControlAttempt,
     internal val metadata: DriveWorkspaceMetadata,val head: LibraryCurrentControl)
+
+/** Exact selected policy bytes/semantics, still PENDING. Final control fencing and
+ * current-state/complete-graph atomic admission remain mandatory before activation. */
+internal class ProcessorControlPolicies private constructor(val capture: ProcessorControlCapture,
+    val publishers: CatalogPublisherAuthorization,val sources: CatalogSourceConfiguration,
+    private val publisherBody: ByteArray,private val sourceBody: ByteArray) {
+    fun publisherEnvelope(): ByteArray = publisherBody.copyOf()
+    fun sourceEnvelope(): ByteArray = sourceBody.copyOf()
+    companion object {
+        fun verify(capture: ProcessorControlCapture,pin: LibraryConnectionDescriptor,publisher: ByteArray,source: ByteArray): ProcessorControlPolicies {
+            val ownedPublisher=publisher.copyOf();val ownedSource=source.copyOf()
+            return ProcessorControlPolicies(capture,capture.head.readPublishers(ownedPublisher,pin),capture.head.readSources(ownedSource,pin),ownedPublisher,ownedSource)
+        }
+    }
+}
 
 /** One serial borrowed-I/O owner. Close first denies admission, then joins actual I/O
  * even when a provider ignores cancellation. The composition root must close this
@@ -47,13 +65,21 @@ internal class ProcessorCurrentControlReader(private val observations: Processor
     }
 
     suspend fun assertCaptured(capture: ProcessorControlCapture) = operation {
-        if (capture.owner !== identity) throw ProcessorWorkspaceConflict()
-        observations.assertCaptured(capture.attempt)
+        requireCapture(capture)
+    }
+
+    suspend fun readSelectedPolicies(capture: ProcessorControlCapture): ProcessorControlPolicies = operation {
+        requireCapture(capture)
+        val publishers=readPolicy(capture,capture.head.publishers.reference)
+        // Deny an invalid/revoked catalog selection before another policy request.
+        capture.head.readPublishers(publishers,pin)
+        val sources=readPolicy(capture,capture.head.sources.reference)
+        val selected=ProcessorControlPolicies.verify(capture,pin,publishers,sources)
+        checkRunning();requireCapture(capture);selected
     }
 
     suspend fun fence(capture: ProcessorControlCapture): ProcessorControlAttempt = operation {
-        if (capture.owner !== identity) throw ProcessorWorkspaceConflict()
-        observations.assertCaptured(capture.attempt)
+        requireCapture(capture)
         checkRunning()
         val metadata = source.capture(checkNotNull(pin.currentFileId))
         checkRunning()
@@ -84,6 +110,29 @@ internal class ProcessorCurrentControlReader(private val observations: Processor
         currentCoroutineContext().ensureActive()
         check(!closed) { "Current-control read owner is closed." }
         if (source.connectionSha256 != pin.documentSha256) throw ProcessorWorkspaceConflict()
+    }
+    private suspend fun requireCapture(capture: ProcessorControlCapture) {
+        if (capture.owner !== identity || capture.head.connectionSha256 != pin.documentSha256 || capture.head.sequence != capture.attempt.sequence ||
+            capture.head.envelopeSha256 != capture.attempt.contentSha256 || capture.metadata.id != pin.currentFileId ||
+            capture.metadata.version != capture.attempt.version || capture.metadata.sharedDriveId != capture.attempt.driveId)
+            throw ProcessorWorkspaceConflict()
+        observations.assertCaptured(capture.attempt)
+    }
+    private suspend fun readPolicy(capture: ProcessorControlCapture,reference: CatalogObjectReference): ByteArray {
+        requireCapture(capture);checkRunning()
+        if (reference.accountId != pin.workspace.accountId || reference.workspaceId != pin.workspace.folderId || reference.fileId == pin.currentFileId)
+            throw ProcessorWorkspaceConflict()
+        val metadata=source.capture(reference.fileId)
+        checkRunning();requireCapture(capture)
+        if (metadata.id != reference.fileId || metadata.version < 1 || metadata.bytes != reference.bytes || metadata.mimeType != "application/json" ||
+            metadata.trashed || metadata.downloadable != true || pin.workspace.folderId !in metadata.parents || metadata.sharedDriveId != capture.metadata.sharedDriveId ||
+            metadata.sha256 != null && metadata.sha256 != reference.sha256) throw ProcessorWorkspaceConflict()
+        val borrowed=source.readCaptured(metadata)
+        checkRunning();requireCapture(capture)
+        if (borrowed.size.toLong() != reference.bytes) throw ProcessorWorkspaceConflict()
+        val owned=borrowed.copyOf()
+        if (hash(owned) != reference.sha256) throw ProcessorWorkspaceConflict()
+        return owned
     }
     private fun validate(metadata: DriveWorkspaceMetadata) {
         if (metadata.id != pin.currentFileId || metadata.mimeType != "application/json" || metadata.trashed || metadata.downloadable != true ||

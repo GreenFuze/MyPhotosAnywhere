@@ -142,3 +142,12 @@ Close joins physical provider I/O; a failed pending checkpoint keeps exit unconf
 and borrowed resources alive until retry. It creates no file and exposes no setup-ready
 state. GenerateIds alone creates no file, so an unknown unused ID after a hard crash
 before result durability cannot be described as an exactly-once published identity.
+
+Native selected publisher/source reads now participate in that same captured reader
+lifetime. Actual ID/length/type/version/parent/corpus/downloadability/checksum and complete
+bytes precede Root policy signature/sequence verification. A bad publisher stops before
+another role request. Owned policy envelopes and typed semantics remain pending; they
+cannot activate a catalog. Head/capture identity, sequence, actual SHA and control
+metadata must match before I/O. Final fencing retires every selected-policy read, while
+close/cancellation join actual physical I/O. Full graph/staging/admission and canonical
+activation remain pending; no schema or conservative legacy recovery rule changed.

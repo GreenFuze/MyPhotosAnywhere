@@ -166,8 +166,12 @@ class ProcessorWorkspaceObservationDeviceTest {
     }
 
 
-    private fun controlEnvelope(descriptor: LibraryConnectionDescriptor): ByteArray {
-        fun reference(file: String) = """{"accountId":"test-account","workspaceId":"test-workspace","bytes":"1","sha256":"${"a".repeat(64)}","fileId":"$file"}"""
+    private fun controlEnvelope(descriptor: LibraryConnectionDescriptor,policies: Map<String,ByteArray>? = null): ByteArray {
+        fun reference(file: String): String {
+            val bytes=policies?.get(file)
+            val size=bytes?.size?.toString() ?: "1";val digest=bytes?.let { ProcessorWorkspaceObservations.hash(it) } ?: "a".repeat(64)
+            return """{"accountId":"test-account","workspaceId":"test-workspace","bytes":"$size","sha256":"$digest","fileId":"$file"}"""
+        }
         val raw = """{"format":"mpa","major":1,"minor":0,"libraryId":"${descriptor.libraryId}","actorId":"${descriptor.controllerId}","epoch":"1","sequence":"3","kind":"library-current-control","requiredCapabilities":["library.current.v1"],"payload":{"workspace":{"accountId":"test-account","folderId":"test-workspace"},"currentFileId":"control","publishers":{"object":${reference("publisher")},"sequence":"1"},"sources":{"object":${reference("sources")},"sequence":"2"},"catalog":null}}"""
         val body = com.myphotosanywhere.mpa.processor.protocol.CanonicalProtocolJson().encode(raw.toByteArray(Charsets.UTF_8))
         val signer = com.myphotosanywhere.mpa.processor.protocol.ProtocolDocumentSigner(key.private,key.public)
@@ -203,6 +207,40 @@ class ProcessorWorkspaceObservationDeviceTest {
             assertEquals(pending,ProcessorWorkspaceObservations(store).lastAttempt());assertArrayEquals(byteArrayOf(7,5,3),original.readBytes())
             sql(directory) { assertEquals(7,it.version) }
         } finally { store.close();cleanup(directory) }
+    }
+
+    @Test fun nativeSelectedPoliciesUseTheSameCapturedOwnerAndRetireAtItsFinalFence() = runBlocking<Unit> {
+        val directory=directory();val store=store(directory)
+        val descriptor=LibraryConnectionDescriptor(pin.libraryId,pin.controllerId,pin.controllerEpoch,pin.workspace,key.public.encoded,"control")
+        fun policy(sequence:Long,source:Boolean):ByteArray {
+            val kind=if(source) "library-source-configuration" else "library-publisher-authorization"
+            val capability=if(source) "library.sources.v1" else "library.publishers.v1"
+            val payload=if(source) """{"workspace":{"accountId":"test-account","folderId":"test-workspace"},"configurationRevision":"1","accounts":["test-account"],"sources":[]}"""
+                else """{"workspace":{"accountId":"test-account","folderId":"test-workspace"},"publisher":null}"""
+            val raw="""{"format":"mpa","major":1,"minor":0,"libraryId":"${descriptor.libraryId}","actorId":"${descriptor.controllerId}","epoch":"1","sequence":"$sequence","kind":"$kind","requiredCapabilities":["$capability"],"payload":$payload}"""
+            val body=com.myphotosanywhere.mpa.processor.protocol.CanonicalProtocolJson().encode(raw.toByteArray(Charsets.UTF_8))
+            val signer=com.myphotosanywhere.mpa.processor.protocol.ProtocolDocumentSigner(key.private,key.public)
+            return com.myphotosanywhere.mpa.processor.protocol.SignedProtocolDocuments(setOf(capability)).encode(body,signer.sign(body))
+        }
+        val bodies=mapOf("publisher" to policy(1,false),"sources" to policy(2,true)).toMutableMap()
+        bodies["control"]=controlEnvelope(descriptor,bodies);val readIds=mutableListOf<String>()
+        val source=object:ProcessorWorkspaceCapturedSource {
+            override val connectionSha256=descriptor.documentSha256
+            override suspend fun capture(fileId:String)=DriveWorkspaceMetadata(fileId,"application/json",1,checkNotNull(bodies[fileId]).size.toLong(),listOf("test-workspace"),false,null,true)
+            override suspend fun readCaptured(expected:DriveWorkspaceMetadata):ByteArray { readIds+=expected.id;return checkNotNull(bodies[expected.id]) }
+            override suspend fun cursor():DriveWorkspaceCursor=error("Selected policies cannot enumerate account history")
+            override suspend fun page(token:String?):DriveWorkspacePage=error("Selected policies cannot search for copies")
+        }
+        val reader=ProcessorCurrentControlReader(ProcessorCurrentControlObservations(store),source,descriptor)
+        try {
+            approve(store,descriptor);val captured=reader.capture();val policies=reader.readSelectedPolicies(captured)
+            assertNull(policies.publishers.publisher);assertEquals(1L,policies.publishers.sequence);assertEquals(1L,policies.sources.revision)
+            assertEquals(listOf("control","publisher","sources"),readIds)
+            val copied=policies.sourceEnvelope();copied[0]=0;assertArrayEquals(checkNotNull(bodies["sources"]),policies.sourceEnvelope())
+            assertEquals("fenced",reader.fence(captured).phase);val count=readIds.size
+            try { reader.readSelectedPolicies(captured);fail("Fenced native policies reopened") } catch(_:ProcessorWorkspaceConflict) { }
+            assertEquals(count,readIds.size)
+        } finally { reader.close();store.close();cleanup(directory) }
     }
 
 }
