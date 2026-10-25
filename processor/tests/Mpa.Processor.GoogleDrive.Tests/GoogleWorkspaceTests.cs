@@ -8,7 +8,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Mpa.Processor.GoogleDrive.Tests;
 
 [TestClass]
-public sealed class GoogleWorkspaceTests
+public sealed partial class GoogleWorkspaceTests
 {
     private static readonly byte[] Content = "{\"ok\":true}"u8.ToArray();
     private static readonly string Digest = Convert.ToHexStringLower(SHA256.HashData(Content));

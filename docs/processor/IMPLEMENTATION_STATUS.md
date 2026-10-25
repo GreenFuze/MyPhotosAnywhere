@@ -1,5 +1,26 @@
 # MPA 0.6.0 implementation ledger
 
+## Exact bounded JSON observations on the desktop transport
+
+The captured Google connection can now read one independently selected JSON file ID
+without listing, searching for a copy or knowing its body length in advance. Actual
+metadata must report a concrete positive bounded size, JSON MIME, matching identity,
+workspace membership and download permission before any body request. Complete owned
+bytes and matching before/after revision metadata are required. Images, shortcuts,
+documents and compressed/binary objects are rejected before content download.
+
+All72 Google transport cases pass, including seven new exact-read cases; the previous
+65 assertions remain. Tests cover unknown lengths, short/oversized bodies, actual scope,
+changing metadata, cancellation and provider errors. Desktop builds with zero warnings
+or errors. Source/log/report hashes are frozen in
+preflight-060/exact-current-json-validation.json. No schema, dependency, warning gate,
+deadline or byte budget changes. Live acceptance through this new method is pending.
+
+This optional transport interface is not yet composed into current publication/runtime
+admission. Returned bytes are untrusted observations: Root verification, durable head
+high-water, same-owner final fencing and atomic canonical admission remain required.
+No current file, original, readiness grant or final0.6 release is published here.
+
 ## Selected native policies share the captured control lifetime
 
 The native current reader now fetches only the exact publisher/source IDs, lengths and
