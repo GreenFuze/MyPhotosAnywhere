@@ -1,5 +1,52 @@
 # MPA 0.6.0 implementation ledger
 
+## Explicit current-control protocol for independent clients
+
+The next authority step now has a concrete C#/Kotlin wire contract. A v2 public connection
+pins one actual mutable Drive file ID with the independently approved root key/workspace.
+Its root-signed current snapshot selects exact immutable publisher/source policies and an
+optional catalog commit. Signatures, scope, distinct roles, strict bounded counters and
+exact policy bytes/sequences are checked. Known control heads reject rewind/fork/retarget
+and changed policy references signed before the earlier accepted head. Explicit publisher
+revocation cannot select an old catalog. Legacy v1 codes retain exact wire identities and
+cannot infer a current-control pin. [Design and required integration](CURRENT_CONTROL.md)
+explain the account-wide unknown-removal problem and the remaining Drive trust assumptions.
+
+Both consumers use the same independent synthetic Python cryptography vectors:39 signed
+malformed/scope/alias cases,8 invalid v2 connections,4 invalid successor transitions,
+full counter range, revocation and validly hashed policies signed by a foreign root.
+No private test key is retained. Initial Android10 cases pass. The first C# build rejects
+new `Object` naming under CA1720; renamed to `Reference`, preserving the analyzer. The
+corrected complete C# protocol suite passes91 cases, zero failures/skips/diagnostics.
+The initial complete682-case Android/lint/APK run and desktop build pass and are frozen
+as historical candidate evidence. Review then makes bounded envelope ownership explicit
+before hashing/signature verification, preventing borrowed-buffer mutation from mixing
+verified semantics and a different retained digest. An additional case per consumer
+checks immutable accepted identity and empty/oversized envelope rejection.
+
+Final validation passes683 Android cases/115 suites, zero lint findings and both APK
+builds;92 complete C# protocol cases and the desktop composition build pass with zero
+warnings/errors/skips. All9 new cases per consumer pass, alongside every prior assertion.
+Only the approved exact AGP diagnostic remains. Frozen source/report/assembly/APK hashes
+and115 unique Android reports are saved in preflight-060/
+current-control-owned-validation.json. Earlier682/91 evidence remains separate and is
+not rebound to the ownership correction. Exact-source cross-platform/native CI remains
+required; these are local Windows/JVM checks, not completed0.6 acceptance.
+
+This component does not publish control documents, reserve IDs, change cloud state,
+relax conservative history recovery, activate catalogs or complete0.6. Producer durable
+CAS/lost-ack integration, actual captured transport/final fencing, high-water persistence,
+retired epochs, canonical staging/atomic activation and native gallery remain next.
+Private client6, Room12 and Processor13 are unchanged. No phone/LAN connection or original
+write permission is introduced.
+
+Exact3c638a1160dc9bb2f3434d387db00399156a1a6f passes Android40171677578 and Native
+40171677569 across API29/35/37. Downloaded artifacts independently verify174 unique passing
+cases, complete process-bound resource traces and108 valid mapped PNGs per API, including
+the two actual schema6 read-retirement/migration cases. Proof is saved in preflight-060/
+ci-3c638a1-native-validation.json. This prior revision does not validate the new v2 contract,
+S23 acceptance or a completed joint release.
+
 ## Observed catalog reads and an explicit final-fence phase
 
 Catalog ancestry and covered-facts reads now use one durable prepared/replayed read set.
