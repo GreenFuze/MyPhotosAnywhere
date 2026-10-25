@@ -26,10 +26,7 @@ public sealed partial class GoogleAccountConnection
     /// returns a credential/URL, writes a source or activates a catalog.</summary>
     public Task<DriveWorkspaceObject> ReadWorkspaceObjectAsync(string folderId, string fileId, long expectedBytes, string expectedSha256, CancellationToken cancellationToken)
     {
-        if (!ValidIdentity(folderId) || folderId == "root" || !ValidIdentity(fileId) || fileId == folderId ||
-            expectedBytes is < 1 or > MaximumWorkspaceObjectBytes || expectedSha256 is null || expectedSha256.Length != 64 ||
-            expectedSha256.Any(value => value is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
-            throw new ArgumentException("A captured metadata workspace/file, bounded exact length and lowercase SHA-256 are required.");
+        CheckWorkspaceReadArguments(folderId,fileId,expectedBytes,expectedSha256);
         var account = _expectedPermissionId ?? throw new InvalidOperationException("Metadata workspace reading requires a captured Google account identity.");
         return ExecuteAsync(async token =>
         {
@@ -38,18 +35,38 @@ public sealed partial class GoogleAccountConnection
         }, cancellationToken);
     }
 
+    private static void CheckWorkspaceReadArguments(string folderId,string fileId,long expectedBytes,string expectedSha256)
+    {
+        if (!ValidIdentity(folderId) || folderId == "root" || !ValidIdentity(fileId) || fileId == folderId ||
+            expectedBytes is < 1 or > MaximumWorkspaceObjectBytes || expectedSha256 is null || expectedSha256.Length != 64 ||
+            expectedSha256.Any(value => value is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+            throw new ArgumentException("A captured metadata workspace/file, bounded exact length and lowercase SHA-256 are required.");
+    }
+
     private async Task<DriveWorkspaceObject> ReadWorkspaceObjectCoreAsync(UserCredential credential, string account, string folderId,
-        string fileId, long expectedBytes, string expectedSha256, CancellationToken token, string? expectedMimeType = null)
+        string fileId, long expectedBytes, string expectedSha256, CancellationToken token, string? expectedMimeType = null,
+        IGoogleWorkspaceObjectObserver? observer=null)
     {
         var before = await ReadWorkspaceMetadataAsync(credential, folderId, fileId, expectedBytes, token).ConfigureAwait(false);
         if (expectedMimeType is not null && before.MimeType != expectedMimeType) throw new DriveWorkspaceObjectChangedException();
+        DriveWorkspaceObjectMetadata Actual(WorkspaceMetadata metadata)=>new(account,folderId,fileId,metadata.Version,checked((int)expectedBytes),
+            metadata.MimeType,metadata.SharedDriveId,metadata.Parents);
+        CheckNetworkActive(token);
+        if(observer is not null) await observer.RememberMetadataAsync(Actual(before),token).ConfigureAwait(false);
+        CheckNetworkActive(token);
         var bytes = await MediaGetAsync(credential, new("https://www.googleapis.com/drive/v3/files/" + Uri.EscapeDataString(fileId) +
             "?supportsAllDrives=true&alt=media"), (int)expectedBytes, token).ConfigureAwait(false);
-        if (bytes.LongLength != expectedBytes || !CryptographicOperations.FixedTimeEquals(SHA256.HashData(bytes), Convert.FromHexString(expectedSha256)))
+        var matches=CryptographicOperations.FixedTimeEquals(SHA256.HashData(bytes),Convert.FromHexString(expectedSha256));
+        if (bytes.LongLength != expectedBytes || observer is null && !matches)
             throw new InvalidDataException("Metadata workspace object is truncated or does not match its immutable SHA-256 reference.");
         var after = await ReadWorkspaceMetadataAsync(credential, folderId, fileId, expectedBytes, token).ConfigureAwait(false);
+        CheckNetworkActive(token);
+        if(observer is not null) await observer.RememberMetadataAsync(Actual(after),token).ConfigureAwait(false);
+        CheckNetworkActive(token);
         if (before != after) throw new DriveWorkspaceObjectChangedException();
-        token.ThrowIfCancellationRequested();
+        if(observer is not null) await observer.RememberBytesAsync(new(Actual(after),bytes),token).ConfigureAwait(false);
+        CheckNetworkActive(token);
+        if(!matches) throw new InvalidDataException("Metadata workspace object does not match its immutable SHA-256 reference.");
         return new DriveWorkspaceObject(account, fileId, folderId, after.Version, bytes) {MimeType=after.MimeType,SharedDriveId=after.SharedDriveId};
     }
 

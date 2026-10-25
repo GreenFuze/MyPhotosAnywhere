@@ -78,7 +78,10 @@ public sealed class LibraryCurrentControlSlotRepository(ProcessorStateDatabase d
         transaction.Commit();return old with { FileId=fileId,AllocationAccountRevision=observedAccountRevision };
     }
 
-    internal LibraryCurrentControlSlot? ReadIn(SqliteTransaction transaction)
+    // A verified completion may be borrowed only from this same serialized SQL
+    // snapshot. This avoids repeating its full signing/outbox verification while
+    // loading one current context; no proof is cached across transactions or I/O.
+    internal LibraryCurrentControlSlot? ReadIn(SqliteTransaction transaction,InitialPolicyReadSnapshot? snapshot=null)
     {
         var planText = Read(PlanKey,4096,transaction);var planHash = Read(PlanKey+":sha256",64,transaction);var claim = Read(PlanClaim,36,transaction);
         var fileText = Read(FileKey,1024,transaction);var fileHash = Read(FileKey+":sha256",64,transaction);var fileClaim = Read(FileClaim,64,transaction);
@@ -96,7 +99,7 @@ public sealed class LibraryCurrentControlSlotRepository(ProcessorStateDatabase d
             var authority = new LibraryAuthorityRepository(_database,_budget);var pin = authority.Controller(transaction) ?? throw new InvalidDataException("Current-control reservation lost its controller.");
             if (plan.Id == Guid.Empty || claim != plan.Id.ToString("D") || plan.AccountRevision < 1 || plan.FileId is not null || plan.AllocationAccountRevision is not null ||
                 Encode(plan) != planText || pin.ConnectionDescriptor().Encode() != plan.RootConnectionCode ||
-                authority.InitialPublicationCompletion(transaction) is null || Read(CompletionHash,64,transaction) != plan.BootstrapReceiptSha256)
+                (snapshot?.Require(_database,transaction) ?? authority.InitialPublicationCompletion(transaction)) is null || Read(CompletionHash,64,transaction) != plan.BootstrapReceiptSha256)
                 throw new InvalidDataException("Current-control reservation changed its immutable setup context.");
             if (fileText is null && fileHash is null && fileClaim is null)
             {

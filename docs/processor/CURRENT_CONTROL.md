@@ -92,7 +92,7 @@ semantic verification. Nonces, Root-head/global-role integrity and actual-file v
 corpus/content high-water survive failed reads and restart. Rewriting bytes under a known
 Drive version is rejected. Changed final probes block the old capture. Close and caller
 cancellation join actual I/O and reject late results; restarted readers capture afresh.
-Private schema7 adds two tables while preserving1–6, old receipts and originals.
+Private schema7 adds two tables while preserving1â€“6, old receipts and originals.
 
 These are pending observations. Future graph consumers must participate in the same
 reader lifetime before fenced evidence can be atomically admitted with exact policies,
@@ -270,3 +270,26 @@ exact-JSON and listed-candidate routes share that check; a valid SHA/version alo
 cannot hide a move or additional parent. Existing JSON/binary bounds and original-MIME
 rejection remain. The graph owner must compare those actual returned fields against
 its captured scope; this transport improvement alone supplies no graph/current authority.
+
+
+### Same-reader selected graph and durable actual immutable observations
+
+`ReadSelectedGraphAsync` now verifies complete Root-selected signed ancestry followed
+by source-covered facts, streaming bounded leaves to an awaited borrowed private stage.
+Its graph witness belongs to that reader and exact completed attempt. A failed retry
+invalidates earlier complete graph witnesses. `FenceSelectedGraphAsync` uses the same
+last actual Root fence; it still requires separate serialized local admission and
+atomic canonical activation before any runtime use.
+
+Actual immutable metadata is checkpointed before/after the body, and actual complete
+body hashes before expected-digest/semantic admission. Immutable expected references
+remain distinct from actual body evidence. New Root nonces preserve high-water;
+legacy inventory/completion and signing counters are not adopted or rewritten.
+Known own publisher signatures must match retained signing intents. A higher orphan
+commit does not replace the Root-selected sequence. Original MIME remains denied.
+
+Initial-policy verification may be reused only through an opaque proof bound to one
+exact live database transaction. No I/O/cross-transaction verification cache is allowed.
+No canonical activation, mutable Root transition, active runtime route or connection
+export is enabled by these pending holders. Keep the old conservative reconciliation
+until selected-current Root witnesses and uploaded-but-unselected recovery are composed.

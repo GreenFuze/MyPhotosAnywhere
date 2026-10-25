@@ -85,26 +85,28 @@ public sealed partial class LocalCurrentControlReader(ProcessorStateCoordinator 
     public Task<LocalCurrentControlFence> FenceAsync(LocalCurrentControlCapture capture,CancellationToken caller)
     {
         ArgumentNullException.ThrowIfNull(capture);
-        return OperationAsync(async token=>
+        return OperationAsync(token=>FenceCapturedCoreAsync(capture,caller,token),caller);
+    }
+
+    private async Task<LocalCurrentControlFence> FenceCapturedCoreAsync(LocalCurrentControlCapture capture,CancellationToken caller,CancellationToken token)
+    {
+        if(!ReferenceEquals(capture.Owner,_identity) || capture.Head.ConnectionSha256!=capture.Attempt.ConnectionSha256 ||
+            capture.Head.Sequence!=capture.Attempt.RootSequence || capture.Head.EnvelopeSha256!=capture.Attempt.ContentSha256 ||
+            capture.Snapshot.Sha256!=capture.Head.EnvelopeSha256) throw new CurrentControlObservationConflictException();
+        var scope=new Scope(capture.Pin,capture.Slot,capture.Attempt);
+        await _state.ExecuteAsync(database=>{Check(caller,token);AssertScope(database,scope);new LocalCurrentControlObservations(database,_budget).AssertCaptured(capture.Attempt,token);return true;},token).ConfigureAwait(false);
+        return await _accounts.ReadDriveAsync(scope.Pin.AccountId,async(reader,revision,owned)=>
         {
-            if(!ReferenceEquals(capture.Owner,_identity) || capture.Head.ConnectionSha256!=capture.Attempt.ConnectionSha256 ||
-                capture.Head.Sequence!=capture.Attempt.RootSequence || capture.Head.EnvelopeSha256!=capture.Attempt.ContentSha256 ||
-                capture.Snapshot.Sha256!=capture.Head.EnvelopeSha256) throw new CurrentControlObservationConflictException();
-            var scope=new Scope(capture.Pin,capture.Slot,capture.Attempt);
-            await _state.ExecuteAsync(database=>{Check(caller,token);AssertScope(database,scope);new LocalCurrentControlObservations(database,_budget).AssertCaptured(capture.Attempt,token);return true;},token).ConfigureAwait(false);
-            return await _accounts.ReadDriveAsync(scope.Pin.AccountId,async(reader,revision,owned)=>
-            {
-                Check(caller,owned);if(revision!=scope.Attempt.AccountRevision) throw new StaleDriveConnectionException();
-                if(reader is not IGoogleWorkspaceConditionalObservation source) throw new InvalidOperationException("The owned Google connection cannot fence current observations.");
-                var observer=new FenceObserver(this,scope,caller);
-                // Last transport operation: its metadata callback blocks changes before
-                // any final body. Its byte callback commits the exact fence after all I/O.
-                _=await source.ObserveConditionalWorkspaceJsonAsync(scope.Pin.FolderId,scope.Slot.FileId!,observer,owned).ConfigureAwait(false);
-                var fenced=observer.Fenced ?? throw new InvalidOperationException("The actual final read lost its durable fence.");
-                await _state.ExecuteAsync(database=>{Check(caller,owned);AssertScope(database,scope);new LocalCurrentControlObservations(database,_budget).AssertFenced(fenced,owned);return true;},owned).ConfigureAwait(false);
-                Check(caller,owned);return new LocalCurrentControlFence(_identity,capture,fenced);
-            },token).ConfigureAwait(false);
-        },caller);
+            Check(caller,owned);if(revision!=scope.Attempt.AccountRevision) throw new StaleDriveConnectionException();
+            if(reader is not IGoogleWorkspaceConditionalObservation source) throw new InvalidOperationException("The owned Google connection cannot fence current observations.");
+            var observer=new FenceObserver(this,scope,caller);
+            // Last transport operation: its metadata callback blocks changes before
+            // any final body. Its byte callback commits the exact fence after all I/O.
+            _=await source.ObserveConditionalWorkspaceJsonAsync(scope.Pin.FolderId,scope.Slot.FileId!,observer,owned).ConfigureAwait(false);
+            var fenced=observer.Fenced ?? throw new InvalidOperationException("The actual final read lost its durable fence.");
+            await _state.ExecuteAsync(database=>{Check(caller,owned);AssertScope(database,scope);new LocalCurrentControlObservations(database,_budget).AssertFenced(fenced,owned);return true;},owned).ConfigureAwait(false);
+            Check(caller,owned);return new LocalCurrentControlFence(_identity,capture,fenced);
+        },token).ConfigureAwait(false);
     }
 
     private Task<bool> AssertScopeAsync(Scope scope,CancellationToken caller,CancellationToken token)=>_state.ExecuteAsync(database=>

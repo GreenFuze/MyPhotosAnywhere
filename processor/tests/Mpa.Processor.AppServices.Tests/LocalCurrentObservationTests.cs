@@ -174,9 +174,9 @@ public sealed partial class AccountServiceTests
         await Assert.ThrowsExactlyAsync<CurrentControlObservationConflictException>(()=>CurrentStateAsync(fixture,store=>store.RememberMetadata(fresh,CurrentMetadata(bytes,long.MaxValue-1)))).ConfigureAwait(false);
     }
 
-    private static async Task<InitialPublicationFixture> ObservedCurrentFixtureAsync()
+    private static async Task<InitialPublicationFixture> ObservedCurrentFixtureAsync(bool addSource=false)
     {
-        var fixture=await InitialPublicationFixture.CreateAsync().ConfigureAwait(false);
+        var fixture=await InitialPublicationFixture.CreateAsync(addSource:addSource).ConfigureAwait(false);
         try {await fixture.Owner.PublishAsync(CancellationToken.None).ConfigureAwait(false);ConfigureCurrentPublication(fixture);await using var publisher=CurrentPublisher(fixture);await publisher.PublishAsync(CancellationToken.None).ConfigureAwait(false);return fixture;}
         catch {await fixture.DisposeAsync().ConfigureAwait(false);throw;}
     }

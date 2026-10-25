@@ -46,7 +46,9 @@ public sealed class InitialCurrentControlPublicationRepository(ProcessorStateDat
         transaction.Commit();return receipt;
     }
 
-    internal InitialCurrentControlPublicationReceipt? ReadIn(SqliteTransaction transaction)
+    // Optional inputs have already been completely verified in this SAME SQL
+    // snapshot. Public/ordinary reads continue to reconstruct their own context.
+    internal InitialCurrentControlPublicationReceipt? ReadIn(SqliteTransaction transaction,InitialPolicyReadSnapshot? snapshot=null)
     {
         var body=ReadValue(Key,2048,transaction);var hash=ReadValue(Key+":sha256",64,transaction);var claim=ReadValue(Key+":claim",64,transaction);
         if (body is null && hash is null && claim is null) return null;
@@ -54,8 +56,8 @@ public sealed class InitialCurrentControlPublicationRepository(ProcessorStateDat
         try
         {
             var receipt=JsonSerializer.Deserialize<InitialCurrentControlPublicationReceipt>(body) ?? throw new InvalidDataException("Missing initial-current receipt.");
-            var slot=new LibraryCurrentControlSlotRepository(_database,_budget).ReadIn(transaction) ?? throw new InvalidDataException("Initial-current receipt lost its slot.");
-            var control=ReadSigned(slot,transaction);
+            var slot=new LibraryCurrentControlSlotRepository(_database,_budget).ReadIn(transaction,snapshot) ?? throw new InvalidDataException("Initial-current receipt lost its slot.");
+            var control=ReadSigned(slot,transaction,snapshot);
             if (Encode(receipt)!=body || receipt.SlotId!=slot.Id || receipt.ConnectionSha256!=control.ConnectionSha256 ||
                 receipt.EnvelopeSha256!=control.EnvelopeSha256 || receipt.RootSequence!=control.Sequence || receipt.DriveVersion<1 ||
                 slot.AllocationAccountRevision is not { } allocated || receipt.AccountRevision<allocated)
@@ -66,13 +68,13 @@ public sealed class InitialCurrentControlPublicationRepository(ProcessorStateDat
         { throw new InvalidDataException("Initial-current receipt cannot be decoded safely.",error); }
     }
 
-    private LibraryCurrentControl ReadSigned(LibraryCurrentControlSlot slot,SqliteTransaction transaction)
+    private LibraryCurrentControl ReadSigned(LibraryCurrentControlSlot slot,SqliteTransaction transaction,InitialPolicyReadSnapshot? snapshot=null)
     {
         var intent=new ProtocolSigningJournal(_database,_budget).Read(slot.Id,transaction)
             ?? throw new InvalidDataException("Initial-current publication lost its fixed signing intent.");
         if (intent.Kind!=LibraryCurrentControl.Kind || intent.Envelope is null) throw new InvalidDataException("Initial current bytes have not been sealed.");
         var control=LibraryCurrentControl.Read(intent.Envelope.Value.Span,slot.ConnectionDescriptor());
-        var completion=new LibraryAuthorityRepository(_database,_budget).InitialPublicationCompletion(transaction)
+        var completion=snapshot?.Require(_database,transaction) ?? new LibraryAuthorityRepository(_database,_budget).InitialPublicationCompletion(transaction)
             ?? throw new InvalidDataException("Initial-current receipt lost its original policies.");
         if (control.Catalog is not null || control.Publishers.Reference.FileId!=completion.Publisher.FileId ||
             control.Publishers.Reference.Bytes!=completion.Publisher.Bytes || control.Publishers.Reference.Sha256!=completion.Publisher.Sha256 ||

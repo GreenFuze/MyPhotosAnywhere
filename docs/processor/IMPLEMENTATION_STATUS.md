@@ -1,5 +1,44 @@
 # MPA 0.6.0 implementation ledger
 
+## Complete selected graph stays under the joined current reader
+
+The producer now walks only the Root-selected catalog ancestry and its source-covered
+facts, under the same reader/account/native-key/observation nonce. A higher uploaded
+commit remains retained pending work. Every selected commit signature and predecessor
+is checked before facts, and source coverage is checked before staging. A borrowed
+stage receives bounded leaves with awaited writes. Partial failures cannot fence an
+older completed graph, and close/cancellation join actual bodies and stage callbacks.
+
+The immutable adapter checkpoints actual metadata before and after each body and
+complete actual bytes before expected-digest or semantic admission. Durable paired
+observations preserve expected references separately from actual body hashes, full
+Int64 version floors, actual encoding/corpus/complete parents and failures across a
+new Root nonce. Existing legacy inventory/completion records are not rewritten.
+No original body, new network path, schema change or larger bound is introduced.
+
+Initial-policy evidence is verified once in each individual serialized SQL snapshot.
+An opaque borrowed proof rejects another database/transaction and use after commit or
+rollback. It never caches verification across network or transaction boundaries;
+all Root history, signatures and current account/nonce checks remain mandatory.
+This removes repeated identical verification inside one observation operation while
+keeping the existing ten-second joined-callback rendezvous tests unchanged.
+
+The final current focus passes all52 cases, preserving the preceding33 and adding19;
+all116 Google cases preserve the preceding108 and add8. Three new Core cases verify
+snapshot ownership and retired/corrupt evidence. All365 Core cases pass, preserving
+every362 preceding identity; the strict Desktop build has zero warnings/errors.
+Exact source/report/full-log hashes are frozen in
+preflight-060/current-selected-graph-validation.json. Full393 ordinary AppServices,
+mandatory scale/reference jobs and fresh complete CI remain required. No final
+joint-release claim is made here.
+
+The returned graph/fence is still pending. Actual private SQLite canonical staging,
+local human/authority/history admission, same-ID Root transition/CAS/lost-ack recovery,
+runtime handoff/export and atomic activation remain unfinished. The Windows contract
+job on7704924 exceeded its unchanged30-minute deadline: its362 Core cases passed,
+but the full job/workflow did not. Its100k fixture seeding dominates the run and is
+being investigated without raising deadlines or removing scale assertions.
+
 ## Immutable object reads fence actual corpus and complete parents
 
 The generic immutable, exact-JSON and listed-candidate read routes now retain actual
@@ -392,7 +431,7 @@ retire. Caller cancellation also joins uncooperative I/O. Fenced evidence remain
 future graph reads must join this lifetime before atomic canonical activation. A restarted
 reader requires a fresh capture; persisted fenced state alone grants no current authority.
 
-Private schema7 adds two tables and preserves1–6;6->7 does not rewrite old controller or
+Private schema7 adds two tables and preserves1Ã¢â‚¬â€œ6;6->7 does not rewrite old controller or
 workspace bodies. Genuine migration tests retain approval, account, pending evidence and
 original bytes. Historical migration fixtures drop only the new tables when constructing
 older versions; every existing preservation assertion remains. Room12 and Processor13
@@ -642,7 +681,7 @@ Exact3f9f8e9312e48415ed7ea971c636289eda835ce6 passes Android40148403416 and the
 API35/37 jobs in Native40148403400. API29's job fails its uninterrupted runtime-capture
 gate after the native tests and108 screenshot collection: its continuous log ends before
 the tests because the confirmed API29 preparation restarted adbd/framework after the
-stream had been opened. The retained heap profile proves the narrow16m→configured576m
+stream had been opened. The retained heap profile proves the narrow16mÃ¢â€ â€™configured576m
 zygote repair, without raising the existing AVD heap. This is incomplete runtime
 evidence, not an accepted warning or passing API29 release result.
 
@@ -1014,7 +1053,7 @@ large-library costs, retention and the remaining 0.6 feature backlog remain unre
 The preceding exact revision 93a4b621 passed Desktop40106241655, Android40106241654,
 device40106241664 on APIs29/35/37, and Protocol40106241772 with all four regression and
 all four scale jobs. Archived reports independently match that SHA. Synthetic preparation
-on those runners took about 161–421 seconds for 10k and 171–380 seconds for 100k; this
+on those runners took about 161Ã¢â‚¬â€œ421 seconds for 10k and 171Ã¢â‚¬â€œ380 seconds for 100k; this
 does not replace current-source validation or live-network/UI acceptance.
 
 ## Measured large generation preparation and immutable public keys

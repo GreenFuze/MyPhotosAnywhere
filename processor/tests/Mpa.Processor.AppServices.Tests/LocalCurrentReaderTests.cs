@@ -132,10 +132,16 @@ public sealed partial class AccountServiceTests
     private sealed partial class LibraryFactory
     {
         public Func<string,string,IGoogleWorkspaceConditionalObserver,CancellationToken,Task<DriveWorkspaceConditionalJson>>? ConditionalObserve {get;set;}
+        public Func<string,string,long,string,IGoogleWorkspaceObjectObserver,CancellationToken,Task<DriveWorkspaceObject>>? ObjectObserve {get;set;}
         private sealed partial class Connection : IGoogleWorkspaceConditionalObservation
         {
             public Task<DriveWorkspaceConditionalJson> ObserveConditionalWorkspaceJsonAsync(string folder,string file,IGoogleWorkspaceConditionalObserver observer,CancellationToken token)=>
                 owner.ConditionalObserve?.Invoke(folder,file,observer,token) ?? throw new InvalidOperationException("Unexpected conditional current observation.");
+        }
+        private sealed partial class Connection : IGoogleWorkspaceObservedObjectReader
+        {
+            public Task<DriveWorkspaceObject> ReadObservedWorkspaceObjectAsync(string folder,string file,long bytes,string hash,IGoogleWorkspaceObjectObserver observer,CancellationToken token)=>
+                owner.ObjectObserve?.Invoke(folder,file,bytes,hash,observer,token) ?? throw new InvalidOperationException("Unexpected immutable graph observation.");
         }
     }
 
@@ -153,10 +159,11 @@ public sealed partial class AccountServiceTests
             Reader=new(data.Setup.Accounts.State,data.Setup.Accounts.Service,data.Setup.Keys,data.Budget);
             data.Setup.Accounts.Readers.ConditionalObserve=async(folder,file,observer,token)=>
             {var result=await connection.ObserveConditionalWorkspaceJsonAsync(folder,file,observer,token).ConfigureAwait(false);if(AfterTransport is not null) await AfterTransport().ConfigureAwait(false);return result;};
+            data.Setup.Accounts.Readers.ObjectObserve=(folder,file,bytes,hash,observer,token)=>connection.ReadObservedWorkspaceObjectAsync(folder,file,bytes,hash,observer,token);
         }
-        public static async Task<CurrentReaderFixture> CreateAsync()
+        public static async Task<CurrentReaderFixture> CreateAsync(bool addSource=false)
         {
-            var data=await ObservedCurrentFixtureAsync().ConfigureAwait(false);var vault=new SetupSigningVault();var http=new CurrentReadHttp(data);
+            var data=await ObservedCurrentFixtureAsync(addSource).ConfigureAwait(false);var vault=new SetupSigningVault();var http=new CurrentReadHttp(data);
             GoogleAccountConnection? connection=null;
             var path=Path.Combine(Path.GetTempPath(),"mpa-current-reader-client-"+Guid.NewGuid().ToString("N")+".json");
             try
@@ -179,6 +186,7 @@ public sealed partial class AccountServiceTests
         public Func<string,Task>? BeforeFileBody {get;set;}
         public Func<string,string,string>? MetadataJson {get;set;}
         public List<string> BodyFiles {get;}=[];
+        public HashSet<string> MissingFiles {get;}=new(StringComparer.Ordinal);
         public int MetadataReads {get;private set;}
         public int BodyReads {get;private set;}
         public bool Disposed {get;private set;}
@@ -189,19 +197,27 @@ public sealed partial class AccountServiceTests
             if(request.RequestUri.AbsolutePath=="/drive/v3/about") return Json("""{"user":{"permissionId":"permission-A","displayName":"Synthetic"}}""");
             StringAssert.Contains(request.RequestUri.Query,"supportsAllDrives=true");
             var file=Uri.UnescapeDataString(request.RequestUri.AbsolutePath[(request.RequestUri.AbsolutePath.LastIndexOf('/')+1)..]);
+            if(MissingFiles.Contains(file)) return Json("{}",HttpStatusCode.NotFound);
             Assert.IsTrue(data.Cloud.ContainsKey(file),"Only exact owned fixture identities may be read.");
-            if(request.RequestUri.AbsolutePath=="/drive/v3/files/"+file)
+            if(request.RequestUri.AbsolutePath=="/drive/v3/files/"+file && request.RequestUri.Query.Contains("alt=media",StringComparison.Ordinal))
             {
                 StringAssert.Contains(request.RequestUri.Query,"alt=media");BodyReads++;if(BeforeBody is not null) await BeforeBody().ConfigureAwait(false);
                 BodyFiles.Add(file);if(BeforeFileBody is not null) await BeforeFileBody(file).ConfigureAwait(false);
                 return new(HttpStatusCode.OK) {Content=new ByteArrayContent(data.Cloud[file].Bytes.ToArray())};
             }
-            Assert.AreEqual("/drive/v2/files/"+file,request.RequestUri.AbsolutePath);MetadataReads++;var actual=data.Cloud[file];
+            MetadataReads++;var actual=data.Cloud[file];
+            if(request.RequestUri.AbsolutePath=="/drive/v3/files/"+file)
+            {
+                var metadata=JsonSerializer.Serialize(new {id=actual.FileId,version=actual.DriveVersion.ToString(CultureInfo.InvariantCulture),size=actual.Bytes.Length.ToString(CultureInfo.InvariantCulture),
+                    mimeType=data.MetadataMimeTypes.GetValueOrDefault(file,actual.MimeType),parents=new[]{actual.FolderId},trashed=false,capabilities=new {canDownload=true}});
+                return Json(MetadataJson?.Invoke(file,metadata) ?? metadata);
+            }
+            Assert.AreEqual("/drive/v2/files/"+file,request.RequestUri.AbsolutePath);
             var raw=JsonSerializer.Serialize(new {id=actual.FileId,version=actual.DriveVersion.ToString(CultureInfo.InvariantCulture),etag="\"actual-"+actual.DriveVersion.ToString(CultureInfo.InvariantCulture)+"\"",
                 fileSize=actual.Bytes.Length.ToString(CultureInfo.InvariantCulture),mimeType="application/json",parents=new[]{new {id=actual.FolderId}},labels=new {trashed=false},capabilities=new {canDownload=true,canEdit=true}});
             return Json(MetadataJson?.Invoke(file,raw) ?? raw);
         }
-        private static HttpResponseMessage Json(string body)=>new(HttpStatusCode.OK) {Content=new StringContent(body,Encoding.UTF8,"application/json")};
+        private static HttpResponseMessage Json(string body,HttpStatusCode status=HttpStatusCode.OK)=>new(status) {Content=new StringContent(body,Encoding.UTF8,"application/json")};
         protected override void Dispose(bool disposing) {if(disposing) Disposed=true;base.Dispose(disposing);}
     }
 }

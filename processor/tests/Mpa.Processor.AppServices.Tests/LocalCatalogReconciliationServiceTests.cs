@@ -320,7 +320,7 @@ public sealed partial class AccountServiceTests
         return reads;
     }
     private static async Task<(CatalogObjectReference Reference, CatalogCommitPlan Plan, ProtocolSigningIntent Intent)> AddCatalogHeadAsync(
-        InitialPublicationFixture fixture, string file, CatalogObjectReference? parent = null, bool unsealed = false, bool includeAsset = false)
+        InitialPublicationFixture fixture, string file, CatalogObjectReference? parent = null, bool unsealed = false, bool includeAsset = false,bool mismatchedCoverage=false)
     {
         var captured = await fixture.Setup.Accounts.State.ExecuteAsync(database =>
         {
@@ -328,6 +328,7 @@ public sealed partial class AccountServiceTests
             return (Authority: authority.CaptureLocalPublicationAuthority(), Sources: authority.CurrentSourceConfiguration()!);
         }, CancellationToken.None).ConfigureAwait(false);
         var authority = captured.Authority; var generation = Guid.NewGuid(); var workspace = new CatalogWorkspace(authority.AccountId, authority.FolderId);
+        var coverageConfiguration=mismatchedCoverage ? checked(authority.ConfigurationRevision+1) : authority.ConfigurationRevision;
         CatalogObjectReference Store(string name, byte[] bytes, string mimeType = "application/json")
         {
             fixture.Cloud.Add(name, new(authority.AccountId, name, authority.FolderId, 7, bytes));
@@ -353,11 +354,11 @@ public sealed partial class AccountServiceTests
         var coveragePages = new List<CatalogCoveragePageReference>();
         if (sources.Length > 0)
         {
-            var bytes = new CatalogCoverageDocumentWriter(workspace).EncodePage(authority.LibraryId, authority.ConfigurationRevision, 1, sources);
+            var bytes = new CatalogCoverageDocumentWriter(workspace).EncodePage(authority.LibraryId, coverageConfiguration, 1, sources);
             coveragePages.Add(new(sources[0].Id, sources[^1].Id, sources.Length, Store(file + "-coverage-page", bytes)));
         }
         var coverage = Store(file + "-coverage", new CatalogCoverageDocumentWriter(workspace).EncodeRoot(authority.LibraryId,
-            authority.ConfigurationRevision, 1, sources.Length, coveragePages));
+            coverageConfiguration, 1, sources.Length, coveragePages));
         var scope = new WorkspacePublicationScope(authority.LibraryId, authority.ActorId, authority.ActorEpoch, generation, authority.AccountId,
             authority.AccountRevision, authority.FolderId, authority.ConfigurationRevision, authority.AuthoritySha256);
         var dependencies = new PreparedCatalogDependencies(authority.LibraryId, authority.ConfigurationRevision, 1, includeAsset ? 1 : 0, captured.Sources.EnvelopeSha256, index, coverage);

@@ -92,6 +92,9 @@ public sealed class LocalCurrentControlObservations(ProcessorStateDatabase datab
     public void AssertCaptured(LocalCurrentControlAttempt expected,CancellationToken token=default)
     { using var transaction=_database.Connection.BeginTransaction();_=Require(expected,"captured",transaction,token);transaction.Commit(); }
 
+    internal LibraryConnectionDescriptor AssertCapturedIn(LocalCurrentControlAttempt expected,SqliteTransaction transaction,CancellationToken token)=>
+        Require(expected,"captured",transaction,token).Connection;
+
     public void AssertFenced(LocalCurrentControlAttempt expected,CancellationToken token=default)
     { using var transaction=_database.Connection.BeginTransaction();_=Require(expected,"fenced",transaction,token);transaction.Commit(); }
 
@@ -133,13 +136,14 @@ public sealed class LocalCurrentControlObservations(ProcessorStateDatabase datab
 
     private Loaded Load(SqliteTransaction transaction,CancellationToken token)
     {
-        token.ThrowIfCancellationRequested();var slot=new LibraryCurrentControlSlotRepository(_database,_budget).ReadIn(transaction)
+        token.ThrowIfCancellationRequested();
+        var snapshot=InitialPolicyReadSnapshot.Capture(_database,_budget,transaction);
+        var completion=snapshot.Require(_database,transaction);
+        var slot=new LibraryCurrentControlSlotRepository(_database,_budget).ReadIn(transaction,snapshot)
             ?? throw new InvalidOperationException("Reserve and publish initial current control before observing it.");
         var connection=slot.ConnectionDescriptor();
-        var receipt=new InitialCurrentControlPublicationRepository(_database,_budget).ReadIn(transaction)
+        var receipt=new InitialCurrentControlPublicationRepository(_database,_budget).ReadIn(transaction,snapshot)
             ?? throw new InvalidOperationException("Verify the first current publication before its ongoing producer observations.");
-        var completion=new LibraryAuthorityRepository(_database,_budget).InitialPublicationCompletion(transaction)
-            ?? throw new InvalidDataException("Current observations lost their original policy completion.");
         var body=Read(StateKey,MaximumBytes,transaction);var sha=Read(StateKey+":sha256",64,transaction);var claim=Read(StateKey+":claim",64,transaction);
         Saved? saved=null;
         if (body is not null || sha is not null || claim is not null)
