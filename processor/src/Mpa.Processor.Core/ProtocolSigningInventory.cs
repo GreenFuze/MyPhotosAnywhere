@@ -124,7 +124,7 @@ public sealed partial class ProtocolSigningJournal
             CheckId(intent.Id);
             if (!ids.Add(intent.Id) || !byActor.TryGetValue((intent.ActorId, intent.Epoch), out var actor) ||
                 intent.Sequence != counts.GetValueOrDefault((intent.ActorId, intent.Epoch)) + 1 || intent.Sequence > actor.Sequence ||
-                intent.Kind is not ("library-publisher-authorization" or "library-source-configuration" or "catalog-commit") ||
+                intent.Kind is not ("library-publisher-authorization" or "library-source-configuration" or "catalog-commit" or LibraryCurrentControl.Kind) ||
                 (actor.Role == "publisher") != (intent.Kind == "catalog-commit") || intent.BodyBytes is < 1 or > MaximumBodyBytes || !InventoryHash(intent.BodySha256) ||
                 (intent.EnvelopeBytes is null) != (intent.EnvelopeSha256 is null) || intent.EnvelopeBytes is < 1 or > ProtocolDocumentReader.MaximumDocumentBytes ||
                 intent.EnvelopeSha256 is not null && !InventoryHash(intent.EnvelopeSha256)) throw new ProtocolSigningConflictException();

@@ -23,7 +23,7 @@ public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase databa
     private readonly ProcessorStateDatabase _database = database ?? throw new ArgumentNullException(nameof(database));
     private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
     private static readonly string[] Capabilities = [CatalogPublisherAuthorization.Capability, CatalogSourceConfiguration.Capability,
-        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability];
+        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability, LibraryCurrentControl.Capability];
 
     internal void InitializeBootstrapActors(SqliteTransaction transaction, LibraryControllerPin controller, PublisherSigningRegistration publisher)
     {
@@ -59,12 +59,12 @@ public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase databa
         if (existing is not null)
         {
             if (existing.ActorId != actorId || existing.Epoch != epoch || existing.Kind != kind) throw new ProtocolSigningConflictException();
-            var replay = bodyFactory(existing.Sequence); ValidateBody(actor, existing.Sequence, kind, replay);
+            var replay = bodyFactory(existing.Sequence); ValidateBody(actor, existing.Sequence, kind, replay,transaction);
             if (!existing.Body.Span.SequenceEqual(replay)) throw new ProtocolSigningConflictException();
             transaction.Commit(); return existing;
         }
         if (actor.Sequence == long.MaxValue) throw new InvalidOperationException("The signing sequence is exhausted; explicitly enroll a new authorized epoch.");
-        var sequence = actor.Sequence + 1; var owned = bodyFactory(sequence).ToArray(); ValidateBody(actor, sequence, kind, owned); var hash = Hash(owned);
+        var sequence = actor.Sequence + 1; var owned = bodyFactory(sequence).ToArray(); ValidateBody(actor, sequence, kind, owned,transaction); var hash = Hash(owned);
         using var reservation = _budget.Reserve(checked(owned.LongLength * 3 + 65536)); reservation.RecheckBeforeWrite(reservation.Bytes);
         using (var insert = Command(transaction, "INSERT INTO signing_intent(id,actor_id,epoch,sequence,kind,body,body_hash) VALUES($id,$actor,$epoch,$sequence,$kind,$body,$hash)",
             ("$id", id.ToString("D")), ("$actor", actorId.ToString("D")), ("$epoch", epoch), ("$sequence", sequence), ("$kind", kind), ("$body", owned), ("$hash", hash)))
@@ -75,7 +75,10 @@ public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase databa
         transaction.Commit(); return new(id, actor.Library, actorId, epoch, sequence, kind, hash, owned, null, null);
     }
 
-    public ProtocolSigningIntent? Read(Guid id) { CheckId(id); return Read(id, null); }
+    public ProtocolSigningIntent? Read(Guid id)
+    {
+        CheckId(id);using var transaction = _database.Connection.BeginTransaction();var result = Read(id,transaction);transaction.Commit();return result;
+    }
 
     public ProtocolSigningIntent Seal(Guid id, string expectedBodySha256, DocumentSignature signature)
     {
@@ -114,7 +117,7 @@ public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase databa
             throw new InvalidDataException("Stored signing intent integrity or sequence is invalid.");
         try
         {
-            ValidateBody(actor, row.Sequence, row.Kind, row.Body);
+            ValidateBody(actor, row.Sequence, row.Kind, row.Body,transaction);
             if (row.Envelope is not null)
             {
                 if (Hash(row.Envelope) != row.EnvelopeHash) throw new InvalidDataException("Stored signed envelope integrity failed.");
@@ -163,7 +166,7 @@ public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase databa
         return [new(controller.LibraryId, controller.ActorId, controller.Epoch, "controller", controller.KeyId, controllerKey, 0),
             new(controller.LibraryId, publisher.ActorId, publisher.Epoch, "publisher", publisher.KeyId, publisherKey, 0)];
     }
-    private static void ValidateBody(ActorRecord actor, long sequence, string kind, ReadOnlySpan<byte> body)
+    private void ValidateBody(ActorRecord actor, long sequence, string kind, ReadOnlySpan<byte> body,SqliteTransaction? transaction)
     {
         if (body.Length is < 1 or > MaximumBodyBytes) throw new ProtocolFormatException("Outgoing signing body exceeds its bounded envelope headroom.");
         var canonical = new CanonicalJson().Encode(body);
@@ -172,9 +175,19 @@ public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase databa
         using var document = JsonDocument.Parse(canonical); var root = document.RootElement;
         if (root.GetProperty("sequence").GetString() != sequence.ToString(CultureInfo.InvariantCulture) || root.GetProperty("kind").GetString() != kind)
             throw new ProtocolFormatException("Outgoing document does not match its reserved kind/sequence.");
+        if (kind == LibraryCurrentControl.Kind)
+        {
+            var slot = new LibraryCurrentControlSlotRepository(_database,_budget).ReadIn(transaction ?? throw new InvalidOperationException("Current-control signing validation requires its caller's owned transaction."));
+            if (slot?.FileId is null) throw new InvalidOperationException("Capture the actual allocated current-control file before reserving its signature.");
+            var connection = slot.ConnectionDescriptor();
+            if (connection.LibraryId != actor.Library || connection.ControllerId != actor.Id || connection.ControllerEpoch != actor.Epoch || connection.ControllerKeyId != actor.KeyId ||
+                !root.GetProperty("requiredCapabilities").EnumerateArray().Any(item => item.GetString() == LibraryCurrentControl.Capability))
+                throw new ProtocolFormatException("Current-control signing requires its exact native root scope and capability.");
+            new LibraryCurrentControlWriter(connection).ValidateUnsignedPayload(Encoding.UTF8.GetBytes(root.GetProperty("payload").GetRawText()),sequence);
+        }
     }
     private static TrustedProtocolActor Authority(ActorRecord actor) => new(actor.Library, actor.Id, actor.Epoch, actor.PublicKey,
-        actor.Role == "controller" ? ["library-publisher-authorization", "library-source-configuration"] : ["catalog-commit"]);
+        actor.Role == "controller" ? ["library-publisher-authorization", "library-source-configuration", LibraryCurrentControl.Kind] : ["catalog-commit"]);
     private SqliteCommand Command(SqliteTransaction? transaction, string sql, params (string Key, object Value)[] values)
     {
         var command = _database.Connection.CreateCommand(); command.Transaction = transaction; command.CommandText = sql;

@@ -27,6 +27,8 @@ public sealed partial class LibraryAuthorityRepository
         var result = ReadInitialCompletion(transaction); transaction.Commit(); return result;
     }
 
+    internal LibraryInitialPublicationCompletion? InitialPublicationCompletion(SqliteTransaction transaction) => ReadInitialCompletion(transaction);
+
     /// <summary>Called by the joined native owner after actual upload/read-back and a
     /// complete current scan. Saves both exact policies and the scan atomically. The
     /// original receipt is immutable; later observations never rewrite its evidence.</summary>

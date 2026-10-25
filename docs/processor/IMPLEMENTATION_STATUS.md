@@ -1,5 +1,47 @@
 # MPA 0.6.0 implementation ledger
 
+## Durable producer control slot and shared Root signing stream
+
+The producer now reserves one immutable local control plan after the completed initial
+policy-publication receipt and current local publication authority. A separate atomic
+receipt captures one actual provider file ID and its original account revision. This
+repository generates no provider ID, makes no network request and publishes no file.
+Reopen/reconnect cannot replace or relabel the captured identity. Root/workspace/existing
+immutable-outbox aliases, missing records, corruption, loss of the independent controller
+pin and missing allocation over signed work fail closed. Historical receipt retention after
+disconnect grants no new access. Low-storage and injected SQL failures roll back the whole
+checkpoint, retaining the same received ID for retry. Processor schema13 is unchanged.
+
+The outgoing canonical writer shares the signed decoder's exact shape/scope validator;
+it returns unsigned bytes, never verified authority. Current-control signing intents use
+the same durable Root counter and first sealed-envelope history as publisher/source
+policies. The concrete allocated slot, matching Root identity, explicit capability and
+exact roles/counters are required. Publisher signing remains catalog-only. Independent
+Python golden vectors and payload-negative cases exercise the outgoing writer.
+
+Local validation passes95 protocol tests,357 Core tests and the309-test ordinary
+AppServices CI subset; the two existing scale/reference categories remain mandatory
+separate CI jobs. Strict Desktop composition builds with zero warnings/errors. Frozen
+source/report/log hashes are in preflight-060/current-control-slot-validation.json.
+The first Core compile and one subsequent new-kind inventory failure are retained; a
+strict local ID helper and the explicit current-control inventory kind fix those issues.
+All old counter/hash/role/preservation assertions remain.
+
+Exact parent5e18172 Android and Native workflows pass. Independently downloaded artifacts
+verify176 unique passing cases, complete process-bound runtime traces,108 mapped valid
+PNGs and exact SDK receipts on each of API29/35/37. Both new control/fence/reopen and
+schema6-preservation cases actually execute on all three. Frozen proof is
+preflight-060/ci-5e18172-native-validation.json. Screenshots are decoded/validated,
+not visually reviewed; runtime diagnostics and physical-device acceptance remain separate.
+
+Actual provider allocation ownership, native-key runtime signing composition, current
+publication/CAS/lost-ack recovery, v2 setup export, complete graph/source/retired-epoch
+admission and atomic canonical activation remain unfinished. The parallel synthetic-only
+media feasibility probe is not production code or accepted publication evidence. No
+current-control file or0.6 release was published, original changed, conservative history
+cleared, warning exception added or phone/desktop link introduced.
+
+
 ## Native captured current control and durable read high-water
 
 The native client now captures only the independently pinned current file, through the

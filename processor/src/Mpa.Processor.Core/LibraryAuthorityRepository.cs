@@ -132,7 +132,7 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
         var text = ReadMeta(transaction, PinKey, 4096); var hash = ReadMeta(transaction, PinKey + ":sha256", 64);
         if (text is null && hash is null)
         {
-            if (ReadMeta(transaction, SelectedKey, 19) is not null || HasPublisherHistory(transaction) || HasSourceHistory(transaction) || HasBootstrapSources(transaction))
+            if (ReadMeta(transaction, SelectedKey, 19) is not null || HasPublisherHistory(transaction) || HasSourceHistory(transaction) || HasBootstrapSources(transaction) || HasCurrentControlState(transaction))
                 throw new InvalidDataException("Accepted publisher state has lost its pinned controller; never bootstrap a replacement.");
             return null;
         }
@@ -173,6 +173,11 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
         if (selected is null && highest != 0 || selected is not null && Counter(selected) != highest)
             throw new InvalidDataException("Publisher selection disagrees with accepted history; never reactivate an older policy.");
         return selected;
+    }
+    private bool HasCurrentControlState(SqliteTransaction? transaction)
+    {
+        using var command = Command(transaction,"SELECT 1 FROM processor_meta WHERE key GLOB 'current_control_*' LIMIT 1");
+        return command.ExecuteScalar() is not null;
     }
     private bool HasPublisherHistory(SqliteTransaction? transaction)
     {

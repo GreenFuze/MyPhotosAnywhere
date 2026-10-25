@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace Mpa.Processor.Protocol;
@@ -38,23 +39,33 @@ public sealed class LibraryCurrentControl
         var verified = new SignedProtocolDocuments([Capability]).VerifyAndRead(owned, authority);
         if (verified.Kind != Kind || !verified.RequiredCapabilities.Contains(Capability, StringComparer.Ordinal))
             throw new ProtocolFormatException("A current-control snapshot requires its explicit capability.");
-        using var document = JsonDocument.Parse(verified.CanonicalPayload); var root = document.RootElement;
-        Fields(root, "workspace", "currentFileId", "publishers", "sources", "catalog");
-        var workspace = root.GetProperty("workspace"); Fields(workspace, "accountId", "folderId");
-        if (Text(workspace, "accountId") != approved.Workspace.AccountId || Text(workspace, "folderId") != approved.Workspace.FolderId ||
-            Text(root, "currentFileId") != approved.CurrentFileId)
+        var selected = ValidatePayload(Encoding.UTF8.GetBytes(verified.CanonicalPayload),verified.Sequence,approved);
+        return new(approved.DocumentSha256,verified.Sequence,Convert.ToHexStringLower(SHA256.HashData(owned)),selected.Publishers,selected.Sources,selected.Catalog);
+    }
+
+    internal static (LibraryPolicyReference Publishers, LibraryPolicyReference Sources, CatalogObjectReference? Catalog)
+        ValidatePayload(ReadOnlySpan<byte> payload,long sequence,LibraryConnectionDescriptor approved)
+    {
+        ArgumentNullException.ThrowIfNull(approved);
+        if (approved.CurrentFileId is null || sequence < 1) throw new ProtocolFormatException("A reserved concrete control identity and positive root sequence are required.");
+        var canonical = new CanonicalJson(ProtocolDocumentReader.MaximumDocumentBytes).Encode(payload);
+        if (!payload.SequenceEqual(canonical)) throw new ProtocolFormatException("Current-control payload must already be canonical.");
+        using var document = JsonDocument.Parse(canonical);var root = document.RootElement;
+        Fields(root,"workspace","currentFileId","publishers","sources","catalog");
+        var workspace = root.GetProperty("workspace");Fields(workspace,"accountId","folderId");
+        if (Text(workspace,"accountId") != approved.Workspace.AccountId || Text(workspace,"folderId") != approved.Workspace.FolderId || Text(root,"currentFileId") != approved.CurrentFileId)
             throw new ProtocolFormatException("Current control cannot retarget its independently approved workspace or file.");
         var ids = new HashSet<string>(StringComparer.Ordinal) { approved.CurrentFileId };
         var publishers = Policy(root.GetProperty("publishers")); var sources = Policy(root.GetProperty("sources"));
         if (publishers.Sequence == sources.Sequence) throw new ProtocolFormatException("Distinct controller policies cannot reuse a root sequence.");
         var catalogValue = root.GetProperty("catalog"); var catalog = catalogValue.ValueKind == JsonValueKind.Null ? null : Reference(catalogValue);
-        return new(approved.DocumentSha256, verified.Sequence, Convert.ToHexStringLower(SHA256.HashData(owned)), publishers, sources, catalog);
+        return (publishers,sources,catalog);
 
         LibraryPolicyReference Policy(JsonElement value)
         {
-            Fields(value, "object", "sequence"); var sequence = Counter(value, "sequence");
-            if (sequence >= verified.Sequence) throw new ProtocolFormatException("A selected policy must precede its current-control signature in the root stream.");
-            return new(Reference(value.GetProperty("object")), sequence);
+            Fields(value, "object", "sequence"); var selectedSequence = Counter(value, "sequence");
+            if (selectedSequence >= sequence) throw new ProtocolFormatException("A selected policy must precede its current-control signature in the root stream.");
+            return new(Reference(value.GetProperty("object")), selectedSequence);
         }
         CatalogObjectReference Reference(JsonElement value)
         {

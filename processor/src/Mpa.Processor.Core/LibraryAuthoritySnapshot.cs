@@ -11,7 +11,7 @@ public sealed partial class LibraryAuthorityRepository
         using var history = snapshot.Connection.CreateCommand(); history.Transaction = snapshot.Transaction;
         history.CommandText = """
             SELECT 1 FROM processor_meta WHERE key IN ($publishers,$sources,$approval,$approvalHash)
-              OR key GLOB 'controller_document_v1:*' OR key GLOB 'controller_source_document_v1:*' LIMIT 1
+              OR key GLOB 'controller_document_v1:*' OR key GLOB 'controller_source_document_v1:*' OR key GLOB 'current_control_*' LIMIT 1
             """;
         history.Parameters.AddWithValue("$publishers", SelectedKey); history.Parameters.AddWithValue("$sources", SelectedSourceKey);
         history.Parameters.AddWithValue("$approval", BootstrapSourcesKey); history.Parameters.AddWithValue("$approvalHash", BootstrapSourcesKey + ":sha256");

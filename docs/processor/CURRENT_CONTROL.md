@@ -36,7 +36,9 @@ before network I/O, verify exact uploaded policies/dependencies, compare-and-upd
 same control object, and reconcile a lost acknowledgement by exact bytes and actual Drive
 version. It must never resolve an ambiguous update by creating another current object or
 selecting an equal copy. Plugin workers receive no controller key or publication owner.
-These producer integrations are still pending; pure decoding is not publication.
+The producer now has a durable local slot and shares the existing root signing journal;
+actual provider allocation and mutable publication remain pending. Pure serialization,
+reservation and signing are not publication.
 
 ## Consumer sequence
 
@@ -97,7 +99,27 @@ retired epochs, signed ancestry and complete canonical facts. Full bounded Root-
 verification currently repeats on observation assertions; retention/ACK and measured CPU
 work remain. No history budget was raised and no account-removal recovery was cleared.
 
-Durable producer publication/CAS/lost-ack recovery and reserved control IDs, v2 setup
+The canonical outgoing writer reuses the decoder's exact payload validator, including
+scope, roles, counters and aliases. It returns unsigned bytes, never a verified snapshot.
+An immutable local slot requires the completed initial two-policy receipt and current
+local publication authority. A separate atomic receipt captures one actual provider ID
+and its original account revision; reconnects cannot relabel or replace it. Missing or
+corrupt records fail closed. Retaining a historical allocation after disconnection grants
+no access. The store performs no network, ID generation or cloud-file creation.
+
+Current-control intents use the same durable root counter and sealed-envelope history as
+the two policy kinds. They require the allocated slot, matching root scope and explicit
+capability. The publisher role remains catalog-only. Native-key runtime composition and
+full current-policy admission still need integration before publishing these intents.
+
+Stage0's live synthetic metadata probe already found that v3 accepted an invalid
+`If-Match`, while v2 rejected previously valid stale tags for metadata and Trash/restore.
+Those results do not establish media-content compare-and-update. A separate synthetic-only
+v2 media probe and lost-ack reconciliation are required before enabling mutable control.
+Numeric Drive versions must never be substituted for actual entity tags. See the
+[existing feasibility evidence](validation/drive-feasibility.md).
+
+Durable producer publication/CAS/lost-ack recovery and actual reserved control IDs, v2 setup
 export/import UX, full graph/control lifetime integration, high-water admission together
 with canonical staging/atomic activation, and native gallery integration remain required.
 No current-control document is published by this change. Legacy Room12 and Processor13
