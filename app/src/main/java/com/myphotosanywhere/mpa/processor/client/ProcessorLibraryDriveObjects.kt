@@ -52,9 +52,9 @@ internal class ProcessorLibraryDriveObjects(private val gateway: DriveGateway,pr
     override suspend fun capture(fileId: String): DriveWorkspaceMetadata {
         DriveWorkspaceMetadata.opaque(fileId)
         if (fileId == pin.workspace.folderId) throw IOException("A catalog object cannot alias its workspace.")
-        account(); workspace()
+        account(); val folder = workspace()
         val metadata = gateway.catalogWorkspaceFile(fileId)
-        if (metadata.id != fileId || metadata.trashed || pin.workspace.folderId !in metadata.parents)
+        if (metadata.id != fileId || metadata.trashed || pin.workspace.folderId !in metadata.parents || metadata.sharedDriveId != folder.sharedDriveId)
             throw IOException("The catalog object left its approved metadata workspace.")
         account(); return metadata
     }

@@ -29,11 +29,11 @@ class ProcessorWorkspaceObservationDeviceTest {
     private fun directory() = File(context.noBackupFilesDir,"workspace-test-${UUID.randomUUID()}")
     private fun store(directory: File) = ProcessorLibraryStateStore(context,StorageBudget(context),directory)
     private fun sql(directory: File,action: (SQLiteDatabase)->Unit) = SQLiteDatabase.openDatabase(File(directory,"connection.sqlite").absolutePath,null,SQLiteDatabase.OPEN_READWRITE).use(action)
-    private suspend fun approve(store: ProcessorLibraryStateStore) {
+    private suspend fun approve(store: ProcessorLibraryStateStore,descriptor: LibraryConnectionDescriptor = pin) {
         val connection = ProcessorLibraryConnection(store,object : ProcessorLibraryConnectionReader {
             override suspend fun account() = ProcessorLibraryAccount("test-account","synthetic@example.invalid")
             override suspend fun workspace(id: String) = ProcessorLibraryWorkspace(id,"Metadata",1,true,false)
-        });connection.approve(connection.review(pin.encode()),pin.documentSha256)
+        });connection.approve(connection.review(descriptor.encode()),descriptor.documentSha256)
     }
     private fun cleanup(directory: File) {
         check(directory.parentFile?.canonicalFile == context.noBackupFilesDir.canonicalFile && directory.name.startsWith("workspace-test-"))
@@ -67,11 +67,11 @@ class ProcessorWorkspaceObservationDeviceTest {
         val directory = directory();var store = store(directory)
         try {
             approve(store);val original = File(directory,"original.jpg").apply { writeBytes(byteArrayOf(7,5,3,1)) };store.close()
-            sql(directory) { db -> db.execSQL("DROP TABLE workspace_history");db.execSQL("DROP TABLE workspace_replay");db.execSQL("DROP TABLE workspace_event");db.execSQL("DROP TABLE workspace_read");db.execSQL("DROP TABLE workspace_candidate");db.execSQL("DROP TABLE workspace_attempt");db.version = 3 }
+            sql(directory) { db -> db.execSQL("DROP TABLE current_control_attempt");db.execSQL("DROP TABLE current_control_head");db.execSQL("DROP TABLE workspace_history");db.execSQL("DROP TABLE workspace_replay");db.execSQL("DROP TABLE workspace_event");db.execSQL("DROP TABLE workspace_read");db.execSQL("DROP TABLE workspace_candidate");db.execSQL("DROP TABLE workspace_attempt");db.version = 3 }
             store = store(directory);assertEquals(pin.encode(),store.current()?.encode());assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
             val prepared = ProcessorWorkspaceInventory(ProcessorWorkspaceObservations(store),source(listOf("a"))).prepare { _,_ -> }
             assertEquals(1,prepared.reads.size);assertArrayEquals(byteArrayOf(7,5,3,1),original.readBytes())
-            sql(directory) { assertEquals(6,it.version) }
+            sql(directory) { assertEquals(7,it.version) }
         } finally { store.close();cleanup(directory) }
     }
     @Test fun nativeRemovedHistoryPersistsAndCannotBeWashedAfterRestart() = runBlocking<Unit> {
@@ -121,14 +121,14 @@ class ProcessorWorkspaceObservationDeviceTest {
                     db.execSQL("UPDATE workspace_attempt SET document=?,sha256=?",arrayOf(bytes,ProcessorWorkspaceObservations.hash(bytes)))
                 }
                 db.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> val values = arrayListOf<ByteArray>();while(rows.moveToNext()) values.add(rows.getBlob(0));events = values }
-                db.execSQL("DROP TABLE workspace_history");db.execSQL("DROP TABLE workspace_replay");db.execSQL("DROP INDEX workspace_event_lookup");db.execSQL("ALTER TABLE workspace_event RENAME TO old_events")
+                db.execSQL("DROP TABLE current_control_attempt");db.execSQL("DROP TABLE current_control_head");db.execSQL("DROP TABLE workspace_history");db.execSQL("DROP TABLE workspace_replay");db.execSQL("DROP INDEX workspace_event_lookup");db.execSQL("ALTER TABLE workspace_event RENAME TO old_events")
                 db.execSQL("CREATE TABLE workspace_event(sequence INTEGER NOT NULL PRIMARY KEY CHECK(sequence>0),kind TEXT NOT NULL CHECK(kind IN ('candidate','read')),file_id TEXT NOT NULL CHECK(length(file_id) BETWEEN 1 AND 256),document BLOB NOT NULL CHECK(length(document) BETWEEN 1 AND 2048),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")
                 db.execSQL("CREATE INDEX workspace_event_lookup ON workspace_event(kind,file_id,sequence)");db.execSQL("INSERT INTO workspace_event SELECT * FROM old_events");db.execSQL("DROP TABLE old_events");db.version = 4
             }
             store.close();store = store(directory);val restored = ProcessorWorkspaceObservations(store)
             assertEquals(ready.attempt,restored.lastAttempt());assertEquals(ready.reads,restored.reads(ready.attempt));assertNull(restored.lastAttempt()?.unresolvedDriveId)
             assertEquals(pin.encode(),store.current()?.encode());assertEquals("synthetic@example.invalid",store.registration()?.account?.email);assertArrayEquals(byteArrayOf(9,7,5,3),original.readBytes())
-            sql(directory) { db -> assertEquals(6,db.version);db.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> var index = 0;while(rows.moveToNext()) assertArrayEquals(events[index++],rows.getBlob(0));assertEquals(events.size,index) } }
+            sql(directory) { db -> assertEquals(7,db.version);db.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> var index = 0;while(rows.moveToNext()) assertArrayEquals(events[index++],rows.getBlob(0));assertEquals(events.size,index) } }
         } finally { store.close();cleanup(directory) }
     }
 
@@ -158,10 +158,50 @@ class ProcessorWorkspaceObservationDeviceTest {
         val directory = directory();var store = store(directory)
         try {
             approve(store);val original = File(directory,"original.jpg").apply { writeBytes(byteArrayOf(6,4,2)) };store.close()
-            sql(directory) { it.version = 5 }
+            sql(directory) { it.execSQL("DROP TABLE current_control_attempt");it.execSQL("DROP TABLE current_control_head");it.version = 5 }
             store = store(directory);assertEquals(pin.encode(),store.current()?.encode());assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
             assertArrayEquals(byteArrayOf(6,4,2),original.readBytes());assertNull(ProcessorWorkspaceObservations(store).lastAttempt())
-            sql(directory) { assertEquals(6,it.version) }
+            sql(directory) { assertEquals(7,it.version) }
+        } finally { store.close();cleanup(directory) }
+    }
+
+
+    private fun controlEnvelope(descriptor: LibraryConnectionDescriptor): ByteArray {
+        fun reference(file: String) = """{"accountId":"test-account","workspaceId":"test-workspace","bytes":"1","sha256":"${"a".repeat(64)}","fileId":"$file"}"""
+        val raw = """{"format":"mpa","major":1,"minor":0,"libraryId":"${descriptor.libraryId}","actorId":"${descriptor.controllerId}","epoch":"1","sequence":"3","kind":"library-current-control","requiredCapabilities":["library.current.v1"],"payload":{"workspace":{"accountId":"test-account","folderId":"test-workspace"},"currentFileId":"control","publishers":{"object":${reference("publisher")},"sequence":"1"},"sources":{"object":${reference("sources")},"sequence":"2"},"catalog":null}}"""
+        val body = com.myphotosanywhere.mpa.processor.protocol.CanonicalProtocolJson().encode(raw.toByteArray(Charsets.UTF_8))
+        val signer = com.myphotosanywhere.mpa.processor.protocol.ProtocolDocumentSigner(key.private,key.public)
+        return com.myphotosanywhere.mpa.processor.protocol.SignedProtocolDocuments(setOf("library.current.v1")).encode(body,signer.sign(body))
+    }
+    @Test fun nativeControlCaptureFencesAndRequiresFreshOwnerAfterReopen() = runBlocking<Unit> {
+        val directory=directory();var store=store(directory)
+        val descriptor=LibraryConnectionDescriptor(pin.libraryId,pin.controllerId,pin.controllerEpoch,pin.workspace,key.public.encoded,"control")
+        val bytes=controlEnvelope(descriptor)
+        val source=object : ProcessorWorkspaceCapturedSource {
+            override val connectionSha256=descriptor.documentSha256
+            override suspend fun capture(fileId: String)=DriveWorkspaceMetadata(fileId,"application/json",1,bytes.size.toLong(),listOf("test-workspace"),false,null,true)
+            override suspend fun readCaptured(expected: DriveWorkspaceMetadata)=bytes
+            override suspend fun cursor(): DriveWorkspaceCursor=error("Current control must not enumerate account history")
+            override suspend fun page(token: String?): DriveWorkspacePage=error("Current control must not search for copies")
+        }
+        var reader=ProcessorCurrentControlReader(ProcessorCurrentControlObservations(store),source,descriptor)
+        try {
+            approve(store,descriptor);val old=reader.capture();assertEquals(3L,old.head.sequence);assertEquals("fenced",reader.fence(old).phase)
+            try { reader.fence(old);fail("Native fenced control reopened") } catch (_: ProcessorWorkspaceConflict) { }
+            reader.close();store.close();store=store(directory);reader=ProcessorCurrentControlReader(ProcessorCurrentControlObservations(store),source,descriptor)
+            try { reader.fence(old);fail("Native restarted owner adopted an old capture") } catch (_: ProcessorWorkspaceConflict) { }
+            val fresh=reader.capture();assertTrue(fresh.attempt.revision>old.attempt.revision);assertEquals("fenced",reader.fence(fresh).phase)
+        } finally { reader.close();store.close();cleanup(directory) }
+    }
+    @Test fun nativeSchemaSixPreservesPendingEvidenceAndOriginal() = runBlocking<Unit> {
+        val directory=directory();var store=store(directory)
+        try {
+            approve(store);val pending=ProcessorWorkspaceObservations(store).begin(pin.documentSha256)
+            val original=File(directory,"original.jpg").apply { writeBytes(byteArrayOf(7,5,3)) };store.close()
+            sql(directory) { it.execSQL("DROP TABLE current_control_attempt");it.execSQL("DROP TABLE current_control_head");it.version=6 }
+            store=store(directory);assertEquals(pin.encode(),store.current()?.encode());assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
+            assertEquals(pending,ProcessorWorkspaceObservations(store).lastAttempt());assertArrayEquals(byteArrayOf(7,5,3),original.readBytes())
+            sql(directory) { assertEquals(7,it.version) }
         } finally { store.close();cleanup(directory) }
     }
 

@@ -119,7 +119,7 @@ internal class ProcessorLibraryStateStore(context: Context, private val storage:
         } finally { database.endTransaction() }
     }
     private fun hasControllerState(database: SQLiteDatabase): Boolean =
-        database.rawQuery("SELECT 1 FROM controller_anchor UNION ALL SELECT 1 FROM controller_document UNION ALL SELECT 1 FROM controller_selection UNION ALL SELECT 1 FROM workspace_attempt UNION ALL SELECT 1 FROM workspace_candidate UNION ALL SELECT 1 FROM workspace_read UNION ALL SELECT 1 FROM workspace_event UNION ALL SELECT 1 FROM workspace_history UNION ALL SELECT 1 FROM workspace_replay UNION ALL SELECT 1 FROM client_meta WHERE key IN ('controller_anchor_sha256','workspace_attempt_revision') LIMIT 1",null).use { it.moveToFirst() }
+        database.rawQuery("SELECT 1 FROM controller_anchor UNION ALL SELECT 1 FROM controller_document UNION ALL SELECT 1 FROM controller_selection UNION ALL SELECT 1 FROM workspace_attempt UNION ALL SELECT 1 FROM workspace_candidate UNION ALL SELECT 1 FROM workspace_read UNION ALL SELECT 1 FROM workspace_event UNION ALL SELECT 1 FROM workspace_history UNION ALL SELECT 1 FROM workspace_replay UNION ALL SELECT 1 FROM current_control_head UNION ALL SELECT 1 FROM current_control_attempt UNION ALL SELECT 1 FROM client_meta WHERE key IN ('controller_anchor_sha256','workspace_attempt_revision','current_control_state_sha256') LIMIT 1",null).use { it.moveToFirst() }
 
     private fun readPin(database: SQLiteDatabase): LibraryConnectionDescriptor? {
         val marker = database.rawQuery("SELECT length(value),value FROM client_meta WHERE key='approved_pin_sha256'",null).use { row ->
@@ -138,7 +138,7 @@ internal class ProcessorLibraryStateStore(context: Context, private val storage:
         return descriptor
     }
     private fun state(valid: Boolean, message: String) { if (!valid) throw ProcessorLibraryStateCorrupt(message) }
-    private class PinDatabase(context: Context, path: String, private val requireMigrationBudget: () -> Unit) : SQLiteOpenHelper(context,path,null,6) {
+    private class PinDatabase(context: Context, path: String, private val requireMigrationBudget: () -> Unit) : SQLiteOpenHelper(context,path,null,7) {
         override fun onCreate(database: SQLiteDatabase) {
             database.execSQL("CREATE TABLE approved_pin(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),code TEXT NOT NULL CHECK(length(code) BETWEEN 1 AND 4096),document_sha256 TEXT NOT NULL CHECK(length(document_sha256)=64))")
             database.execSQL("CREATE TABLE client_meta(key TEXT NOT NULL PRIMARY KEY,value TEXT NOT NULL)")
@@ -146,10 +146,11 @@ internal class ProcessorLibraryStateStore(context: Context, private val storage:
             createControllerJournal(database)
             createWorkspaceObservation(database)
             createWorkspaceReplay(database)
+            createCurrentControl(database)
         }
         override fun onConfigure(database: SQLiteDatabase) { database.setForeignKeyConstraintsEnabled(true) }
         override fun onUpgrade(database: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            if (oldVersion !in 1..5 || newVersion != 6)
+            if (oldVersion !in 1..6 || newVersion != 7)
                 error("Unsupported processor client state upgrade: $oldVersion to $newVersion. Accepted state was preserved.")
             requireMigrationBudget()
             if (oldVersion == 1) createSelector(database)
@@ -162,6 +163,11 @@ internal class ProcessorLibraryStateStore(context: Context, private val storage:
                 database.execSQL("DROP TABLE workspace_event_v4")
             }
             if(oldVersion < 5) createWorkspaceReplay(database)
+            createCurrentControl(database)
+        }
+        private fun createCurrentControl(database: SQLiteDatabase) {
+            database.execSQL("CREATE TABLE current_control_head(sequence INTEGER NOT NULL PRIMARY KEY CHECK(sequence>0),envelope BLOB NOT NULL CHECK(length(envelope) BETWEEN 1 AND 262144),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")
+            database.execSQL("CREATE TABLE current_control_attempt(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),document BLOB NOT NULL CHECK(length(document) BETWEEN 1 AND 4096),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")
         }
         private fun createControllerJournal(database: SQLiteDatabase) {
             database.execSQL("CREATE TABLE controller_anchor(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),connection_sha256 TEXT NOT NULL CHECK(length(connection_sha256)=64))")

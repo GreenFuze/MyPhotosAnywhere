@@ -46,6 +46,8 @@ internal class ProcessorLibraryControllerJournal(private val store: ProcessorLib
             val session = Session(database,registration.descriptor)
             val previous = session.current()
             val incoming = session.decode(owned)
+            if (database.rawQuery("SELECT 1 FROM current_control_head WHERE sequence=?",arrayOf(incoming.header.sequence.toString())).use { it.moveToFirst() })
+                throw ProcessorControllerConflict("The controller reused an observed current-control sequence for another policy role.")
             val existing = session.stored(incoming.header.sequence)
             if (existing != null) {
                 if (!existing.bytes.contentEquals(owned))
@@ -79,6 +81,8 @@ internal class ProcessorLibraryControllerJournal(private val store: ProcessorLib
         }
 
         fun current(): ProcessorControllerState {
+            state(!database.rawQuery("SELECT 1 FROM current_control_head h JOIN controller_document d ON h.sequence=d.sequence LIMIT 1",null).use { it.moveToFirst() },
+                "Root signing history reused a sequence across current-control and policy roles.")
             count = database.rawQuery("SELECT count(*) FROM controller_document",null).use { row ->
                 state(row.moveToFirst(),"Controller history count is missing.")
                 val value = row.getLong(0)

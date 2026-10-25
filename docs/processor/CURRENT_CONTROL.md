@@ -83,8 +83,22 @@ verified semantics with a different retained digest. Shared independently genera
 cryptography vectors exercise both implementations, including malformed signed data and
 validly hashed policies signed by a foreign root. No private key is retained in fixtures.
 
-This is a protocol component. Durable control publication/CAS/lost-ack recovery, transport
-capture and final fencing, high-water persistence, retained-epoch admission, canonical
-staging/atomic activation, setup export/import UX and native gallery integration remain
-required. No current-control document is published by this change. Existing private
-client6, legacy Room12 and Processor13 schemas remain unchanged.
+Android also implements a serialized captured-control reader and durable observation
+journal. Metadata is retained before body I/O and complete actual read SHA/version before
+semantic verification. Nonces, Root-head/global-role integrity and actual-file version/
+corpus/content high-water survive failed reads and restart. Rewriting bytes under a known
+Drive version is rejected. Changed final probes block the old capture. Close and caller
+cancellation join actual I/O and reject late results; restarted readers capture afresh.
+Private schema7 adds two tables while preserving1–6, old receipts and originals.
+
+These are pending observations. Future graph consumers must participate in the same
+reader lifetime before fenced evidence can be atomically admitted with exact policies,
+retired epochs, signed ancestry and complete canonical facts. Full bounded Root-history
+verification currently repeats on observation assertions; retention/ACK and measured CPU
+work remain. No history budget was raised and no account-removal recovery was cleared.
+
+Durable producer publication/CAS/lost-ack recovery and reserved control IDs, v2 setup
+export/import UX, full graph/control lifetime integration, high-water admission together
+with canonical staging/atomic activation, and native gallery integration remain required.
+No current-control document is published by this change. Legacy Room12 and Processor13
+schemas remain unchanged. Fenced persisted state is not fresh authority after restart.

@@ -35,6 +35,7 @@ class ProcessorDriveObjectsTest {
         @Volatile var mime = "application/json"
         @Volatile var parent = pin.workspace.folderId
         @Volatile var sharedDrive: String? = null
+        @Volatile var metadataDrive: String? = null
         @Volatile var history: () -> MockResponse = { MockResponse().setBody("""{"changes":[],"newStartPageToken":"after"}""") }
         @Volatile var afterHistory: () -> Unit = { }
         @Volatile var workspaceMime = DriveGateway.FOLDER_MIME
@@ -74,7 +75,7 @@ class ProcessorDriveObjectsTest {
             val api = server.url("/drive/v3/")
             source = ProcessorLibraryDriveObjects(DriveGateway("synthetic-access",client,api,api),pin)
         }
-        fun metadata() = """{"id":"meta","mimeType":"$mime","version":"$version","size":"2","parents":["$parent"],"trashed":false,"capabilities":{"canDownload":$downloadable}${metadataSha?.let { ",\"sha256Checksum\":\"$it\"" } ?: ""}}"""
+        fun metadata() = """{"id":"meta","mimeType":"$mime","version":"$version","size":"2","parents":["$parent"],"trashed":false,"capabilities":{"canDownload":$downloadable}${metadataSha?.let { ",\"sha256Checksum\":\"$it\"" } ?: ""}${metadataDrive?.let { ",\"driveId\":\"$it\"" } ?: ""}}"""
         fun reference(hash: String = expectedHash) = CatalogObjectReference(pin.workspace.accountId,"meta",pin.workspace.folderId,2,hash)
         fun downloads() = requests.count { it.requestUrl?.queryParameter("alt") == "media" }
         override fun close() {
@@ -87,6 +88,15 @@ class ProcessorDriveObjectsTest {
     }
     private suspend fun rejects(action: suspend () -> Unit) {
         try { action(); fail("Unverified workspace read was accepted") } catch (_: IOException) { }
+    }
+
+    @Test fun actualMetadataCorpusMustMatchItsCapturedWorkspaceBeforeBody() = runBlocking {
+        Fixture(pin()).use { fixture ->
+            fixture.sharedDrive="actual-drive";fixture.metadataDrive="foreign-drive"
+            rejects { fixture.source.capture("meta") };assertEquals(0,fixture.downloads())
+            fixture.metadataDrive="actual-drive";val captured=fixture.source.capture("meta")
+            assertArrayEquals("{}".toByteArray(),fixture.source.readCaptured(captured));assertEquals(1,fixture.downloads())
+        }
     }
 
     @Test fun actualReadChecksAccountParentRevisionAndImmutableHash() = runBlocking {

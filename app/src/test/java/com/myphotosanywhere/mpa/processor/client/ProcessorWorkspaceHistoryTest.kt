@@ -215,7 +215,7 @@ class ProcessorWorkspaceHistoryTest {
             approve(store);val observations = ProcessorWorkspaceObservations(store);val ready = prepared(observations)
             var priorEvents = listOf<ByteArray>()
             sql(store) { db ->
-                db.execSQL("DROP TABLE workspace_history");db.execSQL("DROP TABLE workspace_replay")
+                db.execSQL("DROP TABLE current_control_attempt");db.execSQL("DROP TABLE current_control_head");db.execSQL("DROP TABLE workspace_history");db.execSQL("DROP TABLE workspace_replay")
                 val legacy = document(store,"workspace_attempt");listOf("startDrive","unresolvedDrive","history","replay").forEach { legacy.remove(it) }
                 val bytes = CanonicalProtocolJson(65536).encode(legacy.toString().toByteArray(Charsets.UTF_8))
                 db.execSQL("UPDATE workspace_attempt SET document=?,sha256=?",arrayOf(bytes,ProcessorWorkspaceObservations.hash(bytes)))
@@ -225,7 +225,7 @@ class ProcessorWorkspaceHistoryTest {
                 db.execSQL("CREATE INDEX workspace_event_lookup ON workspace_event(kind,file_id,sequence)");db.execSQL("INSERT INTO workspace_event SELECT * FROM old_events");db.execSQL("DROP TABLE old_events");db.version = 4
             }
             store.close();store = store();val restored = ProcessorWorkspaceObservations(store);assertEquals(ready.attempt,restored.lastAttempt());assertEquals(pin.encode(),store.current()?.encode())
-            sql(store) { db -> assertEquals(6,db.version);db.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> var index = 0;while(rows.moveToNext()) assertArrayEquals(priorEvents[index++],rows.getBlob(0));assertEquals(priorEvents.size,index) } }
+            sql(store) { db -> assertEquals(7,db.version);db.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> var index = 0;while(rows.moveToNext()) assertArrayEquals(priorEvents[index++],rows.getBlob(0));assertEquals(priorEvents.size,index) } }
             val next = restored.begin(pin.documentSha256);rejects { restored.start(next,cursor("later",drive="new-drive")) };assertNull(restored.lastAttempt()?.unresolvedDriveId)
             val started = restored.start(next,cursor("later"));assertEquals("start",started.firstUnresolved)
         } finally { store.close() }

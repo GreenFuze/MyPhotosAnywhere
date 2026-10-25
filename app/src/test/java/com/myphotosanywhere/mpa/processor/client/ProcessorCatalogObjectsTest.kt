@@ -181,13 +181,13 @@ class ProcessorCatalogObjectsTest {
                     attempt.addProperty("eventSha256",global);attempt.addProperty("replay",heads.getValue("replay"))
                     val attemptBytes = encode(attempt);database.execSQL("UPDATE workspace_attempt SET document=?,sha256=? WHERE singleton=1",arrayOf(attemptBytes,ProcessorWorkspaceObservations.hash(attemptBytes)))
                     expected = expected.copy(eventSha256=global,replaySha256=heads.getValue("replay"));oldEvents = encodedEvents
-                    database.version = 5;database.setTransactionSuccessful()
+                    database.execSQL("DROP TABLE current_control_attempt");database.execSQL("DROP TABLE current_control_head");database.version = 5;database.setTransactionSuccessful()
                 } finally { database.endTransaction() }
             }
             store.close();store = store();val restored = ProcessorWorkspaceObservations(store)
             assertEquals(expected,restored.lastAttempt());assertEquals(reads,restored.reads(expected));assertEquals(pin.encode(),store.current()?.encode())
             assertArrayEquals(byteArrayOf(9,4,2),original.readBytes());assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
-            sql(store) { database -> assertEquals(6,database.version);database.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> var index = 0;while(rows.moveToNext()) assertArrayEquals(oldEvents[index++],rows.getBlob(0));assertEquals(oldEvents.size,index) } }
+            sql(store) { database -> assertEquals(7,database.version);database.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> var index = 0;while(rows.moveToNext()) assertArrayEquals(oldEvents[index++],rows.getBlob(0));assertEquals(oldEvents.size,index) } }
             val pending = batch.copy(attempt=expected);assertFalse(pending.state.fenced)
             val objects = ProcessorCatalogObservedObjects.create(restored,source,pending);assertArrayEquals(source.body,objects.read(reference(source)))
             val fenced = ProcessorWorkspaceHistory(restored,source).checkUnchanged(pending,reads);assertTrue(fenced.state.fenced);rejects { objects.read(reference(source)) }

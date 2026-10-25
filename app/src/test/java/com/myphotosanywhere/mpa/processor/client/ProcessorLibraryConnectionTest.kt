@@ -109,7 +109,7 @@ class ProcessorLibraryConnectionTest {
             val client = ProcessorLibraryConnection(pins,Reader(descriptor)); client.approve(client.review(descriptor.encode()),descriptor.documentSha256)
             assertEquals("synthetic@example.invalid",pins.registration()?.account?.email)
             SQLiteDatabase.openDatabase(File(pins.directory,"connection.sqlite").absolutePath,null,SQLiteDatabase.OPEN_READONLY).use { database ->
-                assertEquals(6,database.version)
+                assertEquals(7,database.version)
                 database.rawQuery("SELECT value FROM client_meta WHERE key='approved_pin_sha256'",null).use { row -> assertTrue(row.moveToFirst()); assertEquals(descriptor.documentSha256,row.getString(0)) }
             }
         } finally { pins.close() }

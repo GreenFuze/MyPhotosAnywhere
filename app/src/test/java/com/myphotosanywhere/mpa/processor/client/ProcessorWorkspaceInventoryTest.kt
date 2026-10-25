@@ -205,12 +205,12 @@ class ProcessorWorkspaceInventoryTest {
             val body = CanonicalProtocolJson().encode("""{"format":"mpa","major":1,"minor":0,"libraryId":"${pin.libraryId}","actorId":"${pin.controllerId}","epoch":"1","sequence":"7","kind":"library-publisher-authorization","requiredCapabilities":["library.publishers.v1"],"payload":{"workspace":{"accountId":"test-account","folderId":"test-workspace"},"publisher":null}}""".toByteArray())
             val signer = ProtocolDocumentSigner(key.private,key.public);val bytes = SignedProtocolDocuments(setOf("library.publishers.v1")).encode(body,signer.sign(body))
             ProcessorLibraryControllerJournal(store).accept(bytes);store.close()
-            sql(store) { db -> db.execSQL("DROP TABLE workspace_history");db.execSQL("DROP TABLE workspace_replay");db.execSQL("DROP TABLE workspace_event");db.execSQL("DROP TABLE workspace_read");db.execSQL("DROP TABLE workspace_candidate");db.execSQL("DROP TABLE workspace_attempt");db.version = 3 }
+            sql(store) { db -> db.execSQL("DROP TABLE current_control_attempt");db.execSQL("DROP TABLE current_control_head");db.execSQL("DROP TABLE workspace_history");db.execSQL("DROP TABLE workspace_replay");db.execSQL("DROP TABLE workspace_event");db.execSQL("DROP TABLE workspace_read");db.execSQL("DROP TABLE workspace_candidate");db.execSQL("DROP TABLE workspace_attempt");db.version = 3 }
             store = store();assertEquals(7L,ProcessorLibraryControllerJournal(store).current().publisher?.sequence)
             assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
             val observations = ProcessorWorkspaceObservations(store);assertNull(observations.lastAttempt())
             assertEquals(1L,observations.begin(pin.documentSha256).revision)
-            sql(store) { assertEquals(6,it.version) }
+            sql(store) { assertEquals(7,it.version) }
         } finally { store.close() }
     }
 

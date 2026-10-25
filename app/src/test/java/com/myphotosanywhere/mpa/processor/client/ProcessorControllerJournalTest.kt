@@ -204,14 +204,14 @@ class ProcessorControllerJournalTest {
         try {
             approve(store); store.close()
             SQLiteDatabase.openDatabase(path.absolutePath,null,SQLiteDatabase.OPEN_READWRITE).use { database ->
-                database.execSQL("DROP TABLE workspace_history");database.execSQL("DROP TABLE workspace_replay");database.execSQL("DROP TABLE workspace_event");database.execSQL("DROP TABLE workspace_read"); database.execSQL("DROP TABLE workspace_candidate"); database.execSQL("DROP TABLE workspace_attempt"); database.execSQL("DROP TABLE controller_selection"); database.execSQL("DROP TABLE controller_document"); database.execSQL("DROP TABLE controller_anchor")
+                database.execSQL("DROP TABLE current_control_attempt");database.execSQL("DROP TABLE current_control_head");database.execSQL("DROP TABLE workspace_history");database.execSQL("DROP TABLE workspace_replay");database.execSQL("DROP TABLE workspace_event");database.execSQL("DROP TABLE workspace_read"); database.execSQL("DROP TABLE workspace_candidate"); database.execSQL("DROP TABLE workspace_attempt"); database.execSQL("DROP TABLE controller_selection"); database.execSQL("DROP TABLE controller_document"); database.execSQL("DROP TABLE controller_anchor")
                 database.version = 2
             }
             store = store(); assertEquals(pin.encode(),store.current()?.encode())
             assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
             assertNull(ProcessorLibraryControllerJournal(store).current().publisher)
             assertEquals(1L,ProcessorLibraryControllerJournal(store).accept(policy(1)).publisher?.sequence)
-            SQLiteDatabase.openDatabase(path.absolutePath,null,SQLiteDatabase.OPEN_READONLY).use { assertEquals(6,it.version) }
+            SQLiteDatabase.openDatabase(path.absolutePath,null,SQLiteDatabase.OPEN_READONLY).use { assertEquals(7,it.version) }
         } finally { store.close() }
     }
 
@@ -220,7 +220,7 @@ class ProcessorControllerJournalTest {
         try {
             approve(store); store.close()
             SQLiteDatabase.openDatabase(path.absolutePath,null,SQLiteDatabase.OPEN_READWRITE).use { database ->
-                database.execSQL("DROP TABLE workspace_history");database.execSQL("DROP TABLE workspace_replay");database.execSQL("DROP TABLE workspace_event");database.execSQL("DROP TABLE workspace_read"); database.execSQL("DROP TABLE workspace_candidate"); database.execSQL("DROP TABLE workspace_attempt"); database.execSQL("DROP TABLE controller_selection"); database.execSQL("DROP TABLE controller_document"); database.execSQL("DROP TABLE controller_anchor"); database.version = 2
+                database.execSQL("DROP TABLE current_control_attempt");database.execSQL("DROP TABLE current_control_head");database.execSQL("DROP TABLE workspace_history");database.execSQL("DROP TABLE workspace_replay");database.execSQL("DROP TABLE workspace_event");database.execSQL("DROP TABLE workspace_read"); database.execSQL("DROP TABLE workspace_candidate"); database.execSQL("DROP TABLE workspace_attempt"); database.execSQL("DROP TABLE controller_selection"); database.execSQL("DROP TABLE controller_document"); database.execSQL("DROP TABLE controller_anchor"); database.version = 2
             }
             capacity.bytes = 0; store = store(capacity)
             try { store.registration(); fail("Migrated without capacity") } catch (_: ProcessorClientStorageUnavailable) { }

@@ -1,5 +1,65 @@
 # MPA 0.6.0 implementation ledger
 
+## Native captured current control and durable read high-water
+
+The native client now captures only the independently pinned current file, through the
+actual Google metadata reader. It does not list the folder, scan account changes or search
+for equal copies. File/account/workspace/corpus, JSON type, bounded length, downloadability,
+version and actual SHA are checked. Actual metadata is persisted before its body request;
+a completed bounded read's SHA/version is persisted before Root semantic verification.
+A previously seen Drive version cannot acquire different signed or malformed bytes after
+retry/restart. Invalid Root documents retain their exact read receipt and version.
+
+New attempts retire old nonces before I/O, while preserving signed Root-head history,
+actual-file version/corpus and last complete content receipt. Root sequence collisions
+between controller policy and current-control roles fail in either arrival order. The
+ordered immutable head digest, canonical attempt digest and approved connection share
+one integrity marker; missing history, changed attempt bodies, lost markers or missing
+pins fail closed. A renewed account selector retires old captures without resetting trust.
+Full bounded Root verification checks cancellation between records. The existing4096
+workspace/16384-event limits and64MiB write safety reserve remain; the separate current
+head history has its own4096 bound. Retention and measured CPU work are still required.
+
+A final probe re-reads the same actual file and exact version/bytes. Changed evidence
+blocks the old capture and retains the highest observed version. A successful fence
+prevents every later read through that capture. The reader serializes its borrowed I/O;
+close denies late admission and joins a held physical read before Google/state owners
+retire. Caller cancellation also joins uncooperative I/O. Fenced evidence remains PENDING:
+future graph reads must join this lifetime before atomic canonical activation. A restarted
+reader requires a fresh capture; persisted fenced state alone grants no current authority.
+
+Private schema7 adds two tables and preserves1–6;6->7 does not rewrite old controller or
+workspace bodies. Genuine migration tests retain approval, account, pending evidence and
+original bytes. Historical migration fixtures drop only the new tables when constructing
+older versions; every existing preservation assertion remains. Room12 and Processor13
+are unchanged. Actual Google capture also rejects a file whose corpus differs from its
+captured workspace before body I/O.
+
+Validation passes705 unit cases/116 suites, zero lint findings and both APK builds.
+There are21 new current-control cases and19 actual HTTP transport cases. Two additional
+native signature/fence/reopen and schema6-preservation cases compile; exact-source
+API29/35/37 execution is still required. Frozen source/report/APK hashes and116 unique
+XML reports are saved in preflight-060/native-control-owner-validation.json. Only the
+approved exact AGP diagnostic remains. First-focus failure evidence is retained: the new
+negative helper originally caught IOException while protocol errors are IllegalArgument-
+Exception. Adding only that expected protocol type passes all110 focused cases. Review
+then adds complete read receipts and three corruption/version cases; the final705 includes
+every old assertion. No invariant catch, deadline, warning gate or old bound was relaxed.
+
+Prior exact793df09 passes all four push workflows. Downloaded evidence independently
+verifies174 passing native cases, complete runtime tracing and108 valid PNGs per API;
+32 passing TRX reports across12 protocol/scale/reference jobs,92 protocol cases on each
+OS; and four strict desktop build reports with zero web audit findings. The10k/100k
+fixtures executed, but Windows reports roughly201/216GB cumulative allocation and462/472s
+preparation. These are measurements, not final performance acceptance. Complete evidence
+is in preflight-060/ci-793df09-joint-validation.json. Those private6 results predate this
+private7 increment; desktop reports are not installer or UI acceptance.
+
+Producer current-ID reservation/signing/CAS/lost-ack publication, v2 setup export, actual
+full-graph/source/retired-epoch admission, canonical activation and runtime gallery remain
+next. No current-control file was published, unknown-removal history relaxed, original
+written, phone/LAN link introduced or final0.6 release claimed.
+
 ## Explicit current-control protocol for independent clients
 
 The next authority step now has a concrete C#/Kotlin wire contract. A v2 public connection
