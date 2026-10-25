@@ -151,3 +151,37 @@ cannot activate a catalog. Head/capture identity, sequence, actual SHA and contr
 metadata must match before I/O. Final fencing retires every selected-policy read, while
 close/cancellation join actual physical I/O. Full graph/staging/admission and canonical
 activation remain pending; no schema or conservative legacy recovery rule changed.
+
+## First current-file creation and historical receipt
+
+The joined initial-current publication owner now composes durable allocation and actual
+native Root signing for the first no-catalog head. It reads both exact original policy
+objects before and after create, checks their Root signatures and retained minimum
+versions, and rechecks current native/account/source approval. Actual folder sharing,
+download access and corpus must agree. The final network operation is an exact read of
+the same allocated current ID; no later policy or folder request follows that fence.
+
+Creation is create-only. An uncertain completion reuses the slot and first sealed bytes;
+an existing conflicting head, substituted result or equal copy cannot become an update
+or replacement. Close and caller cancellation join an uncooperative physical write.
+Failed allocation retirement retains its borrowed resources until the known returned
+identity persists. SQL and storage failures preserve pending identities and signatures.
+
+After the final actual read and local authority checks, a bounded private historical
+receipt atomically retains body, digest and claim. It binds the original slot/v2 pin,
+Root envelope/sequence, exact initial policies, account revision and minimum actual
+Drive version. Reopening checks those same retained records and signatures. A partially
+missing or corrupt receipt cannot grant completion; uncertain work rechecks the same
+retained ID and sealed bytes. A lower observed version cannot replace a retained receipt.
+It grants no fresh authority, current-policy selection, canonical activation or readiness.
+Processor schema13 is unchanged; the receipt uses the existing private metadata store.
+
+This owner is not yet composed into setup. That requires a complete v2 current route:
+the old reconciler currently expects sealed Root work in the immutable inventory and
+selects the highest observed catalog. Simply excluding the pinned current ID or adding
+another setup phase would not fix those assumptions. The new route must independently
+observe/fence current Root work, select only its catalog and preserve newer unselected
+commits as pending work. Verified conditional control publication must precede finished
+generation status. Initial bootstrap must keep its existing two-policy completion
+handoff. Later policy/catalog updates, v2 export and independent native activation remain
+unfinished; this increment enables no live application current creation or original write.

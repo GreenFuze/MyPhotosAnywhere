@@ -1,5 +1,50 @@
 # MPA 0.6.0 implementation ledger
 
+## Create-only initial-current publication and joined recovery
+
+The new initial-current owner composes the actual durable allocation/native Root signer
+and create-only Drive transport. Both exact initial policies are verified before/after
+create, including Root signatures, retained versions and current native/account/source
+approval. Actual sharing/corpus is checked; the last network operation fences that same
+current-file ID. Uncertain completion reuses the original ID and sealed bytes. Conflicts,
+substituted results, replaced policies, lower versions and equal copies never authorize
+an overwrite or replacement. It never restarts the two-object bootstrap inventory.
+
+A bounded historical receipt atomically saves body/hash/claim after the exact read and
+local fences. It binds the fixed slot/v2 pin, Root envelope/sequence, original policies,
+account revision and minimum Drive version. Missing/corrupt records stop recovery;
+SQL and low-storage failures roll back all receipt rows and preserve the actual cloud
+ID/signature for retry. Cancellation and close join physical writes. Failed allocation
+retirement leaves exit unconfirmed and resources retained until that same ID persists.
+
+Nineteen focused cases pass, including concurrency/reopen, actual lost-completion
+recovery, policy replacement/rewind, sharing, source/account changes, substituted return
+identity/body, joined cancellation/exit, failed retirement, atomic SQL rollback and
+receipt corruption/storage recovery. The initial new-test compile failures (internal
+connection access and repeated-array allocation) are retained; an existing SQL helper
+and one owned expected array fix them without weakening assertions or analyzers.
+The final source passes all357 Core and341 ordinary AppServices cases, zero failed or
+skipped, followed by a strict Desktop build with zero warnings/errors. The full run
+includes all19 new cases after final retirement-failure recording; physical test owners
+have joined. Source/report/log hashes are frozen in
+preflight-060/initial-current-publication-validation.json. Existing scale/reference
+categories remain mandatory separate CI jobs; no deadline, budget or gate is weakened.
+
+Exact preceding8a16076 passes all four push workflows. Independently downloaded native
+artifacts verify177 unique passing cases, complete process-bound allocation tracing,
+108 mapped valid PNGs and exact SDK receipts on each API29/35/37. The selected-policy
+native case actually executes on all three APIs. Native screenshots are decoded,
+not visually reviewed. All process warning/error records are retained for separate
+attribution/release review; no earlier version-specific diagnostic exception is extended.
+These preceding artifacts do not validate the new C# publication owner or final0.6.
+
+Runtime composition/export is intentionally still pending. The legacy reconciler needs
+a complete current route, rather than ignoring the new Root kind or selecting the
+highest unselected commit. Current CAS must precede finished-generation admission; old
+immutable pending work and conservative unknown-removal recovery remain intact. This
+receipt grants no fresh authority/readiness/activation. No live application current file
+or original is written here. Room12, Processor13 and native private7 remain unchanged.
+
 ## Exact bounded JSON observations on the desktop transport
 
 The captured Google connection can now read one independently selected JSON file ID
