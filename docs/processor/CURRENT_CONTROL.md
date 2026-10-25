@@ -262,3 +262,11 @@ are owned copies. A successful holder remains pending: it does not update legacy
 inventory or mark a scan/current generation complete. Full retained policy/history,
 approved-source/publisher admission, selected ancestry/coverage/facts and atomic
 activation still need integration under this same lifetime before the final fence.
+
+
+Immutable graph-object transport now exposes actual MIME/corpus and includes complete
+sorted parent memberships plus corpus in its before/after metadata fence. Generic,
+exact-JSON and listed-candidate routes share that check; a valid SHA/version alone
+cannot hide a move or additional parent. Existing JSON/binary bounds and original-MIME
+rejection remain. The graph owner must compare those actual returned fields against
+its captured scope; this transport improvement alone supplies no graph/current authority.

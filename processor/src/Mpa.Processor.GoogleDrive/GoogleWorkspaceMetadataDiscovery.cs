@@ -78,7 +78,8 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceMetadataDi
             if (bytes.LongLength != candidate.Bytes) throw new DriveWorkspaceObjectChangedException();
             var after = await ReadWorkspaceMetadataAsync(credential, folderId, candidate.FileId, candidate.Bytes, token).ConfigureAwait(false);
             if (before != after) throw new DriveWorkspaceObjectChangedException(); token.ThrowIfCancellationRequested();
-            return new DriveWorkspaceObject(account, candidate.FileId, folderId, after.Version, bytes);
+            return new DriveWorkspaceObject(account, candidate.FileId, folderId, after.Version, bytes)
+                {MimeType=after.MimeType,SharedDriveId=after.SharedDriveId};
         }, cancellationToken);
     }
     private static int WorkspaceCandidateLimit(string mimeType) => mimeType switch

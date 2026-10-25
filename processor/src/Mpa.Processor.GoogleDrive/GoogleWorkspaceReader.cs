@@ -5,14 +5,20 @@ using Google.Apis.Auth.OAuth2;
 
 namespace Mpa.Processor.GoogleDrive;
 
-public sealed record DriveWorkspaceObject(string AccountId, string FileId, string FolderId, long DriveVersion, ReadOnlyMemory<byte> Bytes);
+public sealed record DriveWorkspaceObject(string AccountId, string FileId, string FolderId, long DriveVersion, ReadOnlyMemory<byte> Bytes)
+{
+    // Actual read metadata, never policy authority. Keep the existing five-field
+    // constructor/deconstruction for captured work and synthetic transport callers.
+    public string MimeType {get;init;}="application/json";
+    public string? SharedDriveId {get;init;}
+}
 public sealed class DriveWorkspaceObjectChangedException() : IOException("This metadata workspace object no longer matches its captured reference.");
 public sealed class DriveWorkspaceDownloadDeniedException() : IOException("Google Drive does not permit downloading this metadata workspace object.");
 
 public sealed partial class GoogleAccountConnection
 {
     public const int MaximumWorkspaceObjectBytes = 4 * 1024 * 1024;
-    private const string WorkspaceObjectFields = "id,mimeType,version,size,parents,trashed,capabilities(canDownload)";
+    private const string WorkspaceObjectFields = "id,mimeType,version,size,parents,driveId,trashed,capabilities(canDownload)";
 
     /// <summary>Reads one captured immutable metadata object only. Actual workspace membership,
     /// byte length/digest and before/after Drive revision are checked inside the account's
@@ -44,7 +50,7 @@ public sealed partial class GoogleAccountConnection
         var after = await ReadWorkspaceMetadataAsync(credential, folderId, fileId, expectedBytes, token).ConfigureAwait(false);
         if (before != after) throw new DriveWorkspaceObjectChangedException();
         token.ThrowIfCancellationRequested();
-        return new DriveWorkspaceObject(account, fileId, folderId, after.Version, bytes);
+        return new DriveWorkspaceObject(account, fileId, folderId, after.Version, bytes) {MimeType=after.MimeType,SharedDriveId=after.SharedDriveId};
     }
 
     private async Task<WorkspaceMetadata> ReadWorkspaceMetadataAsync(UserCredential credential, string folderId, string fileId, long expectedBytes, CancellationToken token)
@@ -74,6 +80,13 @@ public sealed partial class GoogleAccountConnection
                 throw new InvalidDataException("Invalid actual Drive metadata workspace parent memberships.");
         }
         if (!memberships.Contains(folderId)) throw new DriveWorkspaceObjectChangedException();
+        string? drive=null;
+        if(root.TryGetProperty("driveId",out var corpus))
+        {
+            if(corpus.ValueKind!=JsonValueKind.String || !ValidIdentity(corpus.GetString()) || corpus.GetString()=="root")
+                throw new InvalidDataException("Metadata workspace corpus must be a concrete opaque Drive identity when present.");
+            drive=corpus.GetString();
+        }
         var mime = root.GetProperty("mimeType").GetString();
         if (mime is not ("application/json" or "application/gzip" or "application/octet-stream"))
             throw new InvalidDataException("A metadata workspace reference cannot read originals, shortcuts, folders or Google Workspace documents.");
@@ -81,7 +94,7 @@ public sealed partial class GoogleAccountConnection
             throw new DriveWorkspaceDownloadDeniedException();
         var version = WorkspacePositive(root, "version");
         if (WorkspacePositive(root, "size") != expectedBytes) throw new DriveWorkspaceObjectChangedException();
-        return new(version, mime);
+        return new(version, mime,string.Join('\n',memberships.Order(StringComparer.Ordinal)),drive);
     }
     private static long WorkspacePositive(JsonElement root, string name)
     {
@@ -91,5 +104,5 @@ public sealed partial class GoogleAccountConnection
             throw new InvalidDataException("Metadata workspace size/version must be a canonical positive int64 string.");
         return count;
     }
-    private sealed record WorkspaceMetadata(long Version, string MimeType);
+    private sealed record WorkspaceMetadata(long Version, string MimeType,string Parents,string? SharedDriveId);
 }

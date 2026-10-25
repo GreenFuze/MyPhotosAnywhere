@@ -1,5 +1,24 @@
 # MPA 0.6.0 implementation ledger
 
+## Immutable object reads fence actual corpus and complete parents
+
+The generic immutable, exact-JSON and listed-candidate read routes now retain actual
+encoding and shared-drive identity. Their before/after equality includes the complete
+sorted parent memberships and corpus, in addition to version/type. A changed additional
+parent or moved corpus cannot hide behind unchanged bytes/version; harmless parent
+ordering remains valid. Malformed present corpus identities stop before a body. The
+existing five-field constructor/deconstruction and all JSON/binary byte caps remain.
+
+All108 Google cases pass, retaining every97 preceding identity. Eleven new cases cover
+all three routes, malformed corpus before body, changed/removed corpus and extra parents,
+stable parent order and actual binary encoding/corpus without implying gzip validity.
+Strict Desktop builds with zero warnings/errors; frozen source/report/full-log hashes
+are in preflight-060/immutable-scope-fences-validation.json. Fresh exact-source full CI
+remains mandatory. The future same-lifetime graph owner must still compare actual corpus
+against its approved Root capture and verify signed history/coverage/facts before final
+fencing/atomic admission. No original MIME, write authority, schema change, relaxed cap
+or completed0.6 product is introduced.
+
 ## Selected producer policies share the current-reader lifetime
 
 The captured producer reader now fetches only the exact Root-selected publisher and

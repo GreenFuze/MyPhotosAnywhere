@@ -39,7 +39,8 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceExactJsonR
             if (body.LongLength!=length) throw new DriveWorkspaceObjectChangedException();
             var after=await ReadWorkspaceMetadataAsync(credential,folderId,fileId,length,token).ConfigureAwait(false);
             if (after!=before) throw new DriveWorkspaceObjectChangedException();
-            token.ThrowIfCancellationRequested();return new DriveWorkspaceObject(account,fileId,folderId,after.Version,body);
+            token.ThrowIfCancellationRequested();return new DriveWorkspaceObject(account,fileId,folderId,after.Version,body)
+                {MimeType=after.MimeType,SharedDriveId=after.SharedDriveId};
         },cancellationToken);
     }
 }
