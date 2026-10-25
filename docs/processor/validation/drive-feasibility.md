@@ -89,3 +89,41 @@ At 07:41:54 UTC, v2 supplied a file ETag. A matching tag permitted a metadata ch
 The product will isolate the supported v2 conditional metadata adapter while retaining v3 for ordinary discovery/transfers. This proves one synthetic owned-file path only; live user-original actions still require controller-approved scopes, current revision/content checks, actual workspace/source boundaries and durable replay records. Additional-account/shared-drive support remains separate acceptance. Synthetic transport tests reject unexpected statuses, wrong identity, oversized bodies and unexposed operations; strict build has zero warnings/errors.
 
 [Google v2 File ETag resource](https://developers.google.com/workspace/drive/api/reference/rest/v2/files), [v2/v3 comparison](https://developers.google.com/workspace/drive/api/guides/v2-to-v3-reference), [metadata patch semantics](https://developers.google.com/workspace/drive/api/guides/performance).
+
+## Conditional media and same-ID recovery — October25
+
+Six tiny synthetic fixtures were separately journaled in the already approved disposable
+root; no existing original was targeted. Five exploratory runs stopped at exact metadata
+fences or a stronger numeric-version hypothesis. Their logs and private intent/identity
+journals remain unchanged. Captured v2 tags permitted media updates; formerly valid stale
+tags rejected412 while complete payload bytes and content entity tags remained exact.
+
+The complete sequence passes at12:47:25 UTC after checksum-bearing v3 metadata is read
+before, rather than inside, the exact v2 body-read window. Every within-capture version/
+tag fence, complete checksum/download assertion, scope guard and20-request bound remains.
+An actual successful200 response is durably recorded and disposed before its body reaches
+the caller. Re-reading the same generated ID recovers exact intended bytes; its old
+pre-completion tag still rejects412. This injects loss of the completion response, not
+physical socket loss or a process crash.
+
+A new process independently reopens that same private journal and actual fixture at
+12:51:51 UTC. It allocates no new identity, verifies exact pending bytes and actual scope,
+then tests only the retained stale condition. HTTP412 and every byte/content tag/fence
+remain exact. Numeric version delta is0 on this replay. Earlier observations include
+3->4 across operations and1->2 during an initial create/read before a rejected upload.
+The cause is unverified; the original exact+1 hypothesis is falsified. Its failed replay
+log is retained. The corrected contract rejects rollback and content/tag/scope changes
+while recording numeric movement BETWEEN separately exact captures. No within-capture
+fence or original-write safeguard was relaxed, and numeric version never becomes ETag.
+
+The isolated final probe compiles with zero warnings/errors and passes existing transport
+fault checks plus media endpoint/header/type/status/identity guards and bounded recovery
+receipt/alias/condition/rollback/tag/size/path checks. The complete live sequence preceded
+the final numeric-contract correction; independent same-ID recovery uses that correction.
+These are feasibility observations across candidates, not one final application SHA.
+Production current-control publication, additional-account/shared-drive behavior, actual
+socket/process loss, cross-client acceptance and exact joint publication remain pending.
+
+[v2 media-update endpoint](https://developers.google.com/workspace/drive/api/reference/rest/v2/files/update)
+and [v2 File version/entity-tag fields](https://developers.google.com/workspace/drive/api/reference/rest/v2/files)
+describe the API; these observations apply only to the tested small owned-file path.

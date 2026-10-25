@@ -30,6 +30,39 @@ Refresh deliberately runs in a new process from the protected stored record and 
 
 Keep private token/configuration/URL/observation files out of CI, Git, public diagnostics and build caches. The client registration alone does not grant account access. OAuth Testing retains Google's seven-day limit; a successful immediate refresh does not prove the required real-duration acceptance.
 
+## Conditional media diagnostics
+
+`conditional-media` accepts the approved disposable root, creates and journals its own
+tiny synthetic file, and exposes no existing-file target or permanent deletion. It uses
+v2 media updates with captured strong entity tags, checks stale-tag412 responses and
+complete downloaded bytes, and durably discards one actual200 completion before its
+body reaches the caller. Exact reads retain both metadata fences before rejection.
+The20-request bound and every existing transport guard remain.
+
+The live synthetic sequence passes after checksum-bearing v3 metadata is captured
+before the exact v2 body-read window; within-capture fences remain exact. Five earlier
+failed exploratory logs/identity journals are retained. Numeric versions can move
+between operations with unchanged content tags: an initial create/read also moved1->2
+before any rejected upload, and independent same-ID recovery later observed delta0.
+The cause of the advances is unverified. The original exact+1 hypothesis is falsified
+and retained as a diagnostic observation, not a product/backend contract. Rewinds,
+changed content tags/bytes, wrong status/scope and moving within-capture fences still
+fail. Numeric versions never substitute for actual entity tags as write preconditions.
+
+`conditional-media-recover` accepts only a retained journal basename in that same private
+directory, requires its actual discarded-completion receipt and fixed original pending
+identity/condition, and rechecks the actual parent, owner, binary MIME and exact synthetic
+checksum/bytes. It allocates no new ID and submits only the retained stale pre-completion
+tag to the same file. Live recovery in a new process passes with exact pending bytes,
+HTTP412 and no replacement identity. Offline checks reject corrupt/missing receipts,
+aliases, conditions, rollback, changed content tags, size overruns and unsafe paths.
+
+This proves one small owned synthetic path using the existing Windows grant, not
+production publication authority, shared-drive/additional-account behavior, physical
+socket/process failure or final joint-release acceptance. Actual failures are preserved;
+no application assertion, warning gate, existing deadline or request bound was relaxed.
+Neither mode grants original writes.
+
 ## Read-only folder visibility
 
 After consent, the following checks the selected disposable folder with `files.get` and a bounded first page of direct children with `files.list`:

@@ -1,5 +1,36 @@
 # MPA 0.6.0 implementation ledger
 
+## Actual Drive media conditions and retained-identity recovery
+
+The isolated Windows feasibility probe now verifies conditional v2 media writes on a
+small owned synthetic fixture in the approved disposable root. Captured tags permit200;
+formerly valid stale tags reject412 and preserve complete bytes/content tags. A real200
+completion is durably journaled and disposed before the caller consumes its body. The
+same generated ID then yields exact pending bytes. A new process reopens that same
+journal/fixture, allocates no replacement ID and verifies the retained stale condition
+still rejects while preserving bytes, actual scope and exact read fences.
+
+Checksum-bearing v3 metadata is captured before the exact v2 body-read window. Five
+earlier exploratory failures remain archived. Numeric versions moved across operations,
+and an initial create/read also moved1->2 without a prior rejected upload; causality is
+unverified. Same-ID replay falsifies the stronger exact+1 hypothesis with delta0. The
+correct contract records movement between separately exact captures and still rejects
+rollback, changed content tags/bytes, wrong status/scope and moving within-capture fences.
+Numeric versions never substitute for actual entity tags. No application assertion,
+existing deadline, request budget or warning gate was relaxed.
+
+Final isolated build has zero warnings/errors. Existing protected-store/loopback/transport
+checks and new media/recovery receipt, alias, condition, rollback, tag, byte-bound and
+path guards pass without Google access. One complete live sequence and independent
+same-ID recovery pass using the existing protected grant; all six synthetic fixtures
+and private journals are retained, and no existing original changed. Evidence is frozen
+in preflight-060/drive-conditional-media-validation.json, with private IDs/credentials
+excluded. Full sequence and final recovery span probe candidates; this is not one final
+application revision or production publication acceptance. Runtime current ownership/CAS,
+additional accounts/shared drives, actual socket/process loss, independent Android access
+and exact joint release remain unfinished. See the detailed feasibility record.
+
+
 ## Native-key initial current-control signing
 
 The initial no-catalog current snapshot now signs through the actual native key owner

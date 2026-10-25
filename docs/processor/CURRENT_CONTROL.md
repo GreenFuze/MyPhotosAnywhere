@@ -119,8 +119,11 @@ still need integration before live publication.
 
 Stage0's live synthetic metadata probe already found that v3 accepted an invalid
 `If-Match`, while v2 rejected previously valid stale tags for metadata and Trash/restore.
-Those results do not establish media-content compare-and-update. A separate synthetic-only
-v2 media probe and lost-ack reconciliation are required before enabling mutable control.
+A later synthetic-only
+v2 media sequence also verifies captured/stale-tag updates and injected lost-completion
+reconciliation; a new process recovers the same actual ID and exact pending bytes. Numeric
+versions may move between separately fenced captures without content-tag changes, so
+version is not ETag. Production ownership/admission/CAS integration remains required.
 Numeric Drive versions must never be substituted for actual entity tags. See the
 [existing feasibility evidence](validation/drive-feasibility.md).
 

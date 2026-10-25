@@ -39,6 +39,39 @@ internal static class DriveConditionalProtocolProbe
             using (var http = new HttpClient(new ConditionalHandler(_ => throw new InvalidOperationException("Unsupported operation reached HTTP."))))
                 await FailsAsync<InvalidOperationException>(() => new ConditionalSyntheticClient(http, "synthetic-token", "new-synthetic-id", journal)
                     .ChangeAsync(3, "delete-permanently", "\"tag\"", CancellationToken.None)).ConfigureAwait(false);
+            using (var http=new HttpClient(new ConditionalHandler(request=>
+            {
+                if (request.RequestUri?.Host!="www.googleapis.com" || request.RequestUri.AbsolutePath!="/upload/drive/v2/files/new-synthetic-id" ||
+                    request.Method!=HttpMethod.Put || request.Headers.IfMatch.Single().Tag!="\"actual-captured-tag\"" ||
+                    request.Content?.Headers.ContentType?.MediaType!="application/octet-stream" || request.Content.Headers.ContentLength!=3 ||
+                    !request.RequestUri.Query.Contains("uploadType=media",StringComparison.Ordinal))
+                    throw new InvalidOperationException("Synthetic media conditional boundary changed.");
+                return Response(HttpStatusCode.PreconditionFailed,"{\"error\":{\"code\":412}}");
+            })))
+            {
+                var result=await new ConditionalSyntheticClient(http,"synthetic-token","new-synthetic-id",journal)
+                    .WriteMediaAsync("abc"u8.ToArray(),"\"actual-captured-tag\"",CancellationToken.None).ConfigureAwait(false);
+                if (result.Status!=412) throw new InvalidOperationException("A stale media condition was not retained.");
+            }
+            foreach(var tag in new[]{"*","W/\"weak\"","unquoted"})
+            {
+                using var http=new HttpClient(new ConditionalHandler(_=>throw new InvalidOperationException("Invalid condition reached HTTP.")));
+                await FailsAsync<ArgumentException>(()=>new ConditionalSyntheticClient(http,"synthetic-token","new-synthetic-id",journal)
+                    .WriteMediaAsync("abc"u8.ToArray(),tag,CancellationToken.None)).ConfigureAwait(false);
+            }
+            foreach(var status in new[]{HttpStatusCode.Unauthorized,HttpStatusCode.Redirect,HttpStatusCode.TooManyRequests,HttpStatusCode.InternalServerError})
+            {
+                using var http=new HttpClient(new ConditionalHandler(_=>Response(status,"{}")));
+                await FailsAsync<HttpRequestException>(()=>new ConditionalSyntheticClient(http,"synthetic-token","new-synthetic-id",journal)
+                    .WriteMediaAsync("abc"u8.ToArray(),"\"actual-tag\"",CancellationToken.None)).ConfigureAwait(false);
+            }
+            using(var http=new HttpClient(new ConditionalHandler(_=>Response(HttpStatusCode.OK,
+                "{\"id\":\"new-synthetic-id\",\"etag\":\"\\\"next-tag\\\"\",\"version\":\"4\",\"labels\":{\"trashed\":false}}"))))
+            {
+                var result=await new ConditionalSyntheticClient(http,"synthetic-token","new-synthetic-id",journal)
+                    .WriteMediaAsync("abc"u8.ToArray(),"\"actual-tag\"",CancellationToken.None).ConfigureAwait(false);
+                if (result.Version!=4 || result.Etag!="\"next-tag\"") throw new InvalidOperationException("Actual media update revision/tag was not retained.");
+            }
         }
         finally
         {

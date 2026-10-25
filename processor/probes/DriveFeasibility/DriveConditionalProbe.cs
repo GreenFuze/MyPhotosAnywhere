@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -91,6 +92,18 @@ internal sealed class ConditionalSyntheticClient(HttpClient http, string token, 
     internal async Task<ConditionalObservation> ReadV2Async(CancellationToken cancellationToken) =>
         await SendAsync(HttpMethod.Get, 2, "", null, null, cancellationToken).ConfigureAwait(false);
 
+    // Only this invocation's newly created synthetic fixture is admitted. No caller
+    // supplied target, original replacement or v3 conditional fallback is exposed.
+    internal Task<ConditionalObservation> WriteMediaAsync(ReadOnlyMemory<byte> bytes,string capturedEtag,CancellationToken cancellationToken)
+    {
+        if (bytes.Length is < 1 or > 65536 || !EntityTagHeaderValue.TryParse(capturedEtag,out var tag) || tag.IsWeak || tag.Tag == "*")
+            throw new ArgumentException("Synthetic media needs bounded bytes and an actual strong captured entity tag.");
+        var owned=bytes.ToArray();
+        journal.Record(new { operation="before-synthetic-media-update",id=createdId,bytes=owned.Length,
+            sha256=Convert.ToHexStringLower(SHA256.HashData(owned)),condition=capturedEtag });
+        return SendAsync(HttpMethod.Put,2,"",capturedEtag,null,cancellationToken,owned);
+    }
+
     internal Task<ConditionalObservation> ChangeAsync(int version, string operation, string etag, CancellationToken cancellationToken)
     {
         if (version is not (2 or 3) || operation is not ("description" or "trash" or "untrash") ||
@@ -102,15 +115,18 @@ internal sealed class ConditionalSyntheticClient(HttpClient http, string token, 
             operation == "description" ? "{\"description\":\"MPA synthetic conditional test only\"}" : null, cancellationToken);
     }
 
-    private async Task<ConditionalObservation> SendAsync(HttpMethod method, int version, string suffix, string? etag, string? json, CancellationToken cancellationToken)
+    private async Task<ConditionalObservation> SendAsync(HttpMethod method, int version, string suffix, string? etag, string? json, CancellationToken cancellationToken,byte[]? media=null)
     {
         if (++_requests > 20) throw new InvalidOperationException("Synthetic conditional request budget exceeded.");
         var fields = version == 2 ? V2Fields : "id,version,trashed";
-        var address = new Uri("https://www.googleapis.com/drive/v" + version + "/files/" + createdId + suffix + "?fields=" + Uri.EscapeDataString(fields));
+        ProbeDriveClient.CheckId(createdId);
+        var address = new Uri("https://www.googleapis.com/"+(media is null ? "" : "upload/")+"drive/v" + version + "/files/" + createdId + suffix + "?"+
+            (media is null ? "" : "uploadType=media&supportsAllDrives=true&")+"fields=" + Uri.EscapeDataString(fields));
         using var request = new HttpRequestMessage(method, address);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         if (etag is not null) request.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         if (json is not null) request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        if (media is not null) { request.Content=new ByteArrayContent(media);request.Content.Headers.ContentType=new("application/octet-stream"); }
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         var arbitraryConditionServerError = method == HttpMethod.Patch && etag is not null &&
             etag.StartsWith("\"mpa-intentionally-invalid-precondition-", StringComparison.Ordinal) && response.StatusCode == HttpStatusCode.InternalServerError;
@@ -131,8 +147,10 @@ internal sealed class ConditionalSyntheticClient(HttpClient http, string token, 
         if (body.RootElement.GetProperty("id").GetString() != createdId) throw new InvalidDataException("Conditional response changed identity.");
         var tag = version == 2 && body.RootElement.TryGetProperty("etag", out var value) ? value.GetString() : response.Headers.ETag?.ToString();
         var trashed = version == 2 ? body.RootElement.GetProperty("labels").GetProperty("trashed").GetBoolean() : body.RootElement.GetProperty("trashed").GetBoolean();
-        return new(200, tag, trashed);
+        var revision=body.RootElement.TryGetProperty("version",out var actualVersion) && actualVersion.ValueKind==JsonValueKind.String &&
+            long.TryParse(actualVersion.GetString(),NumberStyles.None,CultureInfo.InvariantCulture,out var number) ? number : 0;
+        return new(200, tag, trashed,revision);
     }
 }
 
-internal sealed record ConditionalObservation(int Status, string? Etag, bool Trashed);
+internal sealed record ConditionalObservation(int Status, string? Etag, bool Trashed,long Version=0);
