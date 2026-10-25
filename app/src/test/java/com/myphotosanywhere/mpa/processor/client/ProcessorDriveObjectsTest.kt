@@ -1,6 +1,7 @@
 package com.myphotosanywhere.mpa.processor.client
 
 import com.google.gson.JsonParser
+import com.myphotosanywhere.mpa.drive.DriveWorkspaceCursor
 import com.myphotosanywhere.mpa.drive.DriveGateway
 import com.myphotosanywhere.mpa.drive.DriveWorkspacePage
 import com.myphotosanywhere.mpa.processor.protocol.CatalogObjectReference
@@ -33,6 +34,9 @@ class ProcessorDriveObjectsTest {
         @Volatile var version = "5"
         @Volatile var mime = "application/json"
         @Volatile var parent = pin.workspace.folderId
+        @Volatile var sharedDrive: String? = null
+        @Volatile var history: () -> MockResponse = { MockResponse().setBody("""{"changes":[],"newStartPageToken":"after"}""") }
+        @Volatile var afterHistory: () -> Unit = { }
         @Volatile var workspaceMime = DriveGateway.FOLDER_MIME
         @Volatile var metadataSha: String? = null
         @Volatile var pageToken: String? = null
@@ -52,8 +56,9 @@ class ProcessorDriveObjectsTest {
                     val url = checkNotNull(request.requestUrl)
                     val value = when {
                         url.encodedPath == "/drive/v3/about" -> { accountReply?.let { return it() }; """{"user":{"permissionId":"$principal","emailAddress":"synthetic@example.invalid"}}""" }
+                        url.encodedPath == "/drive/v3/changes" -> return history().also { afterHistory() }
                         url.encodedPath == "/drive/v3/changes/startPageToken" -> """{"startPageToken":"actual_cursor"}"""
-                        url.encodedPath == "/drive/v3/files/${pin.workspace.folderId}" -> """{"id":"${pin.workspace.folderId}","mimeType":"$workspaceMime","version":"7","parents":[],"trashed":false}"""
+                        url.encodedPath == "/drive/v3/files/${pin.workspace.folderId}" -> """{"id":"${pin.workspace.folderId}","mimeType":"$workspaceMime","version":"7","parents":[],"trashed":false${sharedDrive?.let { ",\"driveId\":\"$it\"" } ?: ""}}"""
                         url.encodedPath == "/drive/v3/files/meta" && url.queryParameter("alt") == "media" -> return media().also { afterMedia() }
                         url.encodedPath == "/drive/v3/files/meta" -> metadata()
                         url.encodedPath == "/drive/v3/files" -> {
@@ -185,7 +190,7 @@ class ProcessorDriveObjectsTest {
     }
     @Test fun actualCursorIsBoundedAndKeepsItsGoogleAccountBinding() = runBlocking {
         Fixture(pin()).use { fixture ->
-            assertEquals("actual_cursor",fixture.source.cursor())
+            assertEquals("actual_cursor",fixture.source.cursor().token)
             assertEquals(0,fixture.downloads())
             assertEquals(fixture.pin.documentSha256,fixture.source.connectionSha256)
             assertEquals(1,fixture.requests.count { it.requestUrl?.encodedPath == "/drive/v3/changes/startPageToken" })
@@ -199,6 +204,56 @@ class ProcessorDriveObjectsTest {
         }
         assertThrows(UnsupportedOperationException::class.java) { (empty.files as MutableList<*>).clear() }
     }
+    @Test fun actualHistoryCapturesAccountCorpusAndExplicitApiParameters() = runBlocking {
+        Fixture(pin()).use { fixture ->
+            fixture.sharedDrive = "actual-shared-drive"
+            val cursor = fixture.source.cursor();assertEquals(fixture.pin.workspace.accountId,cursor.accountId);assertEquals("actual-shared-drive",cursor.sharedDriveId)
+            fixture.history = { MockResponse().setBody("""{"changes":[{"changeType":"file","fileId":"meta","removed":false,"file":${fixture.metadata()}}],"newStartPageToken":"after"}""") }
+            val page = fixture.source.changes(cursor);assertEquals("after",page.atEnd?.token);assertEquals("meta",page.changes.single().file?.id)
+            val request = fixture.requests.single { it.requestUrl?.encodedPath == "/drive/v3/changes" };val url = checkNotNull(request.requestUrl)
+            assertEquals("100",url.queryParameter("pageSize"));assertEquals("actual_cursor",url.queryParameter("pageToken"));assertEquals("actual-shared-drive",url.queryParameter("driveId"))
+            assertEquals("true",url.queryParameter("includeRemoved"));assertEquals("true",url.queryParameter("includeCorpusRemovals"));assertEquals(0,fixture.downloads())
+        }
+    }
+    @Test fun changedHistoryPrincipalOrCorpusRejectsAndDoesNotDownloadOriginals() = runBlocking {
+        Fixture(pin()).use { fixture ->
+            val cursor = fixture.source.cursor()
+            rejects { fixture.source.changes(cursor.copy(accountId="foreign")) };rejects { fixture.source.changes(cursor.copy(sharedDriveId="foreign")) }
+            assertTrue(fixture.requests.none { it.requestUrl?.encodedPath == "/drive/v3/changes" })
+            fixture.afterHistory = { fixture.principal = "substituted" };rejects { fixture.source.changes(cursor) };assertEquals(0,fixture.downloads())
+        }
+        Fixture(pin()).use { fixture ->
+            val cursor = fixture.source.cursor();fixture.afterHistory = { fixture.sharedDrive = "moved-drive" }
+            rejects { fixture.source.changes(cursor) };assertEquals(0,fixture.downloads())
+        }
+    }
+    @Test fun malformedAmbiguousAndNonadvancingHistoryCannotAdvance() = runBlocking {
+        Fixture(pin()).use { fixture ->
+            val cursor = fixture.source.cursor()
+            for(body in listOf("{}","""{"changes":[],"nextPageToken":"n","newStartPageToken":"e"}""",
+                """{"changes":[],"nextPageToken":"actual_cursor"}""","""{"changes":[{"changeType":"file","fileId":"meta","removed":false}],"newStartPageToken":"e"}""",
+                """{"changes":[{"changeType":"file","fileId":"other","removed":false,"file":${fixture.metadata()}}],"newStartPageToken":"e"}""")) {
+                fixture.history = { MockResponse().setBody(body) };rejects { fixture.source.changes(cursor) }
+            }
+            assertEquals(0,fixture.downloads())
+        }
+    }
+    @Test fun historyResponsesAndProviderErrorsRemainBounded() = runBlocking {
+        Fixture(pin()).use { fixture ->
+            val cursor = fixture.source.cursor()
+            fixture.history = { MockResponse().setBody(" ".repeat(512 * 1024 + 1)) };rejects { fixture.source.changes(cursor) }
+            fixture.history = { MockResponse().setResponseCode(401).setBody("unread-provider-body".repeat(40000)) };rejects { fixture.source.changes(cursor) }
+            assertEquals(0,fixture.downloads())
+        }
+    }
+    @Test fun removalKeepsActualIdentityAndWrongScopedCursorCannotBeConstructed() = runBlocking<Unit> {
+        Fixture(pin()).use { fixture ->
+            val cursor = fixture.source.cursor();fixture.history = { MockResponse().setBody("""{"changes":[{"changeType":"file","fileId":"removed-id","removed":true}],"newStartPageToken":"actual_cursor"}""") }
+            val removed = fixture.source.changes(cursor).changes.single();assertEquals("removed-id",removed.id);assertTrue(removed.removed);assertNull(removed.file)
+            assertThrows(IOException::class.java) { DriveWorkspaceCursor("root",null,"token") };assertThrows(IOException::class.java) { cursor.copy(token="bad\n") }
+        }
+    }
+
     private companion object {
         fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 255) }
     }

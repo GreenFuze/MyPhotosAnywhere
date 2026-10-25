@@ -52,8 +52,17 @@ class DriveGateway(
         DriveWorkspaceMetadata.account(workspaceResponse(Request.Builder().url(url("about","fields" to "user(permissionId,emailAddress)")),16384))
     }
 
-    internal suspend fun catalogWorkspaceCursor(): String = withContext(Dispatchers.IO) {
-        DriveWorkspacePage.startCursor(workspaceResponse(Request.Builder().url(url("changes/startPageToken","supportsAllDrives" to "true")),16384))
+    internal suspend fun catalogWorkspaceCursor(sharedDriveId: String? = null): String = withContext(Dispatchers.IO) {
+        sharedDriveId?.let(DriveWorkspaceMetadata::opaque)
+        DriveWorkspacePage.startCursor(workspaceResponse(Request.Builder().url(url("changes/startPageToken","supportsAllDrives" to "true","fields" to "startPageToken","driveId" to sharedDriveId)),16384))
+    }
+
+    internal suspend fun catalogWorkspaceChanges(cursor: DriveWorkspaceCursor): DriveWorkspaceChangesPage = withContext(Dispatchers.IO) {
+        val fields = "nextPageToken,newStartPageToken,changes(fileId,driveId,changeType,removed,file($WORKSPACE_FIELDS))"
+        val request = Request.Builder().url(url("changes","pageSize" to "100","spaces" to "drive","supportsAllDrives" to "true",
+            "includeItemsFromAllDrives" to "true","includeRemoved" to "true","includeCorpusRemovals" to "true","fields" to fields,
+            "pageToken" to cursor.token,"driveId" to cursor.sharedDriveId))
+        DriveWorkspaceChangesPage.decode(workspaceResponse(request,512 * 1024),cursor)
     }
 
     /** All workspace children, including binary chunks excluded by legacy media queries. */
@@ -377,7 +386,7 @@ class DriveGateway(
 
     companion object {
         const val FOLDER_MIME = "application/vnd.google-apps.folder"
-        private const val WORKSPACE_FIELDS = "id,mimeType,size,sha256Checksum,version,parents,trashed,capabilities(canDownload)"
+        private const val WORKSPACE_FIELDS = "id,mimeType,size,sha256Checksum,version,parents,trashed,capabilities(canDownload),driveId"
         private const val FILE_FIELDS = "id,name,mimeType,size,md5Checksum,sha256Checksum,version,parents,capabilities(canAddChildren,canTrash,canUntrash),modifiedTime,thumbnailLink,trashed,imageMediaMetadata(time,location(latitude,longitude)),appProperties"
         private val JSON = "application/json; charset=utf-8".toMediaType()
         fun literal(value: String) = value.replace("\\", "\\\\").replace("'", "\\'")

@@ -1,5 +1,6 @@
 package com.myphotosanywhere.mpa.processor.client
 
+import com.myphotosanywhere.mpa.drive.DriveWorkspaceCursor
 import com.myphotosanywhere.mpa.drive.DriveWorkspaceMetadata
 import com.myphotosanywhere.mpa.drive.DriveWorkspacePage
 import java.io.IOException
@@ -11,7 +12,7 @@ import kotlinx.coroutines.ensureActive
 
 internal interface ProcessorWorkspaceInventorySource {
     val connectionSha256: String
-    suspend fun cursor(): String
+    suspend fun cursor(): DriveWorkspaceCursor
     suspend fun page(token: String? = null): DriveWorkspacePage
     suspend fun readCaptured(expected: DriveWorkspaceMetadata): ByteArray
 }

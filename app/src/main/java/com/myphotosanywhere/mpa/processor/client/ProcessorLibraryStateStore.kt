@@ -119,7 +119,7 @@ internal class ProcessorLibraryStateStore(context: Context, private val storage:
         } finally { database.endTransaction() }
     }
     private fun hasControllerState(database: SQLiteDatabase): Boolean =
-        database.rawQuery("SELECT 1 FROM controller_anchor UNION ALL SELECT 1 FROM controller_document UNION ALL SELECT 1 FROM controller_selection UNION ALL SELECT 1 FROM workspace_attempt UNION ALL SELECT 1 FROM workspace_candidate UNION ALL SELECT 1 FROM workspace_read UNION ALL SELECT 1 FROM workspace_event UNION ALL SELECT 1 FROM client_meta WHERE key IN ('controller_anchor_sha256','workspace_attempt_revision') LIMIT 1",null).use { it.moveToFirst() }
+        database.rawQuery("SELECT 1 FROM controller_anchor UNION ALL SELECT 1 FROM controller_document UNION ALL SELECT 1 FROM controller_selection UNION ALL SELECT 1 FROM workspace_attempt UNION ALL SELECT 1 FROM workspace_candidate UNION ALL SELECT 1 FROM workspace_read UNION ALL SELECT 1 FROM workspace_event UNION ALL SELECT 1 FROM workspace_history UNION ALL SELECT 1 FROM workspace_replay UNION ALL SELECT 1 FROM client_meta WHERE key IN ('controller_anchor_sha256','workspace_attempt_revision') LIMIT 1",null).use { it.moveToFirst() }
 
     private fun readPin(database: SQLiteDatabase): LibraryConnectionDescriptor? {
         val marker = database.rawQuery("SELECT length(value),value FROM client_meta WHERE key='approved_pin_sha256'",null).use { row ->
@@ -138,22 +138,30 @@ internal class ProcessorLibraryStateStore(context: Context, private val storage:
         return descriptor
     }
     private fun state(valid: Boolean, message: String) { if (!valid) throw ProcessorLibraryStateCorrupt(message) }
-    private class PinDatabase(context: Context, path: String, private val requireMigrationBudget: () -> Unit) : SQLiteOpenHelper(context,path,null,4) {
+    private class PinDatabase(context: Context, path: String, private val requireMigrationBudget: () -> Unit) : SQLiteOpenHelper(context,path,null,5) {
         override fun onCreate(database: SQLiteDatabase) {
             database.execSQL("CREATE TABLE approved_pin(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),code TEXT NOT NULL CHECK(length(code) BETWEEN 1 AND 4096),document_sha256 TEXT NOT NULL CHECK(length(document_sha256)=64))")
             database.execSQL("CREATE TABLE client_meta(key TEXT NOT NULL PRIMARY KEY,value TEXT NOT NULL)")
             createSelector(database)
             createControllerJournal(database)
             createWorkspaceObservation(database)
+            createWorkspaceReplay(database)
         }
         override fun onConfigure(database: SQLiteDatabase) { database.setForeignKeyConstraintsEnabled(true) }
         override fun onUpgrade(database: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            if (oldVersion !in 1..3 || newVersion != 4)
+            if (oldVersion !in 1..4 || newVersion != 5)
                 error("Unsupported processor client state upgrade: $oldVersion to $newVersion. Accepted state was preserved.")
             requireMigrationBudget()
             if (oldVersion == 1) createSelector(database)
             if (oldVersion < 3) createControllerJournal(database)
-            createWorkspaceObservation(database)
+            if(oldVersion < 4) createWorkspaceObservation(database) else {
+                database.execSQL("ALTER TABLE workspace_event RENAME TO workspace_event_v4")
+                database.execSQL("DROP INDEX workspace_event_lookup")
+                createWorkspaceEvents(database)
+                database.execSQL("INSERT INTO workspace_event SELECT sequence,kind,file_id,document,sha256 FROM workspace_event_v4")
+                database.execSQL("DROP TABLE workspace_event_v4")
+            }
+            createWorkspaceReplay(database)
         }
         private fun createControllerJournal(database: SQLiteDatabase) {
             database.execSQL("CREATE TABLE controller_anchor(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),connection_sha256 TEXT NOT NULL CHECK(length(connection_sha256)=64))")
@@ -161,9 +169,16 @@ internal class ProcessorLibraryStateStore(context: Context, private val storage:
             database.execSQL("CREATE INDEX controller_document_kind_sequence ON controller_document(kind,sequence)")
             database.execSQL("CREATE TABLE controller_selection(kind TEXT NOT NULL PRIMARY KEY CHECK(kind IN ('library-publisher-authorization','library-source-configuration')),sequence INTEGER NOT NULL REFERENCES controller_document(sequence) ON DELETE RESTRICT)")
         }
-        private fun createWorkspaceObservation(database: SQLiteDatabase) {
-            database.execSQL("CREATE TABLE workspace_event(sequence INTEGER NOT NULL PRIMARY KEY CHECK(sequence>0),kind TEXT NOT NULL CHECK(kind IN ('candidate','read')),file_id TEXT NOT NULL CHECK(length(file_id) BETWEEN 1 AND 256),document BLOB NOT NULL CHECK(length(document) BETWEEN 1 AND 2048),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")
+        private fun createWorkspaceEvents(database: SQLiteDatabase) {
+            database.execSQL("CREATE TABLE workspace_event(sequence INTEGER NOT NULL PRIMARY KEY CHECK(sequence>0),kind TEXT NOT NULL CHECK(kind IN ('candidate','read','history','replay')),file_id TEXT NOT NULL CHECK(length(file_id) BETWEEN 1 AND 256),document BLOB NOT NULL CHECK(length(document) BETWEEN 1 AND 2048),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")
             database.execSQL("CREATE INDEX workspace_event_lookup ON workspace_event(kind,file_id,sequence)")
+        }
+        private fun createWorkspaceReplay(database: SQLiteDatabase) {
+            database.execSQL("CREATE TABLE workspace_history(file_id TEXT NOT NULL PRIMARY KEY CHECK(length(file_id)=64),document BLOB NOT NULL CHECK(length(document) BETWEEN 1 AND 2048),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")
+            database.execSQL("CREATE TABLE workspace_replay(file_id TEXT NOT NULL PRIMARY KEY CHECK(file_id='cursor'),document BLOB NOT NULL CHECK(length(document) BETWEEN 1 AND 65536),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")
+        }
+        private fun createWorkspaceObservation(database: SQLiteDatabase) {
+            createWorkspaceEvents(database)
             database.execSQL("CREATE TABLE workspace_attempt(singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1),document BLOB NOT NULL CHECK(length(document) BETWEEN 1 AND 65536),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")
             database.execSQL("CREATE TABLE workspace_candidate(file_id TEXT NOT NULL PRIMARY KEY CHECK(length(file_id) BETWEEN 1 AND 256),document BLOB NOT NULL CHECK(length(document) BETWEEN 1 AND 2048),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")
             database.execSQL("CREATE TABLE workspace_read(file_id TEXT NOT NULL PRIMARY KEY REFERENCES workspace_candidate(file_id) ON DELETE RESTRICT,document BLOB NOT NULL CHECK(length(document) BETWEEN 1 AND 2048),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")

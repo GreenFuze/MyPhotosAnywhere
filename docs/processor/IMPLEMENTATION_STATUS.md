@@ -1,5 +1,52 @@
 # MPA 0.6.0 implementation ledger
 
+## Native actual Drive history replay and immutable recovery
+
+The native Google-only reader now captures account/corpus-bound change cursors and
+reads bounded actual changes pages. Replay retains the earliest unresolved interval,
+atomically journals every relevant observed identity and supported candidate before
+advancing a page or reporting operational failure, and keeps removal/access/move
+recovery sticky across successful listings and coalesced later entries. A128-page
+batch is resumable across restart; it is not a permanent total-history limit. A rejected
+final fence retains evidence without advancing its cursor. Private schema5 preserves
+schema1/2/3/4, including exact older journal bytes and legacy global-corpus cursors.
+
+Seventeen new actual SQLite history cases and five additional real HTTP boundary cases
+pass. The corrected focused run passes78 cases, zero lint findings and both APK builds;
+final full regression passes653 cases across112 suites, no failures/errors/skips, zero
+lint findings and both APK builds. The only build diagnostic is the already approved
+exact AGP setVisible deprecation. Immutable source/report/APK hashes and112 archived
+reports are recorded in preflight-060/native-workspace-history-validation.json.
+Three additional emulator cases compile for sticky removal, a rejected final fence and
+real schema4 migration preserving raw event bytes, the original and approved account.
+They have not run locally; exact-source API29/35/37 execution remains required. The first
+focused run passed57 cases but caught an invalid Kotlin HTTP test declaration (non-Unit
+return). Its reports are archived; explicit Unit corrects the declaration without
+removing an assertion. No new warning exception, larger cap or weaker gate applies.
+
+This still returns PENDING evidence. Actual current controller/retired-epoch admission,
+ancestry/full graph, canonical staging/activation and runtime gallery integration remain
+unfinished. No0.6 release or completed client is claimed.
+
+## API29 runtime-capture preparation ordering
+
+Exact3f9f8e9312e48415ed7ea971c636289eda835ce6 passes Android40148403416 and the
+API35/37 jobs in Native40148403400. API29's job fails its uninterrupted runtime-capture
+gate after the native tests and108 screenshot collection: its continuous log ends before
+the tests because the confirmed API29 preparation restarted adbd/framework after the
+stream had been opened. The retained heap profile proves the narrow16m→configured576m
+zygote repair, without raising the existing AVD heap. This is incomplete runtime
+evidence, not an accepted warning or passing API29 release result.
+
+The CI owner now retains separate before/after preparation diagnostics and starts its
+uninterrupted TEST stream only after preparation joins. The existing dead-reader check,
+exact started/finished/resource-tracing verifier and every native assertion remain.
+No reconnect, report substitution, test retry, increased deadline or exception is added.
+Nine runtime-capture and nine heap-owner regression tests pass; Git Bash syntax passes.
+Fresh exact-source emulator execution must verify this ordering correction. The sandbox
+could not initialize Git Bash's DLL; its authorized read-only external syntax check
+succeeded. This does not qualify the earlier incomplete API29 stream retroactively.
+
 ## Native pending inventory and durable recovery
 
 The native client now commits an incomplete attempt before its first Google request,

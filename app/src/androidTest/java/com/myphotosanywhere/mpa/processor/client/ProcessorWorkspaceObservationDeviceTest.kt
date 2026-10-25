@@ -4,6 +4,9 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.myphotosanywhere.mpa.data.StorageBudget
+import com.myphotosanywhere.mpa.drive.DriveWorkspaceChange
+import com.myphotosanywhere.mpa.drive.DriveWorkspaceChangesPage
+import com.myphotosanywhere.mpa.drive.DriveWorkspaceCursor
 import com.myphotosanywhere.mpa.drive.DriveWorkspaceMetadata
 import com.myphotosanywhere.mpa.drive.DriveWorkspacePage
 import com.myphotosanywhere.mpa.processor.protocol.CatalogWorkspace
@@ -39,7 +42,7 @@ class ProcessorWorkspaceObservationDeviceTest {
     private fun metadata(id: String) = DriveWorkspaceMetadata(id,"application/json",1,2,listOf("test-workspace"),false,null,true)
     private fun source(ids: List<String>) = object : ProcessorWorkspaceInventorySource {
         override val connectionSha256 = pin.documentSha256
-        override suspend fun cursor() = "cursor"
+        override suspend fun cursor() = DriveWorkspaceCursor(pin.workspace.accountId,null,"cursor")
         override suspend fun page(token: String?) = DriveWorkspacePage(ids.map(::metadata),null,false)
         override suspend fun readCaptured(expected: DriveWorkspaceMetadata) = "{}".toByteArray()
     }
@@ -64,11 +67,69 @@ class ProcessorWorkspaceObservationDeviceTest {
         val directory = directory();var store = store(directory)
         try {
             approve(store);val original = File(directory,"original.jpg").apply { writeBytes(byteArrayOf(7,5,3,1)) };store.close()
-            sql(directory) { db -> db.execSQL("DROP TABLE workspace_event");db.execSQL("DROP TABLE workspace_read");db.execSQL("DROP TABLE workspace_candidate");db.execSQL("DROP TABLE workspace_attempt");db.version = 3 }
+            sql(directory) { db -> db.execSQL("DROP TABLE workspace_history");db.execSQL("DROP TABLE workspace_replay");db.execSQL("DROP TABLE workspace_event");db.execSQL("DROP TABLE workspace_read");db.execSQL("DROP TABLE workspace_candidate");db.execSQL("DROP TABLE workspace_attempt");db.version = 3 }
             store = store(directory);assertEquals(pin.encode(),store.current()?.encode());assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
             val prepared = ProcessorWorkspaceInventory(ProcessorWorkspaceObservations(store),source(listOf("a"))).prepare { _,_ -> }
             assertEquals(1,prepared.reads.size);assertArrayEquals(byteArrayOf(7,5,3,1),original.readBytes())
-            sql(directory) { assertEquals(4,it.version) }
+            sql(directory) { assertEquals(5,it.version) }
         } finally { store.close();cleanup(directory) }
     }
+    @Test fun nativeRemovedHistoryPersistsAndCannotBeWashedAfterRestart() = runBlocking<Unit> {
+        val directory = directory();var store = store(directory)
+        try {
+            approve(store);var observations = ProcessorWorkspaceObservations(store)
+            val ready = ProcessorWorkspaceInventory(observations,source(listOf("a"))).prepare { _,_ -> }
+            val changes = object : ProcessorWorkspaceHistorySource {
+                override suspend fun changes(cursor: DriveWorkspaceCursor) = DriveWorkspaceChangesPage(listOf(DriveWorkspaceChange("file","removed",true,null)),null,cursor.copy(token="after"))
+            }
+            try { ProcessorWorkspaceHistory(observations,changes).replay(ready);fail("Removal became complete") } catch (_: ProcessorWorkspaceHistoryRecovery) { }
+            val failed = checkNotNull(observations.lastAttempt());store.close();store = store(directory);observations = ProcessorWorkspaceObservations(store)
+            assertEquals(failed,observations.lastAttempt());val next = ProcessorWorkspaceInventory(observations,source(listOf("a"))).prepare { _,_ -> }
+            val forbidden = object : ProcessorWorkspaceHistorySource { override suspend fun changes(cursor: DriveWorkspaceCursor): DriveWorkspaceChangesPage = error("Sticky removal must survive inventory success") }
+            try { ProcessorWorkspaceHistory(observations,forbidden).replay(next);fail("Removal was washed away") } catch (_: ProcessorWorkspaceHistoryRecovery) { }
+            assertEquals("cursor",observations.lastAttempt()?.firstUnresolved)
+        } finally { store.close();cleanup(directory) }
+    }
+    @Test fun nativeFinalFenceDoesNotAdvancePastRejectedCandidate() = runBlocking<Unit> {
+        val directory = directory();val store = store(directory)
+        try {
+            approve(store);val observations = ProcessorWorkspaceObservations(store)
+            val ready = ProcessorWorkspaceInventory(observations,source(listOf("a"))).prepare { _,_ -> }
+            val clean = object : ProcessorWorkspaceHistorySource { override suspend fun changes(cursor: DriveWorkspaceCursor) = DriveWorkspaceChangesPage(emptyList(),null,cursor.copy(token="end")) }
+            val batch = ProcessorWorkspaceHistory(observations,clean).replay(ready)
+            val changed = object : ProcessorWorkspaceHistorySource { override suspend fun changes(cursor: DriveWorkspaceCursor) = DriveWorkspaceChangesPage(listOf(DriveWorkspaceChange("file","new",false,metadata("new"))),null,cursor.copy(token="must-not-advance")) }
+            try { ProcessorWorkspaceHistory(observations,changed).checkUnchanged(batch,ready.reads);fail("Changed final fence was accepted") } catch (_: ProcessorWorkspaceConflict) { }
+            sql(directory) { db ->
+                db.rawQuery("SELECT document FROM workspace_replay",null).use { row -> assertTrue(row.moveToFirst());val value = com.google.gson.JsonParser.parseString(String(row.getBlob(0),Charsets.UTF_8)).asJsonObject;assertEquals("end",value["cursor"].asJsonObject["token"].asString);assertFalse(value["end"].asBoolean) }
+                db.rawQuery("SELECT count(*) FROM workspace_candidate WHERE file_id='new'",null).use { row -> assertTrue(row.moveToFirst());assertEquals(1,row.getInt(0)) }
+            }
+        } finally { store.close();cleanup(directory) }
+    }
+
+    @Test fun nativeSchemaFourPreservesExactPendingJournalAndGlobalScope() = runBlocking<Unit> {
+        val directory = directory();var store = store(directory)
+        try {
+            approve(store);val observations = ProcessorWorkspaceObservations(store)
+            val ready = ProcessorWorkspaceInventory(observations,source(listOf("a","b"))).prepare { _,_ -> }
+            val original = File(directory,"original.jpg").apply { writeBytes(byteArrayOf(9,7,5,3)) }
+            var events = listOf<ByteArray>()
+            sql(directory) { db ->
+                db.rawQuery("SELECT document FROM workspace_attempt WHERE singleton=1",null).use { row ->
+                    assertTrue(row.moveToFirst());val legacy = com.google.gson.JsonParser.parseString(String(row.getBlob(0),Charsets.UTF_8)).asJsonObject
+                    listOf("startDrive","unresolvedDrive","history","replay").forEach { legacy.remove(it) }
+                    val bytes = com.myphotosanywhere.mpa.processor.protocol.CanonicalProtocolJson(65536).encode(legacy.toString().toByteArray(Charsets.UTF_8))
+                    db.execSQL("UPDATE workspace_attempt SET document=?,sha256=?",arrayOf(bytes,ProcessorWorkspaceObservations.hash(bytes)))
+                }
+                db.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> val values = arrayListOf<ByteArray>();while(rows.moveToNext()) values.add(rows.getBlob(0));events = values }
+                db.execSQL("DROP TABLE workspace_history");db.execSQL("DROP TABLE workspace_replay");db.execSQL("DROP INDEX workspace_event_lookup");db.execSQL("ALTER TABLE workspace_event RENAME TO old_events")
+                db.execSQL("CREATE TABLE workspace_event(sequence INTEGER NOT NULL PRIMARY KEY CHECK(sequence>0),kind TEXT NOT NULL CHECK(kind IN ('candidate','read')),file_id TEXT NOT NULL CHECK(length(file_id) BETWEEN 1 AND 256),document BLOB NOT NULL CHECK(length(document) BETWEEN 1 AND 2048),sha256 TEXT NOT NULL CHECK(length(sha256)=64))")
+                db.execSQL("CREATE INDEX workspace_event_lookup ON workspace_event(kind,file_id,sequence)");db.execSQL("INSERT INTO workspace_event SELECT * FROM old_events");db.execSQL("DROP TABLE old_events");db.version = 4
+            }
+            store.close();store = store(directory);val restored = ProcessorWorkspaceObservations(store)
+            assertEquals(ready.attempt,restored.lastAttempt());assertEquals(ready.reads,restored.reads(ready.attempt));assertNull(restored.lastAttempt()?.unresolvedDriveId)
+            assertEquals(pin.encode(),store.current()?.encode());assertEquals("synthetic@example.invalid",store.registration()?.account?.email);assertArrayEquals(byteArrayOf(9,7,5,3),original.readBytes())
+            sql(directory) { db -> assertEquals(5,db.version);db.rawQuery("SELECT document FROM workspace_event ORDER BY sequence",null).use { rows -> var index = 0;while(rows.moveToNext()) assertArrayEquals(events[index++],rows.getBlob(0));assertEquals(events.size,index) } }
+        } finally { store.close();cleanup(directory) }
+    }
+
 }

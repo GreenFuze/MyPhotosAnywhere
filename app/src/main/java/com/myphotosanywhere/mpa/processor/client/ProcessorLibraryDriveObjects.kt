@@ -1,6 +1,8 @@
 package com.myphotosanywhere.mpa.processor.client
 
 import com.myphotosanywhere.mpa.drive.DriveGateway
+import com.myphotosanywhere.mpa.drive.DriveWorkspaceCursor
+import com.myphotosanywhere.mpa.drive.DriveWorkspaceChangesPage
 import com.myphotosanywhere.mpa.drive.DriveWorkspaceMetadata
 import com.myphotosanywhere.mpa.drive.DriveWorkspacePage
 import com.myphotosanywhere.mpa.processor.protocol.CatalogObjectReference
@@ -10,6 +12,8 @@ import com.myphotosanywhere.mpa.processor.protocol.LibraryConnectionDescriptor
 import java.io.IOException
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -18,11 +22,23 @@ import kotlinx.coroutines.ensureActive
  * are transport evidence, NOT a completed observation fence, controller acceptance or
  * catalog activation. The caller must persist each listed candidate before reading it.
  * No original-file mutation, local media copy or desktop/LAN endpoint is created. */
-internal class ProcessorLibraryDriveObjects(private val gateway: DriveGateway,private val pin: LibraryConnectionDescriptor) : CatalogObjectSource, ProcessorWorkspaceInventorySource {
+internal class ProcessorLibraryDriveObjects(private val gateway: DriveGateway,private val pin: LibraryConnectionDescriptor) : CatalogObjectSource, ProcessorWorkspaceInventorySource, ProcessorWorkspaceHistorySource {
+    private val scopeLock = Mutex()
+    private var boundScope: Pair<String,String?>? = null
     override val connectionSha256: String get() = pin.documentSha256
-    override suspend fun cursor(): String {
+    override suspend fun cursor(): DriveWorkspaceCursor {
+        account();val folder = workspace()
+        val value = gateway.catalogWorkspaceCursor(folder.sharedDriveId)
         account();workspace()
-        return gateway.catalogWorkspaceCursor().also { account() }
+        return DriveWorkspaceCursor(pin.workspace.accountId,folder.sharedDriveId,value)
+    }
+    override suspend fun changes(cursor: DriveWorkspaceCursor): DriveWorkspaceChangesPage {
+        account();val folder = workspace()
+        if (cursor.accountId != pin.workspace.accountId || cursor.sharedDriveId != folder.sharedDriveId)
+            throw IOException("Drive history cursor belongs to another account or corpus.")
+        val result = gateway.catalogWorkspaceChanges(cursor)
+        account();workspace()
+        return result
     }
     override suspend fun page(token: String?): DriveWorkspacePage {
         account(); workspace()
@@ -76,10 +92,16 @@ internal class ProcessorLibraryDriveObjects(private val gateway: DriveGateway,pr
         if (actual.id != pin.workspace.accountId) throw IOException("The Google connection no longer matches the approved library account.")
         currentCoroutineContext().ensureActive()
     }
-    private suspend fun workspace() {
+    private suspend fun workspace(): DriveWorkspaceMetadata {
         val actual = gateway.catalogWorkspaceFile(pin.workspace.folderId)
         if (actual.id != pin.workspace.folderId || actual.mimeType != DriveGateway.FOLDER_MIME || actual.trashed)
             throw IOException("The approved metadata workspace is unavailable.")
+        scopeLock.withLock {
+            val observed = pin.workspace.accountId to actual.sharedDriveId
+            if (boundScope == null) boundScope = observed
+            else if (boundScope != observed) throw IOException("The metadata workspace changed its captured Drive corpus.")
+        }
+        return actual
     }
     private companion object {
         val METADATA_MIME = setOf("application/json","application/octet-stream","application/gzip","application/x-gzip")

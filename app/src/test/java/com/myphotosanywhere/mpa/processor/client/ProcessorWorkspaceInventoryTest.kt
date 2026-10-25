@@ -4,6 +4,7 @@ import android.app.Application
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import com.myphotosanywhere.mpa.data.StorageBudget
+import com.myphotosanywhere.mpa.drive.DriveWorkspaceCursor
 import com.myphotosanywhere.mpa.drive.DriveWorkspaceMetadata
 import com.myphotosanywhere.mpa.drive.DriveWorkspacePage
 import com.myphotosanywhere.mpa.processor.protocol.CatalogWorkspace
@@ -61,10 +62,10 @@ class ProcessorWorkspaceInventoryTest {
         var pageSize = 1
         var sourceCalls = 0;var bodyReads = 0
         var beforeRead: (suspend (DriveWorkspaceMetadata)->Unit)? = null
-        override suspend fun cursor(): String {
+        override suspend fun cursor(): DriveWorkspaceCursor {
             sourceCalls++;val attempt = checkNotNull(observations.lastAttempt())
             assertNull(attempt.inventoryStart);assertFalse(attempt.inventoryListed)
-            return cursorValue
+            return DriveWorkspaceCursor(pin.workspace.accountId,null,cursorValue)
         }
         override suspend fun page(token: String?): DriveWorkspacePage {
             sourceCalls++;val offset = token?.toInt() ?: 0;val end = minOf(offset + pageSize,files.size)
@@ -108,7 +109,7 @@ class ProcessorWorkspaceInventoryTest {
             assertFalse(next.inventoryListed);assertNull(next.inventoryStart)
             assertEquals("cursor-first",next.firstUnresolved)
             rejects { observations.reads(prepared.attempt) }
-            rejects { observations.start(prepared.attempt,"another") }
+            rejects { observations.start(prepared.attempt,DriveWorkspaceCursor(pin.workspace.accountId,null,"another")) }
             assertEquals(next,observations.lastAttempt())
         } finally { store.close() }
     }
@@ -118,7 +119,7 @@ class ProcessorWorkspaceInventoryTest {
         try {
             approve(store);val observations = ProcessorWorkspaceObservations(store)
             val old = ProcessorWorkspaceInventory(observations,Source(observations)).prepare { _,_ -> }
-            var next = observations.start(observations.begin(pin.documentSha256),"cursor-later")
+            var next = observations.start(observations.begin(pin.documentSha256),DriveWorkspaceCursor(pin.workspace.accountId,null,"cursor-later"))
             val rows = listOf(candidate(metadata("a",2)),candidate(metadata("b")))
             next = observations.rememberCandidates(next,rows);next = observations.sealInventory(next,rows)
             rejects { observations.rememberRead(next,rows[0],"[]".toByteArray()) }
@@ -133,7 +134,7 @@ class ProcessorWorkspaceInventoryTest {
         val store = store()
         try {
             approve(store);val observations = ProcessorWorkspaceObservations(store)
-            var attempt = observations.start(observations.begin(pin.documentSha256),"cursor")
+            var attempt = observations.start(observations.begin(pin.documentSha256),DriveWorkspaceCursor(pin.workspace.accountId,null,"cursor"))
             attempt = observations.rememberCandidates(attempt,listOf(candidate(metadata("a")),candidate(metadata("b"))))
             sql(store) { it.execSQL("UPDATE workspace_candidate SET document=x'0000' WHERE file_id='b'") }
             try { observations.begin(pin.documentSha256);fail("Corrupted body was silently washed away") } catch (_: ProcessorLibraryStateCorrupt) { }
@@ -147,7 +148,7 @@ class ProcessorWorkspaceInventoryTest {
         val store = store()
         try {
             approve(store);val observations = ProcessorWorkspaceObservations(store)
-            val attempt = observations.start(observations.begin(pin.documentSha256),"cursor")
+            val attempt = observations.start(observations.begin(pin.documentSha256),DriveWorkspaceCursor(pin.workspace.accountId,null,"cursor"))
             sql(store) { it.execSQL("CREATE TRIGGER reject_attempt BEFORE UPDATE ON workspace_attempt BEGIN SELECT RAISE(ABORT,'synthetic failure'); END") }
             try { observations.rememberCandidates(attempt,listOf(candidate(metadata("a"))));fail("Failed native transaction was acknowledged") } catch (_: SQLiteException) { }
             assertEquals(attempt,observations.lastAttempt())
@@ -204,12 +205,12 @@ class ProcessorWorkspaceInventoryTest {
             val body = CanonicalProtocolJson().encode("""{"format":"mpa","major":1,"minor":0,"libraryId":"${pin.libraryId}","actorId":"${pin.controllerId}","epoch":"1","sequence":"7","kind":"library-publisher-authorization","requiredCapabilities":["library.publishers.v1"],"payload":{"workspace":{"accountId":"test-account","folderId":"test-workspace"},"publisher":null}}""".toByteArray())
             val signer = ProtocolDocumentSigner(key.private,key.public);val bytes = SignedProtocolDocuments(setOf("library.publishers.v1")).encode(body,signer.sign(body))
             ProcessorLibraryControllerJournal(store).accept(bytes);store.close()
-            sql(store) { db -> db.execSQL("DROP TABLE workspace_event");db.execSQL("DROP TABLE workspace_read");db.execSQL("DROP TABLE workspace_candidate");db.execSQL("DROP TABLE workspace_attempt");db.version = 3 }
+            sql(store) { db -> db.execSQL("DROP TABLE workspace_history");db.execSQL("DROP TABLE workspace_replay");db.execSQL("DROP TABLE workspace_event");db.execSQL("DROP TABLE workspace_read");db.execSQL("DROP TABLE workspace_candidate");db.execSQL("DROP TABLE workspace_attempt");db.version = 3 }
             store = store();assertEquals(7L,ProcessorLibraryControllerJournal(store).current().publisher?.sequence)
             assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
             val observations = ProcessorWorkspaceObservations(store);assertNull(observations.lastAttempt())
             assertEquals(1L,observations.begin(pin.documentSha256).revision)
-            sql(store) { assertEquals(4,it.version) }
+            sql(store) { assertEquals(5,it.version) }
         } finally { store.close() }
     }
 
@@ -228,7 +229,7 @@ class ProcessorWorkspaceInventoryTest {
         val store = store()
         try {
             approve(store);val observations = ProcessorWorkspaceObservations(store)
-            val attempt = observations.start(observations.begin(pin.documentSha256),"cursor")
+            val attempt = observations.start(observations.begin(pin.documentSha256),DriveWorkspaceCursor(pin.workspace.accountId,null,"cursor"))
             val value = candidate(metadata("a"))
             rejects { observations.rememberCandidates(attempt,listOf(value,value)) }
             rejects { observations.rememberCandidates(attempt,List(101) { candidate(metadata("item-$it")) }) }
@@ -246,7 +247,7 @@ class ProcessorWorkspaceInventoryTest {
             approve(store);val observations = ProcessorWorkspaceObservations(store);var pages = 0
             val source = object : ProcessorWorkspaceInventorySource {
                 override val connectionSha256 = pin.documentSha256
-                override suspend fun cursor() = "cursor"
+                override suspend fun cursor() = DriveWorkspaceCursor(pin.workspace.accountId,null,"cursor")
                 override suspend fun page(token: String?): DriveWorkspacePage { pages++;return DriveWorkspacePage(emptyList(),"repeat",false) }
                 override suspend fun readCaptured(expected: DriveWorkspaceMetadata): ByteArray { fail("Cyclic inventory downloaded content");return byteArrayOf() }
             }
@@ -304,7 +305,7 @@ class ProcessorWorkspaceInventoryTest {
                 val rows = List(count) { metadata("item-${it.toString().padStart(4,'0')}") }
                 val source = object : ProcessorWorkspaceInventorySource {
                     override val connectionSha256 = pin.documentSha256
-                    override suspend fun cursor() = "cursor"
+                    override suspend fun cursor() = DriveWorkspaceCursor(pin.workspace.accountId,null,"cursor")
                     override suspend fun page(token: String?): DriveWorkspacePage {
                         val offset = token?.toInt() ?: 0;val end = minOf(offset + 100,rows.size)
                         return DriveWorkspacePage(rows.subList(offset,end),if(end < rows.size) end.toString() else null,false)

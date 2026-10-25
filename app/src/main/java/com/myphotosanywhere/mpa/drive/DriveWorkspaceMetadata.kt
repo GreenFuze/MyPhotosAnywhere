@@ -8,17 +8,17 @@ import java.util.Collections
 /** Transport observations only. Membership, pinned account, immutable reads and policy
  * admission belong to the catalog consumer; a listed object grants no authority. */
 internal class DriveWorkspaceMetadata(val id: String,val mimeType: String,val version: Long,val bytes: Long?,
-    parents: List<String>,val trashed: Boolean,val sha256: String?,val downloadable: Boolean?) {
+    parents: List<String>,val trashed: Boolean,val sha256: String?,val downloadable: Boolean?,val sharedDriveId: String? = null) {
     val parents: List<String> = Collections.unmodifiableList(parents.sorted())
     init {
         opaque(id); if (mimeType.length !in 1..128 || mimeType.any { it.code !in 33..126 } || version < 1 || bytes != null && bytes < 0)
             throw IOException("Drive returned invalid metadata workspace fields.")
         if (parents.size > 16 || parents.distinct().size != parents.size) throw IOException("Drive returned invalid workspace parents.")
-        parents.forEach(::opaque)
+        parents.forEach(::opaque);sharedDriveId?.let(::opaque)
         if (sha256 != null && !sha256.matches(Regex("[0-9a-f]{64}"))) throw IOException("Drive returned an invalid workspace checksum.")
     }
     fun sameRevision(other: DriveWorkspaceMetadata): Boolean = id == other.id && mimeType == other.mimeType && version == other.version &&
-        bytes == other.bytes && parents == other.parents && trashed == other.trashed && sha256 == other.sha256 && downloadable == other.downloadable
+        bytes == other.bytes && parents == other.parents && trashed == other.trashed && sha256 == other.sha256 && downloadable == other.downloadable && sharedDriveId == other.sharedDriveId
     companion object {
         fun opaque(value: String) { if (!value.matches(Regex("[A-Za-z0-9_-]{1,256}")) || value == "root") throw IOException("A concrete opaque Drive identity is required.") }
         fun decode(bytes: ByteArray): DriveWorkspaceMetadata = parse(DriveWorkspacePage.json(bytes))
@@ -36,7 +36,7 @@ internal class DriveWorkspaceMetadata(val id: String,val mimeType: String,val ve
             }
             return DriveWorkspaceMetadata(text(value,"id"),text(value,"mimeType"),decimal(text(value,"version"),false),
                 optionalText(value,"size")?.let { decimal(it,true) }, parents?.asJsonArray?.map { scalar(it) } ?: emptyList(),
-                trashed.asBoolean,optionalText(value,"sha256Checksum"),canDownload)
+                trashed.asBoolean,optionalText(value,"sha256Checksum"),canDownload,optionalText(value,"driveId"))
         }
         fun account(bytes: ByteArray): DriveUser {
             val root = DriveWorkspacePage.json(bytes)
