@@ -1,5 +1,39 @@
 # MPA 0.6.0 implementation ledger
 
+## Actual strong-condition JSON transport
+
+The captured Google connection now supports bounded actual v2 JSON observations with
+a strong provider entity tag. Owned body copies, exact size, JSON MIME, parent/corpus,
+positive canonical version and download/edit capability precede write admission. Only
+a snapshot from that same connection can supply a condition; callers cannot construct
+one from a file name or raw tag. Changed corpus/parents, stale tags, version rewind,
+original MIME and retired edit permission stop before a PUT. Numeric versions are
+never sent as conditions; monotonic movement between separately fenced reads is allowed.
+
+An inconsistent length under the same tag also rejects before write. Updates use only
+same-ID v2 media PUT with the captured strong If-Match. Server412 and
+network uncertainty propagate without allocation, unconditional retries or v3 fallback.
+A200 response body is disposed unread; exact before/body/after observation must prove
+the new bytes, advanced version/tag and retained scope. Late physical writes join on
+cancellation/close and cannot return a successful result. An observed snapshot grants
+no Root authority, permission to modify originals or canonical activation.
+
+All89 Google transport cases pass, including all72 previous test identities and17 new cases for
+owned input/output, scope/MIME/size/tag guards, shared drives/corpus moves, stale and
+rewound conditions, actual412, discarded completion, readback mismatch, foreign owners
+and joined cancellation/close. First83-test run retained two new assertion-type errors:
+InvalidDataException does not inherit IOException. Exact typed expectations fix them;
+no production guard or prior assertion is weakened. Final strict Desktop build has zero
+warnings/errors. Frozen source/log/TRX evidence is in
+preflight-060/conditional-json-transport-length-validation.json. The earlier88-case
+candidate proof remains frozen separately; final code includes the additional length guard.
+
+No live application JSON update is enabled. Earlier isolated synthetic v2 media evidence
+is separate from live acceptance through this new adapter. A Root-signed durable intent,
+semantic current-head/graph reconciliation, same-ID cross-process lost-ack recovery,
+runtime handoff and final control publication remain required before composition.
+Schemas, dependencies, existing operation deadlines and byte/history caps are unchanged.
+
 ## Create-only initial-current publication and joined recovery
 
 The new initial-current owner composes the actual durable allocation/native Root signer

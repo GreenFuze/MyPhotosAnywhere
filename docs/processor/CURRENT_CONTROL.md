@@ -185,3 +185,28 @@ commits as pending work. Verified conditional control publication must precede f
 generation status. Initial bootstrap must keep its existing two-policy completion
 handoff. Later policy/catalog updates, v2 export and independent native activation remain
 unfinished; this increment enables no live application current creation or original write.
+
+## Same-ID conditional transport
+
+The actual Google connection now captures bounded JSON with a provider strong entity
+tag and exact before/body/after metadata fences. A private connection identity binds
+the condition to its real observation. Body access returns owned copies. Before an
+update, actual JSON MIME, byte length, parent/corpus, download/edit permission, tag and minimum
+version are checked again. Original MIME, foreign connections, stale conditions and
+scope changes cannot become writes. Numeric version movement between separate exact
+captures is allowed; a numeric version is never an If-Match value.
+
+Only the captured same-ID v2 media PUT is available. A server412 or uncertain completion
+propagates to the semantic owner; it cannot allocate a replacement, issue an unconditional
+update or fall back to v3. Successful status/body is not a receipt: the body is disposed
+unread, and a complete newly fenced observation must match the intended bytes, advanced
+version/tag and original scope. Cancellation and shutdown join actual borrowed I/O.
+
+The [v2 File resource](https://developers.google.com/workspace/drive/api/reference/rest/v2/files)
+defines the actual tag/version/size/scope/capability fields; the
+[v2 update method](https://developers.google.com/workspace/drive/api/reference/rest/v2/files/update)
+provides the media PUT endpoint. The earlier isolated live probe establishes conditional
+media capability, not live acceptance of this application adapter. Its complete89-case
+synthetic transport regression and strict Desktop build pass. Native Root verification,
+durable signed pending-work/observed-head ownership, cross-process recovery and runtime
+composition remain mandatory; this lower interface alone grants no write authority.
