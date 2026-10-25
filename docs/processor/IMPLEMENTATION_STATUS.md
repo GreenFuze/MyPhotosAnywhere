@@ -1,5 +1,32 @@
 # MPA 0.6.0 implementation ledger
 
+## Native-key initial current-control signing
+
+The initial no-catalog current snapshot now signs through the actual native key owner
+and serial durable Root journal. Its signing intent ID is the fixed control-slot ID;
+concurrent retries retain Root sequence3 and exactly the first sealed envelope. The body
+is reconstructed from the completed initial policy receipts and their verified signing
+sequences. Both initial policy selections, original human source approval, ready native
+identity, current local publisher/account authority and actual allocated control ID are
+rechecked before reserving or replaying a signature. No caller-provided policy bytes or
+new intent IDs can replace this initial snapshot.
+
+Disconnect, publisher revocation and changed human sources stop fresh initial-current
+signing while preserving the old sealed bytes and file identity. Publisher native keys
+still cannot sign current-control documents or human operations. Signing performs no
+Google request, upload, canonical activation or original write. Initial policy publication
+and every previous signing/role/recovery assertion remain intact.
+
+Validation passes38 focused native-key/signing cases and all313 ordinary AppServices
+CI-subset cases, with zero failed/skipped tests; Desktop composition builds with zero
+warnings/errors. Four new cases cover allocation/completion prerequisites, concurrent
+exact replay, disconnection, revoked publisher and changed source approval. Frozen
+source/report/log hashes are in preflight-060/native-current-signing-validation.json.
+Scale/reference categories remain mandatory in their existing separate matrices.
+Actual allocation ownership, create/CAS publication, v2 setup export, later catalog and
+policy updates, full canonical admission and the finished0.6 product remain pending.
+
+
 ## Durable producer control slot and shared Root signing stream
 
 The producer now reserves one immutable local control plan after the completed initial

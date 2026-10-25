@@ -15,10 +15,10 @@ internal sealed class LibrarySigningKeys : IDisposable
     private readonly ECDsa _publisher;
     private bool _closed;
     public LibrarySigningPublicIdentity Public { get; }
-    private static readonly string[] ControllerKinds = ["library-publisher-authorization", "library-source-configuration"];
+    private static readonly string[] ControllerKinds = ["library-publisher-authorization", "library-source-configuration",LibraryCurrentControl.Kind];
     private static readonly string[] PublisherKinds = ["catalog-commit"];
     private static readonly string[] Capabilities = [CatalogPublisherAuthorization.Capability, CatalogSourceConfiguration.Capability,
-        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability];
+        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability,LibraryCurrentControl.Capability];
 
     private LibrarySigningKeys(Guid library, Guid installation, Guid controller, long controllerEpoch, Guid publisher, long publisherEpoch,
         ECDsa controllerKey, ECDsa publisherKey)

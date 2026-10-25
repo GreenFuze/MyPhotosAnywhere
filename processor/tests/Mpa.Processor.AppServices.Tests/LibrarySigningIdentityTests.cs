@@ -114,6 +114,7 @@ public sealed class LibrarySigningIdentityTests
         Assert.IsTrue(controllerVerifier.Verify(controller, controllerSignature)); Assert.IsTrue(publisherVerifier.Verify(catalog, publisherSignature));
         Assert.IsFalse(controllerVerifier.Verify(catalog, publisherSignature));
         Assert.ThrowsExactly<ProtocolFormatException>(() => owner.SignCatalogDocument(controller));
+        Assert.ThrowsExactly<ProtocolFormatException>(() => owner.SignCatalogDocument(Body(identity,false,LibraryCurrentControl.Kind)));
         Assert.ThrowsExactly<ProtocolFormatException>(() => owner.SignControllerDocument(catalog));
         Assert.ThrowsExactly<ProtocolFormatException>(() => owner.SignControllerDocument(Body(identity, true, "user-operation")));
         Assert.ThrowsExactly<ProtocolFormatException>(() => owner.SignCatalogDocument(Body(identity, false, library: Guid.NewGuid())));

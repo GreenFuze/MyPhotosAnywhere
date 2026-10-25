@@ -109,8 +109,13 @@ no access. The store performs no network, ID generation or cloud-file creation.
 
 Current-control intents use the same durable root counter and sealed-envelope history as
 the two policy kinds. They require the allocated slot, matching root scope and explicit
-capability. The publisher role remains catalog-only. Native-key runtime composition and
-full current-policy admission still need integration before publishing these intents.
+capability. The publisher role remains catalog-only. The initial no-catalog
+snapshot now uses the native key owner and the fixed slot ID as its durable signing
+intent. It reconstructs exact initial receipt references and rechecks both original
+policy selections, source approval and current native/local authority. Concurrent replay
+keeps the first sealed bytes; disconnect, revocation or source changes deny fresh signing
+without erasing history. Later policy/catalog updates and full current-policy admission
+still need integration before live publication.
 
 Stage0's live synthetic metadata probe already found that v3 accepted an invalid
 `If-Match`, while v2 rejected previously valid stale tags for metadata and Trash/restore.

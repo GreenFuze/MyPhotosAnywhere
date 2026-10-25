@@ -14,7 +14,42 @@ public sealed class JournaledProtocolSigner(ProcessorStateCoordinator state, Lib
     private readonly LibrarySigningIdentityOwner _keys = keys ?? throw new ArgumentNullException(nameof(keys));
     private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
     private static readonly string[] Capabilities = [CatalogPublisherAuthorization.Capability, CatalogSourceConfiguration.Capability,
-        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability];
+        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability,LibraryCurrentControl.Capability];
+
+    /// <summary>Seal the fixed initial no-catalog snapshot from its exact retained
+    /// policy receipts. The slot's immutable ID is also its signing intent ID. Actual
+    /// cloud reconciliation/CAS remains separate; signing proves no fresh availability.
+    /// Superseded policies cannot be replayed as initial setup, even with old receipts.</summary>
+    public async Task<ProtocolSigningIntent> SignInitialCurrentControlAsync(CancellationToken token)
+    {
+        var id=await _state.ExecuteAsync(database=>
+        {
+            var slot=new LibraryCurrentControlSlotRepository(database,_budget).Prepare();
+            if (slot.FileId is null) throw new InvalidOperationException("Capture the actual control-file allocation before signing current setup.");
+            return slot.Id;
+        },token).ConfigureAwait(false);
+        return await SignAsync(id,LibraryCurrentControl.Kind,true,(database,identity)=>
+        {
+            var authority=new LibraryAuthorityRepository(database,_budget);
+            var completion=authority.InitialPublicationCompletion() ?? throw new InvalidDataException("Current setup lost its initial policy receipt.");
+            var slot=new LibraryCurrentControlSlotRepository(database,_budget).Prepare();
+            if (slot.Id!=id || slot.FileId is null) throw new ProtocolSigningConflictException();
+            _keys.AssertPublicationIdentity(authority.Controller() ?? throw new InvalidDataException("Current setup lost its Root pin."),authority.CaptureLocalPublicationAuthority());
+            var publisher=Publisher(identity);
+            var policyPlan=authority.AssertInitialPolicyIntentCurrent(completion.Plan.PublisherIntentId,"library-publisher-authorization",publisher);
+            if (authority.AssertInitialPolicyIntentCurrent(completion.Plan.SourceIntentId,"library-source-configuration",publisher)!=policyPlan)
+                throw new LibraryInitialPolicyConflictException();
+            var journal=new ProtocolSigningJournal(database,_budget);
+            var published=journal.Read(policyPlan.PublisherIntentId) ?? throw new InvalidDataException("The initial publisher signature is missing.");
+            var sources=journal.Read(policyPlan.SourceIntentId) ?? throw new InvalidDataException("The initial source signature is missing.");
+            var connection=slot.ConnectionDescriptor();var writer=new LibraryCurrentControlWriter(connection);
+            var publisherReference=new LibraryPolicyReference(new(connection.Workspace.AccountId,completion.Publisher.FileId,connection.Workspace.FolderId,
+                completion.Publisher.Bytes,completion.Publisher.Sha256),published.Sequence);
+            var sourceReference=new LibraryPolicyReference(new(connection.Workspace.AccountId,completion.Sources.FileId,connection.Workspace.FolderId,
+                completion.Sources.Bytes,completion.Sources.Sha256),sources.Sequence);
+            return sequence=>writer.EncodeDocument(sequence,publisherReference,sourceReference,null);
+        },token).ConfigureAwait(false);
+    }
 
     public Task<LibraryInitialPolicyPlan> PrepareInitialPolicyPlanAsync(CancellationToken token) =>
         _state.ExecuteAsync(database => new LibraryAuthorityRepository(database, _budget).PrepareInitialPolicyPlan(Publisher(_keys.PublicIdentity)), token);
@@ -106,7 +141,7 @@ public sealed class JournaledProtocolSigner(ProcessorStateCoordinator state, Lib
                 new(identity.LibraryId, controller ? identity.ControllerId : identity.PublisherId,
                     controller ? identity.ControllerEpoch : identity.PublisherEpoch,
                     Convert.FromBase64String(controller ? identity.ControllerPublicKeySpki : identity.PublisherPublicKeySpki),
-                    controller ? ["library-source-configuration", "library-publisher-authorization"] : ["catalog-commit"]));
+                    controller ? ["library-source-configuration", "library-publisher-authorization",LibraryCurrentControl.Kind] : ["catalog-commit"]));
             return intent;
         }, token);
     }
