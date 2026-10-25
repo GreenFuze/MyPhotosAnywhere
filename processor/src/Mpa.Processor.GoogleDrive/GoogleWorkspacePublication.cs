@@ -102,15 +102,15 @@ public sealed partial class GoogleAccountConnection
             var content = new MultipartContent("related"); request.Content = content;
             var properties = new ByteArrayContent(metadata); content.Add(properties); properties.Headers.ContentType = new("application/json") { CharSet = "UTF-8" };
             var body = new ByteArrayContent(bytes); content.Add(body); body.Headers.ContentType = new(mime);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await credential.GetAccessTokenForRequestAsync(cancellationToken: token).ConfigureAwait(false));
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
-            if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0 && await credential.RefreshTokenAsync(token).ConfigureAwait(false)) continue;
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await AccessOwnedAsync(credential,token).ConfigureAwait(false));
+            using var response = await SendOwnedAsync(request,token).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0 && await RefreshOwnedAsync(credential,token).ConfigureAwait(false)) continue;
             if (response.StatusCode == HttpStatusCode.Conflict) return;
             if (!response.IsSuccessStatusCode) throw new HttpRequestException("Workspace create failed with HTTP " +
                 ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture) + ". Retain its allocated identity for retry.", null, response.StatusCode);
             // Do not buffer an unbounded response or trust a successful status as proof
             // of storage. The following independent metadata/download checks prove it.
-            token.ThrowIfCancellationRequested(); return;
+            CheckNetworkActive(token); return;
         }
         throw new InvalidOperationException("Workspace create authorization retry was exhausted.");
     }

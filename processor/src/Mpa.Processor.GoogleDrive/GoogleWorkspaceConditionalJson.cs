@@ -155,14 +155,14 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditiona
             using var request=new HttpRequestMessage(HttpMethod.Put,"https://www.googleapis.com/upload/drive/v2/files/"+
                 Uri.EscapeDataString(expected.FileId)+"?uploadType=media&supportsAllDrives=true&fields=id");
             request.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(expected.EntityTag));
-            request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",await credential.GetAccessTokenForRequestAsync(cancellationToken:token).ConfigureAwait(false));
+            request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",await AccessOwnedAsync(credential,token).ConfigureAwait(false));
             request.Content=new ByteArrayContent(bytes);request.Content.Headers.ContentType=new("application/json");
-            using var response=await _http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,token).ConfigureAwait(false);
-            if (response.StatusCode==HttpStatusCode.Unauthorized && attempt==0 && await credential.RefreshTokenAsync(token).ConfigureAwait(false)) continue;
+            using var response=await SendOwnedAsync(request,token).ConfigureAwait(false);
+            if (response.StatusCode==HttpStatusCode.Unauthorized && attempt==0 && await RefreshOwnedAsync(credential,token).ConfigureAwait(false)) continue;
             if (response.StatusCode==HttpStatusCode.PreconditionFailed) throw ConditionalJsonConflict();
             if (response.StatusCode!=HttpStatusCode.OK) throw new HttpRequestException("Conditional JSON update returned HTTP "+
                 ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture)+". Retain its exact pending identity and bytes.",null,response.StatusCode);
-            token.ThrowIfCancellationRequested();return;
+            CheckNetworkActive(token);return;
         }
         throw new InvalidOperationException("Conditional JSON authorization retry was exhausted.");
     }

@@ -94,19 +94,20 @@ public sealed partial class GoogleAccountConnection : IGoogleAccountConnection, 
     {
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            var access = await credential.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            var access = await AccessOwnedAsync(credential,cancellationToken).ConfigureAwait(false);
             using var request = new HttpRequestMessage(HttpMethod.Get,
                 "https://www.googleapis.com/drive/v3/about?fields=user(permissionId,displayName,emailAddress)");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", access);
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            using var response = await SendOwnedAsync(request,cancellationToken).ConfigureAwait(false);
             if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0)
             {
-                if (!await credential.RefreshTokenAsync(cancellationToken).ConfigureAwait(false))
+                if (!await RefreshOwnedAsync(credential,cancellationToken).ConfigureAwait(false))
                     throw new InvalidOperationException("Google authorization needs reconnection; the protected grant was preserved.");
                 continue;
             }
             if (!response.IsSuccessStatusCode)
                 throw new HttpRequestException("Google Drive account check failed with HTTP " + (int)response.StatusCode + ". The account and library were preserved.", null, response.StatusCode);
+            CheckNetworkActive(cancellationToken);
             if (response.Content.Headers.ContentLength > 16384) throw new InvalidDataException("Google account response exceeds its bound.");
             await using var input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             using var body = new MemoryStream();
@@ -132,6 +133,33 @@ public sealed partial class GoogleAccountConnection : IGoogleAccountConnection, 
     }
 
     private static bool ValidIdentity(string? identity) => identity is { Length: > 0 and <= 256 } && identity.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
+
+    // CancelAsync dispatches linked-token callbacks asynchronously. The owner's
+    // closed admission is authoritative immediately, even while token delivery lags.
+    // Initiate SDK/HTTP tasks under that same gate; join already admitted work in
+    // ExecuteAsync/DisposeCoreAsync, without starting a later request or refresh.
+    private T AdmitNetwork<T>(Func<T> start,CancellationToken token)
+    {
+        lock(_gate)
+        {
+            if (_stopping) throw new OperationCanceledException("The Google connection closed network admission.",_stop.Token);
+            token.ThrowIfCancellationRequested();return start();
+        }
+    }
+    private void CheckNetworkActive(CancellationToken token)
+    {
+        lock(_gate)
+        {
+            if (_stopping) throw new OperationCanceledException("The Google connection retired before its next network step.",_stop.Token);
+            token.ThrowIfCancellationRequested();
+        }
+    }
+    private Task<HttpResponseMessage> SendOwnedAsync(HttpRequestMessage request,CancellationToken token)=>
+        AdmitNetwork(()=>_http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,token),token);
+    private Task<string> AccessOwnedAsync(UserCredential credential,CancellationToken token)=>
+        AdmitNetwork(()=>credential.GetAccessTokenForRequestAsync(cancellationToken:token),token);
+    private Task<bool> RefreshOwnedAsync(UserCredential credential,CancellationToken token)=>
+        AdmitNetwork(()=>credential.RefreshTokenAsync(token),token);
 
     private async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
     {

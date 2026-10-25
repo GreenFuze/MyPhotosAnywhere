@@ -205,6 +205,19 @@ public sealed class GoogleWorkspaceConditionalJsonTests
         Assert.AreEqual(1,fixture.Puts);Assert.AreEqual(3,fixture.MetadataReads);CollectionAssert.AreEqual(Next,fixture.Stored);Assert.IsTrue(fixture.WriteResponse!.Disposed);
     }
 
+    [TestMethod]
+    public async Task ClosingAdmissionInsideAnAlreadyAdmittedWriteCannotStartReadback()
+    {
+        using var fixture=new Fixture();await using var connection=await fixture.ConnectAsync().ConfigureAwait(false);
+        var first=await connection.CaptureConditionalWorkspaceJsonAsync("workspace","current-file",CancellationToken.None).ConfigureAwait(false);
+        var stopping=Task.CompletedTask;
+        fixture.AfterPut=()=>stopping=connection.DisposeAsync().AsTask();
+        await Assert.ThrowsAsync<OperationCanceledException>(()=>connection.ReplaceConditionalWorkspaceJsonAsync(first,Next,Hash(Next),CancellationToken.None)).ConfigureAwait(false);
+        await stopping.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        Assert.AreEqual(1,fixture.Puts);Assert.AreEqual(3,fixture.MetadataReads);Assert.AreEqual(1,fixture.BlobReads);
+        CollectionAssert.AreEqual(Next,fixture.Stored);Assert.IsTrue(fixture.WriteResponse!.Disposed);Assert.IsTrue(fixture.HandlerDisposed);
+    }
+
     private enum ConditionalFailure { Invalid,Changed,Denied }
     private static Task ExpectConditionalFailure(ConditionalFailure expected,Func<Task> operation)=>expected switch
     {

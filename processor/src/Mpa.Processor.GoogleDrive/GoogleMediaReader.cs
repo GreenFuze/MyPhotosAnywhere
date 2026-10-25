@@ -74,10 +74,11 @@ public sealed partial class GoogleAccountConnection
         for (var attempt = 0; attempt < 2; attempt++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await credential.GetAccessTokenForRequestAsync(cancellationToken: token).ConfigureAwait(false));
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
-            if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0 && await credential.RefreshTokenAsync(token).ConfigureAwait(false)) continue;
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await AccessOwnedAsync(credential,token).ConfigureAwait(false));
+            using var response = await SendOwnedAsync(request,token).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0 && await RefreshOwnedAsync(credential,token).ConfigureAwait(false)) continue;
             if (!response.IsSuccessStatusCode) throw new HttpRequestException("Drive media request failed with HTTP " + ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture) + ".", null, response.StatusCode);
+            CheckNetworkActive(token);
             if (response.Content.Headers.ContentLength > maximum) throw new InvalidDataException("Drive media response exceeds its bound.");
             await using var input = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
             using var output = new MemoryStream(); var buffer = new byte[8192]; int count;

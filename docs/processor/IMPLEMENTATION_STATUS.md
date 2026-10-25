@@ -1,5 +1,27 @@
 # MPA 0.6.0 implementation ledger
 
+## Network admission closes before asynchronous token delivery
+
+Exact43a4c30 CI exposed a Linux shutdown race: the actual conditional write joined and
+its late result was rejected, but two readback requests started after close because
+CancelAsync had not yet delivered cancellation to linked tokens. The unchanged test
+required exactly3 metadata reads and observed5. That failed run is not accepted or
+rerun into a pass; its logs and artifact remain preserved.
+
+The Google connection now starts credential acquisition, refresh and HTTP tasks under
+the same gate that closes admission. Its closed flag immediately denies later steps,
+independently of cancellation callback timing. Identity reads, bounded media reads,
+create-only publication and conditional updates use this shared owner boundary. Work
+already admitted still joins before the connection/credential owners retire. Successful
+write completion checks the boundary before any readback can start.
+
+All90 Google cases pass locally, including every89 preceding identity and the unchanged
+exact3-read assertion. An additional case closes the owner from inside its admitted
+write callback and requires joined retirement, no readback and disposed responses.
+Strict Desktop builds with zero warnings/errors. Fresh platform CI remains required;
+no assertion, cancellation deadline, warning gate or resource-ownership rule is relaxed.
+The broader current/CAS runtime and full0.6 product remain unfinished.
+
 ## Actual strong-condition JSON transport
 
 The captured Google connection now supports bounded actual v2 JSON observations with
