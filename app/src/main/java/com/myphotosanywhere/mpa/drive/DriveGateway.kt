@@ -47,12 +47,16 @@ class DriveGateway(
     suspend fun children(parent: String, page: String? = null): DrivePage = list(
         "'${literal(parent)}' in parents and trashed = false and (mimeType = '$FOLDER_MIME' or mimeType contains 'image/' or mimeType contains 'video/' or name contains '.json')", page)
 
-    /** Complete metadata-workspace listing, including binary catalog chunks. Legacy
-     * media/Takeout queries cannot establish a complete catalog inventory. */
+    /** Bounded actual account observation for the independent catalog transport. */
     internal suspend fun catalogWorkspaceAccount(): DriveUser = withContext(Dispatchers.IO) {
         DriveWorkspaceMetadata.account(workspaceResponse(Request.Builder().url(url("about","fields" to "user(permissionId,emailAddress)")),16384))
     }
 
+    internal suspend fun catalogWorkspaceCursor(): String = withContext(Dispatchers.IO) {
+        DriveWorkspacePage.startCursor(workspaceResponse(Request.Builder().url(url("changes/startPageToken","supportsAllDrives" to "true")),16384))
+    }
+
+    /** All workspace children, including binary chunks excluded by legacy media queries. */
     internal suspend fun catalogWorkspacePage(parent: String,page: String? = null): DriveWorkspacePage = withContext(Dispatchers.IO) {
         DriveWorkspaceMetadata.opaque(parent); page?.let(DriveWorkspacePage::pageToken)
         val request = Request.Builder().url(url("files","q" to "'${literal(parent)}' in parents and trashed = false",

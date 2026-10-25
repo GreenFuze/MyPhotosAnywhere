@@ -72,14 +72,14 @@ class ProcessorControllerJournalDeviceTest {
             approve(store); val original = File(directory,"original.jpg").apply { writeBytes(byteArrayOf(8,6,4,2)) }
             store.close()
             sql(directory) { database ->
-                database.execSQL("DROP TABLE controller_selection"); database.execSQL("DROP TABLE controller_document"); database.execSQL("DROP TABLE controller_anchor"); database.version = 2
+                database.execSQL("DROP TABLE workspace_event");database.execSQL("DROP TABLE workspace_read"); database.execSQL("DROP TABLE workspace_candidate"); database.execSQL("DROP TABLE workspace_attempt"); database.execSQL("DROP TABLE controller_selection"); database.execSQL("DROP TABLE controller_document"); database.execSQL("DROP TABLE controller_anchor"); database.version = 2
             }
             store = store(directory)
             assertEquals(pin.encode(),store.current()?.encode()); assertEquals("synthetic@example.invalid",store.registration()?.account?.email)
             val state = ProcessorLibraryControllerJournal(store).accept(envelope(1,true))
             assertEquals(1L,state.sourceSequence); assertEquals(1L,state.sources?.revision)
             assertArrayEquals(byteArrayOf(8,6,4,2),original.readBytes())
-            sql(directory) { assertEquals(3,it.version) }
+            sql(directory) { assertEquals(4,it.version) }
         } finally { store.close(); cleanup(directory) }
     }
 }

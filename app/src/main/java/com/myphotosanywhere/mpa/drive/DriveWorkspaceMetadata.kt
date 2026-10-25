@@ -82,6 +82,12 @@ internal class DriveWorkspacePage(files: List<DriveWorkspaceMetadata>,val nextPa
             if (files.map { it.id }.distinct().size != files.size) throw IOException("Drive returned duplicate workspace identities.")
             return DriveWorkspacePage(files,next,incomplete)
         }
+        fun startCursor(bytes: ByteArray): String {
+            val root = json(bytes)
+            val cursor = if (root.isJsonObject) root.asJsonObject["startPageToken"] else null
+            if (cursor == null || !cursor.isJsonPrimitive || !cursor.asJsonPrimitive.isString) throw IOException("Drive did not return the actual workspace cursor.")
+            return cursor.asString.also(::pageToken)
+        }
         fun pageToken(value: String) { if (value.length !in 1..4096 || value.any { it.isISOControl() } || !Charsets.UTF_8.newEncoder().canEncode(value)) throw IOException("Drive workspace page token exceeds its bound.") }
         internal fun json(bytes: ByteArray): JsonElement = try { JsonParser.parseString(Charsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString()) }
             catch (error: com.google.gson.JsonParseException) { throw IOException("Drive returned malformed metadata JSON.",error) }

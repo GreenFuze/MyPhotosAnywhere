@@ -18,8 +18,13 @@ import kotlinx.coroutines.ensureActive
  * are transport evidence, NOT a completed observation fence, controller acceptance or
  * catalog activation. The caller must persist each listed candidate before reading it.
  * No original-file mutation, local media copy or desktop/LAN endpoint is created. */
-internal class ProcessorLibraryDriveObjects(private val gateway: DriveGateway,private val pin: LibraryConnectionDescriptor) : CatalogObjectSource {
-    suspend fun page(token: String? = null): DriveWorkspacePage {
+internal class ProcessorLibraryDriveObjects(private val gateway: DriveGateway,private val pin: LibraryConnectionDescriptor) : CatalogObjectSource, ProcessorWorkspaceInventorySource {
+    override val connectionSha256: String get() = pin.documentSha256
+    override suspend fun cursor(): String {
+        account();workspace()
+        return gateway.catalogWorkspaceCursor().also { account() }
+    }
+    override suspend fun page(token: String?): DriveWorkspacePage {
         account(); workspace()
         val result = gateway.catalogWorkspacePage(pin.workspace.folderId,token)
         account()
@@ -38,7 +43,7 @@ internal class ProcessorLibraryDriveObjects(private val gateway: DriveGateway,pr
         account(); return metadata
     }
 
-    suspend fun readCaptured(expected: DriveWorkspaceMetadata): ByteArray {
+    override suspend fun readCaptured(expected: DriveWorkspaceMetadata): ByteArray {
         val before = capture(expected.id)
         if (!before.sameRevision(expected)) throw IOException("The captured metadata object changed before its read.")
         return readOwned(before)

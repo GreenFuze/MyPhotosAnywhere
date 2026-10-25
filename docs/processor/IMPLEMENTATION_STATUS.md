@@ -1,5 +1,53 @@
 # MPA 0.6.0 implementation ledger
 
+## Native pending inventory and durable recovery
+
+The native client now commits an incomplete attempt before its first Google request,
+binds it to the independently approved connection, and retains the actual start and
+earliest unresolved cursor. It captures every eligible metadata identity across all
+pages before downloading the first body. Unknown-length, empty and oversized metadata
+remain durable failed identities; their disappearance cannot turn a later scan into
+success. Learning a previously unknown length preserves identity. Original media is
+not downloaded or changed by this owner.
+
+Actual read hashes persist before semantic verification. Failed verification, canceled
+I/O, storage failure and stale-owner completion preserve pending recovery. A successor
+fences the exact old attempt. The entire coordinator and callback run off the UI thread;
+recovery loops check cancellation, and source retirement joins before returning.
+Private schema4 preserves schema1/2/3 pins, selectors and accepted controller evidence;
+legacy Room12 and Processor13 remain unchanged. Missing accepted state fails closed.
+
+A first passing628-case candidate exposed superlinear full-inventory hash rebuilding:
+64/256 synthetic metadata records took297/2456ms on the shared Windows host. Immutable
+global/per-role event heads now protect atomic row/event/attempt updates without full
+body rescans per mutation. Startup, recovery and final enumeration verify the entire
+contiguous chain and every materialized body/identity. The4096 distinct-document limit
+is unchanged; the new private journal admits at most16384 events. Retention/ack compaction
+is still unfinished, and these host measurements are not10k/100k media or S23 acceptance.
+A54-case focused chain run passed with64/256 samples723/1490ms; different JIT/load conditions
+mean the timing alone is not proof of a speedup. The algorithm removes full-dataset
+mutation hashing. The focused XML was subsequently overwritten; final reports will be
+archived under a unique name. No integrity check or assertion was relaxed.
+
+New cases cover actual SQLite recovery/migration, unreadable identities, stale owners,
+cancellation, atomic rollback, event/row corruption, page cycles, storage and principal
+binding. Two additional emulator cases compile for interrupted recovery and preserving
+schema3 migration. The first631-case run caught nullable lengths encoded as text instead
+of JSON null; its failure report is retained and encoding is corrected. Final full
+regression passes all631 cases across111 suites, zero lint issues and both APK builds.
+The only build diagnostic is the already approved exact AGP setVisible deprecation.
+Complete logs,111 uniquely archived XML reports, source/APK hashes, host-cost samples
+and explicit limits are recorded in preflight-060/native-workspace-observation-validation.json.
+Two new native cases compile into the test APK; execution still requires exact-source
+API29/35/37 CI because no local AVD is available. No old assertion or warning severity
+was weakened.
+
+The result is explicitly PENDING evidence. There is no completed/current-authority or
+catalog activation API. Real Drive history replay, current controller/retired-epoch
+admission, ancestry, full-graph staging and atomic gallery activation still come next.
+This owner is not yet wired into runtime gallery browsing. No full0.6 product/release
+completion, live Google consent or S23 acceptance is claimed.
+
 ## Native screenshot completion and exact journal CI
 
 Exact9b609eb217812c451247d41873cd95ec581329a8 passes Android40141224428 and all

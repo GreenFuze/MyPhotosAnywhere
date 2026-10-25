@@ -52,6 +52,7 @@ class ProcessorDriveObjectsTest {
                     val url = checkNotNull(request.requestUrl)
                     val value = when {
                         url.encodedPath == "/drive/v3/about" -> { accountReply?.let { return it() }; """{"user":{"permissionId":"$principal","emailAddress":"synthetic@example.invalid"}}""" }
+                        url.encodedPath == "/drive/v3/changes/startPageToken" -> """{"startPageToken":"actual_cursor"}"""
                         url.encodedPath == "/drive/v3/files/${pin.workspace.folderId}" -> """{"id":"${pin.workspace.folderId}","mimeType":"$workspaceMime","version":"7","parents":[],"trashed":false}"""
                         url.encodedPath == "/drive/v3/files/meta" && url.queryParameter("alt") == "media" -> return media().also { afterMedia() }
                         url.encodedPath == "/drive/v3/files/meta" -> metadata()
@@ -180,6 +181,14 @@ class ProcessorDriveObjectsTest {
             rejects { fixture.source.capture("meta") }
             assertEquals(0,fixture.downloads())
             assertTrue(fixture.requests.all { it.requestUrl?.encodedPath == "/drive/v3/about" })
+        }
+    }
+    @Test fun actualCursorIsBoundedAndKeepsItsGoogleAccountBinding() = runBlocking {
+        Fixture(pin()).use { fixture ->
+            assertEquals("actual_cursor",fixture.source.cursor())
+            assertEquals(0,fixture.downloads())
+            assertEquals(fixture.pin.documentSha256,fixture.source.connectionSha256)
+            assertEquals(1,fixture.requests.count { it.requestUrl?.encodedPath == "/drive/v3/changes/startPageToken" })
         }
     }
     @Test fun pageDataIsOwnedAndUnknownStructuresDoNotBecomeEmptySuccess() {
