@@ -53,26 +53,41 @@ public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase databa
     /// captured sequence and must produce the same canonical bytes.</summary>
     public ProtocolSigningIntent Reserve(Guid id, Guid actorId, long epoch, string kind, Func<long, byte[]> bodyFactory)
     {
+        CheckId(id);CheckId(actorId);ArgumentOutOfRangeException.ThrowIfLessThan(epoch,1L);ArgumentNullException.ThrowIfNull(bodyFactory);
+        using var transaction = _database.Connection.BeginTransaction();
+        using var reserved=ReserveIn(id,actorId,epoch,kind,bodyFactory,transaction);
+        reserved.Recheck();transaction.Commit();return reserved.Value;
+    }
+
+    internal ProtocolSigningReservation ReserveIn(Guid id,Guid actorId,long epoch,string kind,Func<long,byte[]> bodyFactory,SqliteTransaction transaction)
+    {
         CheckId(id); CheckId(actorId); ArgumentOutOfRangeException.ThrowIfLessThan(epoch, 1L); ArgumentNullException.ThrowIfNull(bodyFactory);
-        using var transaction = _database.Connection.BeginTransaction(); var actor = Actor(actorId, epoch, transaction);
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Signing reservation requires its owner's live transaction.");
+        var actor = Actor(actorId, epoch, transaction);
         var existing = Read(id, transaction);
         if (existing is not null)
         {
             if (existing.ActorId != actorId || existing.Epoch != epoch || existing.Kind != kind) throw new ProtocolSigningConflictException();
             var replay = bodyFactory(existing.Sequence); ValidateBody(actor, existing.Sequence, kind, replay,transaction);
             if (!existing.Body.Span.SequenceEqual(replay)) throw new ProtocolSigningConflictException();
-            transaction.Commit(); return existing;
+            return new(existing,null);
         }
         if (actor.Sequence == long.MaxValue) throw new InvalidOperationException("The signing sequence is exhausted; explicitly enroll a new authorized epoch.");
         var sequence = actor.Sequence + 1; var owned = bodyFactory(sequence).ToArray(); ValidateBody(actor, sequence, kind, owned,transaction); var hash = Hash(owned);
-        using var reservation = _budget.Reserve(checked(owned.LongLength * 3 + 65536)); reservation.RecheckBeforeWrite(reservation.Bytes);
+        StorageReservation? reservation = _budget.Reserve(checked(owned.LongLength * 3 + 65536));
+        try
+        {
+        reservation.RecheckBeforeWrite(reservation.Bytes);
         using (var insert = Command(transaction, "INSERT INTO signing_intent(id,actor_id,epoch,sequence,kind,body,body_hash) VALUES($id,$actor,$epoch,$sequence,$kind,$body,$hash)",
             ("$id", id.ToString("D")), ("$actor", actorId.ToString("D")), ("$epoch", epoch), ("$sequence", sequence), ("$kind", kind), ("$body", owned), ("$hash", hash)))
             if (insert.ExecuteNonQuery() != 1) throw new InvalidOperationException("Signing intent did not insert exactly one captured record.");
         using (var advance = Command(transaction, "UPDATE signing_actor SET sequence=$next WHERE actor_id=$id AND epoch=$epoch AND sequence=$previous",
             ("$next", sequence), ("$id", actorId.ToString("D")), ("$epoch", epoch), ("$previous", actor.Sequence)))
             if (advance.ExecuteNonQuery() != 1) throw new ProtocolSigningConflictException();
-        transaction.Commit(); return new(id, actor.Library, actorId, epoch, sequence, kind, hash, owned, null, null);
+        var result=new ProtocolSigningReservation(new(id,actor.Library,actorId,epoch,sequence,kind,hash,owned,null,null),reservation);
+        reservation=null;return result;
+        }
+        finally {reservation?.Dispose();}
     }
 
     public ProtocolSigningIntent? Read(Guid id)

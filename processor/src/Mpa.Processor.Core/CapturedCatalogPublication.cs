@@ -38,6 +38,9 @@ public sealed record CapturedCatalogPublication(CatalogGenerationCapture Capture
 /// and a private current upload admission remain the application owner's responsibility.</summary>
 public sealed partial class CatalogGenerationCaptureRepository
 {
+    internal CapturedCatalogPublication PublicationIn(Guid id,SqliteTransaction transaction)
+    {var capture=RequiredCapture(id,transaction);return ReadPublication(capture,transaction) ?? throw new CatalogGenerationCaptureConflictException();}
+
     public CapturedCatalogPublication? Publication(Guid generationId)
     {
         Id(generationId); var capture = Read(generationId);

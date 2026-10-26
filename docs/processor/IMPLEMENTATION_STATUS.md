@@ -1,5 +1,43 @@
 # MPA 0.6.0 implementation ledger
 
+## Fixed outgoing current-control work
+
+The local transition journal now commits the native Root signing reservation and
+its complete immutable transition checkpoint together. Recovery retains the original
+predecessor, account revision, corpus, policy references, captured generation/commit,
+counter and first signature. An incomplete or missing checkpoint cannot silently
+adopt another Root intent, including one already observed in Drive. Only one
+unactivated transition may be pending. Native signing and network work are separate.
+
+Preparation checks the exact fenced predecessor, human source configuration,
+publisher retirement/key/epoch history and verified outbox receipt belonging to the
+original captured catalog plan. Revocation works without an active publisher. A
+successful local canonical activation records the matching transition receipt in
+the same transaction as accepted policies and the active pointer. It does not yet
+advance generation PublishedHead or release publication snapshots.
+
+All391 Core cases pass, retaining all382 previous identities. All85 affected current
+reader/storage Services cases pass unchanged. The strict Desktop build has zero
+warnings/errors. Nine exact LF source/test hashes and complete reports/logs are
+frozen in current-transition-validation.json. Failure coverage includes last-write
+rollback of native counters and checkpoints, low storage, missing/corrupt recovery
+records, stale account/nonces/sources, retired publisher reactivation, exact original
+catalog bindings, reservation ownership and atomic activation receipt rollback.
+Actual conditional Root update, lost-ack reconciliation and runtime handoff remain
+unfinished; this local journal is not a cloud publication grant or completed0.6.
+
+The preceding f7975a2 passed all12 cross-platform contract/scale/reference jobs.
+All32 reports and complete logs were independently verified: each platform95
+Protocol,382 Core,116 Google,423 ordinary Services,9 LAN,27 Web,2 scale and13
+reference cases. All preceding identities are retained. Windows contracts took
+1749seconds under the unchanged1800-second deadline. Android, native and Desktop
+workflows also passed. All177 native cases per API29/35/37, process-bound resource
+tracing,108 mapped decoded PNGs per API and SDK receipts were independently checked.
+The original gesture assertions pass on all three targets. The earlier b74 timeout's
+exact cause remains unverified. Runtime-diagnostic inventory is retained separately;
+it accepts no warning and does not replace visual/final-device acceptance. Fresh
+391-Core/423-Service cross-platform checks are required for this transition increment.
+
 ## Viewer gesture readiness and failure evidence
 
 The selected original can appear before asynchronous viewer-sequence preparation.

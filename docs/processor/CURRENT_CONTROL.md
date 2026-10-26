@@ -1,5 +1,28 @@
 # Exact current control for independent Drive clients
 
+## Fixed transition recovery
+
+The producer now has a local current-control transition journal. One transaction
+reserves both its Root body/counter and its immutable original predecessor, account
+revision, corpus, policies and verified captured catalog publication. Signing occurs
+after that transaction. Recovery never retargets these records, generates replacement
+work or adopts a native Root intent whose checkpoint is missing. Policy retirement,
+epoch/key history and exact human sources are checked before new reservation.
+
+Canonical admission retains the matching transition activation receipt atomically
+with accepted policies and the active pointer. That is a local completion record,
+not generation PublishedHead, snapshot retirement, original-write permission or a
+network grant. The actual same-file strong-condition update and lost-ack owner still
+need composition with fresh complete target reads and subsequent actual selected
+graph/final-fence admission. A desired Root must never be substituted for a real
+captured Root when preparing a canonical index.
+
+All391 Core and85 affected Services cases pass with zero-warning/error Desktop
+validation. Exact frozen source/log/report evidence is recorded separately. The
+preceding f7975a2 full cross-platform and177-per-API native artifacts are independently
+verified; runtime warning attribution, final visual/device acceptance and the full
+0.6 joint product/release remain unfinished.
+
 ## Why the protocol needs an explicit current object
 
 A full folder listing plus the highest signed policy observed locally is insufficient

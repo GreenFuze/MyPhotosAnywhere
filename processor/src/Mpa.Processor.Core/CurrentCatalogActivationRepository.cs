@@ -72,8 +72,10 @@ public sealed class CurrentCatalogActivationRepository(ProcessorStateDatabase da
             selection.Head.Sources.Reference.Sha256,selection.Publishers.Publisher?.ActorId,selection.Publishers.Publisher?.Epoch,selection.Publishers.PublisherKeyId,
             selection.Head.Catalog,catalogSequence,commits,descriptor);
         var encoded=Encode(result);using var reservation=_budget.Reserve(checked(encoded.Length*3L+65536));reservation.RecheckBeforeWrite(reservation.Bytes);
+        using var transition=new CurrentControlTransitionJournal(_database,_budget).RecordActivatedIn(result,transaction,token);
         Put(transaction,Key,encoded);Put(transaction,Key+":sha256",Hash(Encoding.UTF8.GetBytes(encoded)));
         token.ThrowIfCancellationRequested();acceptedPublisher.Recheck();acceptedSources.Recheck();reservation.RecheckBeforeWrite(reservation.Bytes);
+        transition?.RecheckBeforeWrite(transition.Bytes);
         transaction.Commit();return result;
     }
 
