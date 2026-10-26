@@ -158,12 +158,20 @@ public sealed partial class WorkspaceObservationRepository
         CurrentWorkspaceInventoryCheckpoint value;
         try {value=JsonSerializer.Deserialize<CurrentWorkspaceInventoryCheckpoint>(text,CurrentInventoryJson) ?? throw new InvalidDataException("Missing current inventory checkpoint.");}
         catch(JsonException error) {throw new InvalidDataException("Current inventory checkpoint cannot be decoded.",error);}
+        if(EncodeCurrentInventory(value)!=text) throw new InvalidDataException("Current inventory checkpoint changed its typed scope or encoding.");
+        AssertHistoricalCurrentInventoryIn(value,transaction,token);return value;
+    }
+
+    internal void AssertHistoricalCurrentInventoryIn(CurrentWorkspaceInventoryCheckpoint value,SqliteTransaction transaction,CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(value);ArgumentNullException.ThrowIfNull(transaction);
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Historical inventory requires its owning live transaction.");
         if(value.Context is null || value.Format!="mpa-current-workspace-inventory" || value.Major!=1 || value.AttemptId==Guid.Empty ||
             value.AttemptRevision<1 || !ValidAttemptCursor(value.Cursor) || value.RootAttemptId==Guid.Empty || value.RootIntentId==Guid.Empty ||
             value.RootSequence<1 || value.RootVersion<1 || value.Documents is <0 or >MaximumDocuments ||
             new[]{value.ConnectionSha256,value.RootSha256,value.SigningSha256,value.PublicationSha256,value.InventorySha256,
-                value.PreservedObservationSha256,value.PreservedCandidateSha256,value.PreservedHistorySha256}.Any(hash=>!Digest(hash)) ||
-            EncodeCurrentInventory(value)!=text) throw new InvalidDataException("Current inventory checkpoint changed its typed scope or encoding.");
+                value.PreservedObservationSha256,value.PreservedCandidateSha256,value.PreservedHistorySha256}.Any(hash=>!Digest(hash)))
+            throw new InvalidDataException("Current inventory checkpoint changed its typed scope or encoding.");
         try {ValidateContext(value.Context);}
         catch(ArgumentException error) {throw new InvalidDataException("Current inventory checkpoint changed its retained workspace context.",error);}
         var basis=new LocalCurrentControlObservations(_database,_budget).TransitionBasisIn(null,transaction,token);
@@ -174,7 +182,7 @@ public sealed partial class WorkspaceObservationRepository
             basis.SharedDriveId!=value.Context.SharedDriveId || value.RootVersion<basis.MinimumVersion || value.RootVersion>basis.MaximumObservedVersion ||
             value.Context.AccountRevision<basis.MinimumAccountRevision || value.Context.AccountRevision>basis.ObservedAccountRevision)
             throw new InvalidDataException("Current inventory lost its exact observed native Root/workspace binding.");
-        return value;
+        token.ThrowIfCancellationRequested();
     }
 
     private static string EncodeCurrentInventory(CurrentWorkspaceInventoryCheckpoint value)=>Encoding.UTF8.GetString(

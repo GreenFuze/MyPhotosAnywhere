@@ -1,5 +1,44 @@
 # MPA 0.6.0 implementation ledger
 
+## Historical selection of an owned generation
+
+Actual combined admission now records the first selection of an owned catalog in
+the same transaction as the Root terminal and active canonical pointer. The bounded,
+explicitly tagged receipt binds the original generation, scope, snapshot descriptor,
+native signature and immutable publication plan to the actual typed inventory,
+observed Root and sealed canonical activation. Every owned generation object and
+reused dependency must already have its actual verified immutable observation.
+The paired receipt reservation remains held through the final transaction commit.
+
+Historical reads check the original plan and retained native Root/policies without
+requiring a live Drive grant. A subsequent scan, refreshed canonical stage or joined
+retirement of the old private index does not relabel that first receipt. The receipt
+does not change the capture phase, create legacy verification/PublishedHead, complete
+a generation, retire its publication snapshot or authorize any original-file action.
+
+All fourteen focused cases pass, including the ten previous combined-admission cases
+and four new selection cases. They cover actual admission, historical offline reads,
+receipt-hash rollback of the Root terminal and pointer, semantic corruption even with
+a recomputed outer hash, and refresh followed by physical private-index retirement.
+The native plan/Root transport and canonical file are real test owners; the separate
+publication-snapshot descriptor is explicitly synthetic. Full Core and broader
+affected Services regressions are running against frozen sources; fresh platform CI
+and the final strict Desktop build remain required. No pending result is a pass.
+
+Parent adb96b8 passed all 24 protocol jobs after one exact-revision infrastructure
+retry. All 40 reports, preserved identities, fixture/source receipts, measurements,
+job limits and complete final logs were independently verified. Each platform has
+437 Core and 477 ordinary Services cases, with both publication-scale fixtures and
+all 13 dependency-reference cases separate. All report stdout/stderr streams contain
+no diagnostic word matches. Android, native and desktop statuses also pass. The
+original macOS Intel artifact-upload DNS failure and unassigned cancelled ARM job
+remain historical failures; no application warning or failure was waived.
+
+Current-controlled completion, unselected captured-generation disposition and
+successor lineage, runtime consumption and the remaining joint 0.6 work are still
+unfinished. The one-live-publication-capture rule and all schema/resource/signing
+identities remain unchanged.
+
 ## Combined selected graph, inventory and sealed canonical admission
 
 The current reader can now keep the actual sealed canonical SQLite file leased
