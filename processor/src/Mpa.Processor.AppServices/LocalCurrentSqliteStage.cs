@@ -7,7 +7,7 @@ namespace Mpa.Processor.AppServices;
 /// bounded claims/checkpoints; native file writes and whole-file hashing run outside
 /// that queue. A sealed result is historical preparation, never an active catalog or
 /// permission to write originals. The final Root fence and atomic admission follow.</summary>
-public sealed class LocalCurrentSqliteStage : ILocalCurrentCatalogStage,IAsyncDisposable
+public sealed class LocalCurrentSqliteStage : ILocalCurrentCatalogStage,ILocalCurrentIndexOwner
 {
     private readonly ProcessorStateCoordinator _state;
     private readonly StorageBudgetManager _budget;

@@ -1,5 +1,28 @@
 # MPA 0.6.0 implementation ledger
 
+## Historical canonical reopening
+
+A separate read-only owner can reopen the independently verified previous canonical
+selection after restart, a changed cloud Root or account disconnection. It holds the
+same exclusive pool area and exact sealed native claim/header/hash without making
+a new capture or relabeling old work. It exposes historical pages and joined Exit;
+it has no graph-staging, activation, account or publication members. Current-source
+admission still uses the complete fresh reader/stage route.
+
+The pool owns both historical and pending children through one lifetime contract.
+Opening a new candidate preserves old pages; old retirement still requires new
+activation plus actual caller closure. Unknown/corrupt pointers or native files fail
+closed and retain claims/files. An absent active pointer allocates no index or area.
+Five new focused cases pass, including unchanged file bytes, no network/original
+reads, cancellation, shared retirement, corruption refusal and joined pool Exit.
+All85 affected current-reader/storage cases pass, preserving every previous80
+identity. Strict Desktop has zero warnings/errors. Five exact LF source/test hashes
+and full logs/reports are frozen in current-historical-validation.json. Core and
+Core.Tests trees remain identical to the preceding382-case proof; Core was not rerun
+locally for this AppServices-only increment. Fresh all423 ordinary AppServices and
+mandatory cross-platform checks remain required.
+No runtime route, mutable Root CAS or complete0.6 product is enabled by this increment.
+
 ## Atomic canonical admission
 
 The local admission transaction verifies the same live reader's final Root fence,

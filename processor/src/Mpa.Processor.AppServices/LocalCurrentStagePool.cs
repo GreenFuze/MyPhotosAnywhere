@@ -5,14 +5,14 @@ namespace Mpa.Processor.AppServices;
 /// <summary>One joined directory owner for active and pending private indexes.
 /// Opening another candidate leaves historical readers alive. No active pointer,
 /// Root authority, current publication or original-write permission is implied.</summary>
-public sealed class LocalCurrentStagePool(ProcessorStateCoordinator state,StorageBudgetManager budget) : IAsyncDisposable
+public sealed partial class LocalCurrentStagePool(ProcessorStateCoordinator state,StorageBudgetManager budget) : IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state=state ?? throw new ArgumentNullException(nameof(state));
     private readonly StorageBudgetManager _budget=budget ?? throw new ArgumentNullException(nameof(budget));
     private readonly object _gate=new();
     private readonly SemaphoreSlim _serial=new(1,1);
     private readonly CancellationTokenSource _stop=new();
-    private readonly Dictionary<Guid,LocalCurrentSqliteStage> _stages=[];
+    private readonly Dictionary<Guid,ILocalCurrentIndexOwner> _stages=[];
     private CurrentCatalogStageArea? _area;
     private string? _directory;
     private Guid _installation;
@@ -36,8 +36,8 @@ public sealed class LocalCurrentStagePool(ProcessorStateCoordinator state,Storag
         catch {await stage.DisposeAsync().ConfigureAwait(false);throw;}
     },cancellationToken);
 
-    /// <summary>Retire only a caller-closed inactive candidate. The journal's active
-    /// pointer guard stays blocking until its separate atomic admission owner exists.</summary>
+    /// <summary>Retire only a caller-closed inactive candidate. Unknown or corrupt
+    /// active receipts still block retirement through the journal's decoder.</summary>
     public Task RetireAsync(Guid id,CancellationToken cancellationToken)=>OperationAsync(async token=>
     {
         SweepClosed();if(_stages.ContainsKey(id)) throw new InvalidOperationException("Join the index before requesting its retirement.");

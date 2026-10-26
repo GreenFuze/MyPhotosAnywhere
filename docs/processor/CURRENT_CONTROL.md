@@ -356,3 +356,21 @@ or resetting observed metadata high-water. No Root update, original mutation,
 PublishedHead completion, runtime switch or new-process freshness follows from
 these holders. Mutable Root transition/recovery and runtime/native composition are
 still separate required work. Main schemas and existing storage/page limits remain.
+
+
+### Read-only historical reopening
+
+`LocalCurrentStagePool.OpenHistoricalAsync` loads the independently verified active
+receipt and exact sealed claim, opens the original private file under its exclusive
+area/native header/hash checks, then rechecks the main claim before exposing pages.
+It makes no Google request and requires no connected account or newly fabricated
+Root capture. A changed cloud Root cannot relabel the preceding content or grant it
+fresh authority. Missing active content returns no reader and allocates no area;
+corrupt/unknown receipts or changed native files fail closed with evidence retained.
+
+`LocalHistoricalCatalog` exposes only historical selection/pages and joined Exit.
+It has no capture, staging, activation or publication members. Both historical and
+pending children share the pool's close contract; the area retires only after every
+native child has joined. New activation preserves earlier open pages; old claims
+retire only after they are inactive and actually closed. This facade is not yet
+composed into runtime/UI routing. Main schemas and two-index/file limits remain.
