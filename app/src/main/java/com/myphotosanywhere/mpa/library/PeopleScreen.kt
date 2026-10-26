@@ -83,7 +83,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                 "Recognition settings",if(enabled) "On-device face matching is enabled" else "Face recognition is optional",
                 R.drawable.ic_action_settings,"people:settings",open=onSettings)))
             if(state.loading || review==null || indexingLabels) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if(indexingLabels) Text("Updating saved people namesâ€¦",style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("people:indexing"))
+            if(indexingLabels) Text("Updating saved people names…",style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("people:indexing"))
             state.error?.let { Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={ retryPeople++ }) { Text("Retry People") } }
             labelError?.let { Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={ model.app.personLabels.retry() }) { Text("Retry failed labels") } }
             if(!state.loading && review!=null && state.error==null && state.groups.isEmpty()) Text("People appear from your imported names and reviewed faces. Possible face matches need your confirmation.",style=MaterialTheme.typography.bodySmall)
@@ -109,7 +109,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
             }
         }
         item(key="people:unassigned") {
-            Text("Unassigned faces Â· ${faces.count { it.personId==null }}",style=MaterialTheme.typography.titleMedium)
+            Text("Unassigned faces · ${faces.count { it.personId==null }}",style=MaterialTheme.typography.titleMedium)
             val unavailable=review?.diagnostics?.values.orEmpty().count { it.status in listOf(FaceReview.Status.NO_EMBEDDING,FaceReview.Status.INVALID_EMBEDDING,FaceReview.Status.DIFFERENT_MODEL) }
             if(unavailable>0) Text("$unavailable unassigned faces lack usable matching data. Open Why separate? to check them.")
         }
@@ -117,7 +117,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
             val group=ids.mapNotNull { byId[it] }
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    Text(if(group.size>1) "Possible group Â· ${group.size} faces" else "Unknown face")
+                    Text(if(group.size>1) "Possible group · ${group.size} faces" else "Unknown face")
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { group.take(4).forEach { face ->
                         AsyncImage(previewSource(face.cropPath),"Detected face",Modifier.size(64.dp).clickable { onPhoto(face.photoId) })
                     } }
@@ -174,14 +174,14 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                     FaceReview.Status.AMBIGUOUS -> "Two named people are too close in similarity to suggest one safely."
                     FaceReview.Status.SUGGESTED -> "A possible named match is available for review."
                 })
-                detail.named?.nearest?.let { (person,score) -> Text("Closest named person: ${people.find { it.id==person }?.name ?: "Unknown"} Â· ${scoreText(score)}") }
-                detail.named?.runnerUp?.let { (person,score) -> Text("Next named person: ${people.find { it.id==person }?.name ?: "Unknown"} Â· ${scoreText(score)}") }
+                detail.named?.nearest?.let { (person,score) -> Text("Closest named person: ${people.find { it.id==person }?.name ?: "Unknown"} · ${scoreText(score)}") }
+                detail.named?.runnerUp?.let { (person,score) -> Text("Next named person: ${people.find { it.id==person }?.name ?: "Unknown"} · ${scoreText(score)}") }
                 detail.nearestFaceId?.let { nearest ->
                     Text("Most similar face in another photo: ${scoreText(requireNotNull(detail.nearestFaceScore))}")
                     byId[nearest]?.let { face -> AsyncImage(previewSource(face.cropPath),"Most similar face",Modifier.size(96.dp).clickable { explaining=null; onPhoto(face.photoId) }) }
                 }
                 Text("Similarity threshold ${scoreText(FaceMatching.MIN_SIMILARITY)}; required lead over another named person ${scoreText(FaceMatching.MIN_MARGIN)}. Scores measure similarity, not probability. Groups require every pair to pass; separate faces in one photo stay separate.",style=MaterialTheme.typography.bodySmall)
-            } ?: Text("Checking local recognition dataâ€¦")
+            } ?: Text("Checking local recognition data…")
         } },confirmButton={ TextButton(onClick={ explaining=null }) { Text("Close") } })
     }
 }

@@ -92,7 +92,7 @@ semantic verification. Nonces, Root-head/global-role integrity and actual-file v
 corpus/content high-water survive failed reads and restart. Rewriting bytes under a known
 Drive version is rejected. Changed final probes block the old capture. Close and caller
 cancellation join actual I/O and reject late results; restarted readers capture afresh.
-Private schema7 adds two tables while preserving1â€“6, old receipts and originals.
+Private schema7 adds two tables while preserving1–6, old receipts and originals.
 
 These are pending observations. Future graph consumers must participate in the same
 reader lifetime before fenced evidence can be atomically admitted with exact policies,
@@ -270,7 +270,6 @@ exact-JSON and listed-candidate routes share that check; a valid SHA/version alo
 cannot hide a move or additional parent. Existing JSON/binary bounds and original-MIME
 rejection remain. The graph owner must compare those actual returned fields against
 its captured scope; this transport improvement alone supplies no graph/current authority.
-
 
 ### Same-reader selected graph and durable actual immutable observations
 

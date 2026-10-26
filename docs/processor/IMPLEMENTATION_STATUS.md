@@ -1,5 +1,48 @@
 # MPA 0.6.0 implementation ledger
 
+## Complete ordinary regression and native backup action readiness
+
+All393 ordinary AppServices cases pass on immutable5e456e2, preserving every374
+preceding identity. The mandatory scale/reference categories remain separate required
+checks. The exact12-job protocol workflow also completed successfully, including
+Windows under its unchanged30-minute deadline. All32 TRX reports and full logs are
+independently verified across all four native platforms. Cancelled or skipped runs are not used as evidence.
+
+The same native revision failed API35 in the device-folder backup test. Its action
+was visible before the separate off-main-thread original check enabled it; the test
+waited for existence and could tap a disabled control. Readiness now requires enabled
+semantics within the SAME existing10000ms wait, followed by an explicit enabled
+assertion. All original display/dialog/metadata/no-upload assertions and their
+existing deadlines remain. No application permission or availability guard changes.
+The corrected source passes all713 JVM cases/117 suites and zero-finding lint; both
+development APKs and the test APK compile. All three compiler tasks and the full unit
+task were forced to execute. Native execution remains pending; failed evidence is kept.
+
+The actual API35 main-stage empty-crop case passed with zero root-directory SELinux
+denials, independently checked from its exact test log/report. API29/37 were cancelled
+after the later backup test failed, so this is not full native/runtime acceptance.
+The0.6 product, canonical activation/runtime integration and joint release remain
+unfinished. Frozen proofs are current-graph-full-ordinary-services-validation.json,
+native-empty-crop-api35-observation.json and native-backup-readiness-build-validation.json.
+
+## Compiler lifetime and UTF8 text are explicit
+
+A new compiler-daemon connection warning correctly blocked the earlier candidate.
+Compilation now explicitly runs inside the existing short-lived Gradle process and
+fallback is disabled. The heap remains2GiB; warnings, deadlines and assertions remain
+unchanged. The supported strategy avoids borrowing a shared daemon endpoint. All
+three compiler variants and the full713-case unit task actually executed under the
+strict gate, which accepts only the already approved exact AGP diagnostic15 records.
+See [Kotlin compiler execution](https://kotlinlang.org/docs/compiler-execution-strategy.html).
+
+File-editing scripts had also decoded existing UTF8 text through the Windows locale.
+Original labels and unrelated assertion strings were restored from exact committed
+UTF8 bytes before validation; both Kotlin files preserve their original non-ASCII
+character sequences. Future text I/O uses explicit UTF8. Superseded candidate reports
+remain historical, and fresh exact-source/report/APK hashes are frozen in
+preflight-060/native-readiness-owned-compiler-validation.json. Fresh full native CI
+is still required; this does not complete0.6 or authorize publication.
+
 ## Absent face crops remain absent previews
 
 Four people-screen face images now use the existing blank/provider-safe preview
@@ -470,7 +513,7 @@ retire. Caller cancellation also joins uncooperative I/O. Fenced evidence remain
 future graph reads must join this lifetime before atomic canonical activation. A restarted
 reader requires a fresh capture; persisted fenced state alone grants no current authority.
 
-Private schema7 adds two tables and preserves1ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ6;6->7 does not rewrite old controller or
+Private schema7 adds two tables and preserves1–6;6->7 does not rewrite old controller or
 workspace bodies. Genuine migration tests retain approval, account, pending evidence and
 original bytes. Historical migration fixtures drop only the new tables when constructing
 older versions; every existing preservation assertion remains. Room12 and Processor13
@@ -720,7 +763,7 @@ Exact3f9f8e9312e48415ed7ea971c636289eda835ce6 passes Android40148403416 and the
 API35/37 jobs in Native40148403400. API29's job fails its uninterrupted runtime-capture
 gate after the native tests and108 screenshot collection: its continuous log ends before
 the tests because the confirmed API29 preparation restarted adbd/framework after the
-stream had been opened. The retained heap profile proves the narrow16mÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢configured576m
+stream had been opened. The retained heap profile proves the narrow16m→configured576m
 zygote repair, without raising the existing AVD heap. This is incomplete runtime
 evidence, not an accepted warning or passing API29 release result.
 
@@ -1092,7 +1135,7 @@ large-library costs, retention and the remaining 0.6 feature backlog remain unre
 The preceding exact revision 93a4b621 passed Desktop40106241655, Android40106241654,
 device40106241664 on APIs29/35/37, and Protocol40106241772 with all four regression and
 all four scale jobs. Archived reports independently match that SHA. Synthetic preparation
-on those runners took about 161ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ421 seconds for 10k and 171ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ380 seconds for 100k; this
+on those runners took about 161–421 seconds for 10k and 171–380 seconds for 100k; this
 does not replace current-source validation or live-network/UI acceptance.
 
 ## Measured large generation preparation and immutable public keys
