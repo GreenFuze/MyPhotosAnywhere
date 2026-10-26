@@ -19,7 +19,9 @@ public sealed partial class CurrentControlTransitionJournal
     {
         using var transaction=_database.Connection.BeginTransaction();
         var basis=new LocalCurrentControlObservations(_database,_budget).TransitionBasisIn(null,transaction,token);
-        var result=ReadIntentIn(id,basis,transaction,token);token.ThrowIfCancellationRequested();transaction.Commit();return result;
+        var result=ReadIntentIn(id,basis,transaction,token);
+        if(ReadCompletion(result.Plan,transaction)?.Withdrawal is not null) throw new CurrentControlTransitionWithdrawnException();
+        token.ThrowIfCancellationRequested();transaction.Commit();return result;
     }
 
     /// <summary>Local pre-update checks. Only the live joined semantic owner can
@@ -66,6 +68,7 @@ public sealed partial class CurrentControlTransitionJournal
     private void AssertCurrentIn(CurrentControlTransitionPlan plan,ProtocolSigningIntent intent,LocalCurrentTransitionBasis basis,
         LocalCurrentControlAttempt attempt,SqliteTransaction transaction,CancellationToken token)
     {
+        if(ReadCompletion(plan,transaction)?.Withdrawal is not null) throw new CurrentControlTransitionWithdrawnException();
         if(intent.Envelope is null || attempt.AccountRevision<plan.AccountRevision || attempt.Version<plan.PreviousVersion ||
             basis.Head.EnvelopeSha256!=plan.PreviousSha256 && basis.Head.EnvelopeSha256!=intent.EnvelopeSha256 ||
             basis.Head.EnvelopeSha256==intent.EnvelopeSha256 && attempt.Version<=plan.PreviousVersion)

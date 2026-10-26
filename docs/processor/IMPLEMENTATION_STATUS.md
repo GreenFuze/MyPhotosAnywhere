@@ -1,5 +1,39 @@
 # MPA 0.6.0 implementation ledger
 
+## Durable withdrawal of fixed current-control work
+
+The live current reader can withdraw an obsolete fixed Root plan after joining the
+actual account operation and observing a fresh final Root fence. The private terminal
+record preserves the original body, signing ID, counter, source context and first
+signature. Unsigned work stays unsigned. The observed Root must be the exact original
+predecessor or the exact desired body after a lost acknowledgement. Withdrawal cannot
+undo an already applied cloud update and grants no original-file action.
+
+The existing five-row per-plan bound and legacy activation encoding remain unchanged.
+Both terminal integrity rows commit together. A withdrawn plan cannot be signed,
+sent by an earlier admission permit or canonically activated. A separately captured
+new plan can follow; historical same-reason replay works after disconnection. A
+configuration-change reason requires an actual superseded human source or policy.
+
+Eleven new Core and five new Services cases cover corruption with recomputed hashes,
+last-write rollback, storage failure, restart, policy supersession, disconnected
+replay and actual cross-reader joins during uncooperative metadata or physical PUT
+operations. All 404 Core and 110 affected Services cases pass, retaining every prior
+393/105 identity. Strict Desktop has zero warnings/errors. Six exact LF source/test
+hashes and complete reports/logs are frozen in current-withdrawal-validation.json;
+the unchanged Google trees inherit their exact 119-case proof. No PublishedHead,
+captured-generation disposition or snapshot cleanup follows
+from this terminal record. Uploaded but unselected generation recovery, actual v2
+inventory/selected-parent handoff and runtime/native composition remain unfinished.
+
+The preceding e2e58ba passes all four workflows. All 12 cross-platform protocol jobs,
+32 reports and full logs were independently verified: each platform passed 95 Protocol,
+393 Core, 119 Google, 443 ordinary Services, 9 LAN, 27 Web, two scale and 13 reference
+cases. Windows finished in 1424 seconds under its unchanged 1800-second limit. Fresh
+404-Core and 448-ordinary-Service cross-platform checks remain required for withdrawal.
+Whole 0.6 features, installers, diagnostic attribution, final acceptance and exact
+joint publication are still unfinished.
+
 ## Actual conditional current-control publication
 
 The joined current reader now publishes the exact retained Root transition through

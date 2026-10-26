@@ -422,3 +422,25 @@ pending children share the pool's close contract; the area retires only after ev
 native child has joined. New activation preserves earlier open pages; old claims
 retire only after they are inactive and actually closed. This facade is not yet
 composed into runtime/UI routing. Main schemas and two-index/file limits remain.
+
+### Terminal withdrawal is distinct from activation and generation retirement
+
+An obsolete fixed transition may receive a private terminal withdrawal only after a
+live joined reader captures and fences the actual original predecessor or exact
+desired Root. The account lease joins any prior physical request, including an
+uncooperative PUT that may already have applied. Its new nonce invalidates older
+publication permits. The terminal record neither signs nor sends reserved work.
+
+The original plan, body, counter, native intent, outbox and captured generation remain.
+The two terminal rows reuse the existing activation slot with a strictly validated
+variant; old activation bytes retain their canonical encoding. A withdrawn plan is
+refused before signing, immediately before sending and during atomic activation.
+Historical replay preserves its first observation and requires the same reason.
+Configuration-change withdrawal independently requires superseded human configuration
+or policy. Cancellation does not undo an already applied cloud Root.
+
+This permits a distinct newly captured transition without retargeting old work. It
+does not dispose a captured generation, advance PublishedHead, release its snapshot,
+authorize original mutations or make an old observation current authority. Explicit
+generation disposition, v2 immutable inventory witnesses and actual runtime handoff
+are still required. All storage/history bounds and main schemas remain unchanged.

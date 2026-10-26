@@ -49,7 +49,7 @@ public sealed partial class CurrentControlTransitionJournal(ProcessorStateDataba
             // Recovery read only, including after credentials/configuration change.
             transaction.Commit();return old;
         }
-        if(plans.Any(plan=>ReadActivation(plan,transaction) is null)) throw new CurrentControlTransitionInProgressException();
+        if(plans.Any(plan=>ReadCompletion(plan,transaction) is null)) throw new CurrentControlTransitionInProgressException();
         if(plans.Count>=Maximum-1) throw new CatalogTraversalLimitException();
         var basis=observations.TransitionBasisIn(fenced,transaction,token);var journal=new ProtocolSigningJournal(_database,_budget);
         var policies=Policies(basis.Pin,target,transaction);
@@ -99,9 +99,10 @@ public sealed partial class CurrentControlTransitionJournal(ProcessorStateDataba
             activation.AccountRevision<plan.AccountRevision || activation.DriveVersion<=plan.PreviousVersion || activation.ConnectionCode!=plan.ConnectionCode)
             throw new CurrentControlObservationConflictException();
         var receipt=new Activated(plan.Id,activation.RootSha256,activation.StageId,activation.AccountRevision,activation.DriveVersion);
-        var old=ReadActivation(plan,transaction);
+        var old=ReadCompletion(plan,transaction);
         if(old is not null)
         {
+            if(old.Withdrawal is not null) throw new CurrentControlTransitionWithdrawnException();
             if(old.RootSha256!=receipt.RootSha256 || old.AccountRevision>receipt.AccountRevision || old.DriveVersion>receipt.DriveVersion) throw new CurrentControlObservationConflictException();
             return null; // Preserve the first historical completion, never relabel it.
         }
@@ -159,7 +160,7 @@ public sealed partial class CurrentControlTransitionJournal(ProcessorStateDataba
                 var root=LibraryCurrentControl.Read(envelope.Span,basis.Pin);root.AssertSuccessorOf(predecessor);
                 _=root.ReadPublishers(policies.PublisherBytes.Span,basis.Pin);_=root.ReadSources(policies.SourceBytes.Span,basis.Pin);
             }
-            _=ReadActivation(plan,transaction);plans.Add(plan);
+            _=ReadCompletion(plan,transaction);plans.Add(plan);
         }
         // Every post-bootstrap Root signature/reservation must retain its plan,
         // even if it was subsequently observed. Never adopt orphan signing work.
@@ -202,7 +203,7 @@ public sealed partial class CurrentControlTransitionJournal(ProcessorStateDataba
         return(new(pin.Workspace.AccountId,row.FileId,pin.Workspace.FolderId,row.Payload.Length,row.Sha256),row.Scope.GenerationId,publication.Basis.Parent,row.Scope.AccountRevision);
     }
 
-    private Activated? ReadActivation(CurrentControlTransitionPlan plan,SqliteTransaction transaction)
+    private Activated? ReadCompletion(CurrentControlTransitionPlan plan,SqliteTransaction transaction)
     {
         var key=Key(plan.Id)+":activated";var body=ReadValue(transaction,key,4096);var hash=ReadValue(transaction,key+":sha256",64);
         if(body is null && hash is null) return null;
@@ -210,8 +211,17 @@ public sealed partial class CurrentControlTransitionJournal(ProcessorStateDataba
         Activated value;try {value=JsonSerializer.Deserialize<Activated>(body,Json) ?? throw new InvalidDataException("Missing Root activation receipt.");}
         catch(JsonException error){throw new InvalidDataException("Root activation receipt cannot be decoded.",error);}
         var intent=new ProtocolSigningJournal(_database,_budget).Read(plan.Id,transaction);
-        if(value.Id!=plan.Id || value.StageId==Guid.Empty || intent?.Envelope is null || value.RootSha256!=intent.EnvelopeSha256 || value.AccountRevision<plan.AccountRevision ||
-            value.DriveVersion<=plan.PreviousVersion || Encode(value)!=body) throw new InvalidDataException("Root activation receipt changed its fixed signed selection.");
+        if(value.Id!=plan.Id || intent is null || value.AccountRevision<plan.AccountRevision || value.DriveVersion<plan.PreviousVersion || Encode(value)!=body)
+            throw new InvalidDataException("Root terminal receipt changed its fixed scope or encoding.");
+        if(value.Withdrawal is not { } withdrawn)
+        {
+            if(value.StageId==Guid.Empty || intent.Envelope is null || value.RootSha256!=intent.EnvelopeSha256 || value.DriveVersion<=plan.PreviousVersion)
+                throw new InvalidDataException("Root activation receipt changed its fixed signed selection.");
+        }
+        else if(value.StageId!=Guid.Empty || withdrawn.AttemptId==Guid.Empty || withdrawn.BodySha256!=plan.BodySha256 || !WithdrawalReasonKnown(withdrawn.Reason) ||
+            !(value.RootSha256==plan.PreviousSha256 && withdrawn.RootSequence==plan.PreviousSequence ||
+                intent.Envelope is not null && value.RootSha256==intent.EnvelopeSha256 && withdrawn.RootSequence==plan.Sequence && value.DriveVersion>plan.PreviousVersion))
+            throw new InvalidDataException("Root withdrawal lost its original body or actual native predecessor/desired observation.");
         return value;
     }
     private string? ReadValue(SqliteTransaction transaction,string key,int maximum)
@@ -228,5 +238,11 @@ public sealed partial class CurrentControlTransitionJournal(ProcessorStateDataba
     private static string Hash(string value)=>Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     private static string Claim(CurrentControlTransitionPlan plan)=>Hash("mpa-fixed-root-transition-v1\n"+Encode(plan));
     private sealed record PolicyEvidence(CatalogPublisherAuthorization Publisher,CatalogSourceConfiguration Sources,ReadOnlyMemory<byte> PublisherBytes,ReadOnlyMemory<byte> SourceBytes);
-    private sealed record Activated(Guid Id,string RootSha256,Guid StageId,long AccountRevision,long DriveVersion);
+    // The legacy key and activation JSON remain byte-identical. A terminal union
+    // uses the SAME two result rows, keeping the existing five-row-per-plan bound.
+    private sealed record Activated(Guid Id,string RootSha256,Guid StageId,long AccountRevision,long DriveVersion)
+    {
+        [JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] public Withdrawn? Withdrawal {get;init;}
+    }
+    private sealed record Withdrawn(Guid AttemptId,string BodySha256,long RootSequence,string Reason);
 }
