@@ -73,6 +73,7 @@ public sealed partial class AccountServiceTests
     {
         await using var fixture=await CurrentReaderFixture.CreateAsync().ConfigureAwait(false);var plan=await PrepareTransitionAsync(fixture).ConfigureAwait(false);
         var entered=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var release=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseOnExit=new TestCallbackReleaseOwner(release);
         if(actualWrite) fixture.Http.AfterPut=async()=>{entered.TrySetResult();await release.Task.ConfigureAwait(false);};
         else
         {
@@ -84,7 +85,8 @@ public sealed partial class AccountServiceTests
             };
         }
         var publishing=fixture.Reader.PublishTransitionAsync(plan.Id,CancellationToken.None);
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        _ =await Task.WhenAny(entered.Task,publishing).WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        if(publishing.IsCompleted) {await publishing.ConfigureAwait(false);Assert.IsTrue(entered.Task.IsCompleted);}
         var prior=await CurrentStateAsync(fixture.Data,store=>store.Current()!).ConfigureAwait(false);
         await using var other=new LocalCurrentControlReader(fixture.Data.Setup.Accounts.State,fixture.Data.Setup.Accounts.Service,fixture.Data.Setup.Keys,fixture.Data.Budget);
         var withdrawing=other.WithdrawTransitionAsync(plan.Id,CurrentControlTransitionWithdrawalReason.Cancelled,CancellationToken.None);

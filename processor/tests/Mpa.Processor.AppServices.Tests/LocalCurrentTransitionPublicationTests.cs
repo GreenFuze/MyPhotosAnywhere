@@ -83,8 +83,10 @@ public sealed partial class AccountServiceTests
         await using var fixture=await CurrentReaderFixture.CreateAsync().ConfigureAwait(false);using var caller=new CancellationTokenSource();
         var plan=await PrepareTransitionAsync(fixture).ConfigureAwait(false);
         var entered=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var release=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseOnExit=new TestCallbackReleaseOwner(release);
         fixture.Http.AfterPut=async()=>{entered.TrySetResult();await release.Task.ConfigureAwait(false);};
-        var pending=fixture.Reader.PublishTransitionAsync(plan.Id,caller.Token);await entered.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        var pending=fixture.Reader.PublishTransitionAsync(plan.Id,caller.Token);_ =await Task.WhenAny(entered.Task,pending).WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        if(pending.IsCompleted) {await pending.ConfigureAwait(false);Assert.IsTrue(entered.Task.IsCompleted);}
         var stopping=Task.CompletedTask;if(exit) stopping=fixture.Reader.DisposeAsync().AsTask();else await caller.CancelAsync().ConfigureAwait(false);
         try {Assert.IsFalse(pending.IsCompleted);if(exit) Assert.IsFalse(stopping.IsCompleted);Assert.IsFalse(fixture.Http.Disposed);Assert.AreEqual(0,fixture.Data.Setup.Accounts.Readers.DisposalAttempts);}
         finally {release.TrySetResult();}

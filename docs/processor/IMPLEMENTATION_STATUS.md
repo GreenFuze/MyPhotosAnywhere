@@ -1,5 +1,42 @@
 # MPA 0.6.0 implementation ledger
 
+## Native public-key validation cost and failure-safe test callback ownership
+
+The local regression completed with five failures: four existing 10-second callback
+entry waits and the 100k fixture's unchanged 30-minute lifetime. Its actual filter ran
+222 cases, with 217 passing. The earlier expected count of 190 matched method names
+only; VSTest also matches class names. Correcting that evidence does not change any
+test, filter, assertion or deadline. The failed run and complete report remain kept.
+
+An isolated copy of the exact compiled fixture reproduced a publication path close
+to the entry deadline: about 9.9 seconds wall time and 8.7 seconds process CPU before
+Put. A sampled trace attributed most active MPA stack occupancy to repeated native
+public-key import/canonical/curve validation, rather than accepting a signature or
+reading originals. This is evidence of avoidable work; host load alone is not claimed
+as the cause and a successful replay is not presented as a source fix.
+
+The protocol now keeps at most 64 immutable, successfully native-validated canonical
+public-key encodings and public points. Every verifier still imports and owns a fresh
+real native key and checks each actual signature. Actor/library/epoch, enrollment,
+policy, counters, Root observations and authority remain freshly checked. No native
+handle, private key, accepted document or authorization is retained in this pool.
+Eviction revalidates the original encoding. Public point arrays are private copies;
+native imports receive their own copies. Every uncached encoding takes the original
+strict native validation path; invalid encodings never enter the pool.
+
+The four callback tests also now release their uncooperative mock on every scope
+exit and propagate early publication faults. Every original assertion and deadline
+remains intact. This closes a test-owner cleanup gap if entry itself fails.
+
+Isolated validation passed all 95 original Protocol cases plus four new ownership,
+rejection, bound/eviction and concurrency cases. Byte-identical existing Services
+test binaries passed all four deadline cases with only the candidate Protocol DLL
+overlaid. Repository validation then passed all 99 Protocol and all 18 selected
+Services cases, retaining their previous identities. Strict Desktop Release has zero
+warnings/errors. The 10k/100k replay is separate and still pending; the original 100k
+failure is not waived. Full regression and exact-revision CI remain required before
+any publication. This change does not complete the remaining 0.6 features.
+
 ## Historical selection of an owned generation
 
 Actual combined admission now records the first selection of an owned catalog in
