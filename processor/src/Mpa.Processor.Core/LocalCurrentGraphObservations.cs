@@ -73,12 +73,21 @@ public sealed class LocalCurrentGraphObservations(ProcessorStateDatabase databas
     /// admitted immutable body. A later exact signed-reference read may recover, but
     /// cannot erase the rejection or lower its observed metadata high-water.</summary>
     public LocalCurrentGraphObservation RememberRejectedPolicyBytes(LocalCurrentControlAttempt attempt,LocalCurrentGraphObservation expected,
-        string actualSha256,CancellationToken token=default)
+        string actualSha256,CancellationToken token=default)=>RememberRejectedPolicyBytesCore(attempt,expected,actualSha256,null,token);
+
+    public LocalCurrentGraphObservation RememberRejectedTransitionPolicyBytes(Guid transitionId,LocalCurrentControlAttempt attempt,
+        LocalCurrentGraphObservation expected,string actualSha256,CancellationToken token=default)=>
+        RememberRejectedPolicyBytesCore(attempt,expected,actualSha256,transitionId,token);
+
+    private LocalCurrentGraphObservation RememberRejectedPolicyBytesCore(LocalCurrentControlAttempt attempt,LocalCurrentGraphObservation expected,
+        string actualSha256,Guid? transitionId,CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(expected);
         if(!Digest(actualSha256) || actualSha256==expected.Reference.Sha256) throw new ArgumentException("A rejected actual policy digest is required.",nameof(actualSha256));
         using var transaction=_database.Connection.BeginTransaction();
-        var pin=new LocalCurrentControlObservations(_database,_budget).AssertCapturedPolicyIn(attempt,expected.Reference,transaction,token);
+        var pin=transitionId is { } id
+            ? new CurrentControlTransitionJournal(_database,_budget).AssertCapturedTargetPolicyIn(id,attempt,expected.Reference,transaction,token)
+            : new LocalCurrentControlObservations(_database,_budget).AssertCapturedPolicyIn(attempt,expected.Reference,transaction,token);
         var key=Key(pin,expected.Reference.FileId);var old=Read(key,pin,expected.Reference,transaction);
         if(old!=expected || expected.AttemptId!=attempt.Id || old!.Metadata.MimeType!="application/json" ||
             old.RejectedPolicyVersion==old.Metadata.Version && old.RejectedPolicySha256!=actualSha256) throw new WorkspaceObservationConflictException();

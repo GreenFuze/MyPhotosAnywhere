@@ -54,6 +54,15 @@ public sealed class JournaledProtocolSigner(ProcessorStateCoordinator state, Lib
     public Task<LibraryInitialPolicyPlan> PrepareInitialPolicyPlanAsync(CancellationToken token) =>
         _state.ExecuteAsync(database => new LibraryAuthorityRepository(database, _budget).PrepareInitialPolicyPlan(Publisher(_keys.PublicIdentity)), token);
 
+    /// <summary>Seal only the retained transition's already reserved exact bytes.
+    /// Replays retain the first native signature; signing grants no cloud authority.</summary>
+    public Task<ProtocolSigningIntent> SignCurrentControlTransitionAsync(Guid id,CancellationToken token)=>
+        SignAsync(id,LibraryCurrentControl.Kind,true,(database,_)=>
+        {
+            var work=new CurrentControlTransitionJournal(database,_budget).ReadForSigning(id,token);
+            return sequence=>sequence==work.Plan.Sequence ? work.Intent.Body.ToArray() : throw new ProtocolSigningConflictException();
+        },token);
+
     /// <summary>Sign only the fixed initial publisher intent. Superseding policies or
     /// source changes retire this setup path; it cannot revive a revoked publisher.</summary>
     public Task<ProtocolSigningIntent> SignInitialPublisherAuthorizationAsync(Guid id, CancellationToken token) =>

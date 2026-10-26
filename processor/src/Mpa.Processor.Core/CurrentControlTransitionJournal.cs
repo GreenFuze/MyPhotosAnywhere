@@ -23,7 +23,7 @@ public sealed class CurrentControlTransitionInProgressException() : InvalidOpera
 /// captured transition. No native signing or network occurs. Retained outbox receipts
 /// are historical only; complete fresh target reconciliation and same-ID conditional
 /// update are still required by the outgoing owner. Never change original media.</summary>
-public sealed class CurrentControlTransitionJournal(ProcessorStateDatabase database,StorageBudgetManager budget)
+public sealed partial class CurrentControlTransitionJournal(ProcessorStateDatabase database,StorageBudgetManager budget)
 {
     private readonly ProcessorStateDatabase _database=database ?? throw new ArgumentNullException(nameof(database));
     private readonly StorageBudgetManager _budget=budget ?? throw new ArgumentNullException(nameof(budget));
@@ -53,7 +53,7 @@ public sealed class CurrentControlTransitionJournal(ProcessorStateDatabase datab
         if(plans.Count>=Maximum-1) throw new CatalogTraversalLimitException();
         var basis=observations.TransitionBasisIn(fenced,transaction,token);var journal=new ProtocolSigningJournal(_database,_budget);
         var policies=Policies(basis.Pin,target,transaction);
-        new LibraryAuthorityRepository(_database,_budget).AssertHumanSources(policies.Sources,transaction);
+        AssertHumanTargetCurrent(policies,target,transaction);
         var history=new LocalPublisherHistory();CatalogPublisherAuthorization? previousPublisher=null;
         foreach(var rootId in basis.ObservedRoots)
         {

@@ -68,7 +68,7 @@ public sealed partial class LocalCurrentControlReader
                 Check(caller,owned);if(revision!=scope.Attempt.AccountRevision) throw new StaleDriveConnectionException();
                 if(reader is not IGoogleWorkspaceObservedObjectReader transport)
                     throw new InvalidOperationException("Current graph reads require joined actual metadata/byte checkpoints.");
-                var source=new CurrentGraphObjects(this,capture,transport,caller);
+                var source=new CurrentGraphObjects(this,capture,transport,capture.Head,caller);
                 VerifiedProtocolDocument? head=null;var commits=0;long assets=0;
                 await foreach(var entry in new CatalogCommitHistoryTraversal(pin.Workspace,publisher,source).ReadAsync(capture.Head.Catalog,owned).ConfigureAwait(false))
                 {
@@ -114,7 +114,7 @@ public sealed partial class LocalCurrentControlReader
     }
 
     private sealed class CurrentGraphObjects(LocalCurrentControlReader owner,LocalCurrentControlCapture capture,
-        IGoogleWorkspaceObservedObjectReader transport,CancellationToken caller) : ICatalogObjectSource
+        IGoogleWorkspaceObservedObjectReader transport,LibraryCurrentControl target,CancellationToken caller) : ICatalogObjectSource
     {
         private readonly Dictionary<string,CatalogObjectReference> _references=new(StringComparer.Ordinal);
         private bool _facts;
@@ -125,7 +125,7 @@ public sealed partial class LocalCurrentControlReader
         {
             _=await owner.RequirePolicyCaptureAsync(capture,caller,token).ConfigureAwait(false);
             if(reference.AccountId!=capture.Pin.AccountId || reference.WorkspaceId!=capture.Pin.FolderId || reference.FileId==capture.Slot.FileId ||
-                reference.FileId==capture.Head.Publishers.Reference.FileId || reference.FileId==capture.Head.Sources.Reference.FileId ||
+                reference.FileId==target.Publishers.Reference.FileId || reference.FileId==target.Sources.Reference.FileId ||
                 _facts && CommitIds.Contains(reference.FileId)) throw new CurrentControlObservationConflictException();
             if(_references.TryGetValue(reference.FileId,out var previous))
             {if(previous!=reference) throw new WorkspaceObservationConflictException();}

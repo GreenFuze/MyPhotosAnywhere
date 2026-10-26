@@ -59,12 +59,16 @@ public sealed partial class LocalCurrentControlReader
         },token);
 
     private async Task<byte[]> ReadPolicyAsync(LocalCurrentControlCapture capture,IGoogleWorkspaceConditionalObservation source,
-        CatalogObjectReference reference,CancellationToken caller,CancellationToken token)
+        CatalogObjectReference reference,CancellationToken caller,CancellationToken token)=>
+        await ReadPolicyAsync(capture,source,reference,null,caller,token).ConfigureAwait(false);
+
+    private async Task<byte[]> ReadPolicyAsync(LocalCurrentControlCapture capture,IGoogleWorkspaceConditionalObservation source,
+        CatalogObjectReference reference,Guid? transitionId,CancellationToken caller,CancellationToken token)
     {
         _=await RequirePolicyCaptureAsync(capture,caller,token).ConfigureAwait(false);
         if(reference.AccountId!=capture.Pin.AccountId || reference.WorkspaceId!=capture.Pin.FolderId || reference.FileId==capture.Slot.FileId)
             throw new CurrentControlObservationConflictException();
-        var observer=new PolicyObserver(this,capture,reference,caller);
+        var observer=new PolicyObserver(this,capture,reference,transitionId,caller);
         var actual=await source.ObserveConditionalWorkspaceJsonAsync(reference.WorkspaceId,reference.FileId,observer,token).ConfigureAwait(false);
         Check(caller,token);
         if(!ReferenceEquals(actual,observer.Observation)) throw new CurrentControlObservationConflictException();
@@ -72,7 +76,7 @@ public sealed partial class LocalCurrentControlReader
     }
 
     private sealed class PolicyObserver(LocalCurrentControlReader owner,LocalCurrentControlCapture capture,CatalogObjectReference reference,
-        CancellationToken caller) : IGoogleWorkspaceConditionalObserver
+        Guid? transitionId,CancellationToken caller) : IGoogleWorkspaceConditionalObserver
     {
         private DriveWorkspaceConditionalMetadata? _metadata;
         private LocalCurrentGraphObservation? _durable;
@@ -107,6 +111,7 @@ public sealed partial class LocalCurrentControlReader
             {
                 owner.Check(caller,token);var records=new LocalCurrentGraphObservations(database,owner._budget);
                 return actual.Sha256==reference.Sha256 ? records.RememberBytes(capture.Attempt,_durable,actual.Sha256,token) :
+                    transitionId is { } id ? records.RememberRejectedTransitionPolicyBytes(id,capture.Attempt,_durable,actual.Sha256,token) :
                     records.RememberRejectedPolicyBytes(capture.Attempt,_durable,actual.Sha256,token);
             },token).ConfigureAwait(false);
             if(actual.Sha256!=reference.Sha256) throw new CurrentControlObservationConflictException();

@@ -160,6 +160,9 @@ public sealed partial class AccountServiceTests
             data.Setup.Accounts.Readers.ConditionalObserve=async(folder,file,observer,token)=>
             {var result=await connection.ObserveConditionalWorkspaceJsonAsync(folder,file,observer,token).ConfigureAwait(false);if(AfterTransport is not null) await AfterTransport().ConfigureAwait(false);return result;};
             data.Setup.Accounts.Readers.ObjectObserve=(folder,file,bytes,hash,observer,token)=>connection.ReadObservedWorkspaceObjectAsync(folder,file,bytes,hash,observer,token);
+            data.Setup.Accounts.Readers.ConditionalCapture=(folder,file,token)=>connection.CaptureConditionalWorkspaceJsonAsync(folder,file,token);
+            data.Setup.Accounts.Readers.ConditionalReplace=(expected,bytes,hash,token)=>connection.ReplaceConditionalWorkspaceJsonAsync(expected,bytes,hash,token);
+            data.Setup.Accounts.Readers.ConditionalAdmittedReplace=(expected,bytes,hash,admit,token)=>connection.ReplaceAdmittedConditionalWorkspaceJsonAsync(expected,bytes,hash,admit,token);
         }
         public static async Task<CurrentReaderFixture> CreateAsync(bool addSource=false)
         {
@@ -180,7 +183,7 @@ public sealed partial class AccountServiceTests
         public async ValueTask DisposeAsync()
         {await Reader.DisposeAsync().ConfigureAwait(false);await Data.DisposeAsync().ConfigureAwait(false);await _connection.DisposeAsync().ConfigureAwait(false);await _vault.DisposeAsync().ConfigureAwait(false);}
     }
-    private sealed class CurrentReadHttp(InitialPublicationFixture data) : HttpMessageHandler
+    private sealed partial class CurrentReadHttp(InitialPublicationFixture data) : HttpMessageHandler
     {
         public Func<Task>? BeforeBody {get;set;}
         public Func<string,Task>? BeforeFileBody {get;set;}
@@ -192,6 +195,7 @@ public sealed partial class AccountServiceTests
         public bool Disposed {get;private set;}
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
         {
+            if(request.Method==HttpMethod.Put) return await PutTransitionAsync(request,token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();Assert.AreEqual(HttpMethod.Get,request.Method);Assert.AreEqual("www.googleapis.com",request.RequestUri!.Host);
             Assert.AreEqual("https",request.RequestUri.Scheme);Assert.AreEqual("synthetic-access",request.Headers.Authorization!.Parameter);
             if(request.RequestUri.AbsolutePath=="/drive/v3/about") return Json("""{"user":{"permissionId":"permission-A","displayName":"Synthetic"}}""");
@@ -205,6 +209,7 @@ public sealed partial class AccountServiceTests
                 BodyFiles.Add(file);if(BeforeFileBody is not null) await BeforeFileBody(file).ConfigureAwait(false);
                 return new(HttpStatusCode.OK) {Content=new ByteArrayContent(data.Cloud[file].Bytes.ToArray())};
             }
+            if(BeforeMetadata is not null) await BeforeMetadata(file).ConfigureAwait(false);
             MetadataReads++;var actual=data.Cloud[file];
             if(request.RequestUri.AbsolutePath=="/drive/v3/files/"+file)
             {

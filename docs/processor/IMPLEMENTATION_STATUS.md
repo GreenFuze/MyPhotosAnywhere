@@ -1,5 +1,52 @@
 # MPA 0.6.0 implementation ledger
 
+## Actual conditional current-control publication
+
+The joined current reader now publishes the exact retained Root transition through
+the actual Google transport's same-file strong condition. It verifies desired
+policies and complete catalog ancestry, coverage and facts under an actual captured
+predecessor or exact desired Root. It never fabricates a desired Root capture or
+canonical staging header. Workspace sharing/corpus/parents and a final actual Root
+fence precede publication. Lost acknowledgements recover the original ID, body,
+counter and first signature; an actual conflict never allocates a replacement file.
+
+The transport awaits bounded local admission after metadata/token IO immediately
+before each PUT attempt. Admission rechecks the same nonce, account, native keys,
+human source rows and locally selected policy sequence/hash in one transaction.
+This also rejects obsolete targets before reserving another Root counter. Existing
+generic conditional transport behavior and selected-graph reads are preserved.
+
+The result remains pending. A separate fresh actual selected-graph read, private
+index preparation, final fence and atomic canonical activation are required. The
+tests exercise that actual subsequent activation, while retaining the original
+captured publication and leaving PublishedHead/snapshot retirement untouched.
+No live Drive acceptance or application runtime composition is claimed.
+
+All 393 Core, 119 Google and 105 affected current-reader/storage Services cases pass.
+Every previous 391/116/85 identity is retained. New coverage includes 20 publication
+cases, three transport admission cases and two pre-reservation policy checks.
+Strict Desktop has zero warnings/errors. Sixteen exact LF source/test hashes and
+complete reports/logs are frozen in current-transition-publisher-repaired-validation.json.
+Two additional tests first reproduced an actual forbidden synthetic PUT after a
+newer local publisher/source policy was selected without changed source rows. The
+fixed guards block both and also block policy changes during actual final metadata
+IO. Red reports and earlier candidate evidence remain separate; no assertion,
+deadline, capacity, schema or warning gate was weakened.
+
+The preceding d4f8aad passed all 12 cross-platform contract/scale/reference jobs.
+All 32 reports and complete logs were independently verified: each platform passed
+95 Protocol, 391 Core, 116 Google, 423 ordinary Services, 9 LAN, 27 Web, two scale
+and 13 reference cases. Windows took 1639 seconds under the unchanged 1800-second
+limit. Android, Desktop and all three native workflows also pass. Android sources
+are unchanged from the separately verified f7975a2 native artifacts. Fresh 393-Core,
+119-Google and 443-ordinary-Service cross-platform checks remain required here.
+
+Explicit durable withdrawal/supersession of obsolete fixed work is still necessary;
+changed human settings must not permanently strand the one pending transition.
+Keep all original work and existing storage bounds. Then complete actual v2 inventory
+and generation handoff, runtime/export/native integration and all remaining 0.6
+features, installers, warning attribution, final acceptance and exact joint release.
+
 ## Fixed outgoing current-control work
 
 The local transition journal now commits the native Root signing reservation and

@@ -51,7 +51,9 @@ public sealed partial class LocalCurrentControlReader(ProcessorStateCoordinator 
     public bool ExitConfirmed {get {lock(_gate) return _exitConfirmed;}}
     public Exception? Failure {get {lock(_gate) return _failure;}}
 
-    public Task<LocalCurrentControlCapture> CaptureAsync(CancellationToken caller)=>OperationAsync(async token=>
+    public Task<LocalCurrentControlCapture> CaptureAsync(CancellationToken caller)=>OperationAsync(token=>CaptureCoreAsync(caller,token),caller);
+
+    private async Task<LocalCurrentControlCapture> CaptureCoreAsync(CancellationToken caller,CancellationToken token)
     {
         var scope=await _state.ExecuteAsync(database=>
         {
@@ -80,7 +82,7 @@ public sealed partial class LocalCurrentControlReader(ProcessorStateCoordinator 
             },owned).ConfigureAwait(false);
             Check(caller,owned);return new LocalCurrentControlCapture(_identity,scope.Pin,scope.Slot,snapshot,observed.Attempt,observed.Head);
         },token).ConfigureAwait(false);
-    },caller);
+    }
 
     public Task<LocalCurrentControlFence> FenceAsync(LocalCurrentControlCapture capture,CancellationToken caller)
     {

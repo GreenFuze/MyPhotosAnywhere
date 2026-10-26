@@ -320,7 +320,7 @@ public sealed partial class AccountServiceTests
         return reads;
     }
     private static async Task<(CatalogObjectReference Reference, CatalogCommitPlan Plan, ProtocolSigningIntent Intent)> AddCatalogHeadAsync(
-        InitialPublicationFixture fixture, string file, CatalogObjectReference? parent = null, bool unsealed = false, bool includeAsset = false,bool mismatchedCoverage=false)
+        InitialPublicationFixture fixture, string file, CatalogObjectReference? parent = null, bool unsealed = false, bool includeAsset = false,bool mismatchedCoverage=false,Func<CatalogCommitPlan,Guid,Task>? beforeSigning=null)
     {
         var captured = await fixture.Setup.Accounts.State.ExecuteAsync(database =>
         {
@@ -364,6 +364,7 @@ public sealed partial class AccountServiceTests
         var dependencies = new PreparedCatalogDependencies(authority.LibraryId, authority.ConfigurationRevision, 1, includeAsset ? 1 : 0, captured.Sources.EnvelopeSha256, index, coverage);
         var plan = new CatalogCommitPlan(scope, dependencies, captured.Sources, parent, 0, 1);
         var identity = fixture.Setup.Keys.PublicIdentity; var writer = new CatalogCommitDocumentWriter(plan); var id = Guid.NewGuid();
+        if(beforeSigning is not null) await beforeSigning(plan,id).ConfigureAwait(false);
         var intent = unsealed ? await fixture.Setup.Accounts.State.ExecuteAsync(database => new ProtocolSigningJournal(database, fixture.Budget)
             .Reserve(id, identity.PublisherId, identity.PublisherEpoch, "catalog-commit", sequence => writer.Encode(identity, sequence)), CancellationToken.None).ConfigureAwait(false) :
             await new JournaledProtocolSigner(fixture.Setup.Accounts.State, fixture.Setup.Keys, fixture.Budget)

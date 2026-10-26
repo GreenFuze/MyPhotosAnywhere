@@ -1,5 +1,30 @@
 # Exact current control for independent Drive clients
 
+## Joined conditional publication
+
+The actual publication owner now verifies the desired complete graph under a real
+captured predecessor/desired Root, fences the same actual current file and uses its
+Google-owned strong condition to replace that exact file. A lost response recovers
+the already-present exact bytes without another PUT or identity. It returns pending
+evidence only; fresh selected-graph/final-fence/canonical admission and generation
+completion remain separate. Desired bytes never become a fabricated staging capture.
+
+An awaited local admission callback runs after actual metadata/token IO immediately
+before every PUT attempt. Same-transaction checks cover the current account/nonce,
+native signer, human source configuration and newer locally selected publisher or
+source policies, including changes that do not alter source rows. Preparation uses
+that same policy barrier before reserving a Root counter. Cancellation/Exit join
+uncooperative callbacks and actual writes before borrowers can retire.
+
+All 393 Core, 119 Google and 105 affected Services tests pass with zero-warning/error
+Desktop validation and 16 frozen source/test hashes. Earlier failing synthetic
+policy-supersession cases are retained alongside their exact passing regressions.
+This is not live acceptance or completed runtime integration. Obsolete pending work
+still needs a durable withdrawal terminal state within the existing record budget;
+it must preserve original scopes/counters and never authorize snapshot/original
+cleanup. The v2 immutable inventory and exact original generation handoff remain
+mandatory before application composition or joint publication.
+
 ## Fixed transition recovery
 
 The producer now has a local current-control transition journal. One transaction

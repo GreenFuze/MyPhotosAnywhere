@@ -67,11 +67,16 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
 
     public CatalogPublisherAuthorization? CurrentPublisherPolicy()
     {
-        using var transaction = _database.Connection.BeginTransaction(); var pin = ReadPin(transaction); var pointer = SelectedSequence(transaction);
-        if (pointer is null) { transaction.Commit(); return null; }
+        using var transaction = _database.Connection.BeginTransaction();var current=CurrentPublisherPolicy(transaction);transaction.Commit();return current;
+    }
+
+    internal CatalogPublisherAuthorization? CurrentPublisherPolicy(SqliteTransaction transaction)
+    {
+        var pin = ReadPin(transaction); var pointer = SelectedSequence(transaction);
+        if (pointer is null) return null;
         if (pin is null) throw new InvalidDataException("Selected publisher policy has no pinned controller.");
         var sequence = Counter(pointer); var current = ReadPolicy(transaction, pin, sequence);
-        transaction.Commit(); return current;
+        return current;
     }
 
     /// <summary>Return the selected policy, including revocation. Previously accepted

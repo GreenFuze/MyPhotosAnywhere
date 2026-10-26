@@ -80,7 +80,16 @@ public interface IGoogleWorkspaceConditionalJson
         ReadOnlyMemory<byte> bytes,string sha256,CancellationToken cancellationToken);
 }
 
-public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditionalJson,IGoogleWorkspaceConditionalObservation
+/// <summary>Await bounded local authority checks after metadata/token IO, immediately
+/// before every actual PUT attempt. Callbacks must not recursively use Google,
+/// perform network IO or retire borrowed owners. They grant no authority themselves.</summary>
+public interface IGoogleWorkspaceConditionalPublication
+{
+    Task<DriveWorkspaceConditionalJson> ReplaceAdmittedConditionalWorkspaceJsonAsync(DriveWorkspaceConditionalJson expected,
+        ReadOnlyMemory<byte> bytes,string sha256,Func<CancellationToken,Task> admit,CancellationToken cancellationToken);
+}
+
+public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditionalJson,IGoogleWorkspaceConditionalObservation,IGoogleWorkspaceConditionalPublication
 {
     private readonly object _jsonConditions=new();
     // No v3 conditional fallback: the isolated live probe proved that v3 ignored
@@ -111,7 +120,18 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditiona
     }
 
     public Task<DriveWorkspaceConditionalJson> ReplaceConditionalWorkspaceJsonAsync(DriveWorkspaceConditionalJson expected,
-        ReadOnlyMemory<byte> bytes,string sha256,CancellationToken cancellationToken)
+        ReadOnlyMemory<byte> bytes,string sha256,CancellationToken cancellationToken)=>
+        ReplaceConditionalWorkspaceJsonCoreAsync(expected,bytes,sha256,null,cancellationToken);
+
+    public Task<DriveWorkspaceConditionalJson> ReplaceAdmittedConditionalWorkspaceJsonAsync(DriveWorkspaceConditionalJson expected,
+        ReadOnlyMemory<byte> bytes,string sha256,Func<CancellationToken,Task> admit,CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(admit);
+        return ReplaceConditionalWorkspaceJsonCoreAsync(expected,bytes,sha256,admit,cancellationToken);
+    }
+
+    private Task<DriveWorkspaceConditionalJson> ReplaceConditionalWorkspaceJsonCoreAsync(DriveWorkspaceConditionalJson expected,
+        ReadOnlyMemory<byte> bytes,string sha256,Func<CancellationToken,Task>? admit,CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(expected);cancellationToken.ThrowIfCancellationRequested();
         if (!ReferenceEquals(expected.Owner,_jsonConditions) || expected.AccountId!=_expectedPermissionId)
@@ -137,7 +157,7 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditiona
                 actual.Parents!=expected.Parents || actual.Drive!=expected.SharedDriveId)
                 throw ConditionalJsonConflict();
             if (!actual.CanEdit) throw new HttpRequestException("Google no longer permits editing the selected JSON.",null,HttpStatusCode.Forbidden);
-            await PutConditionalJsonAsync(credential,expected,owned,token).ConfigureAwait(false);
+            await PutConditionalJsonAsync(credential,expected,owned,admit,token).ConfigureAwait(false);
             // A status is never a receipt. An uncertain response propagates with no
             // allocation/replacement. The semantic owner recovers its exact pending
             // bytes at this same ID before it considers any fresh condition.
@@ -204,7 +224,8 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditiona
         { throw new InvalidDataException("Google returned malformed conditional JSON metadata.",error); }
     }
 
-    private async Task PutConditionalJsonAsync(UserCredential credential,DriveWorkspaceConditionalJson expected,byte[] bytes,CancellationToken token)
+    private async Task PutConditionalJsonAsync(UserCredential credential,DriveWorkspaceConditionalJson expected,byte[] bytes,
+        Func<CancellationToken,Task>? admit,CancellationToken token)
     {
         for(var attempt=0;attempt<2;attempt++)
         {
@@ -213,6 +234,8 @@ public sealed partial class GoogleAccountConnection : IGoogleWorkspaceConditiona
             request.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(expected.EntityTag));
             request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",await AccessOwnedAsync(credential,token).ConfigureAwait(false));
             request.Content=new ByteArrayContent(bytes);request.Content.Headers.ContentType=new("application/json");
+            if(admit is not null) await admit(token).ConfigureAwait(false);
+            CheckNetworkActive(token);
             using var response=await SendOwnedAsync(request,token).ConfigureAwait(false);
             if (response.StatusCode==HttpStatusCode.Unauthorized && attempt==0 && await RefreshOwnedAsync(credential,token).ConfigureAwait(false)) continue;
             if (response.StatusCode==HttpStatusCode.PreconditionFailed) throw ConditionalJsonConflict();

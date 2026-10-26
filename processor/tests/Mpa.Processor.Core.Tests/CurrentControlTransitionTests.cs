@@ -146,6 +146,28 @@ public sealed partial class LibraryAuthorityTests
         Assert.AreEqual(0L,fixture.Budget.Status().ReservedBytes);Assert.IsNull(signing.Read(id)!.Envelope);
     }
 
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void CurrentTransitionRejectsLocallySupersededPoliciesBeforeReservingAnotherRoot(bool sources)
+    {
+        using var fixture=new Fixture();var current=TransitionBootstrap(fixture);var signing=new ProtocolSigningJournal(fixture.Database,fixture.Budget);
+        var original=signing.Inventory(fixture.Store.Controller()!.LibraryId).Intents.Single(value=>value.Kind==(sources ? "library-source-configuration" : "library-publisher-authorization"));
+        var body=signing.Read(original.Id)!.Body.ToArray();
+        var policy=signing.Reserve(Guid.NewGuid(),fixture.ActorId,1,original.Kind,sequence=>
+        {
+            var value=System.Text.Json.Nodes.JsonNode.Parse(body)!.AsObject();value["sequence"]=sequence.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if(!sources) value["payload"]!["publisher"]=null;
+            return new CanonicalJson().Encode(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(value));
+        });
+        policy=signing.Seal(policy.Id,policy.BodySha256,new ProtocolDocumentSigner(fixture.Controller).Sign(policy.Body.Span));
+        if(sources) fixture.Store.SelectSourceConfiguration(policy.Envelope!.Value.Span);else fixture.Store.SelectPublisherPolicy(policy.Envelope!.Value.Span);
+        var id=Guid.NewGuid();var journal=new CurrentControlTransitionJournal(fixture.Database,fixture.Budget);
+        Assert.ThrowsExactly<StaleLibraryConfigurationException>(()=>journal.Prepare(id,current.Fenced,new(current.Head.Publishers,current.Head.Sources,null)));
+        Assert.IsNull(signing.Read(id));Assert.AreEqual(4L,fixture.Scalar("SELECT sequence FROM signing_actor WHERE role='controller'"));
+        Assert.AreEqual(0,journal.ReadAll().Count);Assert.AreEqual(0L,fixture.Budget.Status().ReservedBytes);
+    }
+
     private static (LibraryCurrentControlSlot Slot,LibraryCurrentControl Head,LocalCurrentControlAttempt Fenced,Guid SourceIntentId) TransitionBootstrap(Fixture fixture)
     {
         var completion=CompleteControlBootstrap(fixture);var slots=Slots(fixture);var slot=slots.CaptureAllocatedFile(slots.Prepare(),"account-A",1,"control-file");
