@@ -1,5 +1,32 @@
 # MPA 0.6.0 implementation ledger
 
+## Owned Root inventory witnesses and current CI blocker
+
+The current reader can capture a complete native signing description under its
+actual nonce. One transaction independently verifies the original allocated Root
+slot/publication receipt, every retained transition and terminal record, and all
+native signing intents. Initial, unsigned, observed pending, activated and withdrawn
+Roots remain distinct. A framed digest preserves the existing array/history bounds.
+The same reader rechecks it after the same nonce's final fence; another nonce,
+terminal-only change or other signing mutation invalidates the description.
+
+This is a read-only input to the next v2 inventory owner. It does not skip Root
+kinds, adopt higher orphan policies, complete an immutable scan, dispose a captured
+generation or enable application runtime routing. All 412 Core cases and three new
+actual joined-reader cases pass, including actual canonical activation, missing
+observed Root plans, foreign-reader rejection and cancellation. Every preceding 404
+Core identity remains. Strict Desktop has zero warnings/errors. Four frozen LF
+source/test hashes bind full reports/logs; complete 451-Service CI remains required.
+
+The preceding 2f55ab6 has 11 of 12 successful cross-platform jobs and 29 independently
+verified reports. Windows contracts reached the unchanged 30-minute deadline after
+all 404 Core and 119 Google cases passed; Windows ordinary Services/LAN/Web remain
+incomplete. Two unchanged 100k discovery preparations account for 585 seconds of the
+Core increase. The 11 new withdrawal cases take 14 seconds in total. The actual
+preparation cost is being investigated without changing fixtures, assertions,
+durability or deadlines. Android, native and Desktop workflow statuses pass, which
+does not establish full artifact/runtime acceptance or a completed joint release.
+
 ## Durable withdrawal of fixed current-control work
 
 The live current reader can withdraw an obsolete fixed Root plan after joining the

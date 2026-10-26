@@ -444,3 +444,22 @@ does not dispose a captured generation, advance PublishedHead, release its snaps
 authorize original mutations or make an old observation current authority. Explicit
 generation disposition, v2 immutable inventory witnesses and actual runtime handoff
 are still required. All storage/history bounds and main schemas remain unchanged.
+
+### Complete owned Root signing inventory
+
+A same-reader capture now describes every native signing intent and separately
+validates each Root's original recovery witness. The initial Root needs its actual
+allocated slot and publication receipt; every successor needs its retained plan,
+including an unsigned or previously observed successor. Both terminal variants are
+validated. An observed pending Root cannot be reported as canonically activated.
+
+The complete signing digest, exact pinned connection/current ID, nonce, access,
+actual metadata and initial observation floor are bound to independently framed
+Root entries. Terminal digests invalidate an earlier description even when no
+signing bytes or counters changed. Only a final fence of the same nonce may recheck
+it. The live reader rejects another reader's captures/fences before any network.
+
+The description grants no immutable scan acknowledgement, current policy selection,
+publication, activation, generation completion or snapshot retirement. It is an
+explicit input for the forthcoming v2 inventory/handoff owner, not a blanket skip
+for Root kinds or permission to forget other pending/failed immutable work.
