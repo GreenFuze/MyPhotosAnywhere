@@ -67,6 +67,8 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     private readonly Task _processExit;
     private readonly NativeProcessExitWaiter _nativeExit;
     private int _diagnosticReadStage;
+    private string _shutdownStage="running";
+    internal string ShutdownStage=>Volatile.Read(ref _shutdownStage);
     private readonly Task _resourceMonitor;
     private readonly CancellationTokenSource _stopMonitoring = new();
     private readonly TaskCompletionSource _ownershipReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -74,6 +76,8 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     private readonly object _exitOutcomeGate = new();
     private readonly HashSet<Task> _writes = [];
     private Task? _disposal;
+    private Task? _pipeCancellation;
+    private Task? _inputClosing;
     private bool _stopping;
     private bool _forcedStop;
     private bool _resourcesReleased;
@@ -330,18 +334,33 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     private async Task DisposeCoreAsync(Task[] writes)
     {
         var failures = new List<Exception>();
+        Volatile.Write(ref _shutdownStage,"monitor-cancellation");
         await ObserveAsync(_stopMonitoring.CancelAsync).ConfigureAwait(false);
-        await ObserveAsync(_stopReading.CancelAsync).ConfigureAwait(false);
         // Retire the independent Refresh/measurement loop before querying native
         // process termination; no monitor may mutate the process cache during stop.
+        Volatile.Write(ref _shutdownStage,"monitor-join");
         await ObserveAsync(() => _resourceMonitor).ConfigureAwait(false);
-        try { _process.StandardInput.BaseStream.Close(); } catch (Exception error) { failures.Add(error); }
+        // Pipe cancellation callbacks and closing a pipe with an outstanding write
+        // can wait for the child. Own both tasks, but do not let them prevent the
+        // native stop that unblocks those operations. They are joined before any
+        // resource release, including recovery after an unconfirmed bounded stop.
+        lock(_disposalGate)
+        {
+            _pipeCancellation=Task.Run(_stopReading.CancelAsync,CancellationToken.None);
+            _inputClosing=Task.Run(()=>_process.StandardInput.BaseStream.Close(),CancellationToken.None);
+        }
+        Volatile.Write(ref _shutdownStage,"native-stop");
         await ObserveAsync(StopProcessAsync).ConfigureAwait(false);
         if (_nativeExit.RetirementConfirmed)
         {
+            Volatile.Write(ref _shutdownStage,"pipe-cancellation-join");
+            await ObserveAsync(()=>_pipeCancellation!).ConfigureAwait(false);
+            Volatile.Write(ref _shutdownStage,"input-close-join");
+            await ObserveAsync(()=>_inputClosing!).ConfigureAwait(false);
             // Exit can race a bounded-stop failure. In that case the old finally
             // released process/CTS owners without joining their actual pipe pumps.
             // Join the same real work on EVERY confirmed-exit path, even on failure.
+            Volatile.Write(ref _shutdownStage,"pipe-join");
             await ObserveAsync(() => Task.WhenAll(writes.Select(ObserveShutdownWriteAsync).Append(Completion))).ConfigureAwait(false);
             try { ReleaseResources(); } catch (Exception error) { failures.Add(error); }
         }
@@ -399,14 +418,19 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
     public async Task JoinAfterFailedStopAsync()
     {
         Task[] writes;
+        Task pipeCancellation,inputClosing;
         lock (_disposalGate)
         {
             if (!_stopping) throw new InvalidOperationException("No stop attempt is in progress.");
             writes = _writes.ToArray();
+            pipeCancellation=_pipeCancellation ?? throw new InvalidOperationException("Pipe retirement has not been requested by its stop owner.");
+            inputClosing=_inputClosing ?? throw new InvalidOperationException("Input retirement has not been requested by its stop owner.");
         }
         await _nativeExit.WaitForRetirementAsync(Timeout.InfiniteTimeSpan).ConfigureAwait(false);
         await _processExit.ConfigureAwait(false); _nativeExit.Join();
-        try { await Task.WhenAll(writes.Select(ObserveShutdownWriteAsync).Append(Completion)).ConfigureAwait(false); }
+        var joining=Task.WhenAll(writes.Select(ObserveShutdownWriteAsync).Append(pipeCancellation).Append(inputClosing).Append(Completion));
+        try { await joining.ConfigureAwait(false); }
+        catch when(joining.Exception is not null) {throw joining.Exception.Flatten();}
         finally { ReleaseResources(); }
     }
 

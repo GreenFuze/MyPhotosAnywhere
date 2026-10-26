@@ -10,7 +10,7 @@ using Mpa.Processor.TestSupport;
 namespace Mpa.Processor.Core.Tests;
 
 [TestClass]
-public sealed class WorkerProcessTests
+public sealed partial class WorkerProcessTests
 {
     [TestMethod]
     public async Task ResourceStopKeepsItsPrimaryFailureAndRetainsTheInterruptedFrameDiagnosticAfterJoining()

@@ -17,7 +17,12 @@ public sealed class WorkSupervisorTests
         await operation.Started.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
         Assert.AreEqual(ProcessorWorkState.Running, supervisor.State);
         var pause = supervisor.PauseAsync();
-        await operation.Releasing.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
+        try {await operation.Releasing.Task.WaitAsync(deadline.Token).ConfigureAwait(false);}
+        catch(Exception error)
+        {
+            Console.WriteLine("Actual pre-cleanup worker failure: "+error+"; state="+supervisor.State+"; supervisorFailure="+supervisor.Failure+"; nativeShutdown="+operation.ShutdownStage);
+            operation.AllowRelease.TrySetResult();throw;
+        }
         try
         {
             Assert.IsTrue(operation.ObservedExitBeforeRelease);
@@ -50,7 +55,12 @@ public sealed class WorkSupervisorTests
         var work = supervisor.Start(operation, deadline.Token);
         await operation.Started.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
         var pause = supervisor.PauseAsync();
-        await operation.Releasing.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
+        try {await operation.Releasing.Task.WaitAsync(deadline.Token).ConfigureAwait(false);}
+        catch(Exception error)
+        {
+            Console.WriteLine("Actual pre-cleanup worker failure: "+error+"; state="+supervisor.State+"; supervisorFailure="+supervisor.Failure+"; nativeShutdown="+operation.ShutdownStage);
+            operation.AllowRelease.TrySetResult();throw;
+        }
         var stop = supervisor.StopAsync();
         try
         {
@@ -102,6 +112,7 @@ public sealed class WorkSupervisorTests
         public TaskCompletionSource AllowRelease { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool ObservedExitBeforeRelease { get; private set; }
         public int DisposeCount { get; private set; }
+        public string? ShutdownStage=>_worker?.ShutdownStage;
 
         public Operation(WorkerLaunchSpec launch, string root, StorageBudgetManager budget, bool holdDisposal = false)
         {
