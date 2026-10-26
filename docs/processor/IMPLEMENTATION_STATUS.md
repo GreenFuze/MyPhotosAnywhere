@@ -1,5 +1,36 @@
 # MPA 0.6.0 implementation ledger
 
+## Combined selected graph, inventory and sealed canonical admission
+
+The current reader can now keep the actual sealed canonical SQLite file leased
+while it completes the immutable inventory and one final Root observation. Its
+opaque composite binds the same reader, selected graph, private stage, inventory
+and actual final fence. An unsealed file or foreign owner fails before another
+inventory begins. Reader and stage Exit each cancel and join uncooperative reads
+before the file can be released or retired.
+
+Core admission checks the unchanged complete inventory in the same transaction
+as the selected graph, current human policy, sealed claim, policy/pointer updates
+and Root activation terminal. There is no additional network interval or nested
+transaction. A newer scan, unread candidate, new outbox object or newer Root nonce
+closes admission and preserves that work. Failure of the last pointer hash rolls
+back the Root terminal and policies too. The earlier inventory remains historical
+after its own successful activation changes the terminal; an exact committed
+receipt can be recovered without relabeling the old signing digest.
+
+All 437 Core cases and all 136 affected Services cases pass, retaining all previous
+437 Core and 126 affected Services identities and adding ten integration cases.
+The strict Desktop Release build has zero warnings/errors. The selected-graph case
+uses a real canonical file and actual journaled Root transport; its separate
+publication-snapshot descriptor is explicitly synthetic, so no physical publication
+snapshot completion or retirement is inferred. Full 477 ordinary Services and the
+mandatory platform/scale/reference/native matrices remain required in fresh CI.
+
+This composes local canonical admission. Outgoing current-controlled generation
+completion/supersession, runtime routing and the rest of the joint 0.6 release
+remain unfinished. The one-live-publication-capture rule, two-index canonical pool,
+storage bounds and all schema/signing identities are unchanged.
+
 ## Joined current-workspace inventory and final Root observation
 
 The producer reader now runs the actual immutable metadata inventory through its

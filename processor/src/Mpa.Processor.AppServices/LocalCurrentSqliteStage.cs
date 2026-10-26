@@ -80,6 +80,20 @@ public sealed class LocalCurrentSqliteStage : ILocalCurrentCatalogStage,ILocalCu
     public Task<CurrentCatalogStagePage> ReadPageAsync(CatalogCursor? after,int limit,CancellationToken cancellationToken)=>
         OperationAsync(token=>Task.Run(()=>_index.ReadPage(after,limit,token),CancellationToken.None),cancellationToken);
 
+    /// <summary>Keep the actual sealed native file lease joined throughout the
+    /// remaining inventory and final Root observation. Stage disposal cancels and
+    /// joins that work rather than releasing its file while a scan still borrows it.</summary>
+    internal Task<T> UseSealedCurrentGraphAsync<T>(ProcessorStateCoordinator state,LocalCurrentControlGraph graph,
+        Func<CancellationToken,Task<T>> action,CancellationToken cancellationToken)=>OperationAsync(async token=>
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if(!ReferenceEquals(state,_state) || !ReferenceEquals(graph.Stage,this) || !ReferenceEquals(graph.Policies.Capture,_capture) ||
+            _claim.Phase!="sealed" || _claim.Descriptor is null || _claim.Descriptor.Assets!=graph.Assets)
+            throw new CurrentControlObservationConflictException();
+        await AssertCapturedAsync(token).ConfigureAwait(false);
+        return await action(token).ConfigureAwait(false);
+    },cancellationToken);
+
     internal Task<T> UseSealedGraphAsync<T>(ProcessorStateCoordinator state,LocalCurrentGraphFence fence,
         Func<CurrentCatalogStageClaim,CancellationToken,Task<T>> action,CancellationToken cancellationToken)=>OperationAsync(async token=>
     {

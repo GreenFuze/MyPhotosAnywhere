@@ -34,11 +34,30 @@ public sealed class CurrentCatalogActivationRepository(ProcessorStateDatabase da
     {using var transaction=_database.Connection.BeginTransaction();var result=ReadIn(transaction);transaction.Commit();return result;}
 
     public CurrentCatalogActivation Activate(LocalCurrentControlAttempt fenced,CurrentCatalogStageClaim stage,ReadOnlyMemory<byte> publisher,
-        ReadOnlyMemory<byte> sources,long catalogSequence,int commits,IReadOnlyList<LocalCurrentGraphObservation> observations,CancellationToken token=default)
+        ReadOnlyMemory<byte> sources,long catalogSequence,int commits,IReadOnlyList<LocalCurrentGraphObservation> observations,CancellationToken token=default)=>
+        ActivateCore(fenced,stage,publisher,sources,catalogSequence,commits,observations,null,token);
+
+    /// <summary>Admit a complete actual immutable inventory and selected graph in
+    /// the SAME policy/pointer/terminal transaction. The incoming checkpoint is
+    /// checked before local activation changes its retained signing description.</summary>
+    public CurrentCatalogActivation ActivateReconciled(LocalCurrentControlAttempt fenced,CurrentCatalogStageClaim stage,ReadOnlyMemory<byte> publisher,
+        ReadOnlyMemory<byte> sources,long catalogSequence,int commits,IReadOnlyList<LocalCurrentGraphObservation> observations,
+        CurrentWorkspaceInventoryCheckpoint inventory,CurrentControlSigningInventory signing,WorkspacePublicationInventory publications,CancellationToken token=default)
+    {
+        ArgumentNullException.ThrowIfNull(inventory);ArgumentNullException.ThrowIfNull(signing);ArgumentNullException.ThrowIfNull(publications);
+        return ActivateCore(fenced,stage,publisher,sources,catalogSequence,commits,observations,new(inventory,signing,publications),token);
+    }
+
+    private sealed record InventoryAdmission(CurrentWorkspaceInventoryCheckpoint Checkpoint,CurrentControlSigningInventory Signing,WorkspacePublicationInventory Publications);
+
+    private CurrentCatalogActivation ActivateCore(LocalCurrentControlAttempt fenced,CurrentCatalogStageClaim stage,ReadOnlyMemory<byte> publisher,
+        ReadOnlyMemory<byte> sources,long catalogSequence,int commits,IReadOnlyList<LocalCurrentGraphObservation> observations,InventoryAdmission? inventory,CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(stage);ArgumentNullException.ThrowIfNull(observations);
         if(observations.Count>WorkspaceObservationRepository.MaximumDocuments) throw new CatalogTraversalLimitException();
         var owned=observations.ToArray();using var transaction=_database.Connection.BeginTransaction();token.ThrowIfCancellationRequested();
+        if(inventory is not null) new WorkspaceObservationRepository(_database,_budget).AssertCurrentInventoryUnchangedIn(
+            inventory.Checkpoint,inventory.Signing,fenced,inventory.Publications,transaction,token);
         var selection=new LocalCurrentControlObservations(_database,_budget).FencedSelectionIn(fenced,publisher.Span,sources.Span,transaction,token);
         var claim=new CurrentCatalogStageJournal(_database,_budget).AssertSealedIn(stage,fenced,selection.Pin,transaction);var descriptor=claim.Descriptor!;
         var actuals=new LocalCurrentGraphObservations(_database,_budget);var references=new Dictionary<string,CatalogObjectReference>(StringComparer.Ordinal);

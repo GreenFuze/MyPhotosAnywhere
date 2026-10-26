@@ -81,6 +81,16 @@ public sealed partial class WorkspaceObservationRepository
         ArgumentNullException.ThrowIfNull(checkpoint);ArgumentNullException.ThrowIfNull(signing);
         ArgumentNullException.ThrowIfNull(fenced);ArgumentNullException.ThrowIfNull(publications);
         using var transaction=_database.Connection.BeginTransaction();
+        AssertCurrentInventoryUnchangedIn(checkpoint,signing,fenced,publications,transaction,token);
+        token.ThrowIfCancellationRequested();transaction.Commit();
+    }
+
+    internal void AssertCurrentInventoryUnchangedIn(CurrentWorkspaceInventoryCheckpoint checkpoint,CurrentControlSigningInventory signing,
+        LocalCurrentControlAttempt fenced,WorkspacePublicationInventory publications,SqliteTransaction transaction,CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);ArgumentNullException.ThrowIfNull(signing);
+        ArgumentNullException.ThrowIfNull(fenced);ArgumentNullException.ThrowIfNull(publications);ArgumentNullException.ThrowIfNull(transaction);
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Inventory admission requires its owning live transaction.");
         if(ReadCurrentInventoryIn(transaction,token)!=checkpoint) throw new WorkspaceObservationConflictException();
         var attempt=ReadAttempt(transaction) ?? throw new WorkspaceObservationConflictException();
         var history=RequireCurrentInventoryInputsIn(attempt,null,signing,fenced,publications,transaction,token);
@@ -92,7 +102,7 @@ public sealed partial class WorkspaceObservationRepository
             checkpoint.Documents!=history.ImmutableObservations.Count || checkpoint.InventorySha256!=InventoryHash(history.ImmutableObservations) ||
             checkpoint.PreservedObservationSha256!=history.CompleteObservationSha256 || checkpoint.PreservedCandidateSha256!=history.CompleteCandidateSha256 ||
             checkpoint.PreservedHistorySha256!=HistoryDigest(ReadHistory(attempt.Context,transaction).Values)) throw new WorkspaceObservationConflictException();
-        token.ThrowIfCancellationRequested();transaction.Commit();
+        token.ThrowIfCancellationRequested();
     }
 
     private CurrentWorkspaceObservationHistory RequireCurrentInventoryInputsIn(WorkspaceObservationAttempt attempt,

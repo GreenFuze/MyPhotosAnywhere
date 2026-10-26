@@ -26,39 +26,41 @@ public sealed partial class LocalCurrentControlReader
     public Task<LocalCurrentWorkspaceInventory> ObserveWorkspaceInventoryAsync(LocalCurrentControlCapture capture,CancellationToken caller)
     {
         ArgumentNullException.ThrowIfNull(capture);
-        return OperationAsync(async token=>
+        return OperationAsync(token=>ObserveWorkspaceInventoryCoreAsync(capture,caller,token),caller);
+    }
+
+    private async Task<LocalCurrentWorkspaceInventory> ObserveWorkspaceInventoryCoreAsync(LocalCurrentControlCapture capture,CancellationToken caller,CancellationToken token)
+    {
+        var history=await _state.ExecuteAsync(database=>
         {
-            var history=await _state.ExecuteAsync(database=>
+            Check(caller,token);if(!ReferenceEquals(capture.Owner,_identity)) throw new CurrentControlObservationConflictException();
+            AssertScope(database,new(capture.Pin,capture.Slot,capture.Attempt));
+            var signing=new CurrentControlTransitionJournal(database,_budget).CaptureSigningInventory(capture.Attempt,token);
+            return new WorkspaceObservationRepository(database,_budget).CaptureCurrentHistory(signing,capture.Attempt,token);
+        },token).ConfigureAwait(false);
+        var pin=LibraryConnectionDescriptor.Decode(history.Signing.ConnectionCode);
+        var channel=new CurrentRootInventoryChannel(pin.CurrentFileId!,pin.Workspace.FolderId,capture.Attempt,
+            async(version,owned)=>
             {
-                Check(caller,token);if(!ReferenceEquals(capture.Owner,_identity)) throw new CurrentControlObservationConflictException();
-                AssertScope(database,new(capture.Pin,capture.Slot,capture.Attempt));
-                var signing=new CurrentControlTransitionJournal(database,_budget).CaptureSigningInventory(capture.Attempt,token);
-                return new WorkspaceObservationRepository(database,_budget).CaptureCurrentHistory(signing,capture.Attempt,token);
-            },token).ConfigureAwait(false);
-            var pin=LibraryConnectionDescriptor.Decode(history.Signing.ConnectionCode);
-            var channel=new CurrentRootInventoryChannel(pin.CurrentFileId!,pin.Workspace.FolderId,capture.Attempt,
-                async(version,owned)=>
+                await _state.ExecuteAsync(database=>
                 {
-                    await _state.ExecuteAsync(database=>
-                    {
-                        Check(caller,owned);AssertScope(database,new(capture.Pin,capture.Slot,capture.Attempt));
-                        new LocalCurrentControlObservations(database,_budget).RejectInventoryObservation(capture.Attempt,version,owned);return true;
-                    },owned).ConfigureAwait(false);
-                });
-            var source=new CatalogWorkspaceDocumentSource(_state,_accounts,pin.Workspace,capture.Attempt.SharedDriveId,capture.Attempt.AccountRevision,channel);
-            await using var scan=new WorkspaceObservationService(_state,_budget,history.Context,source);
-            return await scan.ScanCurrentObservedAsync(channel.FileId,async(attempt,cursor,observed,publications,owned)=>
-            {
-                Check(caller,owned);
-                var fence=await FenceCapturedCoreAsync(capture,caller,owned).ConfigureAwait(false);
-                var checkpoint=await _state.ExecuteAsync(database=>
-                {
-                    Check(caller,owned);AssertScope(database,new(capture.Pin,capture.Slot,fence.Attempt));
-                    return new WorkspaceObservationRepository(database,_budget).CompleteCurrentInventory(attempt,cursor.Token,observed,history.Signing,fence.Attempt,publications,owned);
+                    Check(caller,owned);AssertScope(database,new(capture.Pin,capture.Slot,capture.Attempt));
+                    new LocalCurrentControlObservations(database,_budget).RejectInventoryObservation(capture.Attempt,version,owned);return true;
                 },owned).ConfigureAwait(false);
-                Check(caller,owned);return new LocalCurrentWorkspaceInventory(_identity,checkpoint,history.Signing,publications,fence);
-            },token).ConfigureAwait(false);
-        },caller);
+            });
+        var source=new CatalogWorkspaceDocumentSource(_state,_accounts,pin.Workspace,capture.Attempt.SharedDriveId,capture.Attempt.AccountRevision,channel);
+        await using var scan=new WorkspaceObservationService(_state,_budget,history.Context,source);
+        return await scan.ScanCurrentObservedAsync(channel.FileId,async(attempt,cursor,observed,publications,owned)=>
+        {
+            Check(caller,owned);
+            var fence=await FenceCapturedCoreAsync(capture,caller,owned).ConfigureAwait(false);
+            var checkpoint=await _state.ExecuteAsync(database=>
+            {
+                Check(caller,owned);AssertScope(database,new(capture.Pin,capture.Slot,fence.Attempt));
+                return new WorkspaceObservationRepository(database,_budget).CompleteCurrentInventory(attempt,cursor.Token,observed,history.Signing,fence.Attempt,publications,owned);
+            },owned).ConfigureAwait(false);
+            Check(caller,owned);return new LocalCurrentWorkspaceInventory(_identity,checkpoint,history.Signing,publications,fence);
+        },token).ConfigureAwait(false);
     }
 
     public Task AssertWorkspaceInventoryUnchangedAsync(LocalCurrentWorkspaceInventory inventory,CancellationToken caller)
