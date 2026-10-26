@@ -292,3 +292,34 @@ exact live database transaction. No I/O/cross-transaction verification cache is 
 No canonical activation, mutable Root transition, active runtime route or connection
 export is enabled by these pending holders. Keep the old conservative reconciliation
 until selected-current Root witnesses and uploaded-but-unselected recovery are composed.
+
+
+### Claimed private canonical SQLite preparation
+
+`CurrentCatalogStageJournal` commits a bounded immutable preparation claim before
+`CurrentCatalogStageArea` can create its generated-only file. The original Root hash,
+pin, nonce and access revision survive restart. A freshly captured identical Root may
+replay the same ID; a different selected head cannot retarget it. Complete claim/hash
+pairs and the two-stage limit fail closed on corrupt or missing history.
+
+`CurrentCatalogStageIndex` writes one verified facts leaf per SQLite transaction,
+checks exact retained rows during replay and requires every retained leaf before
+sealing. Sealing closes writable native handles, durably flushes, hashes the complete
+bounded file and reopens read-only. Known dates precede unknown dates in bounded
+keyset pages. The descriptor is historical preparation, never fresh authority.
+
+`LocalCurrentSqliteStage` keeps native transactions and cancellable whole-file hashing
+outside the main state queue, with current-capture checks around writes. Only its own
+normally completed graph witness can seal it. Close cancels new work, joins physical
+native work and releases index handles before the directory lease. Claimed files
+survive failed work and Exit. Unknown files and changed sealed files are preserved.
+Retirement first persists its phase, requires the exact owned file, joins native/area
+leases and proves actual file absence before deleting the paired main-state claim.
+Storage admission counts this directory, including temporary SQLite journals.
+
+This is pending preparation only. There is no active pointer, accepted human/policy
+history, current Root CAS, publication completion or runtime handoff here. The current
+adapter owns one area lifetime; composition must add one shared active/pending area
+owner before concurrent activation/retention. Do not bypass its exclusive lease.
+Main Processor schema13, Room12 and native private7 stay unchanged; the new derived
+SQLite file has its own private format1. No original-file write is introduced.

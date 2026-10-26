@@ -1,5 +1,45 @@
 # MPA 0.6.0 implementation ledger
 
+## Claimed canonical private preparation
+
+A durable paired stage claim now precedes generated SQLite file creation. Complete
+facts leaves commit atomically; replay verifies each retained row, and sealing requires
+a complete enumeration, native closure, flush and whole-file digest. Historical sealed
+pages use known-date/identity keysets with unknown dates last. Original media paths
+are never input to this owner. Marked private inventory, immutable scope, disk budgets,
+physical retirement and actual absence guard recovery and cleanup.
+
+The asynchronous adapter keeps native writes/hash work outside the serial main state
+queue and joins them on Exit. It requires its exact graph/capture witness before
+sealing. A new capture can resume the same original identity only for identical Root
+bytes and scope. Fresh final fencing and serialized human/policy/history admission
+plus atomic activation are still separate unfinished work.
+
+Final corrected validation passes all376 Core cases, preserving every367 prior
+identity plus eight stage cases and one worker shutdown case. All62 affected current
+reader/storage AppServices cases pass, preserving the prior52 current-reader cases.
+Strict Desktop builds with zero warnings/errors. All11 exact LF source hashes,
+reports and full logs are frozen in current-stage-corrected-validation.json.
+Full400 ordinary AppServices and mandatory cross-platform scale/reference CI remain
+required. The initial compile failures, superseded rendezvous failure and failed
+375-case candidate remain historical; they are not relabeled as passing results.
+
+A separate worker regression investigation found an unsafe shutdown ordering:
+waiting for pipe-cancellation callbacks before native stop could block the very
+termination that would unblock IO. The actual worker fault-injection case failed
+before the fix and passes afterward. Both pipe cancellation and stdin closure now
+remain owned tasks, joined after physical native retirement and before releasing
+resources; recovery retains and joins the same tasks. All14 worker/supervisor cases
+pass with every original deadline/assertion preserved. The earlier sporadic masked
+failure's exact cause remains unconfirmed; the deterministic ordering defect is
+reproduced and fixed. No historical failure or diagnostic is waived.
+
+Fresh6325b20 native CI passed all177 cases per API29/35/37. Independent artifact
+verification also confirms complete process-bound allocation tracing,108 decoded
+mapped screenshots per API and SDK receipts. All three exact empty-crop case logs
+contain zero root-directory denials. Runtime diagnostic attribution and visual review
+remain pending; no previous version-specific warning exception is extended.
+
 ## Complete ordinary regression and native backup action readiness
 
 All393 ordinary AppServices cases pass on immutable5e456e2, preserving every374
@@ -77,8 +117,9 @@ and a final membership SQL failure that rolls back earlier upserts/memberships a
 allows the same batch to retry. Frozen source/report/full-log hashes and unchanged
 10k/100k observations are in preflight-060/discovery-prepared-commands-validation.json.
 Concurrent host workload makes those observations unsuitable for a controlled speed
-claim. The preceding Windows30-minute contract deadline failure is still unresolved
-until a complete new exact-source run passes. No deadline or fixture is relaxed.
+claim. At that earlier checkpoint the Windows30-minute contract deadline had not yet
+passed; the later independently verified5e456e2 workflow completed all12 jobs,
+including Windows in1549seconds under the same1800-second limit. No deadline or fixture is relaxed.
 Full393 ordinary AppServices, mandatory scale/reference and final joint acceptance
 remain required; this optimization does not complete the0.6 product.
 
