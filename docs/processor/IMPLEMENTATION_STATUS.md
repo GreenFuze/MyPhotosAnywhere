@@ -1,5 +1,41 @@
 # MPA 0.6.0 implementation ledger
 
+## Stable LiteRT patch and retained Android lint failure
+
+Android lint on9e9da1c correctly blocked the newly available stable LiteRT2.3.2
+while MPA pinned2.3.0. The exact Google Maven metadata and artifact POM confirm
+2.3.2; the dependency is now pinned to that patch without changing any warning gate.
+The initial failure remains archived and is not treated as an infrastructure retry.
+
+Local validation has zero lint findings and builds both app and instrumentation
+APKs. A separate explicit rerun of the Android unit task passed all713 existing
+test identities; the first build's cached unit result is not called a fresh run.
+Both strict runs admit only the already approved exact15 AGP deprecation records.
+The first sandbox launch failed to open the external Gradle distribution lock
+before compilation; its log is retained and the host run used the same pinned tools.
+These APKs are local validation outputs. Fresh exact-revision CI/native runtime and
+final signing/upgrade/joint-release acceptance remain required.
+
+The predecessor9e9 protocol matrix passed all24 jobs. All40 reports, all prior/new
+identities, source receipts, measurements, unchanged limits and complete logs were
+independently verified: each platform has99 Protocol/437 Core/481 ordinary Services,
+plus the other existing contracts, both scale fixtures and all13 reference cases.
+Native APIs29/35/37 and Desktop statuses pass. Native's first Google SDK bootstrap
+HTTP502 occurred before application compilation/tests; one exact-revision retry
+passed, retaining the initial failure.9e9 Android remains failed at the now-fixed
+dependency finding; it is never described as a fully passing revision.
+
+The isolated original10k/100k replay also passed within each unchanged30-minute
+fixture lifetime, at about21m38s/23m24s. Only the Protocol DLL differed; all187 other
+copied outputs and the original test assembly were hash-verified. Its roughly
+201/216GB cumulative managed allocations and long preparation remain recorded,
+not presented as final responsiveness acceptance. No failed baseline is erased.
+
+Current-controlled completion is a separate uncommitted candidate: all8 focused
+cases with real publication snapshots pass; all437 Core and194 affected Services
+plus strict Desktop are still running. No pending result or unfinished0.6 feature
+is counted as a release milestone.
+
 ## Native public-key validation cost and failure-safe test callback ownership
 
 The local regression completed with five failures: four existing 10-second callback
@@ -33,9 +69,10 @@ rejection, bound/eviction and concurrency cases. Byte-identical existing Service
 test binaries passed all four deadline cases with only the candidate Protocol DLL
 overlaid. Repository validation then passed all 99 Protocol and all 18 selected
 Services cases, retaining their previous identities. Strict Desktop Release has zero
-warnings/errors. The 10k/100k replay is separate and still pending; the original 100k
-failure is not waived. Full regression and exact-revision CI remain required before
-any publication. This change does not complete the remaining 0.6 features.
+warnings/errors. The separate unchanged10k/100k replay subsequently passed; its
+copied-output and performance boundaries are recorded above. The failed baseline
+remains retained. Full final-revision checks and acceptance remain required before
+publication. This change does not complete the remaining0.6 features.
 
 ## Historical selection of an owned generation
 

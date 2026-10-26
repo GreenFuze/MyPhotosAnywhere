@@ -63,7 +63,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.15.0")
     implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.mlkit:image-labeling:17.0.9")
-    implementation("com.google.ai.edge.litert:litert:2.3.0")
+    implementation("com.google.ai.edge.litert:litert:2.3.2")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.09.00"))
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
