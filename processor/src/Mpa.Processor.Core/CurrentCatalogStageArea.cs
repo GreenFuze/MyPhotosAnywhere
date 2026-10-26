@@ -12,7 +12,9 @@ public sealed class CurrentCatalogStageArea : IDisposable
     private readonly string _root;
     private readonly object _gate=new();
     private readonly HashSet<Guid> _users=[];
+    private readonly HashSet<Guid> _retiring=[];
     private readonly Dictionary<Guid,byte[]> _claims;
+    private readonly Guid _installation;
     private FileStream? _lease;
     private bool _closed;
 
@@ -22,7 +24,8 @@ public sealed class CurrentCatalogStageArea : IDisposable
         var state=Path.TrimEndingDirectorySeparator(Path.GetFullPath(stateDirectory));
         if(!Path.IsPathFullyQualified(stateDirectory) || state==Path.GetPathRoot(state) || installation==Guid.Empty || claims.Count>CurrentCatalogStageJournal.MaximumStages || claims.Select(c=>c.Id).Distinct().Count()!=claims.Count)
             throw new ArgumentException("A dedicated leased installation and bounded complete claims are required.");
-        CheckState(state,installation);_root=Path.Combine(state,Name);_claims=claims.ToDictionary(claim=>claim.Id,CurrentCatalogStageJournal.Identity);
+        CheckState(state,installation);_root=Path.Combine(state,Name);_installation=installation;_claims=claims.ToDictionary(claim=>claim.Id,CurrentCatalogStageJournal.Identity);
+        foreach(var claim in claims.Where(claim=>claim.Phase=="retiring")) _retiring.Add(claim.Id);
         using var reservation=budget.Reserve(65536);reservation.RecheckBeforeWrite(reservation.Bytes);
         lock(AccountingGate)
         {
@@ -60,16 +63,35 @@ public sealed class CurrentCatalogStageArea : IDisposable
         lock(_gate)
         {
             ObjectDisposedException.ThrowIf(_closed,this);if(!_claims.TryGetValue(claim.Id,out var identity) || !identity.AsSpan().SequenceEqual(CurrentCatalogStageJournal.Identity(claim))) throw new InvalidOperationException("A durable captured claim must precede native file creation.");
-            if(claim.Phase=="retiring" || !_users.Add(claim.Id)) throw new InvalidOperationException("A current stage needs one live native owner.");
+            if(claim.Phase=="retiring" || _retiring.Contains(claim.Id) || !_users.Add(claim.Id)) throw new InvalidOperationException("A current stage needs one live native owner.");
         }
         try {return CurrentCatalogStageIndex.Open(IndexPath(claim.Id),claim,budget,()=>Release(claim.Id),token);}
         catch {Release(claim.Id);throw;}
     }
     private void Release(Guid id)
     {lock(_gate) if(!_users.Remove(id)) throw new InvalidOperationException("Current-stage native ownership was released twice.");}
+    /// <summary>Recover a previously claimed preparing file before persisting its
+    /// retirement intent. Missing uncreated files need no allocation to be retired.</summary>
+    public void RecoverPreparing(CurrentCatalogStageClaim claim,StorageBudgetManager budget,CancellationToken token=default)
+    {
+        ArgumentNullException.ThrowIfNull(claim);
+        lock(_gate)
+        {
+            ObjectDisposedException.ThrowIf(_closed,this);
+            if(claim.Phase!="preparing" || !_claims.TryGetValue(claim.Id,out var identity) || !identity.AsSpan().SequenceEqual(CurrentCatalogStageJournal.Identity(claim)))
+                throw new InvalidOperationException("Recover only the exact known preparing index.");
+            token.ThrowIfCancellationRequested();var path=IndexPath(claim.Id);
+            if(!File.Exists(path))
+            {
+                if(Directory.Exists(path) || File.Exists(path+"-journal")) throw new InvalidDataException("Uncreated index has unexplained recovery entries.");
+                return;
+            }
+            using var recovered=Open(claim,budget,token);
+        }
+    }
     /// <summary>Only after the journal durably marks this inactive claim retiring.
     /// The caller must confirm actual absence before removing the paired claim.</summary>
-    public void RemoveRetiring(CurrentCatalogStageClaim claim,CancellationToken token=default)
+    public CurrentCatalogStageRetirement RemoveRetiring(CurrentCatalogStageClaim claim,CancellationToken token=default)
     {
         ArgumentNullException.ThrowIfNull(claim);if(claim.Phase!="retiring") throw new InvalidOperationException("Mark private stage retirement before unlinking it.");
         lock(_gate)
@@ -77,6 +99,7 @@ public sealed class CurrentCatalogStageArea : IDisposable
             ObjectDisposedException.ThrowIf(_closed,this);
             if(!_claims.TryGetValue(claim.Id,out var identity) || !identity.AsSpan().SequenceEqual(CurrentCatalogStageJournal.Identity(claim))) throw new InvalidOperationException("Retirement requires the exact durable captured claim.");
             if(_users.Contains(claim.Id)) throw new InvalidOperationException("Join the current-stage index before retiring its file.");
+            _retiring.Add(claim.Id); // A stale preparing/sealed record cannot reopen it.
             token.ThrowIfCancellationRequested();var path=IndexPath(claim.Id);
             if(File.Exists(path)) CurrentCatalogStageIndex.VerifyForRemoval(path,claim,token);
             else if(Directory.Exists(path) || File.Exists(path+"-journal")) throw new InvalidDataException("Missing current stage has an unexplained filesystem replacement or journal.");
@@ -85,6 +108,51 @@ public sealed class CurrentCatalogStageArea : IDisposable
                 Regular(_root,true);if(File.Exists(path+"-journal")) throw new InvalidDataException("Recover a current-stage transaction before retiring it.");
                 if(File.Exists(path)) {Regular(path,false);File.Delete(path);}
                 if(File.Exists(path) || Directory.Exists(path)) throw new IOException("Current-stage file retirement is unconfirmed.");
+            }
+            return new(this,claim);
+        }
+    }
+    /// <summary>Apply one bounded COMPLETE durable claim inventory. New claims must
+    /// precede files; removed claims require joined users and actual file absence.
+    /// Existing captured headers cannot be replaced by a newer nonce or Root.</summary>
+    public void SyncClaims(IReadOnlyList<CurrentCatalogStageClaim> claims)
+    {
+        ArgumentNullException.ThrowIfNull(claims);
+        if(claims.Count>CurrentCatalogStageJournal.MaximumStages || claims.Any(claim=>claim.Id==Guid.Empty) || claims.Select(claim=>claim.Id).Distinct().Count()!=claims.Count)
+            throw new ArgumentException("A complete bounded durable claim inventory is required.",nameof(claims));
+        var next=claims.ToDictionary(claim=>claim.Id,CurrentCatalogStageJournal.Identity);
+        lock(_gate)
+        {
+            ObjectDisposedException.ThrowIf(_closed,this);
+            if(_users.Any(id=>!next.ContainsKey(id))) throw new InvalidOperationException("A live native stage cannot lose its durable claim.");
+            foreach(var pair in next)
+                if(_claims.TryGetValue(pair.Key,out var old) && !old.AsSpan().SequenceEqual(pair.Value)) throw new InvalidDataException("A live area cannot retarget a captured stage header.");
+            lock(AccountingGate)
+            {
+                CheckOwner(_root,_installation);
+                foreach(var file in Inventory(_root))
+                    if(FileIdentity(file) is { } id && !next.ContainsKey(id)) throw new InvalidDataException("A claim cannot be forgotten while its file or journal remains.");
+                foreach(var claim in claims)
+                    if(claim.Descriptor is not null && claim.Phase!="retiring" && (!File.Exists(IndexPath(claim.Id)) || new FileInfo(IndexPath(claim.Id)).Length!=claim.Descriptor.Bytes || File.Exists(IndexPath(claim.Id)+"-journal")))
+                        throw new InvalidDataException("A retained sealed stage lost its complete file.");
+            }
+            _claims.Clear();foreach(var pair in next) _claims.Add(pair.Key,pair.Value);
+            _retiring.RemoveWhere(id=>!next.ContainsKey(id));foreach(var claim in claims.Where(claim=>claim.Phase=="retiring")) _retiring.Add(claim.Id);
+        }
+    }
+    internal void AssertLiveRetirement(string stateDirectory,Guid installation,CurrentCatalogStageClaim expected)
+    {
+        lock(_gate)
+        {
+            ObjectDisposedException.ThrowIf(_closed,this);
+            var comparison=OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if(installation!=_installation || !string.Equals(_root,Path.Combine(Path.GetFullPath(stateDirectory),Name),comparison) || expected.Phase!="retiring" ||
+                !_retiring.Contains(expected.Id) || _users.Contains(expected.Id) || !_claims.TryGetValue(expected.Id,out var bytes) || !bytes.AsSpan().SequenceEqual(CurrentCatalogStageJournal.Identity(expected)))
+                throw new InvalidOperationException("Retirement receipt lost its exact live area and captured claim.");
+            lock(AccountingGate)
+            {
+                CheckOwner(_root,installation);var path=IndexPath(expected.Id);
+                if(File.Exists(path) || Directory.Exists(path) || File.Exists(path+"-journal") || Directory.Exists(path+"-journal")) throw new IOException("Retired current-stage bytes reappeared; retain the claim.");
             }
         }
     }
@@ -161,5 +229,19 @@ public sealed class CurrentCatalogStageArea : IDisposable
             if(_closed) return;if(_users.Count!=0) throw new InvalidOperationException("Join all current-stage native indexes before releasing their area.");
             _lease?.Dispose();_lease=null;_closed=true; // Claims, indexes and markers deliberately survive Exit.
         }
+    }
+}
+
+/// <summary>Process-local proof of actual per-index retirement while the SAME area
+/// remains exclusively leased. It cannot refresh Root authority or survive Exit.</summary>
+public sealed class CurrentCatalogStageRetirement
+{
+    private readonly CurrentCatalogStageArea _owner;
+    private readonly CurrentCatalogStageClaim _claim;
+    internal CurrentCatalogStageRetirement(CurrentCatalogStageArea owner,CurrentCatalogStageClaim claim) {_owner=owner;_claim=claim;}
+    internal void AssertFor(string stateDirectory,Guid installation,CurrentCatalogStageClaim expected)
+    {
+        if(expected!=_claim) throw new InvalidOperationException("A retirement receipt cannot replace its captured claim.");
+        _owner.AssertLiveRetirement(stateDirectory,installation,expected);
     }
 }

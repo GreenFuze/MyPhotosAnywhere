@@ -14,6 +14,7 @@ public sealed class LocalCurrentSqliteStage : ILocalCurrentCatalogStage,IAsyncDi
     private readonly LocalCurrentControlCapture _capture;
     private readonly CurrentCatalogStageArea _area;
     private readonly CurrentCatalogStageIndex _index;
+    private readonly bool _ownsArea;
     private readonly object _gate=new();
     private readonly SemaphoreSlim _serial=new(1,1);
     private readonly CancellationTokenSource _stop=new();
@@ -23,8 +24,16 @@ public sealed class LocalCurrentSqliteStage : ILocalCurrentCatalogStage,IAsyncDi
     public bool ExitConfirmed {get {lock(_gate) return _exitConfirmed;}}
 
     private LocalCurrentSqliteStage(ProcessorStateCoordinator state,StorageBudgetManager budget,LocalCurrentControlCapture capture,
-        CurrentCatalogStageClaim claim,CurrentCatalogStageArea area,CurrentCatalogStageIndex index)
-    {_state=state;_budget=budget;_capture=capture;_claim=claim;_area=area;_index=index;}
+        CurrentCatalogStageClaim claim,CurrentCatalogStageArea area,CurrentCatalogStageIndex index,bool ownsArea=true)
+    {_state=state;_budget=budget;_capture=capture;_claim=claim;_area=area;_index=index;_ownsArea=ownsArea;}
+
+    internal static LocalCurrentSqliteStage OpenBorrowed(ProcessorStateCoordinator state,StorageBudgetManager budget,LocalCurrentControlCapture capture,
+        CurrentCatalogStageClaim claim,CurrentCatalogStageArea area,CancellationToken token)
+    {
+        var index=area.Open(claim,budget,token);
+        try {token.ThrowIfCancellationRequested();return new(state,budget,capture,claim,area,index,ownsArea:false);}
+        catch {index.Dispose();throw;}
+    }
 
     public static async Task<LocalCurrentSqliteStage> CreateAsync(ProcessorStateCoordinator state,StorageBudgetManager budget,
         LocalCurrentControlCapture capture,Guid id,CancellationToken cancellationToken)
@@ -107,7 +116,7 @@ public sealed class LocalCurrentSqliteStage : ILocalCurrentCatalogStage,IAsyncDi
         try
         {
             if(cancellationFailure is not null) throw new AggregateException("Staging cancellation needs attention; retain borrowed owners.",cancellationFailure);
-            await Task.Run(()=>{_index.Dispose();_area.Dispose();},CancellationToken.None).ConfigureAwait(false);
+            await Task.Run(()=>{_index.Dispose();if(_ownsArea) _area.Dispose();},CancellationToken.None).ConfigureAwait(false);
             _stop.Dispose();lock(_gate) _exitConfirmed=true;
         }
         finally {_serial.Release();}

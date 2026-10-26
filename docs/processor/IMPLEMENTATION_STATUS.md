@@ -1,5 +1,32 @@
 # MPA 0.6.0 implementation ledger
 
+## Shared historical and pending index ownership
+
+`LocalCurrentStagePool` owns one exclusive area for two private indexes, while each
+stage borrows that area. Preparing or retiring a caller-closed candidate leaves the
+other historical reader usable. Complete claim synchronization verifies immutable
+headers, live users and actual remaining files before updating its map. Live retirement
+receipts bind the exact area, installation, captured claim and actual file absence;
+old preparing records cannot recreate retired work. Uncreated files need no allocation,
+and existing preparing files recover before retirement. Exit joins all child indexes
+before releasing the shared area or borrowed state.
+
+All379 Core and66 affected current-reader/storage AppServices cases pass, preserving
+every previous376/62 identity. Strict Desktop has zero warnings/errors. Eight exact LF
+source hashes, reports and full logs are frozen in current-stage-pool-validation.json.
+An initial new assertion compared nested collection references; the final test compares
+complete canonical metadata bytes. The superseded failure remains recorded. Full404
+ordinary AppServices and mandatory cross-platform scale/reference CI remain required.
+No atomic active pointer, current human/policy/history admission or active runtime route
+is enabled. Main schemas, private format1 and existing two-stage/512MiB bounds remain.
+
+The preceding4d0a5a0 contract workflow passed all12 jobs: each Ubuntu, Windows, macOS
+ARM and Intel run passed95/376/116/400/9/27 ordinary project cases plus2 scale and13
+reference cases. All32 reports, full logs and matching platform identity sets were
+independently verified. Windows finished in1348seconds under the unchanged1800-second
+limit. Android, native and Desktop workflows also passed. This is exact prior-source
+evidence; the shared-pool revision still needs its own complete CI and product gates.
+
 ## Claimed canonical private preparation
 
 A durable paired stage claim now precedes generated SQLite file creation. Complete

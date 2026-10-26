@@ -318,8 +318,14 @@ leases and proves actual file absence before deleting the paired main-state clai
 Storage admission counts this directory, including temporary SQLite journals.
 
 This is pending preparation only. There is no active pointer, accepted human/policy
-history, current Root CAS, publication completion or runtime handoff here. The current
-adapter owns one area lifetime; composition must add one shared active/pending area
-owner before concurrent activation/retention. Do not bypass its exclusive lease.
+history, current Root CAS, publication completion or runtime handoff here. `LocalCurrentStagePool` now owns one area for both historical and pending indexes;
+borrowed stage closure releases only its index. Complete durable claim synchronization
+cannot drop live users, forget remaining files or replace immutable headers. Inactive
+retirement uses a process-local proof bound to the exact still-leased area, captured
+claim and actual absence, so another index can remain open. Default recovery still
+requires global area retirement. Stale preparing records cannot reopen deleted work.
+Pool Exit joins every child before releasing its exclusive directory lease. Preparing
+files recover before the retirement intent; uncreated files need no allocation.
+The active-pointer guard remains conservative until atomic current admission exists.
 Main Processor schema13, Room12 and native private7 stay unchanged; the new derived
 SQLite file has its own private format1. No original-file write is introduced.

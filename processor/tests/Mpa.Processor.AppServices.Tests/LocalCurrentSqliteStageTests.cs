@@ -156,6 +156,25 @@ public sealed partial class AccountServiceTests
 
     private static Task<IReadOnlyList<CurrentCatalogStageClaim>> StageClaimsAsync(CurrentReaderFixture fixture)=>
         fixture.Data.Setup.Accounts.State.ExecuteAsync(database=>new CurrentCatalogStageJournal(database,fixture.Data.Budget).ReadAll(),CancellationToken.None);
+
+    [TestMethod]
+    public async Task LocalCurrentSqliteStageLiveRetirementProofAllowsAnotherIndexToRemainOwned()
+    {
+        await using var fixture=await CurrentReaderFixture.CreateAsync().ConfigureAwait(false);var capture=await fixture.Reader.CaptureAsync(CancellationToken.None).ConfigureAwait(false);
+        var prepared=await fixture.Data.Setup.Accounts.State.ExecuteAsync(database=>
+        {
+            var journal=new CurrentCatalogStageJournal(database,fixture.Data.Budget);var first=journal.Begin(capture.Attempt,Guid.NewGuid());var second=journal.Begin(capture.Attempt,Guid.NewGuid());
+            return (first,second,database.StateDirectory,database.InstallationId);
+        },CancellationToken.None).ConfigureAwait(false);
+        using var area=new CurrentCatalogStageArea(prepared.StateDirectory,prepared.InstallationId,[prepared.first,prepared.second],fixture.Data.Budget);
+        using(var old=area.Open(prepared.first,fixture.Data.Budget)) old.Seal(0);
+        using var active=area.Open(prepared.second,fixture.Data.Budget);
+        var retiring=await fixture.Data.Setup.Accounts.State.ExecuteAsync(database=>new CurrentCatalogStageJournal(database,fixture.Data.Budget).BeginRetirement(prepared.first),CancellationToken.None).ConfigureAwait(false);
+        var receipt=area.RemoveRetiring(retiring);
+        await Assert.ThrowsExactlyAsync<IOException>(()=>fixture.Data.Setup.Accounts.State.ExecuteAsync(database=>{new CurrentCatalogStageJournal(database,fixture.Data.Budget).CompleteRetirement(retiring);return true;},CancellationToken.None)).ConfigureAwait(false);
+        await fixture.Data.Setup.Accounts.State.ExecuteAsync(database=>{new CurrentCatalogStageJournal(database,fixture.Data.Budget).CompleteRetirement(retiring,receipt);return true;},CancellationToken.None).ConfigureAwait(false);
+        var remaining=await StageClaimsAsync(fixture).ConfigureAwait(false);Assert.AreEqual(prepared.second,remaining.Single());area.SyncClaims(remaining);Assert.AreEqual(0L,active.Seal(0).Assets);
+    }
     private static Task<string> StagePathAsync(CurrentReaderFixture fixture,Guid id)=>
         fixture.Data.Setup.Accounts.State.ExecuteAsync(database=>Path.Combine(database.StateDirectory,"current-catalog-stages","stage-"+id.ToString("N")+".sqlite"),CancellationToken.None);
     private static void CurrentStageSql(ProcessorStateDatabase database,string sql)

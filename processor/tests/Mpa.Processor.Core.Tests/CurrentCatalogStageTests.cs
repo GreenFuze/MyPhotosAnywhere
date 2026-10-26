@@ -6,7 +6,7 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.Core.Tests;
 
 [TestClass]
-public sealed class CurrentCatalogStageTests
+public sealed partial class CurrentCatalogStageTests
 {
     [TestMethod]
     public void CurrentStageSealsKnownDatesBeforeUnknownAndSeeksWithoutDuplicates()

@@ -64,13 +64,14 @@ public sealed class CurrentCatalogStageJournal(ProcessorStateDatabase database,S
             if(active.ExecuteScalar() is not null) throw new InvalidOperationException("Active catalog retirement requires its joined activation owner.");
         var next=actual with {Phase="retiring"};Save(next,transaction);transaction.Commit();return next;
     }
-    public void CompleteRetirement(CurrentCatalogStageClaim expected)
+    public void CompleteRetirement(CurrentCatalogStageClaim expected,CurrentCatalogStageRetirement? retirement=null)
     {
         ArgumentNullException.ThrowIfNull(expected);using var transaction=_database.Connection.BeginTransaction();
         if(expected.Phase!="retiring" || ReadAll(transaction).SingleOrDefault(value=>value.Id==expected.Id)!=expected) throw new CurrentControlObservationConflictException();
         using(var active=Command(transaction,"SELECT 1 FROM processor_meta WHERE key='current_catalog_active_v1'"))
             if(active.ExecuteScalar() is not null) throw new InvalidOperationException("Active catalog retirement requires its joined activation owner.");
-        CurrentCatalogStageArea.AssertRetired(_database.StateDirectory,_database.InstallationId,expected.Id);
+        if(retirement is null) CurrentCatalogStageArea.AssertRetired(_database.StateDirectory,_database.InstallationId,expected.Id);
+        else retirement.AssertFor(_database.StateDirectory,_database.InstallationId,expected);
         using var delete=Command(transaction,"DELETE FROM processor_meta WHERE key=$body OR key=$hash",("$body",Key(expected.Id)),("$hash",Key(expected.Id)+":sha256"));
         if(delete.ExecuteNonQuery()!=2) throw new InvalidOperationException("Retired staging claim lost its complete pair.");transaction.Commit();
     }
