@@ -114,6 +114,17 @@ public sealed partial class LocalCurrentControlObservations(ProcessorStateDataba
         transaction.Commit();return same;
     }
 
+    /// <summary>A real listed/change-feed Root conflicts with this capture. Retain
+    /// only its actual version high-water and block the nonce; missing transport
+    /// fields are never fabricated into conditional metadata or a new Root.</summary>
+    public void RejectInventoryObservation(LocalCurrentControlAttempt expected,long? actualVersion,CancellationToken token=default)
+    {
+        if(actualVersion is <1) throw new ArgumentOutOfRangeException(nameof(actualVersion));
+        using var transaction=_database.Connection.BeginTransaction();var state=Require(expected,"captured",transaction,token);
+        var next=expected with {Phase="blocked",MaxVersion=Math.Max(expected.MaxVersion,actualVersion ?? expected.MaxVersion)};
+        Save(Saved.Create(next,state.Saved!.Heads),state,transaction);transaction.Commit();
+    }
+
     public LocalCurrentControlAttempt Fence(LocalCurrentControlAttempt expected,LocalCurrentControlMetadata actual,string bodySha256,CancellationToken token=default)
     {
         Validate(actual);using var transaction=_database.Connection.BeginTransaction();var state=Require(expected,"captured",transaction,token);

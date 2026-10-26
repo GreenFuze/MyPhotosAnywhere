@@ -69,6 +69,23 @@ public sealed partial class WorkspaceObservationRepository
         transaction.Commit(); return updated;
     }
 
+    /// <summary>Retain an actual page interrupted by the independently pinned mutable
+    /// Root before/within/after replay. Do not advance any cursor or clear recovery.
+    /// This is not a completed final-fence page and cannot manufacture replay progress.</summary>
+    public WorkspaceObservationAttempt RememberInterruptedInventoryPage(WorkspaceObservationAttempt attempt,
+        IReadOnlyCollection<WorkspaceHistoryEvent> events,IReadOnlyCollection<WorkspaceCandidateObservation> candidates)
+    {
+        ArgumentNullException.ThrowIfNull(attempt);ArgumentNullException.ThrowIfNull(events);ArgumentNullException.ThrowIfNull(candidates);
+        if(events.Count is <1 or >100 || candidates.Count>100) throw new ArgumentException("A bounded actual interrupted page is required.");
+        using var transaction=_database.Connection.BeginTransaction();AssertContext(attempt.Context,transaction);
+        if(ReadAttempt(transaction)!=attempt || attempt.Completed is not null || attempt.InventoryStartCursor is null)
+            throw new WorkspaceObservationConflictException();
+        using var reservation=_budget.Reserve(checked(events.Count*16384L+65536));reservation.RecheckBeforeWrite(reservation.Bytes);
+        var replay=attempt.HistoryReplay;
+        var updated=RetainHistory(replay is null ? attempt : attempt with {HistoryReplay=replay with {Active=false,AtEnd=false,BatchPages=0}},events,candidates,transaction);
+        reservation.RecheckBeforeWrite(reservation.Bytes);transaction.Commit();return updated;
+    }
+
     private WorkspaceObservationAttempt RetainHistory(WorkspaceObservationAttempt attempt, IReadOnlyCollection<WorkspaceHistoryEvent> events,
         IReadOnlyCollection<WorkspaceCandidateObservation> candidates, SqliteTransaction transaction)
     {

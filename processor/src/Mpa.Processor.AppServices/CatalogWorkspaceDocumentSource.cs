@@ -25,6 +25,7 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource, I
     private readonly long _accountRevision;
     private readonly bool _initialPoliciesOnly;
     private readonly bool _allMetadata;
+    private readonly CurrentRootInventoryChannel? _currentRoot;
     public bool RequiresHistoryReplay => _allMetadata;
 
     public CatalogWorkspaceDocumentSource(ProcessorStateCoordinator state, ProcessorAccountService accounts,
@@ -40,6 +41,11 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource, I
         _sharedDriveId = sharedDriveId; _accountRevision = accountRevision; _initialPoliciesOnly = initialPoliciesOnly; _allMetadata = allMetadata;
     }
 
+    internal CatalogWorkspaceDocumentSource(ProcessorStateCoordinator state,ProcessorAccountService accounts,
+        CatalogWorkspace workspace,string? sharedDriveId,long accountRevision,CurrentRootInventoryChannel currentRoot)
+        : this(state,accounts,workspace,sharedDriveId,accountRevision,allMetadata:true)
+    { _currentRoot=currentRoot ?? throw new ArgumentNullException(nameof(currentRoot)); }
+
     public Task<WorkspaceDocumentInventory> CaptureAsync(IReadOnlyCollection<string> previouslyKnownIds, CancellationToken token) =>
         UseAsync((documents, changes, ownedToken) => new WorkspaceDocumentInventoryReader(documents, changes,
             _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly, _allMetadata).CaptureAsync(previouslyKnownIds, ownedToken), token);
@@ -48,7 +54,7 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource, I
     {
         ArgumentNullException.ThrowIfNull(observer);
         return UseAsync((documents, changes, ownedToken) => new WorkspaceDocumentInventoryReader(documents, changes,
-            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly, _allMetadata).CaptureAsync(previouslyKnownIds, ownedToken, observer), token);
+            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly, _allMetadata).CaptureAsync(previouslyKnownIds, ownedToken, observer), token,observer);
     }
 
     internal Task<WorkspaceDocumentInventory> CaptureIncrementalAsync(WorkspaceDocumentInventory baseline, WorkspacePublicationExpectation? expected,
@@ -68,7 +74,7 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource, I
     {
         ArgumentNullException.ThrowIfNull(observer);
         return UseAsync((documents, changes, ownedToken) => new WorkspaceDocumentInventoryReader(documents, changes,
-            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly, _allMetadata).CheckUnchangedAsync(inventory, ownedToken, observer), token);
+            _workspace.AccountId, _workspace.FolderId, _sharedDriveId, _initialPoliciesOnly, _allMetadata).CheckUnchangedAsync(inventory, ownedToken, observer), token,observer);
     }
 
     public Task<DriveWorkspaceObject> ReadAsync(DriveWorkspaceDocumentCandidate candidate, CancellationToken token)
@@ -91,10 +97,11 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource, I
         ArgumentNullException.ThrowIfNull(inventory); ArgumentNullException.ThrowIfNull(from); ArgumentNullException.ThrowIfNull(observer);
         if (!_allMetadata || inventory.AccountId != _workspace.AccountId || inventory.FolderId != _workspace.FolderId || inventory.SharedDriveId != _sharedDriveId)
             throw new ArgumentException("History replay requires the captured complete metadata source.", nameof(inventory));
-        return UseAsync((_, changes, ownedToken) => new WorkspaceHistoryReplayReader(changes).ReplayAsync(inventory, from, observer, ownedToken), token);
+        return UseAsync((_, changes, ownedToken) => new WorkspaceHistoryReplayReader(changes).ReplayAsync(inventory, from, observer, ownedToken), token,history:observer);
     }
 
-    private Task<T> UseAsync<T>(Func<IGoogleWorkspaceDiscovery, IGoogleWorkspaceChanges, CancellationToken, Task<T>> operation, CancellationToken cancellationToken) =>
+    private Task<T> UseAsync<T>(Func<IGoogleWorkspaceDiscovery, IGoogleWorkspaceChanges, CancellationToken, Task<T>> operation, CancellationToken cancellationToken,
+        IWorkspaceInventoryObserver? observer=null,IWorkspaceHistoryObserver? history=null) =>
         _accounts.ReadDriveAsync(_workspace.AccountId, async (reader, revision, token) =>
         {
             token.ThrowIfCancellationRequested(); cancellationToken.ThrowIfCancellationRequested();
@@ -107,6 +114,7 @@ public sealed class CatalogWorkspaceDocumentSource : IWorkspaceDocumentSource, I
             else if (_initialPoliciesOnly)
                 documents = reader is IGoogleInitialWorkspaceDiscovery initial ? new InitialDocuments(documents, initial) :
                     throw new InvalidOperationException("Initial publication requires an unfiltered workspace inventory.");
+            if (_currentRoot is not null) { documents=_currentRoot.Documents(documents,observer); changes=_currentRoot.Changes(changes,observer,history); }
             var result = await operation(documents, changes, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested(); cancellationToken.ThrowIfCancellationRequested();
             await _state.ExecuteAsync(database =>

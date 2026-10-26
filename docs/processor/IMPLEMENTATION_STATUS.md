@@ -1,5 +1,44 @@
 # MPA 0.6.0 implementation ledger
 
+## Joined current-workspace inventory and final Root observation
+
+The producer reader now runs the actual immutable metadata inventory through its
+joined account leases. It retains complete reads, candidates, native signing work,
+outbox expectations and unresolved history, checks the immutable change feed, then
+performs the actual conditional Root fence as the last network operation. Completion
+uses the separate typed checkpoint. Its live result belongs to that reader; stored
+JSON cannot reconstruct the result or confer current authority after restart.
+
+Raw page and total identity limits include the independently pinned Root before
+separation. A missing or duplicated Root cannot manufacture a complete inventory.
+Normal mutable Root events stay in their own channel. A conflicting listed/change
+Root blocks the nonce and retains its actual version high-water without inventing
+conditional transport fields. Other valid candidates and unknown removals on the
+same rejected page remain durable before failure, including before and during
+history replay. Interrupted pages do not advance replay or erase existing recovery.
+
+The scanner reuses the legacy scan implementation with a private typed completion
+path; legacy APIs and completion behavior remain intact. Cancellation and Exit join
+uncooperative immutable reads before releasing borrowed owners. No late checkpoint,
+policy selection, canonical activation, generation completion, snapshot retirement
+or original-file action follows a failed scan.
+
+Final source passed all 437 Core cases and all 467 ordinary Services cases, retaining
+all previous 435 Core and 453 ordinary Services identities. The new two Core and 14
+Services cases cover actual final-read ordering, wrong-channel history, Root version
+changes, sibling removals at every replay phase, raw bounds, missing Root listings,
+rollback, storage and physical cancellation/Exit joins. Strict Desktop Release has
+zero warnings/errors. The local Services run took 57m06s under concurrent host work;
+no configured job limit was changed and no CI performance acceptance is inferred.
+Publication-scale/reference remain separate mandatory CI groups.
+
+Parent 92b9bdb passed all 24 protocol jobs and all Android/native/desktop job statuses.
+Its complete 40 reports, fixture receipts, full logs and cross-platform identities
+were independently verified; all 36 unit stdout/stderr streams have no diagnostic
+word matches. Fresh exact-revision checks remain required. Combined selected-graph,
+sealed-index and inventory admission, runtime consumption, captured generation
+handoff and the remaining joint 0.6 product/release work are still unfinished.
+
 ## Typed immutable-inventory checkpoint under actual current control
 
 A separate bounded, paired checkpoint records a complete immutable read set under
@@ -21,9 +60,9 @@ The final frozen source passed all 435 Core cases, retaining all previous 421 an
 adding 14 cases for complete reads, unread work, sticky recovery, wrong-channel Root
 history, transaction rollback, storage, cancellation, native/outbox changes and
 semantic corruption. All five affected Services cases also pass; the strict Desktop
-Release build has zero warnings and errors. Actual same-reader
-network scanning and runtime consumption are the next implementation step; the
-checkpoint alone is not a completed synchronization implementation.
+Release build has zero warnings and errors. Actual same-reader network scanning
+is composed separately above; runtime consumption remains unfinished. The checkpoint
+alone is not a completed synchronization implementation.
 
 The parent 7ce4eaf completed all 24 mandatory protocol jobs. All 40 downloaded TRX
 reports, exact test identity partitions, fixture source receipts, 10k/100k measured

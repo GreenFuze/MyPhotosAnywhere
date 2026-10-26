@@ -44,10 +44,22 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
 
     /// <summary>The typed observation is already durable when the verifier runs.
     /// Its encoding comes from actual captured metadata, never guessed from content.</summary>
-    public async Task<WorkspaceInventoryCheckpoint> ScanObservedAsync(Func<DriveWorkspaceObject, WorkspaceDocumentObservation, CancellationToken, Task> verifyAndPersist,
-        CancellationToken cancellationToken, Func<CancellationToken, Task>? inspectBeforeFinalChangeCheck = null)
+    public Task<WorkspaceInventoryCheckpoint> ScanObservedAsync(Func<DriveWorkspaceObject, WorkspaceDocumentObservation, CancellationToken, Task> verifyAndPersist,
+        CancellationToken cancellationToken, Func<CancellationToken, Task>? inspectBeforeFinalChangeCheck = null) =>
+        ScanObservedCoreAsync(verifyAndPersist,null,(attempt,cursor,observed,publications,token)=>
+            _state.ExecuteAsync(database=>new WorkspaceObservationRepository(database,_budget).CompleteScan(attempt,cursor.Token,observed,publications),token),
+            inspectBeforeFinalChangeCheck,cancellationToken);
+
+    internal Task<T> ScanCurrentObservedAsync<T>(string currentFileId,
+        Func<WorkspaceObservationAttempt,DriveChangeCursor,IReadOnlyCollection<WorkspaceDocumentObservation>,WorkspacePublicationInventory,CancellationToken,Task<T>> complete,
+        CancellationToken token) => ScanObservedCoreAsync((_,_,_)=>Task.CompletedTask,currentFileId,complete,null,token);
+
+    private async Task<T> ScanObservedCoreAsync<T>(Func<DriveWorkspaceObject,WorkspaceDocumentObservation,CancellationToken,Task> verifyAndPersist,
+        string? currentFileId,
+        Func<WorkspaceObservationAttempt,DriveChangeCursor,IReadOnlyCollection<WorkspaceDocumentObservation>,WorkspacePublicationInventory,CancellationToken,Task<T>> complete,
+        Func<CancellationToken,Task>? inspectBeforeFinalChangeCheck,CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(verifyAndPersist); CancellationTokenSource linked;
+        ArgumentNullException.ThrowIfNull(verifyAndPersist);ArgumentNullException.ThrowIfNull(complete); CancellationTokenSource linked;
         lock (_gate) { ObjectDisposedException.ThrowIf(_stopping, this); linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token); }
         using (linked)
         {
@@ -62,6 +74,11 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                 var known = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).KnownIdentities(_context), token).ConfigureAwait(false);
                 var publications = await _state.ExecuteAsync(database => new WorkspacePublicationRepository(database, _budget).Inventory(_context), token).ConfigureAwait(false);
                 var expectedFiles = publications.Objects.Where(item => item.FileId is not null).ToDictionary(item => item.FileId!, StringComparer.Ordinal);
+                if(currentFileId is not null)
+                {
+                    if(expectedFiles.ContainsKey(currentFileId)) throw new CurrentControlObservationConflictException();
+                    known=known.Where(id=>id!=currentFileId).ToList().AsReadOnly();
+                }
                 var relevant = known.Union(expectedFiles.Keys, StringComparer.Ordinal).ToArray();
                 var progress = new InventoryProgress(this, attempt, cancellationToken, token);
                 var inventory = await _source.CaptureAsync(relevant, progress, token).ConfigureAwait(false);
@@ -130,8 +147,8 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                 if (cursor.AccountId != _context.AccountId || cursor.SharedDriveId != _context.SharedDriveId) throw new InvalidDataException("The final change cursor belongs to another workspace access context.");
                 ThrowIfCanceled(cancellationToken, token);
                 attempt = progress.CapturedAttempt();
-                var checkpoint = await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).CompleteScan(attempt, cursor.Token, observed, publications), token).ConfigureAwait(false);
-                lock (_gate) { ThrowIfCanceled(cancellationToken, token); _failure = null; _completedAttemptId = attempt.Id; return checkpoint; }
+                var checkpoint = await complete(attempt,cursor,observed,publications,token).ConfigureAwait(false);
+                lock (_gate) { ThrowIfCanceled(cancellationToken, token); _failure = null; _completedAttemptId = currentFileId is null ? attempt.Id : null; return checkpoint; }
             }
             catch (Exception error) { lock (_gate) _failure = error; throw; }
             finally { _serial.Release(); }
@@ -139,7 +156,7 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
     }
 
     private sealed class InventoryProgress(WorkspaceObservationService owner, WorkspaceObservationAttempt attempt, CancellationToken caller,
-        CancellationToken run) : IWorkspaceIncrementalInventoryObserver, IWorkspaceRejectedFenceObserver
+        CancellationToken run) : IWorkspaceIncrementalInventoryObserver, IWorkspaceRejectedFenceObserver,ICurrentRootInterruptedPageObserver
     {
         private WorkspaceObservationAttempt _attempt = attempt;
         public void UpdateAttempt(WorkspaceObservationAttempt updated)
@@ -173,6 +190,16 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
             _attempt = await owner._state.ExecuteAsync(database => new WorkspaceObservationRepository(database, owner._budget).RememberRejectedFence(_attempt,
                 page.Events, page.Candidates.Select(CandidateObservation).ToArray()), token).ConfigureAwait(false);
             owner.ThrowIfCanceled(caller, run);
+        }
+        public async Task InterruptedAsync(WorkspaceHistoryPageEvidence page,CancellationToken token)
+        {
+            owner.ThrowIfCanceled(caller,run);token.ThrowIfCancellationRequested();
+            if(page.From.AccountId!=owner._context.AccountId || page.From.SharedDriveId!=owner._context.SharedDriveId ||
+                page.Next.AccountId!=owner._context.AccountId || page.Next.SharedDriveId!=owner._context.SharedDriveId)
+                throw new InvalidDataException("Interrupted actual changes substituted the retained corpus.");
+            _attempt=await owner._state.ExecuteAsync(database=>new WorkspaceObservationRepository(database,owner._budget)
+                .RememberInterruptedInventoryPage(_attempt,page.Events,page.Candidates.Select(CandidateObservation).ToArray()),token).ConfigureAwait(false);
+            owner.ThrowIfCanceled(caller,run);
         }
         public async Task StartedAsync(DriveChangeCursor cursor, CancellationToken token)
         {
