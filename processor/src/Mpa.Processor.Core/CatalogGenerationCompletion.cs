@@ -19,8 +19,8 @@ public sealed partial class CatalogGenerationCaptureRepository
 
     public CatalogGenerationVerification? Verification(Guid generationId)
     {
-        Id(generationId); var capture = Read(generationId);
-        return capture is null ? null : ReadVerification(capture, null);
+        Id(generationId); using var transaction=_database.Connection.BeginTransaction();var capture=Read(generationId,transaction);
+        var result=capture is null ? null : ReadVerification(capture,transaction);transaction.Commit();return result;
     }
 
     /// <summary>The joined concrete owner calls this only after current full graph and
@@ -83,7 +83,7 @@ public sealed partial class CatalogGenerationCaptureRepository
     {
         Id(generationId); using var transaction = _database.Connection.BeginTransaction(); var capture = RequiredCapture(generationId, transaction);
         if (capture.Phase is not ("complete" or "snapshot-retiring")) throw new CatalogGenerationCaptureConflictException();
-        if (ReadPublishedHead(transaction)?.GenerationId != generationId || ReadVerification(capture, transaction) is null)
+        if (ReadPublishedHead(transaction)?.GenerationId != generationId || ReadVerification(capture, transaction) is null && ReadCurrentGenerationVerification(capture,transaction) is null)
             throw new InvalidDataException("Snapshot retirement lost its completed publication owner.");
         if (capture.Phase == "complete")
         {
@@ -139,6 +139,12 @@ public sealed partial class CatalogGenerationCaptureRepository
 
     private void ValidateVerificationState(CatalogGenerationCapture capture, SqliteTransaction? transaction)
     {
+        var selected=ReadCurrentGenerationVerification(capture,transaction);
+        if(selected is not null)
+        {
+            if(capture.Phase is not ("complete" or "snapshot-retiring" or "retired")) throw new InvalidDataException("Current completion lost its atomic completed phase.");
+            return;
+        }
         var receipt = ReadVerification(capture, transaction);
         if ((capture.Phase is "commit-verified" or "complete" or "snapshot-retiring" or "retired") != (receipt is not null))
             throw new InvalidDataException("Generation phase lost or substituted its immutable verification receipt.");
@@ -166,6 +172,11 @@ public sealed partial class CatalogGenerationCaptureRepository
             if (!reader.Read()) return null;
             if (reader.GetInt64(0) is < 1 or > 49152) throw new InvalidDataException("Generation verification exceeds its bound.");
             text = reader.GetString(1); digest = reader.GetString(2);
+        }
+        if(CurrentVerificationTag(text))
+        {
+            _=ReadCurrentGenerationVerification(capture,transaction) ?? throw new InvalidDataException("Current completion lost its typed receipt.");
+            return null; // Never manufacture a legacy observation/checkpoint.
         }
         try
         {
@@ -223,6 +234,7 @@ public sealed partial class CatalogGenerationCaptureRepository
             if (completed.ExecuteScalar() is not null) throw new InvalidDataException("Completed publication history lost its atomic head pointer.");
             return null;
         }
+        if(CurrentHeadTag(text)) return ReadCurrentPublishedHead(text,transaction);
         try
         {
             var pointer = JsonSerializer.Deserialize<HeadPointer>(text) ?? throw new InvalidDataException("Publisher head pointer is missing."); Id(pointer.GenerationId);

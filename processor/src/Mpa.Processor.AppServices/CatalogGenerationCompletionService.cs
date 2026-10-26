@@ -33,8 +33,12 @@ public sealed class CatalogGenerationCompletionService(ProcessorStateCoordinator
             var token = linked.Token; await _serial.WaitAsync(token).ConfigureAwait(false);
             try
             {
-                Check(token); var capture = await _state.ExecuteAsync(database => new CatalogGenerationCaptureRepository(database, _budget).Read(generationId)
-                    ?? throw new CatalogGenerationCaptureConflictException(), token).ConfigureAwait(false);
+                Check(token); var capture = await _state.ExecuteAsync(database =>
+                {
+                    if(new CurrentCatalogGenerationSelectionRepository(database,_budget).Read(generationId,token) is not null)
+                        throw new CatalogGenerationCaptureConflictException(); // Use the typed current owner before any legacy work/cleanup.
+                    return new CatalogGenerationCaptureRepository(database,_budget).Read(generationId) ?? throw new CatalogGenerationCaptureConflictException();
+                },token).ConfigureAwait(false);
                 if (capture.Phase is "dependencies-ready" or "commit-sealed")
                 {
                     _ = await _current.PublishCapturedCommitAsync(generationId, token).ConfigureAwait(false);

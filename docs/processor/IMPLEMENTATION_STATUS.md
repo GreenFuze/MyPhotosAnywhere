@@ -1,5 +1,47 @@
 # MPA 0.6.0 implementation ledger
 
+## Actual selected-generation completion and joined private snapshot retirement
+
+The first real current-controlled selection now has a separate, explicitly tagged
+completion receipt and publisher-head pointer. One transaction verifies the original
+capture, native signature, immutable publication plan/outbox and first actual
+selection before storing verification, head and completed phase. No legacy immutable
+checkpoint is fabricated. Legacy bytes and integrity semantics remain readable;
+unknown, mixed and unsupported formats fail closed.
+
+The new completion service borrows only the serialized state and storage budget.
+It does no new Drive work or policy selection. Its joined owner validates and removes
+the actual retained private publication SQLite snapshot, then acknowledges the same
+durable retirement claim. Offline recovery, cancellation, Exit and lost physical
+deletion acknowledgement retain original generation/snapshot/signing identities.
+No camera original, cloud original or human metadata is removed. The legacy service
+rejects this current variant before starting old reconciliation or cleanup.
+
+All437 previous Core identities and all194 affected Services cases pass:186 previous
+identities plus eight new actual integration cases. The final strict Desktop build
+has zero warnings/errors and full logs are clean. The new cases use real retained
+publication snapshots, real canonical files/native plans/Root transport, with only
+the metadata cloud transport synthetic. They verify final-head rollback, exact
+offline cleanup recovery, corrupt-file preservation, unselected-generation refusal,
+lost retirement acknowledgement, joined uncooperative construction, and semantic
+receipt/head corruption even with recomputed outer hashes. A missing-capture
+classification defect in the new reader was corrected without weakening the exact
+exception assertion; its initial failed report remains retained.
+
+Public capture/publication/verification reads use a consistent transaction. Nested
+selection validation borrows already validated capture/plan inputs in that same
+transaction, avoiding recursive phase interpretation without dropping its checks.
+The intervening LiteRT dependency commit changed no committed Processor tree bytes;
+all eight final C# source hashes match the frozen tested candidate.
+
+This covers actually selected owned generations. It does not dispose unselected
+captured work, manufacture PublishedHead5 when Root selects4, admit a higher orphan,
+or solve the exact owned5/new6 successor lineage. The one-live-publication-capture
+rule, shared two-index/512MiB budget and all schema/signing identities are unchanged.
+Full489 ordinary Services plus mandatory scale/reference/all-platform/native checks
+are required for this new revision. Runtime composition and all remaining0.6
+features, physical-device/final acceptance and exact joint publication remain open.
+
 ## Stable LiteRT patch and retained Android lint failure
 
 Android lint on9e9da1c correctly blocked the newly available stable LiteRT2.3.2
@@ -31,10 +73,9 @@ copied outputs and the original test assembly were hash-verified. Its roughly
 201/216GB cumulative managed allocations and long preparation remain recorded,
 not presented as final responsiveness acceptance. No failed baseline is erased.
 
-Current-controlled completion is a separate uncommitted candidate: all8 focused
-cases with real publication snapshots pass; all437 Core and194 affected Services
-plus strict Desktop are still running. No pending result or unfinished0.6 feature
-is counted as a release milestone.
+The separate current-controlled completion candidate subsequently passed its
+full437 Core/194 affected Services/strict Desktop checks, as recorded above. Its
+fresh platform checks and all remaining0.6 acceptance remain required.
 
 ## Native public-key validation cost and failure-safe test callback ownership
 

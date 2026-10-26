@@ -52,7 +52,7 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
         transaction.Commit(); return new(scope, snapshotId, commitIntentId, "capturing", null);
     }
 
-    public CatalogGenerationCapture? Read(Guid generationId) { Id(generationId); return Read(generationId, null); }
+    public CatalogGenerationCapture? Read(Guid generationId) { Id(generationId); using var transaction=_database.Connection.BeginTransaction(); var result=Read(generationId,transaction); transaction.Commit(); return result; }
 
     public ReadOnlyCollection<CatalogGenerationCapture> Active()
     {

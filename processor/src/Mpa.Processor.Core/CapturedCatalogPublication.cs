@@ -43,8 +43,8 @@ public sealed partial class CatalogGenerationCaptureRepository
 
     public CapturedCatalogPublication? Publication(Guid generationId)
     {
-        Id(generationId); var capture = Read(generationId);
-        return capture is null ? null : ReadPublication(capture, null);
+        Id(generationId); using var transaction=_database.Connection.BeginTransaction();var capture=Read(generationId,transaction);
+        var result=capture is null ? null : ReadPublication(capture,transaction);transaction.Commit();return result;
     }
 
     public CapturedCatalogPublication CapturePublicationBasis(Guid generationId, CapturedCatalogBasis basis, CatalogGenerationLocalAccess? localAccess = null)

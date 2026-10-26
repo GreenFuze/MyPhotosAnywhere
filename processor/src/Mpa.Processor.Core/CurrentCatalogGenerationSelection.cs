@@ -24,7 +24,15 @@ public sealed partial class CatalogGenerationCaptureRepository
 {
     internal CurrentOwnedCatalogSelection SelectionInputsIn(Guid generationId,SqliteTransaction transaction)
     {
-        var capture=RequiredCapture(generationId,transaction);
+        return SelectionInputsIn(RequiredCapture(generationId,transaction),transaction);
+    }
+
+    // The enclosing capture reader has already validated identity/scope/snapshot
+    // and publication. Borrow it while validating a typed disposition so that its
+    // phase validator cannot recursively call itself through RequiredCapture.
+    internal CurrentOwnedCatalogSelection SelectionInputsIn(CatalogGenerationCapture capture,SqliteTransaction transaction)
+    {
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Original inputs require their owning transaction.");
         if(capture.Phase is not ("commit-sealed" or "commit-verified" or "complete" or "snapshot-retiring" or "retired"))
             throw new CatalogGenerationCaptureConflictException();
         var publication=ReadPublication(capture,transaction) ?? throw new CatalogGenerationCaptureConflictException();
@@ -48,7 +56,7 @@ public sealed class CurrentCatalogGenerationSelectionRepository(ProcessorStateDa
     public CurrentCatalogGenerationSelection? Read(Guid generationId,CancellationToken token=default)
     {
         if(generationId==Guid.Empty) throw new ArgumentException("An original generation identity is required.",nameof(generationId));
-        using var transaction=_database.Connection.BeginTransaction();var result=ReadIn(generationId,transaction,token);
+        using var transaction=_database.Connection.BeginTransaction();var result=ReadIn(generationId,null,transaction,token);
         token.ThrowIfCancellationRequested();transaction.Commit();return result;
     }
 
@@ -85,7 +93,7 @@ public sealed class CurrentCatalogGenerationSelectionRepository(ProcessorStateDa
         var value=new CurrentCatalogGenerationSelection(work.Scope.GenerationId,work.Scope,capture.SnapshotId,capture.CommitIntentId,
             inputs.Intent.Sequence,capture.Snapshot!.Assets,inventory,activation,commit);
         ValidateIn(value,inputs,transaction,token);
-        var old=ReadIn(value.GenerationId,transaction,token);
+        var old=ReadIn(value.GenerationId,inputs,transaction,token);
         if(old is not null)
         {
             if(old.Scope!=value.Scope || old.SnapshotId!=value.SnapshotId || old.CommitIntentId!=value.CommitIntentId || old.Sequence!=value.Sequence ||
@@ -103,7 +111,15 @@ public sealed class CurrentCatalogGenerationSelectionRepository(ProcessorStateDa
         finally {reservation?.Dispose();}
     }
 
-    private CurrentCatalogGenerationSelection? ReadIn(Guid generationId,SqliteTransaction transaction,CancellationToken token)
+    internal CurrentCatalogGenerationSelection? ReadForCaptureIn(CurrentOwnedCatalogSelection inputs,SqliteTransaction transaction,CancellationToken token)
+    {
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Historical selection requires its owning transaction.");
+        return ReadIn(inputs.Publication.Capture.Scope.GenerationId,inputs,transaction,token);
+    }
+
+    internal static string HistoricalSha256(CurrentCatalogGenerationSelection value)=>Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Encode(value))));
+
+    private CurrentCatalogGenerationSelection? ReadIn(Guid generationId,CurrentOwnedCatalogSelection? supplied,SqliteTransaction transaction,CancellationToken token)
     {
         var text=Value(transaction,Key(generationId),MaximumBytes);var sha=Value(transaction,Key(generationId)+":sha256",64);
         if(text is null && sha is null) return null;
@@ -114,7 +130,7 @@ public sealed class CurrentCatalogGenerationSelectionRepository(ProcessorStateDa
         if(value.GenerationId!=generationId || value.Format!="mpa-current-generation-selection" || value.Major!=1 || value.Scope is null ||
             value.Inventory is null || value.Activation is null || value.Activation.Index is null || value.Commit is null || Encode(value)!=text)
             throw new InvalidDataException("Current generation selection changed its explicit format or identity.");
-        var inputs=new CatalogGenerationCaptureRepository(_database,_budget).SelectionInputsIn(generationId,transaction);
+        var inputs=supplied ?? new CatalogGenerationCaptureRepository(_database,_budget).SelectionInputsIn(generationId,transaction);
         if(Hash(inputs.PlanSha256,text)!=sha) throw new InvalidDataException("Current selection lost its original plan integrity binding.");
         ValidateIn(value,inputs,transaction,token);return value;
     }
