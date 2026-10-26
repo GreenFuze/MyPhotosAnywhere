@@ -1,5 +1,30 @@
 # MPA 0.6.0 implementation ledger
 
+## Mandatory CI scheduling for the complete original suite
+
+Both attempts of the preceding 2f55ab6 Windows contracts reached the 30-minute
+runner deadline. The first passed all 404 Core cases but could not finish Services;
+the second did not finish Core. Neither is accepted as a passing validation or a
+performance fix. The two unchanged 100k preparation fixtures dominate the observed
+first-run increase. Isolated sorting/layout experiments do not establish a safe
+application fix; no production index, cache, schema or durability change was adopted.
+
+CI now schedules metadata/application contracts independently and runs each original
+Core discovery/snapshot fixture in a separate mandatory job on all four platforms.
+The same 30-minute job limits remain. All original test methods/assertions and
+10k/100k sizes are unchanged. The ordinary Core filter is the exact complement of
+the two positive fixture selectors: all 421 local identities partition exactly once
+as 417 ordinary plus two discovery and two snapshot cases. Both cases and their
+original sizes are enforced inside every fixture job. No group is optional.
+
+All six original projects, warning/restore/execution gates and the separate mandatory
+publication-scale/reference matrices remain. The new complete workflow requires 24
+successful jobs and 40 reports on the same immutable revision. YAML, project paths,
+selector complement, unchanged fixture source bytes, diagnostics and job limits are
+independently checked in processor-contract-fixture-partition-validation.json. Fresh
+actual CI remains required; this scheduling change accepts no historical failure,
+unresolved warning, application-performance result or completed joint release.
+
 ## Retained workspace history classification
 
 The live reader now separates only the independently pinned actual current file
