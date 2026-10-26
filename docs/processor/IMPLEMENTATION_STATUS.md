@@ -1,5 +1,35 @@
 # MPA 0.6.0 implementation ledger
 
+## Retained workspace history classification
+
+The live reader now separates only the independently pinned actual current file
+from retained immutable observations and candidates. It verifies the complete native
+signing/Root witness in the same transaction. Previously read Root bytes must match
+an original retained native envelope; neither read nor candidate versions may exceed
+the actual Root version. Changed encoding, unknown bytes, stale nonces, changed
+terminal work and inconsistent workspace/access history fail closed.
+
+The projection keeps the original Root records separately and retains every other
+known/unread identity, the previous attempt, earliest unresolved cursor and complete
+inventory digests. It performs no writes and works under low storage. It does not
+complete a scan, resolve a history failure, select policies, dispose a generation or
+enable runtime routing. All 421 Core cases pass, retaining every previous 412 identity.
+The two new and three previous joined-reader cases pass. Strict Desktop has zero
+warnings/errors. Five exact final LF source/test hashes and full reports/logs are
+frozen in current-history-classification-validation.json. All 453 ordinary Services
+and complete fresh platform checks remain required.
+
+The new App fixture assertions initially assumed that a later start replaced an
+earlier unresolved cursor and that earlier candidates disappeared. Production
+correctly retained both. Final assertions require the earlier cursor and every
+previous candidate; both original failures remain recorded. No existing assertion,
+source fixture, schema, storage bound or warning gate changed.
+
+Actual v2 immutable scan/final-fence completion, exact retained generation lineage
+and supersession, runtime/export/native integration and the remaining joint release
+work are still unfinished. Historical Windows scheduling failures remain separate
+from application acceptance; no performance fix or diagnostic exception is claimed.
+
 ## Owned Root inventory witnesses and current CI blocker
 
 The current reader can capture a complete native signing description under its

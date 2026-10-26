@@ -61,9 +61,16 @@ public sealed partial class CurrentControlTransitionJournal
     {
         ArgumentNullException.ThrowIfNull(inventory);ArgumentNullException.ThrowIfNull(expected);
         using var transaction=_database.Connection.BeginTransaction();
+        _=RequireSigningInventoryIn(inventory,expected,transaction,token);
+        token.ThrowIfCancellationRequested();transaction.Commit();
+    }
+
+    internal CurrentControlSigningInventory RequireSigningInventoryIn(CurrentControlSigningInventory inventory,
+        LocalCurrentControlAttempt expected, SqliteTransaction transaction, CancellationToken token)
+    {
         var actual=CaptureSigningInventoryIn(expected,transaction,token);
         if(actual.Sha256!=inventory.Sha256) throw new CurrentControlSigningInventoryChangedException();
-        token.ThrowIfCancellationRequested();transaction.Commit();
+        return actual;
     }
 
     private CurrentControlSigningInventory CaptureSigningInventoryIn(LocalCurrentControlAttempt expected,

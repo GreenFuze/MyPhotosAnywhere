@@ -463,3 +463,20 @@ The description grants no immutable scan acknowledgement, current policy selecti
 publication, activation, generation completion or snapshot retirement. It is an
 explicit input for the forthcoming v2 inventory/handoff owner, not a blanket skip
 for Root kinds or permission to forget other pending/failed immutable work.
+
+### Retained history classification before the v2 immutable scan
+
+`CaptureWorkspaceHistoryAsync` borrows the same live reader and exact actual capture.
+One state transaction rechecks the complete signing/Root witness, pinned workspace,
+account/corpus and prior observation history. Only the independently allocated
+current file ID is separated. Its previously read digest/size must match retained
+native Root bytes, and no remembered version may be ahead of the actual capture.
+Unknown bytes or non-JSON encoding cannot acquire the mutable classification.
+
+The read-only result retains the original Root observation/candidate separately,
+all other immutable/unread records, the existing attempt and framed full-inventory
+digests. It neither deletes nor overwrites the wrong-channel historical Root row.
+Old failed attempts, candidate evidence and earliest unresolved cursors remain.
+No scan completion, history repair, policy/current admission or cleanup follows.
+The actual v2 scanner and typed completion still need composition under a final
+Root fence after its last immutable network/change-feed operation.
