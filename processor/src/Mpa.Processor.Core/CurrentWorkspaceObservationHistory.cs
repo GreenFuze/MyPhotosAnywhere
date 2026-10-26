@@ -42,6 +42,14 @@ public sealed partial class WorkspaceObservationRepository
     {
         ArgumentNullException.ThrowIfNull(signing);ArgumentNullException.ThrowIfNull(expected);
         using var transaction=_database.Connection.BeginTransaction();
+        var result=CaptureCurrentHistoryIn(signing,expected,transaction,token);
+        token.ThrowIfCancellationRequested();transaction.Commit();return result;
+    }
+
+    internal CurrentWorkspaceObservationHistory CaptureCurrentHistoryIn(CurrentControlSigningInventory signing,
+        LocalCurrentControlAttempt expected,Microsoft.Data.Sqlite.SqliteTransaction transaction,CancellationToken token)
+    {
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("History classification requires its owning live transaction.");
         var actual=new CurrentControlTransitionJournal(_database,_budget).RequireSigningInventoryIn(signing,expected,transaction,token);
         var pin=LibraryConnectionDescriptor.Decode(actual.ConnectionCode);
         var rootId=pin.CurrentFileId ?? throw new InvalidDataException("Current history classification requires the independently pinned mutable file.");
@@ -66,7 +74,7 @@ public sealed partial class WorkspaceObservationRepository
             candidate.Bytes>ProtocolDocumentReader.MaximumDocumentBytes)) throw new WorkspaceObservationConflictException();
         var immutable=known.Where(value=>value.FileId!=rootId).ToList().AsReadOnly();
         var immutableCandidates=candidates.Values.Where(value=>value.FileId!=rootId).OrderBy(value=>value.FileId,StringComparer.Ordinal).ToList().AsReadOnly();
-        token.ThrowIfCancellationRequested();transaction.Commit();
+        token.ThrowIfCancellationRequested();
         return new(context,actual,retained,root,candidate,immutable,immutableCandidates,InventoryHash(known),CandidateInventoryHash(candidates.Values));
     }
 }

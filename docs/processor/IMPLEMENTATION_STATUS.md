@@ -1,5 +1,39 @@
 # MPA 0.6.0 implementation ledger
 
+## Typed immutable-inventory checkpoint under actual current control
+
+A separate bounded, paired checkpoint records a complete immutable read set under
+the same actual final Root nonce, native signing inventory and captured outbox.
+It retains the complete prior observations, unread candidates, earliest unresolved
+cursor and history. Existing recovery-required history remains blocking. The exact
+pinned mutable Root is classified through its retained native witness; no other
+document is excluded by name, kind or MIME. Sealed native work must have its actual
+immutable read or original pending outbox object before completion.
+
+This record does not complete the legacy current-head attempt, select a policy,
+activate a catalog, complete a generation, retire a snapshot or authorize an
+original-file action. Historical reads independently verify the observed native
+Root and retained workspace/version bounds. A new scan, Root nonce, changed signing
+work or changed outbox invalidates current use. Paired writes roll back together;
+storage reservations stay owned through commit.
+
+The final frozen source passed all 435 Core cases, retaining all previous 421 and
+adding 14 cases for complete reads, unread work, sticky recovery, wrong-channel Root
+history, transaction rollback, storage, cancellation, native/outbox changes and
+semantic corruption. All five affected Services cases also pass; the strict Desktop
+Release build has zero warnings and errors. Actual same-reader
+network scanning and runtime consumption are the next implementation step; the
+checkpoint alone is not a completed synchronization implementation.
+
+The parent 7ce4eaf completed all 24 mandatory protocol jobs. All 40 downloaded TRX
+reports, exact test identity partitions, fixture source receipts, 10k/100k measured
+reports and full workflow/artifact logs were independently verified. Each platform
+ran all 421 Core identities exactly once, 453 ordinary Services and the unchanged
+other contract/scale/reference suites within existing job limits. Historical failed
+Windows attempts remain failed. No warning exception or performance fix is inferred
+from the scheduling change. Fresh exact-revision CI and full joint release acceptance
+remain required.
+
 ## Mandatory CI scheduling for the complete original suite
 
 Both attempts of the preceding 2f55ab6 Windows contracts reached the 30-minute

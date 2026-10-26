@@ -5,7 +5,7 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.Core;
 
 internal sealed record LocalCurrentTransitionBasis(LibraryConnectionDescriptor Pin,LibraryCurrentControl Head,ReadOnlyCollection<Guid> ObservedRoots,
-    string? SharedDriveId,long MinimumVersion,long MinimumAccountRevision);
+    string? SharedDriveId,long MinimumVersion,long MinimumAccountRevision,long MaximumObservedVersion,long ObservedAccountRevision);
 
 public sealed partial class LocalCurrentControlObservations
 {
@@ -14,6 +14,7 @@ public sealed partial class LocalCurrentControlObservations
     internal LocalCurrentTransitionBasis TransitionBasisIn(LocalCurrentControlAttempt? expected,SqliteTransaction transaction,CancellationToken token,string phase="fenced")
     {
         var state=expected is null ? Load(transaction,token) : Require(expected,phase,transaction,token);
-        return new(state.Connection,state.Head,Array.AsReadOnly(state.Saved?.Heads ?? [state.Slot.Id]),state.InitialDriveId,state.Receipt.DriveVersion,state.Receipt.AccountRevision);
+        return new(state.Connection,state.Head,Array.AsReadOnly(state.Saved?.Heads ?? [state.Slot.Id]),state.InitialDriveId,state.Receipt.DriveVersion,state.Receipt.AccountRevision,
+            state.Saved?.Attempt.MaxVersion ?? state.Receipt.DriveVersion,state.Saved?.Attempt.AccountRevision ?? state.Receipt.AccountRevision);
     }
 }
