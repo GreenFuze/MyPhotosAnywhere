@@ -1,5 +1,31 @@
 # MPA 0.6.0 implementation ledger
 
+## Viewer gesture readiness and failure evidence
+
+The selected original can appear before asynchronous viewer-sequence preparation.
+The gesture regression now requires the same existing bounded control readiness as
+the other viewer test, with explicit previous-disabled/next-enabled assertions before
+touch input. Every original swipe, pinch, double-tap, assertion and10000ms filename
+wait remains. Failure-only semantics/screenshot capture runs before fixture cleanup;
+a diagnostic failure attaches to the original exception instead of masking it.
+
+The actual test compiler and test APK build pass; lint has zero findings. The strict
+gate accepts only the existing exact15 AGP/Gradle records. Frozen source/report/APK/
+full-log evidence is native-viewer-gesture-readiness-validation.json. Production
+Android sources are unchanged, so713 JVM cases were not repeated locally for this
+test-only increment. Fresh complete native execution is still required. The earlier
+b74 API29 timeout's exact cause remains unverified; an unchanged later pass is not
+called a fix or a diagnostic exception.
+
+Exact preceding ae747c8 passed all12 cross-platform contract/scale/reference jobs.
+All32 reports and full logs were independently verified: each platform95 Protocol,
+382 Core,116 Google, all418 ordinary Services,9 LAN,27 Web,2 scale and13 reference
+cases. All prior identities are retained. Windows completed in1731seconds under the
+unchanged1800-second limit. Android, native and Desktop workflows also pass at ae;
+its native status is separate from complete artifact/runtime-warning acceptance.
+Historical reopening's423 ordinary cases and this native test source still require
+their own CI. Whole0.6 implementation, final acceptance and publication remain unfinished.
+
 ## Historical canonical reopening
 
 A separate read-only owner can reopen the independently verified previous canonical

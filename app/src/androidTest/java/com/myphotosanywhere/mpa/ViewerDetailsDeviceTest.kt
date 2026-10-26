@@ -100,27 +100,34 @@ class ViewerDetailsDeviceTest {
 
     @Test fun upwardDetailsGestureDoesNotStealHorizontalPagingOrZoomedPan() {
         Fixture("gesture").use { fixture ->
-            fixture.open()
-            currentImage().performTouchInput { swipeDown() }
-            compose.onNodeWithTag("photo-details").assertDoesNotExist()
-            currentImage().performTouchInput { swipeUp() }
-            waitTag("photo-details")
-            compose.onNodeWithTag("photo-details-close").performClick();waitGone("photo-details")
-            currentImage().performTouchInput { swipeLeft() }
-            waitName(fixture.photos[1].displayName)
-            compose.onNodeWithTag("photo-details").assertDoesNotExist()
-            currentImage().performTouchInput {
-                pinch(Offset(center.x-30,center.y),Offset(center.x+30,center.y),Offset(center.x-100,center.y),Offset(center.x+100,center.y))
+            withGestureFailureEvidence {
+                fixture.open()
+                // The selected original precedes asynchronous sequence preparation.
+                // Paging assertions require the same enabled controls as the other viewer test.
+                waitTag("viewer-next")
+                compose.onNodeWithTag("viewer-previous").assertIsNotEnabled()
+                compose.onNodeWithTag("viewer-next").assertIsEnabled()
+                currentImage().performTouchInput { swipeDown() }
+                compose.onNodeWithTag("photo-details").assertDoesNotExist()
+                currentImage().performTouchInput { swipeUp() }
+                waitTag("photo-details")
+                compose.onNodeWithTag("photo-details-close").performClick();waitGone("photo-details")
+                currentImage().performTouchInput { swipeLeft() }
+                waitName(fixture.photos[1].displayName)
+                compose.onNodeWithTag("photo-details").assertDoesNotExist()
+                currentImage().performTouchInput {
+                    pinch(Offset(center.x-30,center.y),Offset(center.x+30,center.y),Offset(center.x-100,center.y),Offset(center.x+100,center.y))
+                }
+                currentImage().performTouchInput { swipeUp() }
+                compose.onNodeWithTag("photo-details").assertDoesNotExist()
+                compose.onNodeWithText(fixture.photos[1].displayName).assertExists()
+                currentImage().performTouchInput { doubleClick() }
+                currentImage().performTouchInput { swipeUp() }
+                waitTag("photo-details")
+                compose.onNodeWithTag("viewer-screen").assertExists()
+                compose.onNodeWithTag("photo-details-close").performClick();waitGone("photo-details")
+                compose.onNodeWithText(fixture.photos[1].displayName).assertExists()
             }
-            currentImage().performTouchInput { swipeUp() }
-            compose.onNodeWithTag("photo-details").assertDoesNotExist()
-            compose.onNodeWithText(fixture.photos[1].displayName).assertExists()
-            currentImage().performTouchInput { doubleClick() }
-            currentImage().performTouchInput { swipeUp() }
-            waitTag("photo-details")
-            compose.onNodeWithTag("viewer-screen").assertExists()
-            compose.onNodeWithTag("photo-details-close").performClick();waitGone("photo-details")
-            compose.onNodeWithText(fixture.photos[1].displayName).assertExists()
         }
     }
 
@@ -272,6 +279,17 @@ class ViewerDetailsDeviceTest {
             compose.onNodeWithTag("viewer-close").performClick();waitGone("viewer-screen")
             assertEquals(fixture.hash,DriveBackupWorker.digest(fixture.file,"SHA-256"))
             runBlocking { app.database.cloud().savePhoto(cloud.copy(removed=true)) }
+        }
+    }
+
+    private fun withGestureFailureEvidence(action: ()->Unit) {
+        try { action() }
+        catch(error: Throwable) {
+            try {
+                println("Viewer gesture failure before fixture cleanup:\n"+compose.onNodeWithTag("viewer-screen").printToString())
+                saveScreenshot("viewer-gesture-failure")
+            } catch(diagnostic: Throwable) { error.addSuppressed(diagnostic) }
+            throw error
         }
     }
 
