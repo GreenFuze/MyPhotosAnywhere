@@ -329,3 +329,30 @@ files recover before the retirement intent; uncreated files need no allocation.
 The active-pointer guard remains conservative until atomic current admission exists.
 Main Processor schema13, Room12 and native private7 stay unchanged; the new derived
 SQLite file has its own private format1. No original-file write is introduced.
+
+
+### Atomic local canonical selection
+
+The same serialized reader and exact sealed stage remain live through final local
+admission. The repository borrows one main transaction to recheck the current fenced
+nonce/access/pin, exact retained controller Root/policy signatures, all complete
+actual graph observations, observed publisher retirement/key/epoch history, and
+previously observed selected catalog ancestry. Human source approval checks exact
+source membership, source revisions, account/folder/enabled/descendant values and
+global configuration revision independently of publication permission.
+
+Both policy mutations own reservations through the caller's COMMIT. Exact selected
+Root policy digests must match the accepted selections, even when an older incoming
+policy would normally return a retained newer selection. Policy/history acceptance
+and the explicit format1 paired active receipt commit together. A last-write failure
+preserves preceding policies/pointer and the same pending stage identity. Only the
+exact validated active index is protected from retirement; unknown or corrupt
+receipts still block cleanup. Historical receipt reads independently verify retained
+Root/policy/native history and sealed main claims; they are not fresh authority.
+
+Policy transport retains rejected actual SHA/version separately from admitted
+immutable body evidence. Exact later repair may recover without erasing the failure
+or resetting observed metadata high-water. No Root update, original mutation,
+PublishedHead completion, runtime switch or new-process freshness follows from
+these holders. Mutable Root transition/recovery and runtime/native composition are
+still separate required work. Main schemas and existing storage/page limits remain.

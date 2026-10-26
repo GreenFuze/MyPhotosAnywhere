@@ -75,6 +75,7 @@ public sealed partial class LocalCurrentControlReader
         CancellationToken caller) : IGoogleWorkspaceConditionalObserver
     {
         private DriveWorkspaceConditionalMetadata? _metadata;
+        private LocalCurrentGraphObservation? _durable;
         internal DriveWorkspaceConditionalJson? Observation {get;private set;}
         public async Task RememberMetadataAsync(DriveWorkspaceConditionalMetadata actual,CancellationToken token)
         {
@@ -89,6 +90,8 @@ public sealed partial class LocalCurrentControlReader
                 var known=new WorkspaceObservationRepository(database,owner._budget).Known(context).SingleOrDefault(row=>row.FileId==reference.FileId);
                 if(known is not null && (actual.Version<known.Version || reference.Bytes!=known.Bytes || reference.Sha256!=known.Sha256 || known.MimeType is not null))
                     throw new WorkspaceObservationConflictException();
+                _durable=new LocalCurrentGraphObservations(database,owner._budget).RememberMetadata(capture.Attempt,reference,
+                    new(actual.Version,actual.ByteLength,"application/json",actual.SharedDriveId,actual.ParentsSha256),token);
                 return true;
             },token).ConfigureAwait(false);
             _metadata=actual;
@@ -97,9 +100,17 @@ public sealed partial class LocalCurrentControlReader
         {
             Validate(actual.Metadata);
             if(_metadata is null || Observation is not null || actual.Version!=_metadata.Version || actual.EntityTag!=_metadata.EntityTag ||
-                actual.Metadata.ParentsSha256!=_metadata.ParentsSha256 || actual.Sha256!=reference.Sha256)
+                actual.Metadata.ParentsSha256!=_metadata.ParentsSha256 || _durable is null)
                 throw new CurrentControlObservationConflictException();
-            _=await owner.RequirePolicyCaptureAsync(capture,caller,token).ConfigureAwait(false);Observation=actual;
+            _=await owner.RequirePolicyCaptureAsync(capture,caller,token).ConfigureAwait(false);
+            _durable=await owner._state.ExecuteAsync(database=>
+            {
+                owner.Check(caller,token);var records=new LocalCurrentGraphObservations(database,owner._budget);
+                return actual.Sha256==reference.Sha256 ? records.RememberBytes(capture.Attempt,_durable,actual.Sha256,token) :
+                    records.RememberRejectedPolicyBytes(capture.Attempt,_durable,actual.Sha256,token);
+            },token).ConfigureAwait(false);
+            if(actual.Sha256!=reference.Sha256) throw new CurrentControlObservationConflictException();
+            Observation=actual;
         }
         private void Validate(DriveWorkspaceConditionalMetadata actual)
         {

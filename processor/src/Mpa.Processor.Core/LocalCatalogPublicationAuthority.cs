@@ -42,13 +42,7 @@ public sealed partial class LibraryAuthorityRepository
         var publisher = ReadPolicy(transaction, pin, Counter(publisherSequence));
         var actor = publisher.Publisher ?? throw new CatalogPublicationNotAuthorizedException();
         var source = ReadCurrentSources(transaction, pin) ?? throw new CatalogPublicationNotAuthorizedException();
-        var settings = new LibrarySourceRepository(_database).Snapshot(transaction); var approved = source.Configuration;
-        if (approved.Revision != settings.Revision || approved.Sources.Count != settings.Sources.Count) throw new StaleLibraryConfigurationException();
-        var sources = approved.Sources.ToDictionary(item => item.Id);
-        foreach (var row in settings.Sources)
-            if (!sources.TryGetValue(row.Id, out var policy) || policy.AccountId != row.AccountId || policy.FolderId != row.FolderId ||
-                policy.Revision != row.Revision || policy.IncludeDescendants != row.IncludeDescendants || policy.Enabled != row.Enabled)
-                throw new StaleLibraryConfigurationException();
+        var configurationRevision = AssertHumanSources(source.Configuration,transaction);
         using var account = Command(transaction, "SELECT revision FROM drive_account WHERE permission_id=$account AND connected=1", ("$account", pin.AccountId));
         if (account.ExecuteScalar() is not long accountRevision || accountRevision < 1) throw new StaleLibraryConfigurationException();
         // Credential revision stays in the captured access scope. Reconnection cannot
@@ -59,9 +53,23 @@ public sealed partial class LibraryAuthorityRepository
             controllerId = pin.ActorId.ToString("D"), controllerEpoch = pin.Epoch.ToString(CultureInfo.InvariantCulture), controllerKeyId = pin.KeyId,
             publisherId = actor.ActorId.ToString("D"), publisherEpoch = actor.Epoch.ToString(CultureInfo.InvariantCulture), publisherKeyId = publisher.PublisherKeyId,
             publisherSequence, publisherPolicySha256 = publisher.EnvelopeSha256, sourceSequence = source.Sequence.ToString(CultureInfo.InvariantCulture),
-            sourcePolicySha256 = source.EnvelopeSha256, accountId = pin.AccountId, folderId = pin.FolderId, configurationRevision = settings.Revision.ToString(CultureInfo.InvariantCulture)
+            sourcePolicySha256 = source.EnvelopeSha256, accountId = pin.AccountId, folderId = pin.FolderId, configurationRevision = configurationRevision.ToString(CultureInfo.InvariantCulture)
         }));
-        return new(pin.LibraryId, actor.ActorId, actor.Epoch, pin.AccountId, accountRevision, pin.FolderId, settings.Revision,
+        return new(pin.LibraryId, actor.ActorId, actor.Epoch, pin.AccountId, accountRevision, pin.FolderId, configurationRevision,
             publisher.PublisherKeyId ?? throw new InvalidDataException("Active publisher lost its public key identity."), Hash(bytes));
+    }
+
+    /// <summary>Local human source approval only. Unlike publication authority this
+    /// remains available when the selected publisher has been revoked.</summary>
+    internal long AssertHumanSources(Mpa.Processor.Protocol.CatalogSourceConfiguration approved,SqliteTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(approved);
+        var settings = new LibrarySourceRepository(_database).Snapshot(transaction);
+        if (approved.Revision != settings.Revision || approved.Sources.Count != settings.Sources.Count) throw new StaleLibraryConfigurationException();
+        var sources = approved.Sources.ToDictionary(item => item.Id);
+        foreach (var row in settings.Sources)
+            if (!sources.TryGetValue(row.Id, out var policy) || policy.AccountId != row.AccountId || policy.FolderId != row.FolderId ||
+                policy.Revision != row.Revision || policy.IncludeDescendants != row.IncludeDescendants || policy.Enabled != row.Enabled) throw new StaleLibraryConfigurationException();
+        return settings.Revision;
     }
 }

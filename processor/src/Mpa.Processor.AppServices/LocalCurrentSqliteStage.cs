@@ -80,6 +80,17 @@ public sealed class LocalCurrentSqliteStage : ILocalCurrentCatalogStage,IAsyncDi
     public Task<CurrentCatalogStagePage> ReadPageAsync(CatalogCursor? after,int limit,CancellationToken cancellationToken)=>
         OperationAsync(token=>Task.Run(()=>_index.ReadPage(after,limit,token),CancellationToken.None),cancellationToken);
 
+    internal Task<T> UseSealedGraphAsync<T>(ProcessorStateCoordinator state,LocalCurrentGraphFence fence,
+        Func<CurrentCatalogStageClaim,CancellationToken,Task<T>> action,CancellationToken cancellationToken)=>OperationAsync(async token=>
+    {
+        if(!ReferenceEquals(state,_state) || !ReferenceEquals(fence.Graph.Stage,this) || !ReferenceEquals(fence.Graph.Policies.Capture,_capture) ||
+            !ReferenceEquals(fence.Current.Capture,_capture) || _claim.Phase!="sealed" || _claim.Descriptor is null || _claim.Descriptor.Assets!=fence.Graph.Assets)
+            throw new CurrentControlObservationConflictException();
+        // The serialized stage owner keeps its verified immutable file lease alive
+        // through the caller's entire main-state transaction.
+        return await action(_claim,token).ConfigureAwait(false);
+    },cancellationToken);
+
     private Task<bool> AssertCapturedAsync(CancellationToken token)=>_state.ExecuteAsync(database=>
     {new CurrentCatalogStageJournal(database,_budget).AssertForCapture(_claim,_capture.Attempt,token);return true;},token);
 

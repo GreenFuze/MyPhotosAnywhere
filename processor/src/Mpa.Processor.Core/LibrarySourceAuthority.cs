@@ -19,9 +19,17 @@ public sealed partial class LibraryAuthorityRepository
     public AcceptedSourceConfiguration SelectSourceConfiguration(ReadOnlySpan<byte> signedEnvelope)
     {
         _ = Budget;
-        if (signedEnvelope.Length is < 1 or > ProtocolDocumentReader.MaximumDocumentBytes)
-            throw new ArgumentException("A bounded signed source policy is required.", nameof(signedEnvelope));
-        var owned = signedEnvelope.ToArray(); using var transaction = _database.Connection.BeginTransaction();
+        if (signedEnvelope.Length is < 1 or > ProtocolDocumentReader.MaximumDocumentBytes) throw new ArgumentException("A bounded signed source policy is required.",nameof(signedEnvelope));
+        using var transaction = _database.Connection.BeginTransaction();
+        using var selected = SelectSourceConfigurationIn(signedEnvelope,transaction);
+        selected.Recheck();transaction.Commit();return selected.Value;
+    }
+
+    internal LibraryPolicySelection<AcceptedSourceConfiguration> SelectSourceConfigurationIn(ReadOnlySpan<byte> signedEnvelope,SqliteTransaction transaction)
+    {
+        _ = Budget;
+        if (signedEnvelope.Length is < 1 or > ProtocolDocumentReader.MaximumDocumentBytes) throw new ArgumentException("A bounded signed source policy is required.",nameof(signedEnvelope));
+        var owned = signedEnvelope.ToArray();
         var pin = ReadPin(transaction) ?? throw new InvalidOperationException("Independently approve library setup before accepting source policies.");
         var incoming = DecodeSources(pin, owned); var key = SourceDocumentKey(incoming.Sequence);
         AssertControllerSequenceKind(transaction, incoming.Sequence, source: true);
@@ -32,7 +40,7 @@ public sealed partial class LibraryAuthorityRepository
         {
             var retained = ReadSources(transaction, pin, incoming.Sequence);
             if (retained.EnvelopeSha256 != incoming.EnvelopeSha256 || previous != Encoding.UTF8.GetString(owned)) throw new ControllerAuthorityConflictException();
-            transaction.Commit(); return current ?? throw new InvalidDataException("Accepted source history lost its current policy.");
+            return new(current ?? throw new InvalidDataException("Accepted source history lost its current policy."),null);
         }
         if (current is not null)
         {
@@ -40,19 +48,23 @@ public sealed partial class LibraryAuthorityRepository
             if (higherSequence && incoming.Configuration.Revision < current.Configuration.Revision ||
                 !higherSequence && incoming.Configuration.Revision >= current.Configuration.Revision ||
                 higherSequence && incoming.Configuration.Revision == current.Configuration.Revision &&
-                SourcePayload(pin, owned) != SourcePayload(pin, StoredSourceEnvelope(transaction, current.Sequence)))
-                throw new ControllerAuthorityConflictException();
+                SourcePayload(pin, owned) != SourcePayload(pin, StoredSourceEnvelope(transaction, current.Sequence))) throw new ControllerAuthorityConflictException();
         }
-        using var reservation = Budget.Reserve(checked(owned.LongLength * 3 + 65536)); reservation.RecheckBeforeWrite(reservation.Bytes);
-        Insert(transaction, key, Encoding.UTF8.GetString(owned)); Insert(transaction, key + ":sha256", incoming.EnvelopeSha256);
-        var selected = current is null || incoming.Sequence > current.Sequence;
-        if (selected)
+        StorageReservation? reservation = Budget.Reserve(checked(owned.LongLength * 3 + 65536));
+        try
         {
-            using var update = Command(transaction, "INSERT INTO processor_meta(key,value) VALUES($key,$value) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                ("$key", SelectedSourceKey), ("$value", incoming.Sequence.ToString(CultureInfo.InvariantCulture)));
-            if (update.ExecuteNonQuery() != 1) throw new InvalidOperationException("Source selection did not update exactly one pointer.");
+            reservation.RecheckBeforeWrite(reservation.Bytes);
+            Insert(transaction, key, Encoding.UTF8.GetString(owned)); Insert(transaction, key + ":sha256", incoming.EnvelopeSha256);
+            var selected = current is null || incoming.Sequence > current.Sequence;
+            if (selected)
+            {
+                using var update = Command(transaction, "INSERT INTO processor_meta(key,value) VALUES($key,$value) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    ("$key", SelectedSourceKey), ("$value", incoming.Sequence.ToString(CultureInfo.InvariantCulture)));
+                if (update.ExecuteNonQuery() != 1) throw new InvalidOperationException("Source selection did not update exactly one pointer.");
+            }
+            var mutation = new LibraryPolicySelection<AcceptedSourceConfiguration>(selected ? incoming : current ?? throw new InvalidDataException("Retained source selection is missing."),reservation);reservation=null;return mutation;
         }
-        transaction.Commit(); return selected ? incoming : current ?? throw new InvalidDataException("Retained source selection is missing.");
+        finally {reservation?.Dispose();}
     }
 
     public AcceptedSourceConfiguration? CurrentSourceConfiguration()

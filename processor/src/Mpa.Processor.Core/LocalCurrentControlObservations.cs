@@ -24,7 +24,7 @@ public sealed record LocalCurrentControlMetadata(long Version,int Bytes,string E
 /// Exact Root envelopes already live in its immutable signing journal; retain bounded
 /// references rather than duplicate bodies or adopt counters from received documents.
 /// Initial publication provides a historical floor, never current-cloud freshness.</summary>
-public sealed class LocalCurrentControlObservations(ProcessorStateDatabase database,StorageBudgetManager budget)
+public sealed partial class LocalCurrentControlObservations(ProcessorStateDatabase database,StorageBudgetManager budget)
 {
     private readonly ProcessorStateDatabase _database=database ?? throw new ArgumentNullException(nameof(database));
     private readonly StorageBudgetManager _budget=budget ?? throw new ArgumentNullException(nameof(budget));
@@ -94,6 +94,12 @@ public sealed class LocalCurrentControlObservations(ProcessorStateDatabase datab
 
     internal LibraryConnectionDescriptor AssertCapturedIn(LocalCurrentControlAttempt expected,SqliteTransaction transaction,CancellationToken token)=>
         Require(expected,"captured",transaction,token).Connection;
+    internal LibraryConnectionDescriptor AssertCapturedPolicyIn(LocalCurrentControlAttempt expected,CatalogObjectReference reference,SqliteTransaction transaction,CancellationToken token)
+    {
+        var state=Require(expected,"captured",transaction,token);
+        if(reference!=state.Head.Publishers.Reference && reference!=state.Head.Sources.Reference) throw new CurrentControlObservationConflictException();
+        return state.Connection;
+    }
 
     public void AssertFenced(LocalCurrentControlAttempt expected,CancellationToken token=default)
     { using var transaction=_database.Connection.BeginTransaction();_=Require(expected,"fenced",transaction,token);transaction.Commit(); }

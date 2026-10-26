@@ -12,7 +12,11 @@ public sealed record LocalCurrentGraphMetadata(long Version,int Bytes,string Mim
 /// expected signed reference; BodySha256 is separately retained actual complete data,
 /// including a mismatch. Neither is a graph/activation or original-write grant.</summary>
 public sealed record LocalCurrentGraphObservation(Guid AttemptId,string ConnectionSha256,CatalogObjectReference Reference,
-    LocalCurrentGraphMetadata Metadata,long? BodyVersion,string? BodySha256);
+    LocalCurrentGraphMetadata Metadata,long? BodyVersion,string? BodySha256)
+{
+    [JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] public long? RejectedPolicyVersion {get;init;}
+    [JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] public string? RejectedPolicySha256 {get;init;}
+}
 
 /// <summary>Private bounded observations for current-selected graph reads. Borrow one
 /// serialized database transaction; no network, media body duplication, signing-counter
@@ -37,7 +41,8 @@ public sealed class LocalCurrentGraphObservations(ProcessorStateDatabase databas
             (legacy.MimeType ?? "application/json")!=metadata.MimeType)) throw new WorkspaceObservationConflictException();
         if(old is not null && (metadata.Version<old.Metadata.Version || old.Metadata.MimeType!=metadata.MimeType || old.Metadata.SharedDriveId!=metadata.SharedDriveId ||
             metadata.Version==old.Metadata.Version && metadata!=old.Metadata)) throw new WorkspaceObservationConflictException();
-        var next=new LocalCurrentGraphObservation(attempt.Id,pin.DocumentSha256,reference,metadata,old?.BodyVersion,old?.BodySha256);
+        var next=new LocalCurrentGraphObservation(attempt.Id,pin.DocumentSha256,reference,metadata,old?.BodyVersion,old?.BodySha256)
+            {RejectedPolicyVersion=old?.RejectedPolicyVersion,RejectedPolicySha256=old?.RejectedPolicySha256};
         if(next!=old) Save(key,next,old is null,transaction);
         transaction.Commit();return next;
     }
@@ -64,6 +69,22 @@ public sealed class LocalCurrentGraphObservations(ProcessorStateDatabase databas
         if(result is not null && result.Metadata.SharedDriveId!=attempt.SharedDriveId) throw new InvalidDataException("Graph observations lost their retained corpus binding.");
         transaction.Commit();return result;
     }
+    /// <summary>Retain complete rejected policy transport bytes separately from an
+    /// admitted immutable body. A later exact signed-reference read may recover, but
+    /// cannot erase the rejection or lower its observed metadata high-water.</summary>
+    public LocalCurrentGraphObservation RememberRejectedPolicyBytes(LocalCurrentControlAttempt attempt,LocalCurrentGraphObservation expected,
+        string actualSha256,CancellationToken token=default)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        if(!Digest(actualSha256) || actualSha256==expected.Reference.Sha256) throw new ArgumentException("A rejected actual policy digest is required.",nameof(actualSha256));
+        using var transaction=_database.Connection.BeginTransaction();
+        var pin=new LocalCurrentControlObservations(_database,_budget).AssertCapturedPolicyIn(attempt,expected.Reference,transaction,token);
+        var key=Key(pin,expected.Reference.FileId);var old=Read(key,pin,expected.Reference,transaction);
+        if(old!=expected || expected.AttemptId!=attempt.Id || old!.Metadata.MimeType!="application/json" ||
+            old.RejectedPolicyVersion==old.Metadata.Version && old.RejectedPolicySha256!=actualSha256) throw new WorkspaceObservationConflictException();
+        var next=old with {RejectedPolicyVersion=old.Metadata.Version,RejectedPolicySha256=actualSha256};
+        if(next!=old) Save(key,next,false,transaction);transaction.Commit();return next;
+    }
 
     private LibraryConnectionDescriptor Require(LocalCurrentControlAttempt attempt,CatalogObjectReference reference,LocalCurrentGraphMetadata metadata,
         SqliteTransaction transaction,CancellationToken token)
@@ -72,6 +93,14 @@ public sealed class LocalCurrentGraphObservations(ProcessorStateDatabase databas
         var pin=new LocalCurrentControlObservations(_database,_budget).AssertCapturedIn(attempt,transaction,token);
         CheckReference(pin,reference);
         if(metadata.SharedDriveId!=attempt.SharedDriveId) throw new CurrentControlObservationConflictException();return pin;
+    }
+    internal LocalCurrentGraphObservation RequireCompleteIn(LocalCurrentControlAttempt fenced,LibraryConnectionDescriptor pin,
+        CatalogObjectReference reference,SqliteTransaction transaction)
+    {
+        CheckReference(pin,reference);var actual=Read(Key(pin,reference.FileId),pin,reference,transaction);
+        if(fenced.Phase!="fenced" || actual is null || actual.AttemptId!=fenced.Id || actual.Metadata.SharedDriveId!=fenced.SharedDriveId ||
+            actual.BodyVersion!=actual.Metadata.Version || actual.BodySha256!=reference.Sha256) throw new CurrentControlObservationConflictException();
+        return actual;
     }
     private static void CheckReference(LibraryConnectionDescriptor pin,CatalogObjectReference reference)
     {
@@ -99,7 +128,9 @@ public sealed class LocalCurrentGraphObservations(ProcessorStateDatabase databas
         catch(JsonException error){throw new InvalidDataException("Graph observation cannot be decoded.",error);}
         if(value.Reference is null || value.Metadata is null || value.AttemptId==Guid.Empty || value.ConnectionSha256!=pin.DocumentSha256 ||
             value.Reference.FileId!=reference.FileId || (value.BodyVersion is null)!=(value.BodySha256 is null) ||
-            value.BodyVersion is not null && (value.BodyVersion<1 || value.BodyVersion>value.Metadata.Version || !Digest(value.BodySha256)) || Encode(value)!=body)
+            value.BodyVersion is not null && (value.BodyVersion<1 || value.BodyVersion>value.Metadata.Version || !Digest(value.BodySha256)) ||
+            (value.RejectedPolicyVersion is null)!=(value.RejectedPolicySha256 is null) || value.RejectedPolicyVersion is not null &&
+            (value.RejectedPolicyVersion<1 || value.RejectedPolicyVersion>value.Metadata.Version || !Digest(value.RejectedPolicySha256) || value.RejectedPolicySha256==value.Reference.Sha256) || Encode(value)!=body)
             throw new InvalidDataException("Current graph observations changed their fixed reference, scope or canonical state.");
         try {Validate(value.Reference,value.Metadata);}
         catch(ArgumentException error){throw new InvalidDataException("Retained graph observation metadata exceeds its schema or bounds.",error);}

@@ -82,8 +82,16 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
     {
         _ = Budget;
         if (signedEnvelope.Length is < 1 or > ProtocolDocumentReader.MaximumDocumentBytes) throw new ArgumentException("A bounded signed policy is required.", nameof(signedEnvelope));
-        var owned = signedEnvelope.ToArray();
         using var transaction = _database.Connection.BeginTransaction();
+        using var selected = SelectPublisherPolicyIn(signedEnvelope,transaction);
+        selected.Recheck();transaction.Commit();return selected.Value;
+    }
+
+    internal LibraryPolicySelection<CatalogPublisherAuthorization> SelectPublisherPolicyIn(ReadOnlySpan<byte> signedEnvelope,SqliteTransaction transaction)
+    {
+        _ = Budget;
+        if (signedEnvelope.Length is < 1 or > ProtocolDocumentReader.MaximumDocumentBytes) throw new ArgumentException("A bounded signed policy is required.", nameof(signedEnvelope));
+        var owned = signedEnvelope.ToArray();
         var pin = ReadPin(transaction) ?? throw new InvalidOperationException("Independently enroll the controller before accepting Drive policies.");
         var policy = Reader(pin).ReadPublisherAuthorization(owned, Actor(pin)); var sequence = policy.Sequence.ToString(CultureInfo.InvariantCulture);
         AssertControllerSequenceKind(transaction, policy.Sequence, source: false);
@@ -93,23 +101,25 @@ public sealed partial class LibraryAuthorityRepository(ProcessorStateDatabase da
         if (old is not null && Hash(Encoding.UTF8.GetBytes(old)) != oldHash) throw new InvalidDataException("Stored controller document integrity failed.");
         if (old is not null && oldHash != hash) throw new ControllerAuthorityConflictException();
         var selected = SelectedSequence(transaction); var currentSequence = selected is null ? 0 : Counter(selected);
-        if (currentSequence > 0) _ = ReadPolicy(transaction, pin, currentSequence); // Never overwrite a damaged current pointer.
-        if (old is not null && policy.Sequence <= currentSequence)
+        if (currentSequence > 0) _ = ReadPolicy(transaction, pin, currentSequence);
+        if (old is not null && policy.Sequence <= currentSequence) return new(ReadPolicy(transaction,pin,currentSequence),null);
+        StorageReservation? reservation = Budget.Reserve(checked(owned.LongLength * 3 + 65536));
+        try
         {
-            var retained = ReadPolicy(transaction, pin, currentSequence); transaction.Commit(); return retained;
+            reservation.RecheckBeforeWrite(reservation.Bytes);
+            if (old is null) { Insert(transaction, key, Encoding.UTF8.GetString(owned)); Insert(transaction, key + ":sha256", hash); }
+            CatalogPublisherAuthorization result;
+            if (policy.Sequence > currentSequence)
+            {
+                using var update = Command(transaction, "INSERT INTO processor_meta(key,value) VALUES($key,$value) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    ("$key", SelectedKey), ("$value", sequence));
+                if (update.ExecuteNonQuery() != 1) throw new InvalidOperationException("Publisher selection did not update exactly one pointer.");
+                result = policy;
+            }
+            else result = ReadPolicy(transaction,pin,currentSequence);
+            var mutation = new LibraryPolicySelection<CatalogPublisherAuthorization>(result,reservation);reservation=null;return mutation;
         }
-        using var reservation = Budget.Reserve(checked(owned.LongLength * 3 + 65536)); reservation.RecheckBeforeWrite(reservation.Bytes);
-        if (old is null) { Insert(transaction, key, Encoding.UTF8.GetString(owned)); Insert(transaction, key + ":sha256", hash); }
-        CatalogPublisherAuthorization result;
-        if (policy.Sequence > currentSequence)
-        {
-            using var update = Command(transaction, "INSERT INTO processor_meta(key,value) VALUES($key,$value) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                ("$key", SelectedKey), ("$value", sequence));
-            if (update.ExecuteNonQuery() != 1) throw new InvalidOperationException("Publisher selection did not update exactly one pointer.");
-            result = policy;
-        }
-        else result = ReadPolicy(transaction, pin, currentSequence);
-        transaction.Commit(); return result;
+        finally {reservation?.Dispose();}
     }
 
     private CatalogPublisherAuthorization ReadPolicy(SqliteTransaction transaction, LibraryControllerPin pin, long sequence)

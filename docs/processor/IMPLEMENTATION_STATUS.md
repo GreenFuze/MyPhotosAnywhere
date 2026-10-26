@@ -1,5 +1,45 @@
 # MPA 0.6.0 implementation ledger
 
+## Atomic canonical admission
+
+The local admission transaction verifies the same live reader's final Root fence,
+complete actual policy/graph observations, retained native controller signatures,
+observed publisher retirement and catalog ancestry, and exact local human source
+approval. Publisher/source selections retain their storage reservations through the
+same COMMIT as the paired, explicitly versioned canonical pointer. Failed writes
+leave the preceding pointer and immutable pending identity intact. Revocation can
+select an empty catalog without granting publication permission.
+
+The facade holds its exact sealed native index and serialized reader owners through
+admission. Historical reads do not refresh authority. Only a validated inactive
+index can retire; corrupt/unknown pointers block retirement. Rejected policy transport
+digests remain distinct from admitted bodies, preserving exact-byte recovery and
+metadata high-water. Runtime routing, mutable Root CAS, publication completion,
+connection export and native composition remain unfinished.
+
+All382 Core and80 affected current-reader/storage AppServices cases pass, preserving
+every previous379/66 identity. Strict Desktop has zero warnings/errors. Fifteen exact
+LF source/test hashes, reports and full logs are frozen in
+current-activation-validation.json. New cases cover atomic policy/pointer rollback,
+retired publisher epochs, observed-but-unactivated catalog rollback, live owner scope,
+disconnected accounts, corrupt/unknown pointer formats, safe inactive retirement and
+retained rejected-policy evidence with exact repair. Full418 ordinary AppServices and
+mandatory cross-platform scale/reference checks remain required for this revision.
+
+An initial new assertion incorrectly concatenated two snapshots of the same
+source-scoped identity; the corrected assertion verifies one latest asset and its
+exact identity. A new serializer allocation analyzer finding was resolved with one
+reusable options instance. Superseded failures remain recorded; no warning was
+suppressed and no old assertion, deadline or storage bound was weakened.
+
+The preceding b74d3a7 contract workflow passed all12 jobs and32 independently
+verified reports: each platform95/379/116/404/9/27 ordinary cases plus2 scale and13
+reference cases. Windows finished in1613seconds under the unchanged1800 limit.
+Its Android/Desktop builds pass, but native API29 fails the horizontal swipe filename
+assertion after the original10000ms wait. The actual failure/logs are retained;
+its cause remains unverified and blocks release. API35/37 partial artifacts are not
+complete native acceptance. No previous diagnostic exception is extended.
+
 ## Shared historical and pending index ownership
 
 `LocalCurrentStagePool` owns one exclusive area for two private indexes, while each

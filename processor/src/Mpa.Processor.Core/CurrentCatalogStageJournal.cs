@@ -36,6 +36,14 @@ public sealed class CurrentCatalogStageJournal(ProcessorStateDatabase database,S
     }
     public IReadOnlyList<CurrentCatalogStageClaim> ReadAll()
     {using var transaction=_database.Connection.BeginTransaction();var result=ReadAll(transaction);transaction.Commit();return result;}
+    internal CurrentCatalogStageClaim AssertSealedIn(CurrentCatalogStageClaim expected,LocalCurrentControlAttempt fenced,
+        LibraryConnectionDescriptor pin,SqliteTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(expected);var actual=ReadAll(transaction).SingleOrDefault(value=>value.Id==expected.Id);
+        if(fenced.Phase!="fenced" || actual!=expected || expected.Phase!="sealed" || expected.Descriptor is null) throw new CurrentControlObservationConflictException();
+        AssertScope(expected,fenced,pin);return expected;
+    }
+    internal IReadOnlyList<CurrentCatalogStageClaim> ReadAllIn(SqliteTransaction transaction)=>ReadAll(transaction);
     public void AssertForCapture(CurrentCatalogStageClaim expected,LocalCurrentControlAttempt attempt,CancellationToken token=default)
     {
         ArgumentNullException.ThrowIfNull(expected);using var transaction=_database.Connection.BeginTransaction();
@@ -60,16 +68,14 @@ public sealed class CurrentCatalogStageJournal(ProcessorStateDatabase database,S
         if(actual is null || actual!=expected) throw new CurrentControlObservationConflictException();
         // Future activation must retain the active claim. Unknown active-pointer data
         // cannot be interpreted as permission to remove a generated file.
-        using(var active=Command(transaction,"SELECT 1 FROM processor_meta WHERE key='current_catalog_active_v1'"))
-            if(active.ExecuteScalar() is not null) throw new InvalidOperationException("Active catalog retirement requires its joined activation owner.");
+        new CurrentCatalogActivationRepository(_database,_budget).AssertNotActiveIn(expected.Id,transaction);
         var next=actual with {Phase="retiring"};Save(next,transaction);transaction.Commit();return next;
     }
     public void CompleteRetirement(CurrentCatalogStageClaim expected,CurrentCatalogStageRetirement? retirement=null)
     {
         ArgumentNullException.ThrowIfNull(expected);using var transaction=_database.Connection.BeginTransaction();
         if(expected.Phase!="retiring" || ReadAll(transaction).SingleOrDefault(value=>value.Id==expected.Id)!=expected) throw new CurrentControlObservationConflictException();
-        using(var active=Command(transaction,"SELECT 1 FROM processor_meta WHERE key='current_catalog_active_v1'"))
-            if(active.ExecuteScalar() is not null) throw new InvalidOperationException("Active catalog retirement requires its joined activation owner.");
+        new CurrentCatalogActivationRepository(_database,_budget).AssertNotActiveIn(expected.Id,transaction);
         if(retirement is null) CurrentCatalogStageArea.AssertRetired(_database.StateDirectory,_database.InstallationId,expected.Id);
         else retirement.AssertFor(_database.StateDirectory,_database.InstallationId,expected);
         using var delete=Command(transaction,"DELETE FROM processor_meta WHERE key=$body OR key=$hash",("$body",Key(expected.Id)),("$hash",Key(expected.Id)+":sha256"));
