@@ -1,5 +1,29 @@
 # MPA 0.6.0 implementation ledger
 
+## Wait for the actual canonical People list before its existing review assertions
+
+The exact cc8126c API29 native main stage passed168 of169 cases. Its remaining
+People review case attempted to scroll while the actual list still reported Loading
+people. The test had awaited only the independent faces stream; Compose idle does
+not await the canonical repository's IO. API35 passed and API37 was cancelled by
+the existing matrix failure policy. The failed report and complete diagnostics are
+retained, and cc8126c is not presented as an all-CI pass.
+
+This test now retains its original face condition and additionally waits for the
+canonical person identity and the rendered People ready semantics, within the same
+10000ms deadline. All chooser, imported-name, confirmation and saved-data assertions
+remain byte-for-byte intact. Application behavior, test budgets and warning gates
+are unchanged. Final-source Android test compilation and lint pass with zero lint
+findings; the incremental unit task also completed. Only the exact approved AGP
+deprecation was admitted. Corrected full native checks on the committed revision
+are still mandatory; no corrected device pass or runtime exception is claimed.
+
+The preceding cc8126c Protocol24/Android/Desktop jobs succeeded, with all40 protocol
+reports and full logs retained. Its native failure remains separately blocking.
+Local-header recovery is still uncommitted and separately under validation. This
+test synchronization does not finish runtime composition or the remaining0.6
+product, installer, S23 or exact joint-publication acceptance.
+
 ## Unsigned partial-work disposition without losing originals or consuming counters
 
 A separate current disposition now handles a frozen generation with partial immutable
