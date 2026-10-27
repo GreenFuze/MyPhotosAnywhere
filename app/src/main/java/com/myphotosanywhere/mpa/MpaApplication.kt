@@ -15,8 +15,8 @@ class MpaApplication : Application(), androidx.work.Configuration.Provider {
         @OptIn(androidx.work.ExperimentalConfigurationApi::class)
         get() = androidx.work.Configuration.Builder()
             .setJobSchedulerJobIdRange(1,999_999)
-            // Android37 ignores this legacy scheduling hint; keep earlier behavior.
-            .setMarkingJobsAsImportantWhileForeground(android.os.Build.VERSION.SDK_INT<37)
+            // Android36+ ignores this legacy scheduling hint; keep earlier behavior.
+            .setMarkingJobsAsImportantWhileForeground(android.os.Build.VERSION.SDK_INT<android.os.Build.VERSION_CODES.BAKLAVA)
             .build()
     private val databaseOwner=lazy {
         Room.databaseBuilder(this, PhotoDatabase::class.java, "mpa.db")

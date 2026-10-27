@@ -1,5 +1,42 @@
 # MPA 0.6.0 implementation ledger
 
+## Framework hint boundary and actual native diagnostic comparison
+
+Android's official JobInfo.Builder reference states that important-while-foreground
+is ignored beginning with BAKLAVA, whose version constant is36. The initial37
+boundary therefore left API36 requesting an ineffective hint. The configuration now
+uses Build.VERSION_CODES.BAKLAVA; behavior below36, scheduling constraints, job IDs
+and foreground transfer ownership remain unchanged. The getter-scoped explicit
+WorkManager experimental API opt-in and all warning gates remain unchanged.
+
+References: [JobInfo.Builder](https://developer.android.com/reference/android/app/job/JobInfo.Builder#setImportantWhileForeground(boolean)),
+[BAKLAVA](https://developer.android.com/reference/android/os/Build.VERSION_CODES#BAKLAVA).
+
+On these exact host sources, all713 previous unit identities/117 suites pass,
+lint has zero findings, and debug/release/test APKs build. Complete diagnostics,
+source/report/APK hashes and merged manifest declarations were verified. Only the
+exact existing15 AGP deprecations are admitted. This is build evidence; fresh
+same-revision native checks remain required for the boundary correction.
+
+The preceding exactdb3e48c passed Android40498246114 and Native40498246140 on
+API29/35/37. All177 test identities perAPI and complete resource-traced start/finish
+records were independently verified from one artifact download. The targeted
+API35 missing-callback messages fell from30 to0, and API37 ignored-hint messages
+from42 to0 in traced target processes. Full original logcats and every other
+warning/error remain preserved; those reductions do not waive other diagnostics
+or establish API36 physical-device, visual, S23 or final release acceptance.
+
+The allocation component's original8 focused regressions now pass with the same
+10-second entry/exit deadlines. Duplicate pre-request full scans were removed while
+retaining the mandatory full current-state check immediately before every physical
+request; known-ID checkpointing still precedes cancellation. Two earlier timed-out
+entry tests remain retained. Additional alias/SQL/authority-change tests and the
+actual admitted immutable metadata create boundary are uncommitted and under test.
+No header receipt owner, runtime integration or complete0.6 product is claimed.
+Remaining workflows, processing/plugins, six installers, independent live-client
+and final-device acceptance, warning clearance and exact joint publication remain.
+
+
 ## Supported scheduling hint and Compose fixture callback declarations
 
 Exact4b440ae traced native diagnostics identified42 API37 JobInfo messages for an
