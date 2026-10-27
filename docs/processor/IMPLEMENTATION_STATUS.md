@@ -1,5 +1,64 @@
 # MPA 0.6.0 implementation ledger
 
+## Exact original header recovery in local journals
+
+Current recovery can inspect a genuinely reserved catalog header under the same
+reader's actual final Root fence and complete native signing inventory. It checks
+the original captured plan/body/counter, Root-authorized same publisher key, actual
+selected anchor and retired-owned ancestry, newer archived human source revision,
+and absence of Root targets or selected receipts for this generation. A higher
+native reservation is refused. No counter, epoch, signing identity or head resets.
+
+The local repair signs only that existing reserved body and retains its first
+sealed envelope. A sealed replay never calls the signer again. A private Core
+transaction context derives the pending UUID, role, MIME and bytes from the original
+native intent, and atomically pairs a missing original outbox row with its lost
+commit-sealed phase. Existing matching rows keep their original bytes. Payload
+and phase storage claims remain held and rechecked through commit. Ordinary
+Prepare/AssertCurrent/ConfirmVerified source checks remain intact.
+
+The sealed-native/no-outbox crash can therefore recover local bookkeeping before
+complete immutable inventory is possible. The changed signing/outbox state then
+requires a genuinely new complete scan; no checkpoint is relabeled or invented.
+These APIs grant no Google allocation/create/upload, facts/coverage/thumbnail or
+original-file permission. Actual per-header cloud recovery and separate handling
+of global pending Root/policy/revocation work are still unfinished.
+
+All437 prior Core cases and all241 affected Services cases pass on four frozen
+sources:233 prior identities plus eight new cases, also passed in the corrected
+focused run. Strict Desktop has zero warnings/errors. Real native Root/signatures,
+private publication SQLite and the existing shared canonical owner are used with
+synthetic metadata transport. Coverage includes reserved and already sealed missing
+rows, unchanged original scope/body/counter/signature/UUID and actual selected head,
+new real inventory after repair, old-source facts refusal, insert/phase rollback,
+foreign readers, stale nonce, actual low storage and higher native work refusal.
+No original or live Drive object is read or written by these new cases.
+
+An initial prototype application removed a required cryptography import; strict
+compilation failed and that import was restored. The first higher-orphan fixture
+incorrectly reused a captured plan for another sequence; its existing immutable
+guard rejected setup before the intended assertion. Only that new fixture now
+encodes its independent orphan. Both failures remain retained; original guards,
+assertions, deadlines, warning gates, schemas, capture/index limits and budgets
+are unchanged.
+
+The preceding exactcc8126c Processor matrix passed24 jobs with40 reports, all528
+ordinary Services cases per platform, all437 Core identities partitioned once,
+99 Protocol/119 Google/9 LAN/27 Web, scale/reference measurements, source hashes,
+full logs and unchanged limits independently checked. Its API29 native failure
+remains a failed parent record. The Android-test-only4b440ae successor has the
+identical committed Processor subtree; its corrected native177 cases perAPI and
+complete traced runtime identities pass on29/35/37, and Android checks pass.
+Those separately scoped receipts do not claim same-revision all-workflow or final
+runtime-warning/visual acceptance. Fresh exact-revision536 ordinary Services and
+all mandatory native/platform/scale/reference checks remain required here.
+
+Remaining header cloud materialization, signed partial/revoked/handover recovery,
+eligible selected dependency reuse, runtime/export/native composition, processing
+plugins, human operations, finished clients, installers, independent live clients,
+final S23 and exact tested joint publication are unfinished. Room12/Processor13/
+native-private7/canonical1, one live capture and shared two-index/512MiB stay fixed.
+
 ## Wait for the actual canonical People list before its existing review assertions
 
 The exact cc8126c API29 native main stage passed168 of169 cases. Its remaining
