@@ -1,5 +1,85 @@
 # MPA 0.6.0 implementation ledger
 
+## Exact original-header P1 receipt and real P2 retirement
+
+The original assigned signed header now has its own joined immutable upload owner.
+It accepts a genuinely new same-reader P1 inventory after allocation, keeps the
+original UUID/FileId/scope/first JSON bytes and performs no new allocation. Every
+physical request uses the actual account lease and full state-only admission. That
+callback uses the separately joined state lane, avoiding the reproduced account/
+network reader inversion. Cancellation and Exit join entered create/readback and
+receipt work; a lost create reply retries only that original immutable identity.
+
+The narrow Core receipt transaction repeats the actual complete P1/native/Root/
+human/header inputs in the same SQLite transaction as verified_version. Account,
+folder, FileId, MIME, length, exact bytes/hash and actual positive Drive version
+must match. Ordinary Prepare/AssertCurrent/ConfirmVerified source checks remain.
+The storage claim is held and rechecked through commit. Post-write checks reject
+receipt or captured-context trigger corruption and roll the transaction back.
+
+Only the expected local receipt field may change across the outbox descriptions.
+Native work, retained observations/candidates/history/replay, actual Root binding,
+human selections, capture, plan and first signature remain checked. A shared pure
+formatter preserves the original canonical inspection preimage; its private
+post-write comparison normalizes only that receipt field. It returns no authority
+and writes no refreshed network checkpoint, cursor, counter, phase or head.
+
+The receipt deliberately spends P1. A real new P2 scan observes the actual stored
+header before the existing complete materialized supersession and joined private
+snapshot retirement. The end-to-end fixture leaves the acknowledged selected head
+unchanged and uploads no obsolete facts or original media. Disconnected/canceled
+results never substitute another header or pretend a late result rolled back.
+
+On seven frozen sources, all437 prior Core identities and all270 affected Services
+identities pass(259 prior+11 new). The11 new cases also passed focused execution:
+real P0/P1/P2 and snapshot retirement, lost reply/same-ID recovery, seven wrong
+readback fields, caller cancellation/Exit with entered uncooperative create, source
+and publisher changes, receipt/context-trigger rollback and exact retry, foreign
+reader and stale nonce. Strict Desktop has zero warnings/errors. Original tests,
+10-second lifecycle bounds, schemas, document/storage/index/capture limits and
+warning policies remain intact. No live Drive or original file was used by these
+new synthetic-metadata/native-key/private-SQLite fixtures.
+
+The original5f9525f Windows application job exceeded its30-minute limit twice;
+both failures, annotations and complete available logs remain retained. The exact
+test/cause was not identifiable from their default logs. Diagnostic-onlyfc141de
+changes just the CI workflow: per-case Windows output and a5-minute per-test hang
+diagnostic with a mini dump. All original assertions and job deadlines remain.
+Its complete committed processor and Android trees equal5f byte-for-byte. The
+seven local receipt sources also match the original completed437/270/11 reports;
+no test is claimed rerun merely because the workflow changed.
+
+The subsequentfc141de diagnostic job also reached its30-minute deadline. Its226
+completed cases report27m47s of test time with zero failed cases, identifying
+aggregate suite capacity rather than establishing any individual hang. All failed
+logs remain retained. Workflow-onlyab297d0 therefore requires three disjoint
+Services groups: headers26, continuity39 and remaining489. Their actual method
+identities are verified against all554 previous ordinary cases with no duplicates
+or omissions. Every existing assertion, original job limit, warning gate and
+10k/100k benchmark remains unchanged; this is not a product performance fix.
+
+The actualab297d0 parent now passes all32 mandatory jobs/48 actual reports,
+preserving all554 Services,139 Google,437 Core exactly once,99 Protocol,9 LAN,
+27 Web and the original scale/reference/source/full-stream checks per platform.
+Its Android/native statuses are fresh; Desktop status is explicitly inherited
+from identical5f application trees. No old Windows failure becomes a pass.
+Fresh receipt-revision CI requires565 ordinary Services across the same32 jobs,
+with its11 new header cases required in the header partition.
+Final runtime/physical/visual/live-client acceptance remains.
+
+This completes the tested fully materialized original-header recovery component,
+not the0.6 product. Signed partial dependency work still needs its distinct typed
+disposition; revoked/key-epoch/handover/ambiguous Root recovery, eligible selected
+dependency reuse, runtime/native integration, processing/plugins and finished
+clients remain. Six installers, independent live-client/S23 acceptance and exact
+tested joint publication remain mandatory. No original mutation is authorized by
+a header receipt or historical disposition.
+
+Owner direction,2026-10-27: prioritize the PC app/processor and defer new mobile
+implementation. Preserve Drive-only Android compatibility and the eventual joint
+release gates. See CURRENT_PC_EXECUTION.md for the five unfinished PC milestones.
+
+
 ## Observed original-header allocation and per-request metadata transport
 
 An interrupted original signed header now has a joined GenerateIds-only owner.

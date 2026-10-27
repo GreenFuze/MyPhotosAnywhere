@@ -45,19 +45,7 @@ public sealed partial class CatalogGenerationCaptureRepository
             header.Role!="catalog-commit" || header.MimeType!="application/json" ||
             header.Sha256!=original.Intent.EnvelopeSha256 || !header.Payload.Span.SequenceEqual(original.Intent.Envelope.Value.Span))
             throw new WorkspacePublicationConflictException();
-        var basis=new LocalCurrentControlObservations(_database,_budget).TransitionBasisIn(fenced,transaction,token);
-        // Global policy/revocation work can exist without targeting this generation.
-        // A historical or unobserved native Root cannot silently grant a new write.
-        if(signing.Roots.Any(root=>root.Disposition==CurrentRootSigningDisposition.Pending))
-            throw new CurrentControlTransitionInProgressException();
-        var authority=new LibraryAuthorityRepository(_database,_budget);
-        var publisher=authority.CurrentPublisherPolicy(transaction);
-        var sources=authority.CurrentSourceConfiguration(transaction);
-        if(publisher is not null && (publisher.Sequence>basis.Head.Publishers.Sequence ||
-                publisher.Sequence==basis.Head.Publishers.Sequence && publisher.EnvelopeSha256!=basis.Head.Publishers.Reference.Sha256) ||
-            sources is not null && (sources.Sequence>basis.Head.Sources.Sequence ||
-                sources.Sequence==basis.Head.Sources.Sequence && sources.EnvelopeSha256!=basis.Head.Sources.Reference.Sha256))
-            throw new StaleLibraryConfigurationException();
+        var basis=AssertCurrentHeaderPolicyInputsIn(signing,fenced,transaction,token);
         if(inventory.Context.LibraryId!=header.Scope.LibraryId || inventory.Context.AccountId!=header.Scope.AccountId ||
             inventory.Context.FolderId!=header.Scope.FolderId || inventory.Context.AccountRevision<header.Scope.AccountRevision)
             throw new WorkspacePublicationConflictException();

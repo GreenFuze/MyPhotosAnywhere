@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Mpa.Processor.Protocol;
 
@@ -96,13 +94,7 @@ public sealed partial class CatalogGenerationCaptureRepository
             header.Sha256!=intent.EnvelopeSha256 || !header.Payload.Span.SequenceEqual(intent.Envelope.Value.Span) || header.FileId==basis.Pin.CurrentFileId))
             throw new WorkspacePublicationConflictException();
         var planSha=PlanHash(capture,publication.Basis,PublicationEncode(plan));
-        var claim=Convert.ToHexStringLower(SHA256.HashData(new CanonicalJson(32768).Encode(JsonSerializer.SerializeToUtf8Bytes(new
-        {
-            domain="mpa-current-original-catalog-header-inspection-v1",capture.Scope,capture.SnapshotId,capture.CommitIntentId,capture.Phase,
-            intent.Sequence,intent.BodySha256,intent.EnvelopeSha256,planSha,OriginalFileId=header?.FileId,VerifiedVersion=header?.VerifiedVersion,
-            SelectedAnchor=basis.Head.Catalog,HumanRevision=human.Revision,HumanSourcesSha256=humanSha,SigningSha256=signing.Sha256,
-            fenced.Id,fenced.Revision,fenced.AccountRevision,fenced.Version,fenced.ContentSha256
-        },CurrentCompletionJson))));
+        var claim=CurrentHeaderClaim(capture,intent,planSha,header,basis.Head.Catalog,human.Revision,humanSha,signing.Sha256,fenced);
         token.ThrowIfCancellationRequested();
         return new(capture,publication,intent,header,new(capture,intent,header,basis.Head.Catalog,human.Revision,humanSha,claim));
     }
