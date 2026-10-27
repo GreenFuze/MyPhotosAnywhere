@@ -117,6 +117,23 @@ public sealed partial class CurrentControlTransitionJournal(ProcessorStateDataba
 
     private List<CurrentControlTransitionPlan> ReadAllIn(LocalCurrentTransitionBasis basis,SqliteTransaction transaction,CancellationToken token)
     {
+        var rows=ReadOriginalTransitionRowsIn(transaction,token);var plans=new List<CurrentControlTransitionPlan>();
+        foreach(var id in OriginalTransitionIds(rows))
+        {
+            var original=ReadOriginalTransitionInputsIn(id,rows,basis,transaction,token);
+            var plan=original.Plan;var policies=original.Policies;
+            // Keep full captured generation/phase validation on the ordinary path.
+            var catalog=Catalog(basis.Pin,plan.Target,policies.Publisher,policies.Sources,transaction);
+            if(catalog.Reference!=plan.Catalog || catalog.Generation!=plan.GenerationId || policies.Sources.Revision!=plan.ConfigurationRevision ||
+                catalog.AccountRevision>plan.AccountRevision) throw new InvalidDataException("Root transition retargeted captured generation or policy work.");
+            AssertOriginalTransitionEnvelope(original,basis.Pin);
+            _=ReadCompletion(plan,transaction);plans.Add(plan);
+        }
+        AssertOriginalRootCoverageIn(plans.Select(plan=>plan.Id),basis,transaction,token);return plans;
+    }
+
+    private Dictionary<string,string> ReadOriginalTransitionRowsIn(SqliteTransaction transaction,CancellationToken token)
+    {
         var rows=new Dictionary<string,string>(StringComparer.Ordinal);
         using(var command=Command(transaction,"SELECT key,length(CAST(value AS BLOB)),value FROM processor_meta WHERE key GLOB $prefix ORDER BY key LIMIT $limit",("$prefix",Prefix+"*"),("$limit",Maximum*5+1)))
         using(var reader=command.ExecuteReader())
@@ -128,49 +145,64 @@ public sealed partial class CurrentControlTransitionJournal(ProcessorStateDataba
                     throw new InvalidDataException("Root transition inventory has an unknown key or exceeds its bounds.");
                 rows.Add(key,reader.GetString(2));
             }
-        var plans=new List<CurrentControlTransitionPlan>();var journal=new ProtocolSigningJournal(_database,_budget);
-        foreach(var id in rows.Keys.Select(key=>Guid.ParseExact(key.Substring(Prefix.Length,36),"D")).Distinct())
+        return rows;
+    }
+
+    private static IEnumerable<Guid> OriginalTransitionIds(Dictionary<string,string> rows)=>rows.Keys
+        .Select(key=>Guid.ParseExact(key.Substring(Prefix.Length,36),"D")).Distinct().OrderBy(id=>id.ToString("D"),StringComparer.Ordinal);
+
+    private OriginalTransitionInputs ReadOriginalTransitionInputsIn(Guid id,Dictionary<string,string> rows,
+        LocalCurrentTransitionBasis basis,SqliteTransaction transaction,CancellationToken token)
+    {
+        var journal=new ProtocolSigningJournal(_database,_budget);
+        token.ThrowIfCancellationRequested();var key=Key(id);
+        if(!rows.TryGetValue(key,out var body) || !rows.TryGetValue(key+":sha256",out var hash) || Hash(body)!=hash || !rows.TryGetValue(key+":claim",out var claim))
+            throw new InvalidDataException("Root transition lost its complete immutable checkpoint.");
+        CurrentControlTransitionPlan plan;
+        try {plan=JsonSerializer.Deserialize<CurrentControlTransitionPlan>(body,Json) ?? throw new InvalidDataException("Missing Root transition.");}
+        catch(JsonException error){throw new InvalidDataException("Root transition cannot be decoded.",error);}
+        if(plan.Format!="mpa-current-control-transition" || plan.Major!=1 || plan.Id!=id || plan.Id==plan.PreviousIntentId ||
+            plan.CapturedAttempt==Guid.Empty || plan.AccountRevision<basis.MinimumAccountRevision || plan.PreviousVersion<basis.MinimumVersion ||
+            plan.SharedDriveId!=basis.SharedDriveId || plan.PreviousSequence<1 || plan.Sequence<=plan.PreviousSequence ||
+            plan.ConfigurationRevision<1 || plan.Target is null || plan.Target.Publishers is null || plan.Target.Sources is null ||
+            plan.ConnectionCode!=basis.Pin.Encode() || Encode(plan)!=body || claim!=Claim(plan) ||
+            (plan.Catalog is null)!=(plan.GenerationId is null) || (plan.Catalog is null)!=(plan.Target.CatalogPublicationId is null) || plan.GenerationId==Guid.Empty)
+            throw new InvalidDataException("Root transition changed its captured scope, format or target.");
+        var previous=journal.Read(plan.PreviousIntentId,transaction) ?? throw new SigningHistoryRecoveryRequiredException();
+        if(previous.Envelope is null || previous.Sequence!=plan.PreviousSequence || previous.EnvelopeSha256!=plan.PreviousSha256) throw new InvalidDataException("Root transition lost its exact predecessor signature.");
+        var predecessor=LibraryCurrentControl.Read(previous.Envelope.Value.Span,basis.Pin);
+        var intent=journal.Read(id,transaction) ?? throw new SigningHistoryRecoveryRequiredException();
+        var encoded=new LibraryCurrentControlWriter(basis.Pin).EncodeDocument(plan.Sequence,plan.Target.Publishers,plan.Target.Sources,plan.Catalog);
+        if(intent.Kind!=LibraryCurrentControl.Kind || intent.Sequence!=plan.Sequence || intent.BodySha256!=plan.BodySha256 || !intent.Body.Span.SequenceEqual(encoded) ||
+            plan.Target.Publishers!=predecessor.Publishers && plan.Target.Publishers.Sequence<=predecessor.Sequence ||
+            plan.Target.Sources!=predecessor.Sources && plan.Target.Sources.Sequence<=predecessor.Sequence) throw new InvalidDataException("Root transition lost its fixed native signing intent or successor.");
+        var policies=Policies(basis.Pin,plan.Target,transaction);
+        return new(plan,intent,predecessor,policies);
+    }
+
+    private static void AssertOriginalTransitionEnvelope(OriginalTransitionInputs original,LibraryConnectionDescriptor pin)
+    {
+        var intent=original.Intent;var predecessor=original.Predecessor;var policies=original.Policies;
+        if(intent.Envelope is { } envelope)
         {
-            token.ThrowIfCancellationRequested();var key=Key(id);
-            if(!rows.TryGetValue(key,out var body) || !rows.TryGetValue(key+":sha256",out var hash) || Hash(body)!=hash || !rows.TryGetValue(key+":claim",out var claim))
-                throw new InvalidDataException("Root transition lost its complete immutable checkpoint.");
-            CurrentControlTransitionPlan plan;
-            try {plan=JsonSerializer.Deserialize<CurrentControlTransitionPlan>(body,Json) ?? throw new InvalidDataException("Missing Root transition.");}
-            catch(JsonException error){throw new InvalidDataException("Root transition cannot be decoded.",error);}
-            if(plan.Format!="mpa-current-control-transition" || plan.Major!=1 || plan.Id!=id || plan.Id==plan.PreviousIntentId ||
-                plan.CapturedAttempt==Guid.Empty || plan.AccountRevision<basis.MinimumAccountRevision || plan.PreviousVersion<basis.MinimumVersion ||
-                plan.SharedDriveId!=basis.SharedDriveId || plan.PreviousSequence<1 || plan.Sequence<=plan.PreviousSequence ||
-                plan.ConfigurationRevision<1 || plan.Target is null || plan.Target.Publishers is null || plan.Target.Sources is null ||
-                plan.ConnectionCode!=basis.Pin.Encode() || Encode(plan)!=body || claim!=Claim(plan) ||
-                (plan.Catalog is null)!=(plan.GenerationId is null) || (plan.Catalog is null)!=(plan.Target.CatalogPublicationId is null) || plan.GenerationId==Guid.Empty)
-                throw new InvalidDataException("Root transition changed its captured scope, format or target.");
-            var previous=journal.Read(plan.PreviousIntentId,transaction) ?? throw new SigningHistoryRecoveryRequiredException();
-            if(previous.Envelope is null || previous.Sequence!=plan.PreviousSequence || previous.EnvelopeSha256!=plan.PreviousSha256) throw new InvalidDataException("Root transition lost its exact predecessor signature.");
-            var predecessor=LibraryCurrentControl.Read(previous.Envelope.Value.Span,basis.Pin);
-            var intent=journal.Read(id,transaction) ?? throw new SigningHistoryRecoveryRequiredException();
-            var encoded=new LibraryCurrentControlWriter(basis.Pin).EncodeDocument(plan.Sequence,plan.Target.Publishers,plan.Target.Sources,plan.Catalog);
-            if(intent.Kind!=LibraryCurrentControl.Kind || intent.Sequence!=plan.Sequence || intent.BodySha256!=plan.BodySha256 || !intent.Body.Span.SequenceEqual(encoded) ||
-                plan.Target.Publishers!=predecessor.Publishers && plan.Target.Publishers.Sequence<=predecessor.Sequence ||
-                plan.Target.Sources!=predecessor.Sources && plan.Target.Sources.Sequence<=predecessor.Sequence) throw new InvalidDataException("Root transition lost its fixed native signing intent or successor.");
-            var policies=Policies(basis.Pin,plan.Target,transaction);var catalog=Catalog(basis.Pin,plan.Target,policies.Publisher,policies.Sources,transaction);
-            if(catalog.Reference!=plan.Catalog || catalog.Generation!=plan.GenerationId || policies.Sources.Revision!=plan.ConfigurationRevision ||
-                catalog.AccountRevision>plan.AccountRevision) throw new InvalidDataException("Root transition retargeted captured generation or policy work.");
-            if(intent.Envelope is { } envelope)
-            {
-                var root=LibraryCurrentControl.Read(envelope.Span,basis.Pin);root.AssertSuccessorOf(predecessor);
-                _=root.ReadPublishers(policies.PublisherBytes.Span,basis.Pin);_=root.ReadSources(policies.SourceBytes.Span,basis.Pin);
-            }
-            _=ReadCompletion(plan,transaction);plans.Add(plan);
+            var root=LibraryCurrentControl.Read(envelope.Span,pin);root.AssertSuccessorOf(predecessor);
+            _=root.ReadPublishers(policies.PublisherBytes.Span,pin);_=root.ReadSources(policies.SourceBytes.Span,pin);
         }
+    }
+
+    private void AssertOriginalRootCoverageIn(IEnumerable<Guid> ids,LocalCurrentTransitionBasis basis,SqliteTransaction transaction,CancellationToken token)
+    {
         // Every post-bootstrap Root signature/reservation must retain its plan,
         // even if it was subsequently observed. Never adopt orphan signing work.
-        var known=plans.Select(plan=>plan.Id).ToHashSet();known.Add(basis.ObservedRoots[0]);var count=0;
+        var known=ids.ToHashSet();known.Add(basis.ObservedRoots[0]);var count=0;
         using(var roots=Command(transaction,"SELECT id FROM signing_intent WHERE actor_id=$actor AND epoch=$epoch AND kind=$kind",("$actor",basis.Pin.ControllerId.ToString("D")),("$epoch",basis.Pin.ControllerEpoch),("$kind",LibraryCurrentControl.Kind)))
         using(var reader=roots.ExecuteReader())
             while(reader.Read())
             {token.ThrowIfCancellationRequested();if(++count>Maximum) throw new CatalogTraversalLimitException();if(!Guid.TryParseExact(reader.GetString(0),"D",out var id) || !known.Contains(id)) throw new SigningHistoryRecoveryRequiredException();}
-        return plans;
     }
+
+    private sealed record OriginalTransitionInputs(CurrentControlTransitionPlan Plan,ProtocolSigningIntent Intent,
+        LibraryCurrentControl Predecessor,PolicyEvidence Policies);
 
     private PolicyEvidence Policies(LibraryConnectionDescriptor pin,CurrentControlTransitionTarget target,SqliteTransaction transaction)
     {

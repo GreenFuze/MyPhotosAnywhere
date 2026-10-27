@@ -1,5 +1,62 @@
 # MPA 0.6.0 implementation ledger
 
+## Durable materialized supersession and joined private snapshot retirement
+
+An explicit historical disposition now handles an exact fully materialized owned
+generation that remains unselected after a human source change. The current owner
+rechecks its actual same-reader inventory and final Root fence in the transaction
+that writes the paired disposition and terminal private-work phase. It records the
+original scope, snapshot, native commit/counter and actually selected anchor
+separately. It never writes a publisher head or manufactures a selected completion.
+
+The record binds the original archived authored configuration, each independently
+withdrawn Root plan and a framed digest of original generation outbox objects and
+reused dependencies. All actual materialized observations are required before the
+write. Historical reads recheck immutable native/policy/Root bindings and original
+work without mistaking later global outbox changes or human revisions for fresh
+authority. Source bindings changed without an archived revision fail closed.
+Shared basic original Root readers avoid capture-phase recursion; ordinary Root
+reads retain their complete captured-Catalog, phase, policy and terminal checks.
+
+A distinct joined service retires only the real retained private publication SQLite
+snapshot and acknowledges its original durable claim. Offline recovery, corrupt-file
+preservation, cancellation, Exit and lost actual-unlink acknowledgement preserve the
+same identities. Both selected-current and legacy completion reject this disposition
+before cleanup. Ordinary selected snapshot retirement cannot claim it. Original media,
+human metadata, native signing work and cloud objects are preserved.
+
+The initial candidate passed all437 prior Core identities and all213 affected Services
+cases:203 prior cases plus ten actual supersession/retirement cases. Review then found
+an omitted historical check against the observed Root source revision. A real signed-
+policy regression demonstrated acceptance of a retargeted older human archive even
+with recomputed outer hashes. The historical reader now verifies the actual signed
+Root source revision against that archived human revision. All eleven final focused
+cases and strict Desktop pass on the final nine source hashes, with zero warnings/
+errors and complete logs checked. The older437/213 proof remains bound to its exact
+pre-guard sources; fresh full CI on this commit remains mandatory. The cases use real private
+publication snapshots, native Root work and canonical files with synthetic metadata
+transport. They cover atomic rollback, stale/foreign/pending Root refusal, no fabricated
+head, offline retry, semantic corruption even with recomputed outer hashes, historical
+human revisions, joined uncooperative construction/Exit, lost unlink acknowledgement,
+existing maximum Unicode names and exact64-bit counters. No old assertion, deadline,
+resource budget, schema, signing identity or warning gate was weakened.
+
+The first materialized-only disposition does not solve the selected4/owned5/new6
+successor lineage, a second obsolete generation chained behind an unselected parent,
+unsigned/partial materialization, revocation or ambiguous Root outcomes. Those cases
+must retain original work until their own exact current contracts are implemented.
+Runtime integration and all remaining0.6 product/final acceptance are unfinished.
+One live publication capture, two canonical indexes and the512MiB budget stay fixed.
+
+The exact parent117a41b passed all24 protocol jobs and Android/native/Desktop statuses;
+all40 protocol reports, prior/new identities, source/fixture receipts, scale/reference
+measurements, unchanged limits and full logs were independently checked. Its initial
+API29 heap proof failed before app tests because actual zygote startup records were
+missing from the retained main log. The unchanged-revision retry is separately recorded;
+no missing evidence, failed test or runtime diagnostic was waived. This new increment
+still requires fresh509 ordinary Services, separate scale/reference and all mandatory
+platform/native/visual/S23/exact joint-release acceptance on its own revision.
+
 ## Exact materialized predecessor inspection without changing selection or ownership
 
 The current reader can inspect a fully materialized, currently unselected owned

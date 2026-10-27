@@ -16,6 +16,19 @@ public sealed class LocalCurrentMaterializedPredecessor
 
 public sealed partial class LocalCurrentControlReader
 {
+    public Task<CurrentCatalogGenerationSupersession> SupersedeMaterializedGenerationAsync(LocalCurrentWorkspaceInventory inventory,Guid generationId,CancellationToken caller)
+    {
+        ArgumentNullException.ThrowIfNull(inventory);
+        return OperationAsync(token=>_state.ExecuteAsync(database=>
+        {
+            Check(caller,token);AssertPredecessorInventoryOwner(inventory);
+            var fence=inventory.Fence;AssertScope(database,new(fence.Capture.Pin,fence.Capture.Slot,fence.Attempt));
+            var result=new CatalogGenerationCaptureRepository(database,_budget).SupersedeMaterializedCurrentGeneration(generationId,
+                inventory.Checkpoint,inventory.Signing,fence.Attempt,inventory.Publications,token);
+            Check(caller,token);return result;
+        },token),caller);
+    }
+
     public Task<LocalCurrentMaterializedPredecessor> InspectMaterializedPredecessorAsync(LocalCurrentWorkspaceInventory inventory,Guid generationId,CancellationToken caller)
     {
         ArgumentNullException.ThrowIfNull(inventory);

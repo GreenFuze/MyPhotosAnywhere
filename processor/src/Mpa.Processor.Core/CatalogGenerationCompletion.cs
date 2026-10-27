@@ -82,7 +82,8 @@ public sealed partial class CatalogGenerationCaptureRepository
     public CatalogGenerationCapture BeginSnapshotRetirement(Guid generationId)
     {
         Id(generationId); using var transaction = _database.Connection.BeginTransaction(); var capture = RequiredCapture(generationId, transaction);
-        if (capture.Phase is not ("complete" or "snapshot-retiring")) throw new CatalogGenerationCaptureConflictException();
+        if (capture.Phase is not ("complete" or "snapshot-retiring") || ReadCurrentSupersession(capture,transaction,CancellationToken.None) is not null)
+            throw new CatalogGenerationCaptureConflictException();
         if (ReadPublishedHead(transaction)?.GenerationId != generationId || ReadVerification(capture, transaction) is null && ReadCurrentGenerationVerification(capture,transaction) is null)
             throw new InvalidDataException("Snapshot retirement lost its completed publication owner.");
         if (capture.Phase == "complete")
@@ -96,7 +97,8 @@ public sealed partial class CatalogGenerationCaptureRepository
     {
         ArgumentNullException.ThrowIfNull(actual); using var transaction = _database.Connection.BeginTransaction();
         var capture = RequiredCapture(actual.Capture.Scope.GenerationId, transaction); actual.AssertOwned(capture);
-        if (capture.Phase != "snapshot-retiring" || ReadPublishedHead(transaction)?.GenerationId != capture.Scope.GenerationId)
+        if (capture.Phase != "snapshot-retiring" || ReadCurrentSupersession(capture,transaction,CancellationToken.None) is not null ||
+            ReadPublishedHead(transaction)?.GenerationId != capture.Scope.GenerationId)
             throw new CatalogGenerationCaptureConflictException();
         using var storage = _budget.Reserve(65536); storage.RecheckBeforeWrite(storage.Bytes);
         ChangePhase(capture, "retired", transaction); transaction.Commit(); actual.Confirm(); return capture with { Phase = "retired" };
@@ -139,6 +141,11 @@ public sealed partial class CatalogGenerationCaptureRepository
 
     private void ValidateVerificationState(CatalogGenerationCapture capture, SqliteTransaction? transaction)
     {
+        if(ReadCurrentSupersession(capture,transaction,CancellationToken.None) is not null)
+        {
+            if(capture.Phase is not ("complete" or "snapshot-retiring" or "retired")) throw new InvalidDataException("Supersession lost its atomic terminal phase.");
+            return;
+        }
         var selected=ReadCurrentGenerationVerification(capture,transaction);
         if(selected is not null)
         {
@@ -160,8 +167,13 @@ public sealed partial class CatalogGenerationCaptureRepository
                 if (ids.Count == ProtocolSigningJournal.MaximumInventoryIntents) throw new InvalidDataException("Retired generation history exceeds its complete validation bound.");
                 ids.Add(ParseId(reader.GetString(0)));
             }
-        foreach (var id in ids) _ = Read(id, transaction) ?? throw new InvalidDataException("Retired capture history disappeared.");
-        if (ids.Count != 0 && ReadPublishedHead(transaction) is null) throw new InvalidDataException("Retired history lost its completed publisher head.");
+        var selectedHistory=false;
+        foreach(var id in ids)
+        {
+            var capture=Read(id,transaction) ?? throw new InvalidDataException("Retired capture history disappeared.");
+            if(ReadCurrentSupersession(capture,transaction,CancellationToken.None) is null) selectedHistory=true;
+        }
+        if(selectedHistory && ReadPublishedHead(transaction) is null) throw new InvalidDataException("Retired selected history lost its completed publisher head.");
     }
     private CatalogGenerationVerification? ReadVerification(CatalogGenerationCapture capture, SqliteTransaction? transaction)
     {
@@ -230,8 +242,21 @@ public sealed partial class CatalogGenerationCaptureRepository
         }
         if (text is null)
         {
-            using var completed = Command(transaction, "SELECT 1 FROM catalog_generation_capture WHERE phase IN('complete','snapshot-retiring','retired') LIMIT 1");
-            if (completed.ExecuteScalar() is not null) throw new InvalidDataException("Completed publication history lost its atomic head pointer.");
+            var completedIds=new List<Guid>();
+            using(var completed=Command(transaction,"SELECT id FROM catalog_generation_capture WHERE phase IN('complete','snapshot-retiring','retired') ORDER BY id LIMIT $limit",
+                ("$limit",ProtocolSigningJournal.MaximumInventoryIntents+1)))
+            using(var reader=completed.ExecuteReader())
+                while(reader.Read())
+                {
+                    if(completedIds.Count==ProtocolSigningJournal.MaximumInventoryIntents) throw new InvalidDataException("Completed history exceeds its validation bound.");
+                    completedIds.Add(ParseId(reader.GetString(0)));
+                }
+            foreach(var id in completedIds)
+            {
+                var capture=Read(id,transaction) ?? throw new InvalidDataException("Completed capture disappeared.");
+                if(ReadCurrentSupersession(capture,transaction,CancellationToken.None) is null)
+                    throw new InvalidDataException("Completed selected publication history lost its atomic head pointer.");
+            }
             return null;
         }
         if(CurrentHeadTag(text)) return ReadCurrentPublishedHead(text,transaction);
