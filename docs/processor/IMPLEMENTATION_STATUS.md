@@ -1,5 +1,51 @@
 # MPA 0.6.0 implementation ledger
 
+## Exact materialized predecessor inspection without changing selection or ownership
+
+The current reader can inspect a fully materialized, currently unselected owned
+generation after a human source change. The opaque result keeps the actual Root-
+selected anchor separate from the original captured commit. It grants no durable
+disposition, file cleanup, upload, new parent or policy admission. No capture phase,
+publisher head, scope, original payload or private-file claim changes during inspection.
+
+One transaction rechecks the actual same-reader inventory/fence, complete native
+signing/outbox work, exact captured plan, original commit signature against the
+actual Root-authorized publisher key, selected anchor and acknowledged head. Every
+relevant Root transition must have its original withdrawal, and every owned object
+and reused dependency must have its actual verified observation. An existing first
+selection prevents treating that generation as an unselected predecessor.
+
+Rechecking rejects a new nonce, foreign or retired reader, changed pending allocation,
+human revision or authored source bindings. Bindings changing without their revision
+are an invariant failure. Individual framed source fingerprints preserve the existing
+256-source/1024-character limits without packing a large array into the claim.
+Dynamic connectivity is separate from authored bindings. Existing maximum Unicode
+names and full64-bit revisions work without narrowing canonical JSON rules.
+
+All437 previous Core identities and all203 affected Services cases pass:194 previous
+identities plus nine new actual inspection cases. Final strict Desktop has zero
+warnings/errors; frozen three-source hashes and complete logs were checked. Fixtures
+use real retained publication snapshots/native Root/canonical files and synthetic
+metadata transport. The initial new test incorrectly attempted preparation under an
+obsolete scope; the product correctly rejected it. The fixture now records only an
+original pending allocation captured before the source change. Its failed report
+and an intermediate using-directive compiler failure remain retained; no product
+scope fence, old assertion, deadline or global resource bound was weakened.
+
+The exact parent99d8be4 passed all24 protocol jobs and all Android/native/Desktop
+statuses. All40 protocol reports, prior/new identities, fixture/source receipts,
+measurements, job limits and full logs were independently verified. Each platform
+has437 Core/489 ordinary Services/99 Protocol plus all existing companion contracts,
+both publication-scale fixtures and all13 reference cases. This increment requires
+fresh498 ordinary Services and all mandatory matrices on its own revision.
+
+The durable currently-unselected disposition, original Root recovery/withdrawal
+witness, physical snapshot retirement and exact selected4/owned5/new6 lineage are
+still required. Prepared factoring/history/retirement-owner files have not been
+applied or accepted. Runtime composition and all remaining0.6 features, final device
+and release acceptance remain unfinished. All schema/signing identities, one live
+publication capture and the shared two-index/512MiB budget remain unchanged.
+
 ## Actual selected-generation completion and joined private snapshot retirement
 
 The first real current-controlled selection now has a separate, explicitly tagged
