@@ -1,5 +1,46 @@
 # MPA 0.6.0 implementation ledger
 
+## Supported scheduling hint and Compose fixture callback declarations
+
+Exact4b440ae traced native diagnostics identified42 API37 JobInfo messages for an
+important-while-foreground hint that this framework ignores. Stable WorkManager2.12.0
+exposes a configuration option for that hint. MPA now preserves its earlier-platform
+behavior below37 and stops requesting the ineffective hint on37+. Scheduling,
+constraints, foreground transfers and the existing job-ID range remain intact.
+
+The option is explicitly marked ExperimentalConfigurationApi by the pinned stable
+library. Its opt-in is limited to the configuration getter. The first strict compile
+correctly rejected the missing opt-in; its log is retained. This explicit API contract
+acknowledgement changes no compiler/lint/Gradle warning policy or diagnostic logging.
+The initial bytecode review overlooked that annotation and is corrected in evidence.
+
+MainActivity already enables modern back callbacks. A debug-only manifest merge
+now gives the existing Compose ComponentActivity fixture the same declaration.
+The merged release manifest still contains no fixture activity; production manifest
+and navigation behavior are unchanged. Existing gesture/back assertions remain.
+
+All713 previous unit identities across117 suites pass on the exact final sources;
+lint has zero findings and debug/release/test APKs build. Merged debug/release
+declarations, full logs, source/report hashes and the original strict warning gate
+were checked. Only the exact existing15 AGP deprecation records were admitted.
+A pre-write helper initially rejected an unchanged CRLF checkout; it now proves
+committed equivalence before normalizing LF. A mistakenly launched unchanged-source
+build is retained separately and is not counted as validation of these changes.
+
+Actual native before/after scheduling, gesture and diagnostic checks on this commit
+remain required. No runtime warning is waived and no previous version-specific
+exception is extended. ActivityScenario's141 System/Global settings messages perAPI,
+legacy phone ML Kit and other framework/emulator diagnostics remain under review.
+These APKs are build outputs, not independently verified upgrade/release artifacts.
+
+Exact parentf08bcde passed24 protocol jobs plus Android, all3 native APIs and4 desktop
+jobs. All40 reports,536 ordinary Services identities per platform(all528 prior+8 new),
+437 Core identities partitioned once,99 Protocol/119 Google/9 LAN/27 Web and unchanged
+scale/reference/source/full-log evidence were independently verified. The separate
+new allocation component is uncommitted and under focused testing; actual header
+create/readback, complete0.6 runtime/features/installers/final S23 and exact tested
+joint publication remain unfinished.
+
 ## Exact original header recovery in local journals
 
 Current recovery can inspect a genuinely reserved catalog header under the same
