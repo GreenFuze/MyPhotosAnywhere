@@ -45,7 +45,11 @@ public sealed partial class GoogleAccountConnection
     /// before/after parent/revision verification. A conflicting existing file is never
     /// updated. Network uncertainty propagates so resume can reuse this same ID.</summary>
     public Task<DriveWorkspaceObject> CreateWorkspaceObjectAsync(string folderId, string allocatedId, string mimeType,
-        ReadOnlyMemory<byte> bytes, string sha256, CancellationToken cancellationToken)
+        ReadOnlyMemory<byte> bytes, string sha256, CancellationToken cancellationToken) =>
+        CreateWorkspaceObjectOwnedAsync(folderId,allocatedId,mimeType,bytes,sha256,null,cancellationToken);
+
+    private Task<DriveWorkspaceObject> CreateWorkspaceObjectOwnedAsync(string folderId,string allocatedId,string mimeType,
+        ReadOnlyMemory<byte> bytes,string sha256,Func<CancellationToken,Task>? admit,CancellationToken cancellationToken)
     {
         if (!ValidIdentity(folderId) || folderId == "root" || !ValidIdentity(allocatedId) || allocatedId == "root" || allocatedId == folderId ||
             mimeType is not ("application/json" or "application/gzip" or "application/octet-stream") ||
@@ -59,7 +63,7 @@ public sealed partial class GoogleAccountConnection
         var owned = bytes.ToArray();
         if (!CryptographicOperations.FixedTimeEquals(SHA256.HashData(owned), Convert.FromHexString(sha256)))
             throw new InvalidDataException("Publication input does not match its captured SHA-256.");
-        return ExecuteAsync(async token =>
+        async Task<DriveWorkspaceObject> CreateOwned(CancellationToken token)
         {
             var credential = await MediaCredentialAsync(token).ConfigureAwait(false);
             await VerifyWorkspaceWritableAsync(credential, folderId, token).ConfigureAwait(false);
@@ -67,7 +71,9 @@ public sealed partial class GoogleAccountConnection
             var result = await ReadWorkspaceObjectCoreAsync(credential, account, folderId, allocatedId, owned.Length, sha256, token, mimeType).ConfigureAwait(false);
             await VerifyWorkspaceWritableAsync(credential, folderId, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested(); return result;
-        }, cancellationToken);
+        }
+        return admit is null ? ExecuteAsync(CreateOwned,cancellationToken)
+            : ExecuteAdmittedMetadataAsync(CreateOwned,admit,cancellationToken);
     }
 
     private async Task VerifyWorkspaceWritableAsync(UserCredential credential, string folderId, CancellationToken token)

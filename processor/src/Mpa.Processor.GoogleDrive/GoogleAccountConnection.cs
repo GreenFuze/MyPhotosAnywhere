@@ -155,7 +155,7 @@ public sealed partial class GoogleAccountConnection : IGoogleAccountConnection, 
         }
     }
     private Task<HttpResponseMessage> SendOwnedAsync(HttpRequestMessage request,CancellationToken token)=>
-        AdmitNetwork(()=>_http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,token),token);
+        SendMetadataAwareOwnedAsync(request,token);
     private Task<string> AccessOwnedAsync(UserCredential credential,CancellationToken token)=>
         AdmitNetwork(()=>credential.GetAccessTokenForRequestAsync(cancellationToken:token),token);
     private Task<bool> RefreshOwnedAsync(UserCredential credential,CancellationToken token)=>

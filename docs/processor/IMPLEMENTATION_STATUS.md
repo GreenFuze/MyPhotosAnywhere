@@ -1,5 +1,79 @@
 # MPA 0.6.0 implementation ledger
 
+## Observed original-header allocation and per-request metadata transport
+
+An interrupted original signed header now has a joined GenerateIds-only owner.
+Its opaque admission belongs to the actual current reader and checks the complete
+inventory, native signing history, exact original UUID/scope/first JSON bytes,
+latest human and authored policy state, and every pending Root barrier. The full
+transaction runs immediately before each physical Google request under its actual
+account lease. State-only callbacks have a separate joined reader lane: a concurrent
+scan can own the network lane while awaiting that same account. No callback waits
+for the network lane, reacquires an account or reconciles network state. Reader
+shutdown joins both lanes before disposing its owned lifetime. Earlier duplicate
+scans were removed; the last check
+and the original10-second cancellation/Exit assertions remain intact.
+
+The actual Google transport now joins an allocated canonical-ID observer after
+parsing its bounded response and before its normal canceled-result admission.
+The known ID is locally checkpointed under its original native/captured header
+even if source/publisher authority or caller lifetime changes during that entered
+operation. A storage/SQL failure retains the first pending receipt for retry and
+Exit joins it. No second allocation can precede that recovery. Invalid or aliased
+provider receipts fail without creating a nonpersistable pending owner. Receipt
+and immutable native/capture context are checked after writes; storage claims
+remain held through commit. No counter, identity, scope, phase or head is reset.
+
+The separate admitted immutable create transport reuses the original bounded
+validation, owned input copy, create-only ID, exact download/hash and before/after
+metadata verification. Its lexical admission runs before every physical identity,
+folder, create and readback request, and retires before releasing the connection's
+serial lease. The ordinary existing API retains its behavior. A failed callback
+cannot leak authority into a later call; entered admission/create work is joined.
+No original update/delete/upload API or runtime background route is enabled here.
+
+On eighteen frozen source files, all437 prior Core identities, all259 affected
+Services identities(241 prior+18 new) and all139 Google identities pass; the latter
+preserves128 prior cases and adds11 actual transport-boundary cases. The18 new
+Services cases passed in8+7+3 focused runs. Coverage includes first-ID
+preservation, stale/foreign readers, source and publisher changes, global pending
+Root work, malformed/role aliases, low storage, SQL-trigger corruption/rollback,
+same-ID retry, cancellation/Exit, all seven actual create/readback request gates,
+owned bytes, no escaped grant, the actual reader/account lock cycle, and entered
+uncooperative SQLite work during cancellation/Reader Exit. Strict Desktop has zero warnings/errors.
+Original assertions, deadlines, schemas and resource/document budgets remain.
+
+The initial new global-Root fixture attempted an invalid active-publisher catalog
+deselection; its existing guard correctly rejected setup. Only the new fixture was
+corrected to real revocation work. Two new entry cases initially timed out with
+three repeated full scans; only redundant early scans were removed, retaining the
+full per-request gate and every original assertion/deadline. Failed reports/logs
+remain preserved. A default sandbox build failed without useful diagnostics; the
+host retry passed and that initial cause is not claimed resolved by attribution.
+After the initial437/256 broad run passed, a reader/account lock inversion was
+independently reproduced at the unchanged10-second assertion. Only state-only
+callback ownership was separated and retirement now joins both lanes. The original
+failing reproduction is retained. Its first instrumentation fixture did not
+compile; only that new fixture now probes its private SQLite connection under the
+actual state owner, without exposing a production connection API.
+
+Exact preceding15c0d35 Android40511690420 and Native40511689865 pass. All177 traced
+native identities perAPI29/35/37 and original full logcats were independently
+verified. Targeted API35 callback and API37 ignored-hint messages remain absent.
+Other diagnostics remain unresolved and no prior version-specific exception is
+extended. Exact parentf08bcde also passed all24 Processor jobs/40 reports,536
+ordinary Services identities perplatform, all previous identities and unchanged
+scale/reference gates. Fresh component CI requires554 ordinary Services and139
+Google identities perplatform, plus every original platform/native/scale check.
+
+These are recovery and transport components. An actual original-header P1 receipt
+factory, new real P2 materialized disposition, signed partial/revoked/handover
+recovery, current-selected dependency reuse and runtime/native export integration
+remain unfinished. Processing/plugins, completed native/web workflows, six
+installers, independent live clients, final S23 and exact joint publication also
+remain required. No foundation is presented as the finished0.6 product.
+
+
 ## Framework hint boundary and actual native diagnostic comparison
 
 Android's official JobInfo.Builder reference states that important-while-foreground

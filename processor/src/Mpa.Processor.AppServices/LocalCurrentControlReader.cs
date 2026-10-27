@@ -188,9 +188,19 @@ public sealed partial class LocalCurrentControlReader(ProcessorStateCoordinator 
     {
         Exception? cancellationFailure=null;try {await _stop.CancelAsync().ConfigureAwait(false);}catch(Exception error){cancellationFailure=error;}
         await _serial.WaitAsync().ConfigureAwait(false);
-        try {if(cancellationFailure is not null) throw new AggregateException("Current-reader cancellation needs attention; retain borrowed owners.",cancellationFailure);_stop.Dispose();lock(_gate) _exitConfirmed=true;}
+        try
+        {
+            await _stateAdmissionSerial.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                if(cancellationFailure is not null) throw new AggregateException("Current-reader cancellation needs attention; retain borrowed owners.",cancellationFailure);
+                _stop.Dispose();lock(_gate) _exitConfirmed=true;
+            }
+            finally{_stateAdmissionSerial.Release();}
+        }
         catch(Exception error){lock(_gate) _failure=error;throw;}
-        finally {_serial.Release();}
+        finally{_serial.Release();}
+        _stateAdmissionSerial.Dispose();_serial.Dispose();
     }
     private sealed record Scope(LibraryControllerPin Pin,LibraryCurrentControlSlot Slot,LocalCurrentControlAttempt Attempt);
 }
