@@ -95,13 +95,14 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
               (SELECT count(*) FROM workspace_publication WHERE json_extract(scope,'$.GenerationId')=$id)
             """, ("$intent", current.CommitIntentId.ToString("D")), ("$id", generationId.ToString("D"))))
             if ((long)work.ExecuteScalar()! != 0) throw new InvalidOperationException("Signed or uploaded generation work must be recovered; its snapshot claim cannot be abandoned.");
+        using var reservation = current.Phase == "abandoned" ? null : _budget.Reserve(65536);
         if (current.Phase != "abandoned")
         {
-            using var reservation = _budget.Reserve(65536); reservation.RecheckBeforeWrite(reservation.Bytes);
+            reservation!.RecheckBeforeWrite(reservation.Bytes);
             using var update = Command(transaction, "UPDATE catalog_generation_capture SET phase='abandoned' WHERE id=$id", ("$id", generationId.ToString("D")));
             if (update.ExecuteNonQuery() != 1) throw new InvalidOperationException("Unpublished capture abandonment lost its owner.");
         }
-        transaction.Commit(); return current with { Phase = "abandoned" };
+        reservation?.RecheckBeforeWrite(reservation.Bytes); transaction.Commit(); return current with { Phase = "abandoned" };
     }
 
     /// <summary>A filename/marker alone is not cleanup authority. Recovery requires
@@ -128,6 +129,7 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
         {
             var capture=ReadOriginalCaptureFields(generationId,transaction);
             if(capture is null) return null;
+            if(ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is not null) return capture;
             ValidatePublicationState(capture,transaction);ValidateVerificationState(capture,transaction);return capture;
         }
         catch(Exception error) when(error is JsonException or ArgumentException or ProtocolFormatException or CatalogGenerationCaptureConflictException)

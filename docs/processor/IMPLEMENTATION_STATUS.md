@@ -1,5 +1,67 @@
 # MPA 0.6.0 implementation ledger
 
+## Unsigned partial-work disposition without losing originals or consuming counters
+
+A separate current disposition now handles a frozen generation with partial immutable
+metadata work and no native catalog reservation. Its transaction rechecks the actual
+same-reader complete inventory/final Root, original capture/basis, current publisher
+key and unchanged native predecessor counter, plus a newer archived authored source
+revision. Any original signing intent, selected verification, materialized supersession
+or Root target for that generation closes this route. No counter is skipped, signed,
+reset or attributed to an unsigned generation.
+
+The framed original-work digest includes all retained outbox scopes, payload hashes,
+allocated identities, verification versions and dependency references. Unallocated,
+allocated-but-absent, uploaded-but-unacknowledged and verified objects keep their exact
+original identities and bytes. They are not retargeted, uploaded after a source change
+or deleted. A tagged original-phase record allows full historical validation without
+fabricating a complete plan, legacy checkpoint or selected receipt. Native/selected
+history remains distinct; an unsigned disposition never becomes a publisher head.
+
+Its joined metadata-only owner verifies/removes only the real retained private SQLite
+snapshot and acknowledges the same durable claim. Corruption, offline operation,
+cancellation, uncooperative Exit and a lost actual-unlink acknowledgement preserve
+the original recovery path. Only physical retirement releases the single live capture.
+Both unpublished abandonment and selected retirement now keep/recheck their existing
+storage reservations through the enclosing commit; original budgets are unchanged.
+
+All437 previous Core identities and all233 affected Services cases pass:221 previous
+cases plus twelve new actual recovery cases. Strict Desktop has zero warnings/errors;
+eight frozen source hashes, full logs and every previous identity were checked. The
+new tests use actual private publication SQLite snapshots, native signing/Root and
+the shared canonical owner with synthetic metadata transport. They cover all four
+partial materialization states, paired SQL rollback, unchanged source/foreign reader/
+stale nonce refusal, a genuinely reserved-but-unsealed counter, first-generation
+retirement with no selected head, low storage, semantic retargeting even with a
+recomputed outer hash, and real file/lifecycle recovery. Original reads/writes, fake
+selection and extra canonical indexes remain prohibited.
+
+The initial new fixture referenced SnapshotPath instead of the existing Path property;
+strict compilation also rejected per-operation serializer options with CA1869. Only
+that new fixture property and serializer ownership changed. A separate initial test
+flipped SQLite byte0 and correctly received native SqliteException before its intended
+retained-file hash assertion. It now keeps the database header valid and mutates the
+final byte to exercise that unchanged InvalidDataException assertion. Failed reports
+remain retained. The new no-head fixture initially omitted the existing current
+inventory adapter and failed before disposition; only its adapter installation line
+was added. That original twelve-case report remains eleven passes and one fixture
+failure, with a separate passing corrected case. The clean final233-case broad run
+then passed every one of the twelve new cases on corrected bytes. No old assertion,
+deadline, warning gate, schema, signing identity,
+storage margin, capture count or shared two-index/512MiB bound was weakened.
+
+Exact parent5454432 passed all24 protocol jobs and Android/native/Desktop statuses;
+all40 protocol reports, prior/new identities, source/fixture hashes, scale/reference
+measurements, unchanged limits and full logs were independently checked. Fresh528
+ordinary Services cases plus all mandatory platform/scale/reference/native checks
+remain required on this increment before any subsequent release acceptance.
+
+Reserved/unsealed or signed partially materialized generations, revoked keys/epochs,
+ambiguous Root outcomes and eligible current-selected dependency reuse still require
+their own exact contracts. This unsigned route grants no header recovery or permission
+to upload obsolete facts. Runtime composition and all remaining0.6 product/final
+acceptance are unfinished. Room12/Processor13/native-private7/canonical1 stay fixed.
+
 ## Actual current selection through exact retired-owned ancestry
 
 The current producer keeps the actual selected anchor separate from its exact native

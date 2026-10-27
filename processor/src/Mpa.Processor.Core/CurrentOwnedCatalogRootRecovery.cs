@@ -54,4 +54,20 @@ public sealed partial class CurrentControlTransitionJournal
             Span<byte> size=stackalloc byte[4];BinaryPrimitives.WriteInt32BigEndian(size,bytes.Length);hash.AppendData(size);hash.AppendData(bytes);
         }
     }
+
+    internal void AssertUnsignedCatalogHasNoRootIn(CatalogGenerationCapture capture,SqliteTransaction transaction,CancellationToken token)
+    {
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Unsigned Root inspection requires its exact transaction.");
+        var basis=new LocalCurrentControlObservations(_database,_budget).TransitionBasisIn(null,transaction,token);
+        var rows=ReadOriginalTransitionRowsIn(transaction,token);var ids=OriginalTransitionIds(rows).ToArray();
+        foreach(var id in ids)
+        {
+            token.ThrowIfCancellationRequested();var original=ReadOriginalTransitionInputsIn(id,rows,basis,transaction,token);
+            AssertOriginalTransitionEnvelope(original,basis.Pin);_=ReadCompletion(original.Plan,transaction);
+            if(original.Plan.GenerationId==capture.Scope.GenerationId || original.Plan.Target.CatalogPublicationId==capture.CommitIntentId)
+                throw new CatalogGenerationCaptureConflictException();
+        }
+        AssertOriginalRootCoverageIn(ids,basis,transaction,token);
+    }
+
 }
