@@ -50,13 +50,20 @@ public sealed partial class CatalogGenerationCaptureRepository
     public CapturedCatalogPublication CapturePublicationBasis(Guid generationId, CapturedCatalogBasis basis, CatalogGenerationLocalAccess? localAccess = null)
     {
         Id(generationId); ArgumentNullException.ThrowIfNull(basis);
-        using var transaction = _database.Connection.BeginTransaction(); var capture = RequiredCapture(generationId, transaction);
+        using var transaction = _database.Connection.BeginTransaction();
+        using var write=CapturePublicationBasisIn(generationId,basis,localAccess,transaction);write.Recheck();transaction.Commit();return write.Value;
+    }
+
+    private CapturedCatalogBasisWrite CapturePublicationBasisIn(Guid generationId,CapturedCatalogBasis basis,
+        CatalogGenerationLocalAccess? localAccess,SqliteTransaction transaction)
+    {
+        var capture=RequiredCapture(generationId,transaction);
         if (capture.Phase == "abandoned") throw new CatalogGenerationCaptureConflictException();
         ValidateBasis(capture, basis); var existing = ReadPublication(capture, transaction);
         if (existing is not null)
         {
             if (existing.Basis != basis) throw new CatalogGenerationCaptureConflictException();
-            transaction.Commit(); return existing; // Recovery read, never fresh authority.
+            return new(existing,null); // Recovery read, never fresh authority.
         }
         if (capture.Phase != "frozen") throw new CatalogGenerationCaptureConflictException();
         AssertNoPublicationWork(capture, transaction);
@@ -65,12 +72,28 @@ public sealed partial class CatalogGenerationCaptureRepository
         var approved = new LibraryAuthorityRepository(_database).CurrentSourceConfiguration(transaction) ?? throw new CatalogPublicationNotAuthorizedException();
         if (approved.EnvelopeSha256 != basis.SourcePolicySha256 || approved.Configuration.LibraryId != capture.Scope.LibraryId ||
             approved.Configuration.Revision != capture.Scope.ConfigurationRevision) throw new CatalogGenerationCaptureConflictException();
-        var encoded = PublicationEncode(basis); using var reservation = _budget.Reserve(131072); reservation.RecheckBeforeWrite(reservation.Bytes);
-        using var insert = Command(transaction, "INSERT INTO catalog_generation_publication(id,basis,basis_hash) VALUES($id,$basis,$hash)",
-            ("$id", generationId.ToString("D")), ("$basis", encoded), ("$hash", BasisHash(capture, encoded)));
-        if (insert.ExecuteNonQuery() != 1) throw new InvalidOperationException("Publication basis lost its captured generation owner.");
-        ChangePhase(capture, "publication-planned", transaction);
-        transaction.Commit(); return new(capture with { Phase = "publication-planned" }, basis, null);
+        var encoded=PublicationEncode(basis);StorageReservation? reservation=_budget.Reserve(131072);
+        try
+        {
+            reservation.RecheckBeforeWrite(reservation.Bytes);
+            using var insert=Command(transaction,"INSERT INTO catalog_generation_publication(id,basis,basis_hash) VALUES($id,$basis,$hash)",
+                ("$id",generationId.ToString("D")),("$basis",encoded),("$hash",BasisHash(capture,encoded)));
+            if(insert.ExecuteNonQuery()!=1) throw new InvalidOperationException("Publication basis lost its captured generation owner.");
+            ChangePhase(capture,"publication-planned",transaction);
+            var owned=new CapturedCatalogBasisWrite(new(capture with {Phase="publication-planned"},basis,null),reservation);
+            reservation=null;return owned;
+        }
+        finally {reservation?.Dispose();}
+    }
+
+    // Keep the exact storage claim alive through the enclosing transaction commit.
+    private sealed class CapturedCatalogBasisWrite(CapturedCatalogPublication value,StorageReservation? reservation) : IDisposable
+    {
+        private int _disposed;
+        public CapturedCatalogPublication Value {get;}=value;
+        public void Recheck()
+        {ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed)!=0,this);reservation?.RecheckBeforeWrite(reservation.Bytes);}
+        public void Dispose() {if(Interlocked.Exchange(ref _disposed,1)==0) reservation?.Dispose();}
     }
 
     /// <summary>Call after the actual dependency owner has read back and verified the

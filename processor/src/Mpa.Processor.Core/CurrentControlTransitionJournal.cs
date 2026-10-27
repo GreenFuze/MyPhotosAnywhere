@@ -37,7 +37,19 @@ public sealed partial class CurrentControlTransitionJournal(ProcessorStateDataba
         var plans=ReadAllIn(basis,transaction,token);token.ThrowIfCancellationRequested();transaction.Commit();return plans.AsReadOnly();
     }
 
-    public CurrentControlTransitionPlan Prepare(Guid id,LocalCurrentControlAttempt fenced,CurrentControlTransitionTarget target,CancellationToken token=default)
+    public CurrentControlTransitionPlan Prepare(Guid id,LocalCurrentControlAttempt fenced,CurrentControlTransitionTarget target,CancellationToken token=default)=>
+        PrepareCore(id,fenced,target,null,token);
+
+    public CurrentControlTransitionPlan PrepareCurrent(Guid id,LocalCurrentControlAttempt fenced,CurrentControlTransitionTarget target,
+        CurrentWorkspaceInventoryCheckpoint inventory,CurrentControlSigningInventory signing,WorkspacePublicationInventory publications,CancellationToken token=default)
+    {
+        ArgumentNullException.ThrowIfNull(inventory);ArgumentNullException.ThrowIfNull(signing);ArgumentNullException.ThrowIfNull(publications);
+        return PrepareCore(id,fenced,target,new(inventory,signing,publications),token);
+    }
+    private sealed record CurrentTransitionCatalogInventory(CurrentWorkspaceInventoryCheckpoint Inventory,CurrentControlSigningInventory Signing,WorkspacePublicationInventory Publications);
+
+    private CurrentControlTransitionPlan PrepareCore(Guid id,LocalCurrentControlAttempt fenced,CurrentControlTransitionTarget target,
+        CurrentTransitionCatalogInventory? current,CancellationToken token)
     {
         if(id==Guid.Empty) throw new ArgumentException("A fixed transition/signing identity is required.",nameof(id));ArgumentNullException.ThrowIfNull(target);
         using var transaction=_database.Connection.BeginTransaction();var observations=new LocalCurrentControlObservations(_database,_budget);
@@ -51,6 +63,8 @@ public sealed partial class CurrentControlTransitionJournal(ProcessorStateDataba
         }
         if(plans.Any(plan=>ReadCompletion(plan,transaction) is null)) throw new CurrentControlTransitionInProgressException();
         if(plans.Count>=Maximum-1) throw new CatalogTraversalLimitException();
+        if(current is not null) new WorkspaceObservationRepository(_database,_budget).AssertCurrentInventoryUnchangedIn(
+            current.Inventory,current.Signing,fenced,current.Publications,transaction,token);
         var basis=observations.TransitionBasisIn(fenced,transaction,token);var journal=new ProtocolSigningJournal(_database,_budget);
         var policies=Policies(basis.Pin,target,transaction);
         AssertHumanTargetCurrent(policies,target,transaction);
@@ -70,7 +84,9 @@ public sealed partial class CurrentControlTransitionJournal(ProcessorStateDataba
         {
             var samePublisher=previousPublisher!.Publisher?.ActorId==policies.Publisher.Publisher?.ActorId &&
                 previousPublisher.Publisher?.Epoch==policies.Publisher.Publisher?.Epoch && previousPublisher.PublisherKeyId==policies.Publisher.PublisherKeyId;
-            if(catalog.Parent!=(samePublisher ? basis.Head.Catalog : null)) throw new CatalogGenerationCaptureConflictException();
+            if(current is not null && samePublisher && catalog.Generation is {} generation)
+                new CatalogGenerationCaptureRepository(_database,_budget).AssertCurrentCandidateLineageIn(generation,basis.Head.Catalog,transaction,token);
+            else if(catalog.Parent!=(samePublisher ? basis.Head.Catalog : null)) throw new CatalogGenerationCaptureConflictException();
         }
         if(target.Publishers!=basis.Head.Publishers && target.Publishers.Sequence<=basis.Head.Sequence ||
             target.Sources!=basis.Head.Sources && target.Sources.Sequence<=basis.Head.Sequence) throw new ProtocolSigningConflictException();

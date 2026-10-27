@@ -246,6 +246,7 @@ public sealed partial class AccountServiceTests
         CatalogGenerationCapture capture,string snapshotPath) : IAsyncDisposable
     {
         internal CurrentReaderFixture Fixture {get;}=fixture;
+        internal LocalCurrentStagePool Pool=>pool;
         internal CatalogGenerationCapture Capture {get;}=capture;
         internal string SnapshotPath {get;}=snapshotPath;
         internal Task<CurrentCatalogGenerationSelection?> SelectionAsync()=>Fixture.Data.Setup.Accounts.State.ExecuteAsync(database=>

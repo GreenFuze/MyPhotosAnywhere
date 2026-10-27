@@ -16,6 +16,32 @@ public sealed class LocalCurrentMaterializedPredecessor
 
 public sealed partial class LocalCurrentControlReader
 {
+    public Task<CurrentControlTransitionPlan> PrepareCurrentCatalogTransitionAsync(Guid id,LocalCurrentWorkspaceInventory inventory,CurrentControlTransitionTarget target,CancellationToken caller)
+    {
+        ArgumentNullException.ThrowIfNull(inventory);ArgumentNullException.ThrowIfNull(target);
+        return OperationAsync(token=>_state.ExecuteAsync(database=>
+        {
+            Check(caller,token);AssertPredecessorInventoryOwner(inventory);
+            var fence=inventory.Fence;AssertScope(database,new(fence.Capture.Pin,fence.Capture.Slot,fence.Attempt));
+            var result=new CurrentControlTransitionJournal(database,_budget).PrepareCurrent(id,fence.Attempt,target,
+                inventory.Checkpoint,inventory.Signing,inventory.Publications,token);
+            Check(caller,token);return result;
+        },token),caller);
+    }
+
+    public Task<CapturedCatalogPublication> CaptureCurrentPublicationBasisAsync(LocalCurrentWorkspaceInventory inventory,Guid generationId,CapturedCatalogBasis basis,CancellationToken caller)
+    {
+        ArgumentNullException.ThrowIfNull(inventory);ArgumentNullException.ThrowIfNull(basis);
+        return OperationAsync(token=>_state.ExecuteAsync(database=>
+        {
+            Check(caller,token);AssertPredecessorInventoryOwner(inventory);
+            var fence=inventory.Fence;AssertScope(database,new(fence.Capture.Pin,fence.Capture.Slot,fence.Attempt));
+            var result=new CatalogGenerationCaptureRepository(database,_budget).CaptureCurrentPublicationBasis(generationId,basis,
+                inventory.Checkpoint,inventory.Signing,fence.Attempt,inventory.Publications,token);
+            Check(caller,token);return result;
+        },token),caller);
+    }
+
     public Task<CurrentCatalogGenerationSupersession> SupersedeMaterializedGenerationAsync(LocalCurrentWorkspaceInventory inventory,Guid generationId,CancellationToken caller)
     {
         ArgumentNullException.ThrowIfNull(inventory);

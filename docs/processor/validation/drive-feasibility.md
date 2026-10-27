@@ -1,6 +1,6 @@
 # Drive feasibility â€” Stage 0, incomplete
 
-Updated October 20, 2026. Observed results are separate from pending acceptance. Private account/folder identifiers, credentials, authorization URLs and upload session URIs stay out of public evidence.
+Updated October 27, 2026. Observed results are separate from pending acceptance. Private account/folder identifiers, credentials, authorization URLs and upload session URIs stay out of public evidence.
 
 ## Configuration and permission boundary
 
@@ -25,7 +25,7 @@ The Windows probe uses Google.Apis.Auth 1.77.0, PKCE, forced loopback, random va
 | Full fresh-process refresh | Oct 20 04:37:29 UTC: passed without a browser. |
 | Full existing-folder visibility | Folder GET 200; child list 200/zero before fixture creation. |
 | Actual expiry/restart/suspension/network loss | Immediate new-process refresh passed; other cases pending. Initial sandbox DNS failure did not revoke credentials; the same protected grant worked with authorized network access. |
-| Beyond-seven-day observation | Started at **2026-10-20T04:33:16Z**. Requires real successful refresh after **2026-10-27T04:33:16Z**; no clock manipulation or duration pass claimed. |
+| Beyond-seven-day observation | Passed in a fresh standalone Windows process at **2026-10-27T04:34:13.1113788+00:00**, 604856.658 real seconds after the original consent. The prior access token had expired. Google refreshed the protected full-Drive grant without browser/interactive consent; original authorization history is unchanged. No clock change or Drive write. [Sanitized evidence](seven-day-drive-refresh.json). Product vault/platform and background/client acceptance remain separate. |
 
 ## Live synthetic round trip
 
@@ -64,7 +64,7 @@ Fault injection is not live revoked-grant/rate-limit evidence. Full logs and obs
 | Actual crash/network-loss reconciliation | Actual socket/process interruption pending; real-server successful completion discarded before client consumption, injected I/O failure and reserved-ID reconciliation passed. |
 | Additional source/workspace accounts | Pending; current run covers one account. |
 | Live denied/revoked scopes and operational recovery | Pending; synthetic failures passed. Preserve existing Android grants. |
-| Actual expiry and beyond-seven-day refresh | Actual expired access-token refresh passed in a fresh process at 2026-10-20T06:22:43.0693717Z, after recorded expiration 06:03:57.8061269Z, without interactive authorization. Beyond-seven-day refresh remains due after October 27 04:33:16 UTC. |
+| Actual expiry and beyond-seven-day refresh | Actual expired access-token refresh passed in a fresh process at 2026-10-20T06:22:43.0693717Z, after recorded expiration 06:03:57.8061269Z, without interactive authorization. Original full-Drive grant also refreshed after more than seven actual days on October 27 without interactive consent; see the sanitized evidence above. Product-specific vault, platform and background recovery acceptance remain separate. |
 
 Immediate Gate A's browser/configuration/full-scope access/short-refresh evidence and personal-test verification path are observed. Cross-client/source discovery/recovery remain explicit gates before activating corresponding product paths. Stage 0 overall remains open, including native/platform feasibility. Duration remains a Stage 9 release gate.
 

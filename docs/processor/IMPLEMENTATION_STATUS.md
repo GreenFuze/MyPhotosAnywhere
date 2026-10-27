@@ -1,5 +1,56 @@
 # MPA 0.6.0 implementation ledger
 
+## Actual current selection through exact retired-owned ancestry
+
+The current producer keeps the actual selected anchor separate from its exact native
+signing predecessor. A transaction-owned iterative reader verifies original captured
+fields, publication plans, native signatures/counters, immutable outbox references,
+every original supersession receipt and physical retirement before accepting an
+intervening parent. It stops at an independently acknowledged selected anchor and
+never chooses a higher orphan, fabricates an intermediate publisher head or resets
+an epoch/counter. Original-only readers remain private; ordinary public reads keep
+their complete phase/disposition checks without recursive ancestry calls.
+
+The new current basis factory rechecks the same actual inventory/final nonce,
+registered publisher key/counter and current local source authority in one transaction.
+The basis write's explicit storage owner remains held and rechecked through commit.
+A distinct current Root preparation path uses the same chain and actual captured
+candidate intent. Ordinary Root preparation keeps its strict direct-parent rule.
+After real canonical selection, completion can acknowledge the new actual head
+through retired ancestry without claiming an unselected intermediate was published.
+
+Actual selected1/unselected2/new3 integration uses real private publication snapshots,
+native Root/signing work, the existing shared two-index owner and synthetic metadata
+transport. The new3 empty source coverage excludes the newly disabled original source;
+ordinary preparation rejects its parent2 against actual Root1 before a PUT. Current
+preparation, conditional publication, real canonical staging/selection and completion
+then produce Head3 directly from Head1. No original is read or modified. A repeated
+source change disposes3 through retired2 while actual Head1 remains, and the next
+capture preserves native parent3/counter3. Injected Root-plan insertion failure rolls
+back its exact native reservation and counter together; the same ID retries safely.
+
+All437 previous Core identities and all221 affected Services cases pass:214 previous
+cases plus seven new real lineage cases. Strict Desktop has zero warnings/errors;
+ten frozen source hashes and full logs were checked. The initial four new fixtures
+passed ParentSequence as SettingsRevision; existing immutable-body comparison correctly
+rejected them. Only the new fixture argument changed. A new fixture getter initially
+duplicated primary-constructor capture and failed CS9124; it now reuses the existing
+pool capture. Both failures remain retained; no assertion, deadline, resource bound
+or compiler warning was weakened. Fresh516 ordinary Services and all mandatory
+platform/scale/reference/native checks remain required on this commit.
+
+The original protected full-Drive Windows probe grant refreshed in a new process on
+October27 at04:34:13 UTC, more than seven actual days after October20 consent. The
+prior access token had expired; no browser/interactive authorization, clock change or
+Drive write occurred. Original authorization history is unchanged. Sanitized evidence
+is in validation/seven-day-drive-refresh.json. This establishes the measured grant
+viability case, not product-vault/platform/background or independent-client acceptance.
+
+Unsigned/partial/revoked-work recovery, eligible current-selected dependency reuse,
+runtime composition and all remaining0.6 product/final acceptance are unfinished.
+Room12/Processor13/native-private7/canonical1, one live publication capture, the shared
+two-index/512MiB budget and all upgrade/signing identities remain unchanged.
+
 ## Durable materialized supersession and joined private snapshot retirement
 
 An explicit historical disposition now handles an exact fully materialized owned

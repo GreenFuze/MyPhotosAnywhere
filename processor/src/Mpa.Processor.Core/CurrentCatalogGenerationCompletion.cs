@@ -52,10 +52,11 @@ public sealed partial class CatalogGenerationCaptureRepository
             token.ThrowIfCancellationRequested();transaction.Commit();return previous;
         }
         if(capture.Phase!="commit-sealed" || ReadVerification(capture,transaction) is not null) throw new CatalogGenerationCaptureConflictException();
-        if(previous is not null && (previous.GenerationId==generationId || previous.Sequence!=inputs.Publication.Basis.ParentSequence ||
-            inputs.Publication.Basis.Parent is not {} parent || previous.Commit.AccountId!=parent.AccountId || previous.Commit.WorkspaceId!=parent.WorkspaceId ||
-            previous.Commit.FileId!=parent.FileId || previous.Commit.Bytes!=parent.Bytes || previous.Commit.Sha256!=parent.Sha256))
-            throw new CatalogGenerationCaptureConflictException();
+        if(previous?.GenerationId==generationId) throw new CatalogGenerationCaptureConflictException();
+        // Actual selection is already verified above. A retired owned predecessor
+        // is signed ancestry, never a fabricated intermediate PublishedHead.
+        new OwnedCatalogLineageReader(this,capture.Scope,transaction,token).RequirePath(inputs.Publication.Basis.Parent,
+            inputs.Publication.Basis.ParentSequence,previous?.Commit);
         var encoded=EncodeCurrentVerification(actual);var hash=VerificationHash(capture,inputs.Publication,encoded);
         var pointer=EncodeCurrentHead(new(generationId,hash));
         using var reservation=_budget.Reserve(checked(Encoding.UTF8.GetByteCount(encoded)*3L+65536));reservation.RecheckBeforeWrite(reservation.Bytes);

@@ -62,7 +62,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         if(human.Revision<=scope.ConfigurationRevision) throw new StaleLibraryConfigurationException();
         if(inventory.Context.LibraryId!=scope.LibraryId || inventory.Context.AccountId!=scope.AccountId || inventory.Context.FolderId!=scope.FolderId ||
             inventory.Context.AccountRevision<scope.AccountRevision || basis.Head.Catalog==original ||
-            basis.Head.Catalog!=inputs.Publication.Basis.Parent || inputs.Intent.Sequence!=checked(inputs.Publication.Basis.ParentSequence+1))
+            inputs.Intent.Sequence!=checked(inputs.Publication.Basis.ParentSequence+1))
             throw new CatalogGenerationCaptureConflictException();
         var journal=new ProtocolSigningJournal(_database,_budget);
         var publisher=basis.Head.ReadPublishers(journal.RetainedControllerReference(basis.Pin,basis.Head.Publishers,"library-publisher-authorization",transaction).Span,basis.Pin);
@@ -75,10 +75,15 @@ public sealed partial class CatalogGenerationCaptureRepository
         var head=ReadPublishedHead(transaction);
         if(basis.Head.Catalog is {} anchor)
         {
-            if(head is null || head.Commit!=anchor || head.Sequence!=inputs.Publication.Basis.ParentSequence || head.GenerationId==generationId)
+            if(head is null || head.Commit!=anchor || head.GenerationId==generationId)
                 throw new CatalogGenerationCaptureConflictException();
         }
-        else if(head is not null || inputs.Publication.Basis.ParentSequence!=0) throw new CatalogGenerationCaptureConflictException();
+        else if(head is not null) throw new CatalogGenerationCaptureConflictException();
+        // An actual selected anchor and an owned signing parent are distinct. All
+        // intervening native commits must have their original verified disposition
+        // and physical retirement; no higher orphan becomes a new head.
+        new OwnedCatalogLineageReader(this,scope,transaction,token).RequirePath(inputs.Publication.Basis.Parent,
+            inputs.Publication.Basis.ParentSequence,basis.Head.Catalog);
         var roots=0;
         foreach(var root in signing.Roots)
         {

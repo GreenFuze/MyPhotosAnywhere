@@ -124,6 +124,21 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
 
     private CatalogGenerationCapture? Read(Guid generationId, SqliteTransaction? transaction)
     {
+        try
+        {
+            var capture=ReadOriginalCaptureFields(generationId,transaction);
+            if(capture is null) return null;
+            ValidatePublicationState(capture,transaction);ValidateVerificationState(capture,transaction);return capture;
+        }
+        catch(Exception error) when(error is JsonException or ArgumentException or ProtocolFormatException or CatalogGenerationCaptureConflictException)
+        {throw new InvalidDataException("Retained generation metadata is invalid; preserve it for recovery.",error);}
+    }
+
+    // Original immutable fields only, never a public phase/disposition bypass.
+    // The iterative lineage owner validates publication and every disposition/link
+    // before returning; ordinary reads still perform their complete checks above.
+    private CatalogGenerationCapture? ReadOriginalCaptureFields(Guid generationId,SqliteTransaction? transaction)
+    {
         using var command = Command(transaction, """
             SELECT id,library_id,snapshot_id,commit_intent_id,length(scope),scope,context_hash,phase,length(snapshot),snapshot,snapshot_hash,
               (SELECT value FROM processor_meta WHERE key='library_id') FROM catalog_generation_capture WHERE id=$id
@@ -148,7 +163,7 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
             }
             if (phase is "frozen" or "publication-planned" or "dependencies-ready" or "commit-sealed" or "commit-verified" or "complete" or "snapshot-retiring" or "retired" && snapshot is null || phase == "capturing" && snapshot is not null) throw new InvalidDataException("Captured generation phase disagrees with its frozen file proof.");
             var capture = new CatalogGenerationCapture(scope, snapshotId, intent, phase, snapshot);
-            reader.Close(); ValidatePublicationState(capture, transaction); ValidateVerificationState(capture, transaction); return capture;
+            reader.Close(); return capture;
         }
         catch (Exception error) when (error is JsonException or ArgumentException or ProtocolFormatException or CatalogGenerationCaptureConflictException)
         { throw new InvalidDataException("Retained generation metadata is invalid; preserve it for recovery.", error); }

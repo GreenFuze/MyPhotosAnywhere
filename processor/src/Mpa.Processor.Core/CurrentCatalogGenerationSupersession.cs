@@ -86,6 +86,19 @@ public sealed partial class CatalogGenerationCaptureRepository
 
     private CurrentCatalogGenerationSupersession? ReadCurrentSupersession(CatalogGenerationCapture capture,SqliteTransaction? transaction,CancellationToken token)
     {
+        var value=ReadOriginalCurrentSupersession(capture,transaction,token);
+        if(value is null) return null;
+        ArgumentNullException.ThrowIfNull(transaction);
+        var inputs=SelectionInputsIn(capture,transaction);
+        new OwnedCatalogLineageReader(this,capture.Scope,transaction,token).RequirePath(inputs.Publication.Basis.Parent,
+            inputs.Publication.Basis.ParentSequence,value.SelectedAnchor);
+        return value;
+    }
+
+    // Does not recursively load earlier capture dispositions. Only the iterative
+    // lineage owner may consume this original binding without the wrapper above.
+    private CurrentCatalogGenerationSupersession? ReadOriginalCurrentSupersession(CatalogGenerationCapture capture,SqliteTransaction? transaction,CancellationToken token)
+    {
         var key=SupersessionPrefix+capture.Scope.GenerationId.ToString("D");string? text=null;string? digest=null;
         using(var query=Command(transaction,"SELECT key,length(CAST(value AS BLOB)),value FROM processor_meta WHERE key=$key OR key=$hash",("$key",key),("$hash",key+":sha256")))
         using(var reader=query.ExecuteReader())
@@ -106,7 +119,7 @@ public sealed partial class CatalogGenerationCaptureRepository
                 value.CommitIntentId!=capture.CommitIntentId || capture.Phase is not ("complete" or "snapshot-retiring" or "retired") ||
                 value.Sequence!=inputs.Intent.Sequence || value.Sequence!=checked(inputs.Publication.Basis.ParentSequence+1) ||
                 value.OriginalCommit!=new CatalogObjectReference(scope.AccountId,inputs.Work.FileId!,scope.FolderId,inputs.Work.Payload.Length,inputs.Work.Sha256) ||
-                value.SelectedAnchor!=inputs.Publication.Basis.Parent || value.SelectedAnchor==value.OriginalCommit ||
+                value.SelectedAnchor==value.OriginalCommit ||
                 value.HumanConfigurationRevision<=scope.ConfigurationRevision || !Digest(value.HumanConfigurationSha256) ||
                 value.HumanConfigurationSha256!=ReadArchivedPredecessorHumanSources(value.HumanConfigurationRevision,transaction) ||
                 value.Inventory is null || value.Inventory.Context is null || value.Inventory.Context.LibraryId!=scope.LibraryId || value.Inventory.Context.AccountId!=scope.AccountId ||
