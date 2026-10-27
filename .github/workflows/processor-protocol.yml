@@ -28,15 +28,18 @@ jobs:
       fail-fast: true
       matrix:
         runner: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
-        contract_group: [metadata, application]
+        contract_group: [metadata, application, headers, continuity]
     runs-on: ${{ matrix.runner }}
     # All six projects and every original case remain required on this exact SHA.
     # Windows run40296922461 passed all404 Core cases but its two unchanged100k
     # preparations consumed21m of the shared30m runner window. Separate the
     # independent metadata/application processes into mandatory groups; keep every
     # fixture, assertion, diagnostic gate and the30m job limit. The four original
-    # Core discovery/snapshot scale cases run below in mandatory per-fixture jobs;
-    # these complement the exact Core filter rather than skipping any coverage.
+    # Core discovery/snapshot scale cases run below in mandatory per-fixture jobs.
+    # fc141de Windows completed226 Services cases (27m47s of reported test time)
+    # before the same30m job deadline, with zero failed cases. Require all Services
+    # exactly once across headers, continuity and the remaining application group.
+    # No test assertion, original job deadline or scale benchmark is relaxed.
     timeout-minutes: 30
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
@@ -65,11 +68,14 @@ jobs:
             @('protocol', 'core', 'google')
           } elseif ('${{ matrix.contract_group }}' -eq 'application') {
             @('setup', 'lan', 'web')
+          } elseif ('${{ matrix.contract_group }}' -in @('headers', 'continuity')) {
+            @('setup')
           } else {
             throw 'Unknown required contract group.'
           }
           $mpaProjects = @($mpaAllProjects | Where-Object { $_.Name -in $mpaProjectNames })
-          if ($mpaProjects.Count -ne 3) { throw 'Every contract group must retain its three required projects.' }
+          $mpaExpectedProjects = if ('${{ matrix.contract_group }}' -in @('headers', 'continuity')) { 1 } else { 3 }
+          if ($mpaProjects.Count -ne $mpaExpectedProjects) { throw 'The contract group lost a required project.' }
           foreach ($mpaProject in $mpaProjects) {
             $mpaName = $mpaProject.Name
             dotnet restore $mpaProject.Path --locked-mode *> "build/protocol-tests/$mpaName-restore.log"
@@ -78,7 +84,22 @@ jobs:
             # Every pre-existing assertion remains here. The newly added publication
             # measurements and immutable-reuse cases have separate mandatory matrices
             # on this same SHA; none is dropped or made optional.
-            if ($mpaName -eq 'setup') { $mpaArguments += @('--filter', 'TestCategory!=LargeCatalogPublication&TestCategory!=ImmutableDependencyReuse') }
+            if ($mpaName -eq 'setup') {
+              $mpaBaseFilter = 'TestCategory!=LargeCatalogPublication&TestCategory!=ImmutableDependencyReuse'
+              $mpaHeaderFamilies = @('CurrentHeader', 'CurrentSignedPartial')
+              $mpaContinuityFamilies = @('CurrentOwnedLineage', 'CurrentSupersession', 'CurrentUnsigned', 'MaterializedPredecessor')
+              $mpaHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaContinuity = ($mpaContinuityFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotContinuity = ($mpaContinuityFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaServiceFilter = switch ('${{ matrix.contract_group }}') {
+                'headers' { "$mpaBaseFilter&($mpaHeaders)" }
+                'continuity' { "$mpaBaseFilter&$mpaNotHeaders&($mpaContinuity)" }
+                'application' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity" }
+                default { throw 'Unknown required Services partition.' }
+              }
+              $mpaArguments += @('--filter', $mpaServiceFilter)
+            }
             if ($mpaName -eq 'core') { $mpaArguments += @('--filter', 'FullyQualifiedName!~Mpa.Processor.Core.Tests.DiscoveredCatalogTests.LargeDiscoveryFixturesKeepQueriesAndReturnedPagesBounded&FullyQualifiedName!~Mpa.Processor.Core.Tests.FrozenCatalogSnapshotTests.LargeCapturesMeasureStorageAndMemoryWhileAnImportWritesBesideTheirLiveObservation') }
             # Keep every original test and the30-minute job limit. Archive per-case
             # progress and a mini dump if Windows enters an unbounded test/cleanup.
