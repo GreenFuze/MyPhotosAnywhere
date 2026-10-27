@@ -80,6 +80,11 @@ jobs:
             # on this same SHA; none is dropped or made optional.
             if ($mpaName -eq 'setup') { $mpaArguments += @('--filter', 'TestCategory!=LargeCatalogPublication&TestCategory!=ImmutableDependencyReuse') }
             if ($mpaName -eq 'core') { $mpaArguments += @('--filter', 'FullyQualifiedName!~Mpa.Processor.Core.Tests.DiscoveredCatalogTests.LargeDiscoveryFixturesKeepQueriesAndReturnedPagesBounded&FullyQualifiedName!~Mpa.Processor.Core.Tests.FrozenCatalogSnapshotTests.LargeCapturesMeasureStorageAndMemoryWhileAnImportWritesBesideTheirLiveObservation') }
+            # Keep every original test and the30-minute job limit. Archive per-case
+            # progress and a mini dump if Windows enters an unbounded test/cleanup.
+            if ($mpaName -eq 'setup' -and '${{ matrix.runner }}' -eq 'windows-2025') {
+              $mpaArguments += @('--logger', 'console;verbosity=normal', '--blame-hang', '--blame-hang-timeout', '5m', '--blame-hang-dump-type', 'mini')
+            }
             dotnet test @mpaArguments *> "build/protocol-tests/$mpaName-test.log"
             $mpaContractExit = $LASTEXITCODE
             Get-Content "build/protocol-tests/$mpaName-test.log"
