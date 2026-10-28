@@ -52,12 +52,12 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
 
     internal Task<T> ScanCurrentObservedAsync<T>(string currentFileId,
         Func<WorkspaceObservationAttempt,DriveChangeCursor,IReadOnlyCollection<WorkspaceDocumentObservation>,WorkspacePublicationInventory,CancellationToken,Task<T>> complete,
-        CancellationToken token) => ScanObservedCoreAsync((_,_,_)=>Task.CompletedTask,currentFileId,complete,null,token);
+        CancellationToken token,CurrentWorkspaceReadCache? cache=null) => ScanObservedCoreAsync((_,_,_)=>Task.CompletedTask,currentFileId,complete,null,token,cache);
 
     private async Task<T> ScanObservedCoreAsync<T>(Func<DriveWorkspaceObject,WorkspaceDocumentObservation,CancellationToken,Task> verifyAndPersist,
         string? currentFileId,
         Func<WorkspaceObservationAttempt,DriveChangeCursor,IReadOnlyCollection<WorkspaceDocumentObservation>,WorkspacePublicationInventory,CancellationToken,Task<T>> complete,
-        Func<CancellationToken,Task>? inspectBeforeFinalChangeCheck,CancellationToken cancellationToken)
+        Func<CancellationToken,Task>? inspectBeforeFinalChangeCheck,CancellationToken cancellationToken,CurrentWorkspaceReadCache? cache=null)
     {
         ArgumentNullException.ThrowIfNull(verifyAndPersist);ArgumentNullException.ThrowIfNull(complete); CancellationTokenSource linked;
         lock (_gate) { ObjectDisposedException.ThrowIf(_stopping, this); linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token); }
@@ -115,21 +115,31 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                 var observed = new List<WorkspaceDocumentObservation>();
                 foreach (var candidate in inventory.Documents)
                 {
-                    ThrowIfCanceled(cancellationToken, token); var document = await _source.ReadAsync(candidate, token).ConfigureAwait(false);
                     ThrowIfCanceled(cancellationToken, token);
-                    if (document.AccountId != _context.AccountId || document.FolderId != _context.FolderId || document.FileId != candidate.FileId ||
-                        document.DriveVersion != candidate.Version || document.Bytes.Length != candidate.Bytes || document.Bytes.Length < 1 ||
-                        document.Bytes.Length > WorkspaceDocumentInventoryReader.CandidateByteLimit(candidate.MimeType, includeBinaryMetadata: true))
-                        throw new InvalidDataException("Actual document read substituted its captured identity, revision or size.");
-                    var observation = new WorkspaceDocumentObservation(document.FileId, document.DriveVersion, document.Bytes.Length, Convert.ToHexStringLower(SHA256.HashData(document.Bytes.Span)), StoredMime(candidate.MimeType));
+                    DriveWorkspaceObject? document=null;
+                    // Only this internal current path has a live completed-scan cache.
+                    // Public verifier scans always read actual bytes as before.
+                    var observation=currentFileId is not null ? cache?.Find(_context,candidate) : null;
+                    if(observation is null)
+                    {
+                        document=await _source.ReadAsync(candidate,token).ConfigureAwait(false);
+                        ThrowIfCanceled(cancellationToken,token);
+                        if(document.AccountId!=_context.AccountId || document.FolderId!=_context.FolderId || document.FileId!=candidate.FileId ||
+                            document.DriveVersion!=candidate.Version || document.Bytes.Length!=candidate.Bytes || document.Bytes.Length<1 ||
+                            document.Bytes.Length>WorkspaceDocumentInventoryReader.CandidateByteLimit(candidate.MimeType,includeBinaryMetadata:true))
+                            throw new InvalidDataException("Actual document read substituted its captured identity, revision or size.");
+                        observation=new WorkspaceDocumentObservation(document.FileId,document.DriveVersion,document.Bytes.Length,
+                            Convert.ToHexStringLower(SHA256.HashData(document.Bytes.Span)),StoredMime(candidate.MimeType));
+                    }
                     await _state.ExecuteAsync(database => new WorkspaceObservationRepository(database, _budget).RememberRead(_context, observation), token).ConfigureAwait(false);
                     ThrowIfCanceled(cancellationToken, token);
-                    if (expectedFiles.TryGetValue(document.FileId, out var expected) && (expected.Bytes != observation.Bytes || expected.Sha256 != observation.Sha256 ||
+                    if (expectedFiles.TryGetValue(observation.FileId, out var expected) && (expected.Bytes != observation.Bytes || expected.Sha256 != observation.Sha256 ||
                         expected.MimeType != candidate.MimeType || expected.VerifiedVersion is { } version && observation.Version < version))
                         throw new WorkspaceObservationConflictException();
                     // If persistence fails, the verifier never receives this document.
                     // Its policy writes also must succeed before this scan can complete.
-                    await verifyAndPersist(document, observation, token).ConfigureAwait(false); ThrowIfCanceled(cancellationToken, token); observed.Add(observation);
+                    if(document is not null) await verifyAndPersist(document,observation,token).ConfigureAwait(false);
+                    ThrowIfCanceled(cancellationToken,token);observed.Add(observation);
                 }
                 var present = inventory.Documents.Select(item => item.FileId).ToHashSet(StringComparer.Ordinal);
                 if (inventory.MissingKnownIds.Any(id => known.Contains(id, StringComparer.Ordinal) || !expectedFiles.TryGetValue(id, out var expected) || expected.VerifiedVersion is not null) ||

@@ -29,7 +29,25 @@ public sealed partial class LocalCurrentControlReader
         return OperationAsync(token=>ObserveWorkspaceInventoryCoreAsync(capture,caller,token),caller);
     }
 
-    private async Task<LocalCurrentWorkspaceInventory> ObserveWorkspaceInventoryCoreAsync(LocalCurrentControlCapture capture,CancellationToken caller,CancellationToken token)
+    private CurrentWorkspaceReadCache? _completedDocumentReads;
+
+    /// <summary>Complete current scan reusing only this live reader's previously
+    /// completed identical-version observations. Actual listing, access/history,
+    /// changes and final Root reads remain required; restart/failure drops reuse.
+    /// ObserveWorkspaceInventoryAsync retains its full actual-body-read contract.</summary>
+    public Task<LocalCurrentWorkspaceInventory> ObserveWorkspaceInventorySessionAsync(LocalCurrentControlCapture capture,CancellationToken caller)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        return OperationAsync(token=>ObserveWorkspaceInventoryCoreAsync(capture,caller,token,reuseCompletedReads:true),caller);
+    }
+
+    private async Task<LocalCurrentWorkspaceInventory> ObserveWorkspaceInventoryCoreAsync(LocalCurrentControlCapture capture,CancellationToken caller,CancellationToken token,bool reuseCompletedReads=false)
+    {
+        try {return await ObserveWorkspaceInventoryOwnedAsync(capture,reuseCompletedReads,caller,token).ConfigureAwait(false);}
+        catch {_completedDocumentReads=null;throw;}
+    }
+
+    private async Task<LocalCurrentWorkspaceInventory> ObserveWorkspaceInventoryOwnedAsync(LocalCurrentControlCapture capture,bool reuseCompletedReads,CancellationToken caller,CancellationToken token)
     {
         var history=await _state.ExecuteAsync(database=>
         {
@@ -59,8 +77,10 @@ public sealed partial class LocalCurrentControlReader
                 Check(caller,owned);AssertScope(database,new(capture.Pin,capture.Slot,fence.Attempt));
                 return new WorkspaceObservationRepository(database,_budget).CompleteCurrentInventory(attempt,cursor.Token,observed,history.Signing,fence.Attempt,publications,owned);
             },owned).ConfigureAwait(false);
-            Check(caller,owned);return new LocalCurrentWorkspaceInventory(_identity,checkpoint,history.Signing,publications,fence);
-        },token).ConfigureAwait(false);
+            Check(caller,owned);
+            _completedDocumentReads=new CurrentWorkspaceReadCache(history.Context,observed);
+            return new LocalCurrentWorkspaceInventory(_identity,checkpoint,history.Signing,publications,fence);
+        },token,reuseCompletedReads?_completedDocumentReads:null).ConfigureAwait(false);
     }
 
     public Task AssertWorkspaceInventoryUnchangedAsync(LocalCurrentWorkspaceInventory inventory,CancellationToken caller)

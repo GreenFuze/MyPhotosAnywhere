@@ -176,7 +176,7 @@ public sealed partial class LocalCurrentControlReader(ProcessorStateCoordinator 
         {
             await _serial.WaitAsync(linked.Token).ConfigureAwait(false);
             try {Check(caller,linked.Token);var result=await action(linked.Token).ConfigureAwait(false);lock(_gate) {Check(caller,linked.Token);_failure=null;return result;}}
-            catch(Exception error) {lock(_gate) _failure=error;throw;}
+            catch(Exception error) {_completedDocumentReads=null;lock(_gate) _failure=error;throw;}
             finally {_serial.Release();}
         }
     }
@@ -194,7 +194,7 @@ public sealed partial class LocalCurrentControlReader(ProcessorStateCoordinator 
             try
             {
                 if(cancellationFailure is not null) throw new AggregateException("Current-reader cancellation needs attention; retain borrowed owners.",cancellationFailure);
-                _stop.Dispose();lock(_gate) _exitConfirmed=true;
+                _completedDocumentReads=null;_stop.Dispose();lock(_gate) _exitConfirmed=true;
             }
             finally{_stateAdmissionSerial.Release();}
         }

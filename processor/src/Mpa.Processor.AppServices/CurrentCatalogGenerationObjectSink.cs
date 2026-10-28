@@ -63,7 +63,7 @@ public sealed class CurrentCatalogGenerationObjectSink(Guid generationId,Process
     private async Task<LocalCurrentCatalogDependencyCloudAdmission> ObserveAsync(Guid id,CancellationToken token)
     {
         var capture=await _reader.CaptureAsync(token).ConfigureAwait(false);
-        var inventory=await _reader.ObserveWorkspaceInventoryAsync(capture,token).ConfigureAwait(false);
+        var inventory=await _reader.ObserveWorkspaceInventorySessionAsync(capture,token).ConfigureAwait(false);
         return await _reader.InspectCatalogDependencyCloudAsync(inventory,id,token).ConfigureAwait(false);
     }
     private static void RequireSame(WorkspacePublicationRecord expected,WorkspacePublicationRecord actual)

@@ -1,5 +1,45 @@
 # MPA 0.6.0 implementation ledger
 
+## Live completed metadata observation reuse
+
+The current reader now offers an explicit session scan that reuses only hashes
+from its own completed actual reads when a fresh candidate has the same file ID,
+server version, size and encoding in the exact live context. It retains at most
+the existing4,096 observations and never stores bodies or imports a caller or
+persisted cache. Failure and retirement discard reuse; a new reader fully reads.
+
+Every session still obtains a complete actual listing with capability checks,
+persists candidates before reads, replays required history, retains missing and
+uncertain work, drains actual changes and makes the conditional Root read last.
+The same local/native/outbox postconditions remain required. A hit is observation
+reuse, not a synthetic nonce or permission to upload obsolete data. Public full
+scans retain their actual-body verification contract. The typed builder path uses
+the session operation while public caller-byte preparation still performs full
+reads. No original media is read or modified by this change.
+
+All7 new count/safety cases pass: unchanged session zero body rereads, changed
+server version actual read, public/cold reader complete reads, missing/incomplete
+inventory rejection, failed new body recovery, actual final Root high-water
+failure, and joined cancellation/Exit. All80 exact prior scan/history/current
+inventory/dependency cases pass. Strict isolated Desktop has zero warnings/errors.
+Core source/test bytes are unchanged; the prior actual447-case Core evidence is
+retained rather than rerun locally. Fresh full native matrix remains required.
+
+Two new private parameter-order diagnostics were fixed without suppression. The
+new reader session operation is a documented public API; the cache stays private.
+The first new fixture wrongly expected failed scans to delete historical current
+checkpoints. It was corrected to require exact historical preservation, a distinct
+failed attempt and rejection of old permission. Production did not change for
+that correction; existing tests/assertions/deadlines remain untouched. All raw
+compile/test failures remain retained.
+
+This establishes a live observation optimization and functional request counts,
+not live Drive throughput or full-product performance acceptance. The full current
+producer, verified dependency reuse, dependency sealing/signing, Root activation,
+engine/gallery composition, processing/plugins, human/web workflows, installers
+and final0.6 acceptance remain unfinished. Predecessor CI status is not inferred
+from local component evidence; exact final-source native checks remain mandatory.
+
 ## Current metadata create/readback/receipt and joined frozen-builder sink
 
 The current-authority metadata path now creates only an assigned original
