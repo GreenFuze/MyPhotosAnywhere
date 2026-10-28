@@ -1,5 +1,57 @@
 # MPA 0.6.0 implementation ledger
 
+## Canonical query and refresh lifetime owner
+
+The new canonical read runtime composes the actual current reader and shared
+two-index pool. It reopens acknowledged historical content without Drive access,
+while a separate refresh lane captures policies, reads the selected graph, seals
+its real canonical file, observes the complete immutable inventory and final Root,
+then activates that exact input. The old historical handle remains usable until
+the acknowledged replacement has closed and actually reopened read-only.
+
+Each page carries its historical selection context. A continuation from another
+active index fails explicitly; it never substitutes another photo or silently
+retargets a cursor. A graph-read error propagates while retaining readable content
+and the exact inactive claim. The next pass closes/reconciles that claim before
+opening another candidate. Only closed, inactive generated canonical files can be
+retired. This owner has no original-media or metadata-publication operation, and
+historical content never grants fresh cloud authority.
+
+Active, opening, displaced and candidate handles remain explicitly owned through
+cancellation and Exit. Entered refresh and page operations join before their native
+handles release; borrowed current-reader, pool and state owners remain live until
+the runtime has retired. Queries do not wait behind an uncooperative network body.
+The shared two-index budget and all original storage/document limits remain.
+
+Four new real-canonical-index tests pass: usable historical queries during blocked
+refresh with joined Exit; offline reopen despite a newer actual remote Root; old
+page-context refusal after actual new activation; retained content and bounded
+inactive-claim recovery after a graph-read failure. The broader30-case regression
+also passes every26 previous index/history/activation API identity plus those four
+behaviors. Strict Desktop compilation reports zero warnings/errors. Core and all
+existing API implementations are unchanged.
+
+The initial four new fixtures correctly failed the complete signing-history guard:
+their bare signed Root changes lacked retained transition plans. They now use the
+actual original transition preparation/publication owner; the production guard and
+all previous assertions/deadlines remain unchanged. The fixture's outgoing snapshot
+descriptor is explicitly synthetic. Real canonical files are exercised; outgoing
+generation/snapshot completion or retirement is not claimed by these new tests.
+The first failed report remains retained.
+
+Exact parent446b829 passes all32 mandatory protocol jobs/48 actual reports and fresh
+Android/native/Desktop statuses. Independent verification preserves all575 ordinary
+Services per platform,437 Core exactly once,139 Google,99 Protocol,9 LAN,27 Web,
+original scale/reference/source evidence, complete logs and unchanged job limits.
+The new component's committed CI must add all four cases,579 ordinary Services
+(47 header/39 continuity/493 application), with every preceding gate retained.
+
+This is the tested read/refresh component. Composition into the running desktop
+engine/gallery, current producer recovery and dependency reuse, processing/plugins,
+finished web workflows, installers and final independent acceptance/publication
+remain unfinished. New mobile implementation remains deferred; eventual joint
+release gates, Android Drive-only operation and127.0.0.1 development remain explicit.
+
 ## Signed partial disposition with immutable pending work
 
 A verified original signed header can now receive a distinct historical partial
