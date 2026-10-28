@@ -99,29 +99,44 @@ public sealed partial class CatalogGenerationCaptureRepository
     /// <summary>Call after the actual dependency owner has read back and verified the
     /// complete graph. This checkpoint independently binds root/coverage to this exact
     /// generation's retained, verified outbox bytes; receipts alone are not current reads.</summary>
-    public CapturedCatalogPublication SealDependencies(Guid generationId, CapturedCatalogCommitPlan plan, CatalogGenerationLocalAccess? localAccess = null)
+    public CapturedCatalogPublication SealDependencies(Guid generationId,CapturedCatalogCommitPlan plan,CatalogGenerationLocalAccess? localAccess=null)
     {
-        Id(generationId); ArgumentNullException.ThrowIfNull(plan);
-        using var transaction = _database.Connection.BeginTransaction(); var capture = RequiredCapture(generationId, transaction);
+        Id(generationId);ArgumentNullException.ThrowIfNull(plan);
+        using var transaction=_database.Connection.BeginTransaction();
+        using var mutation=SealDependenciesIn(generationId,plan,localAccess,transaction);
+        mutation.Recheck();transaction.Commit();return mutation.Value;
+    }
+
+    private CapturedCatalogBasisWrite SealDependenciesIn(Guid generationId,CapturedCatalogCommitPlan plan,
+        CatalogGenerationLocalAccess? localAccess,SqliteTransaction transaction)
+    {
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Dependency plan must use its owning transaction.");
+        var capture=RequiredCapture(generationId,transaction);
         var publication = ReadPublication(capture, transaction) ?? throw new InvalidOperationException("Capture the publication basis before writing dependencies.");
         ValidatePlan(capture, plan);
         if (publication.Basis != plan.Basis) throw new CatalogGenerationCaptureConflictException();
         if (publication.Plan is not null)
         {
             if (publication.Plan != plan) throw new CatalogGenerationCaptureConflictException();
-            transaction.Commit(); return publication;
+            return new(publication,null);
         }
         if (capture.Phase != "publication-planned" || new ProtocolSigningJournal(_database, _budget).Read(capture.CommitIntentId, transaction) is not null)
             throw new CatalogGenerationCaptureConflictException();
         new LibraryAuthorityRepository(_database).AssertLocalPublicationScope(capture.Scope, transaction, localAccess);
         AssertDependency(capture, plan.RootIndex, "facts-index", transaction);
         AssertDependency(capture, plan.SourceCoverage, "coverage-root", transaction);
-        var encoded = PublicationEncode(plan); using var reservation = _budget.Reserve(131072); reservation.RecheckBeforeWrite(reservation.Bytes);
+        var encoded=PublicationEncode(plan);StorageReservation? reservation=_budget.Reserve(131072);
+        try
+        {
+        reservation.RecheckBeforeWrite(reservation.Bytes);
         using (var update = Command(transaction, "UPDATE catalog_generation_publication SET plan=$plan,plan_hash=$hash WHERE id=$id AND plan IS NULL",
             ("$plan", encoded), ("$hash", PlanHash(capture, publication.Basis, encoded)), ("$id", generationId.ToString("D"))))
             if (update.ExecuteNonQuery() != 1) throw new InvalidOperationException("Dependency checkpoint lost its immutable plan owner.");
-        ChangePhase(capture, "dependencies-ready", transaction); transaction.Commit();
-        return new(capture with { Phase = "dependencies-ready" }, publication.Basis, plan);
+        ChangePhase(capture,"dependencies-ready",transaction);
+        var mutation=new CapturedCatalogBasisWrite(new(capture with {Phase="dependencies-ready"},publication.Basis,plan),reservation);
+        reservation=null;return mutation;
+        }
+        finally {reservation?.Dispose();}
     }
 
     /// <summary>Recovers the crash between sealing a signature and saving this phase.

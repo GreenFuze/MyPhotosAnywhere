@@ -40,14 +40,17 @@ public sealed partial class CatalogGenerationCaptureRepository
 
     private CurrentBasisInputs RequireCurrentBasisInputsIn(Guid generationId,CurrentWorkspaceInventoryCheckpoint inventory,
         CurrentControlSigningInventory signing,LocalCurrentControlAttempt fenced,WorkspacePublicationInventory publications,
-        SqliteTransaction transaction,CancellationToken token)
+        SqliteTransaction transaction,CancellationToken token,CapturedCatalogCommitPlan? sealedPlan=null)
     {
         Id(generationId);ArgumentNullException.ThrowIfNull(inventory);ArgumentNullException.ThrowIfNull(signing);
         ArgumentNullException.ThrowIfNull(fenced);ArgumentNullException.ThrowIfNull(publications);token.ThrowIfCancellationRequested();
         new WorkspaceObservationRepository(_database,_budget).AssertCurrentInventoryUnchangedIn(inventory,signing,fenced,publications,transaction,token);
         var actual=AssertCurrentHeaderPolicyInputsIn(signing,fenced,transaction,token);
         var capture=RequiredCapture(generationId,transaction);var scope=capture.Scope;
-        if(capture.Phase is not("frozen" or "publication-planned") || capture.Snapshot is null) throw new CatalogGenerationCaptureConflictException();
+        var retainedPlan=ReadPublication(capture,transaction)?.Plan;
+        var exactSealed=sealedPlan is not null && capture.Phase=="dependencies-ready" && retainedPlan==sealedPlan;
+        if(capture.Phase is not("frozen" or "publication-planned") && !exactSealed || capture.Snapshot is null)
+            throw new CatalogGenerationCaptureConflictException();
         var authority=new LibraryAuthorityRepository(_database,_budget);authority.AssertLocalPublicationScope(scope,transaction);
         var publisher=authority.CurrentPublisherPolicy(transaction) ?? throw new CatalogPublicationNotAuthorizedException();
         var sources=authority.CurrentSourceConfiguration(transaction) ?? throw new CatalogPublicationNotAuthorizedException();
@@ -64,7 +67,7 @@ public sealed partial class CatalogGenerationCaptureRepository
             history.Observe(root.ReadPublishers(journal.RetainedControllerReference(actual.Pin,root.Publishers,"library-publisher-authorization",transaction).Span,actual.Pin));
         }
         history.Observe(publisher);
-        if(journal.Read(capture.CommitIntentId,transaction) is not null || ReadPublication(capture,transaction)?.Plan is not null)
+        if(journal.Read(capture.CommitIntentId,transaction) is not null || retainedPlan is not null && (sealedPlan is null || retainedPlan!=sealedPlan))
             throw new CatalogGenerationCaptureConflictException();
         var roots=signing.Roots.Select(value=>value.Intent.Id).ToHashSet();
         if(signing.Signing.Intents.Any(value=>!roots.Contains(value.Id) && value.EnvelopeSha256 is null)) throw new SigningHistoryRecoveryRequiredException();

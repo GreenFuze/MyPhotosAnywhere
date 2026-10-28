@@ -28,7 +28,7 @@ jobs:
       fail-fast: true
       matrix:
         runner: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
-        contract_group: [metadata, application, headers, continuity, publication]
+        contract_group: [metadata, application, headers, continuity, publication, graphs]
     runs-on: ${{ matrix.runner }}
     # All six projects and every original case remain required on this exact SHA.
     # Windows run40296922461 passed all404 Core cases but its two unchanged100k
@@ -43,6 +43,10 @@ jobs:
     # deadline. New current-upload/builder cases add substantial native work.
     # Require the CurrentDependency family in its own mandatory group on every
     # existing platform; keep all original cases/streams/scale and30m limits.
+    # 1bd7932 Windows application consumed22m31s for538 unchanged cases.
+    # The new actual graph/frozen-file producer cases perform multiple complete
+    # capture/upload/readback passes. Require their own graphs group on every
+    # existing platform rather than consume that original30m application's headroom.
     # No test assertion, original job deadline or scale benchmark is relaxed.
     timeout-minutes: 30
     env:
@@ -72,13 +76,13 @@ jobs:
             @('protocol', 'core', 'google')
           } elseif ('${{ matrix.contract_group }}' -eq 'application') {
             @('setup', 'lan', 'web')
-          } elseif ('${{ matrix.contract_group }}' -in @('headers', 'continuity', 'publication')) {
+          } elseif ('${{ matrix.contract_group }}' -in @('headers', 'continuity', 'publication', 'graphs')) {
             @('setup')
           } else {
             throw 'Unknown required contract group.'
           }
           $mpaProjects = @($mpaAllProjects | Where-Object { $_.Name -in $mpaProjectNames })
-          $mpaExpectedProjects = if ('${{ matrix.contract_group }}' -in @('headers', 'continuity', 'publication')) { 1 } else { 3 }
+          $mpaExpectedProjects = if ('${{ matrix.contract_group }}' -in @('headers', 'continuity', 'publication', 'graphs')) { 1 } else { 3 }
           if ($mpaProjects.Count -ne $mpaExpectedProjects) { throw 'The contract group lost a required project.' }
           foreach ($mpaProject in $mpaProjects) {
             $mpaName = $mpaProject.Name
@@ -93,17 +97,21 @@ jobs:
               $mpaHeaderFamilies = @('CurrentHeader', 'CurrentSignedPartial')
               $mpaContinuityFamilies = @('CurrentOwnedLineage', 'CurrentSupersession', 'CurrentUnsigned', 'MaterializedPredecessor')
               $mpaPublicationFamilies = @('CurrentDependency')
+              $mpaGraphFamilies = @('CurrentPreparedGraph')
               $mpaHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
               $mpaNotHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
               $mpaContinuity = ($mpaContinuityFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
               $mpaNotContinuity = ($mpaContinuityFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
               $mpaPublication = ($mpaPublicationFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
               $mpaNotPublication = ($mpaPublicationFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaGraphs = ($mpaGraphFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotGraphs = ($mpaGraphFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
               $mpaServiceFilter = switch ('${{ matrix.contract_group }}') {
                 'headers' { "$mpaBaseFilter&($mpaHeaders)" }
                 'continuity' { "$mpaBaseFilter&$mpaNotHeaders&($mpaContinuity)" }
                 'publication' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&($mpaPublication)" }
-                'application' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication" }
+                'graphs' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&($mpaGraphs)" }
+                'application' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&$mpaNotGraphs" }
                 default { throw 'Unknown required Services partition.' }
               }
               $mpaArguments += @('--filter', $mpaServiceFilter)

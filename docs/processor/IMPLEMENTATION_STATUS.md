@@ -1,5 +1,47 @@
 # MPA 0.6.0 implementation ledger
 
+## Current frozen dependency graph producer
+
+The joined current-only dependency owner now derives the original basis, opens
+its actually claimed retained file, creates and reads back the four metadata
+roles, traverses the complete actual graph and compares canonical leaf facts
+and full coverage against that original file. Equal counts cannot substitute
+different facts. Concurrent discovery does not replace captured inputs.
+
+Actual current source/policy/native/outbox checks surround graph reads. A fresh
+complete observation with Root read last precedes the atomic original-plan and
+dependencies-ready checkpoint. Its reserved storage survives all postchecks
+through commit. A narrowly exact retained-plan path supports idempotent recovery;
+default dependency preparation still rejects later phases. Public legacy sealing
+uses the same reserved mutation helper and preserves its original semantics.
+
+Cancellation and Exit join basis, sink and actual file users before borrowed
+owners retire. Cleanup failure retains ownership and reports the original
+operation and cleanup failures together. Strict compilation rejected throwing
+from a finally clause in the first draft; exception propagation now happens
+outside finally with the original stack preserved. No warning was suppressed.
+
+All12 new genesis/selected-parent, frozen discovery, equal-count substitution,
+missing facts, changed coverage, SQL/human/outbox rollback, retry, cancellation,
+Exit and owner-identity cases pass. All447 original Core identities, including
+the four original scale cases, and78 affected prior service identities pass.
+Strict isolated Desktop has zero warnings/errors. Existing test sources,
+assertions and deadlines are unchanged. Exact main build and fresh native CI
+remain separate gates; no live Drive or final performance acceptance is claimed.
+
+The unchanged Windows application partition previously used22m31s for538 cases.
+Require the12 new graph cases in a separate mandatory group on all four native
+platforms, preserving every679 preceding ordinary service identity exactly once.
+The resulting requirement is40jobs/56reports and691 ordinary Services per
+platform. Original30-minute jobs, Windows5-minute hang diagnostics, scale,
+reference, stream, source and diagnostic gates remain unchanged.
+
+This owner stops at dependencies-ready. Current reference reuse, initial header
+reservation/signing, Root activation, recovery/runtime/engine/gallery composition,
+incremental efficiency, processing/plugins, human/web workflows, all installers
+and final0.6 acceptance remain unfinished. Android stays Drive-only and new mobile
+work is deferred. Development binds only127.0.0.1. No release is published here.
+
 ## Live completed metadata observation reuse
 
 The current reader now offers an explicit session scan that reuses only hashes
