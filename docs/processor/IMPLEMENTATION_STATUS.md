@@ -1,5 +1,50 @@
 # MPA 0.6.0 implementation ledger
 
+## Original captured-authority evidence after publisher revocation
+
+The current reader can now inspect a capture's exact original publisher/source
+policy pair through bounded retained observed Root history. Each pair is read and
+verified one at a time under the same native inventory and actual final Root nonce.
+The original v1 authority digest, workspace, actor/epoch, source revision, captured
+publication basis, reserved body and any first sealed signature must agree. A
+missing witness fails while preserving all work; current keys/policies are never
+substituted for old evidence. The returned Root is explicitly a policy witness,
+not an invented exact capture-time Root or a fresh cloud/publication grant.
+
+Publisher revocation does not erase the public evidence needed to verify an old
+signature. It also does not revive the publisher, sign new bytes, alter an outbox
+scope, acknowledge a scan, dispose old work or authorize an original-media action.
+Foreign and superseded reader fences fail before capture inspection. The owner
+uses the existing joined reader/state/native lifetime without new network calls.
+
+The local authority formatter is factored into one internal value object with
+byte-identical v1 all-string counters. All218 existing authority cases and four
+independent fixed vectors passed; vectors include counters beyond JavaScript's
+exact integer range and Int64.MaxValue. Only the new inspector/fixture changed
+after that222-case run; formatter and original tests stayed byte-identical. Final
+exact-source four vectors and five service behaviors pass with a strict Desktop
+build reporting zero warnings/errors. Fresh committed CI must preserve all441 Core
+and584 ordinary Services identities across the existing32 jobs/48 actual reports.
+
+Both initial new-fixture failures are retained. Root reading correctly did not
+select durable publisher policy; the fixture now explicitly selects the actually
+published signed revocation. Its second incorrect assumption treated generic
+outbox bookkeeping as publisher authorization. The final test exercises the actual
+captured-generation signing boundary and requires unchanged native/capture/full
+outbox evidence. No production guard, existing assertion or deadline was weakened.
+The outgoing snapshot helper is synthetic; no outgoing physical completion or
+live Drive acceptance is claimed. Actual native signatures and metadata-transport
+Root transitions are exercised.
+
+Exact parent522ad5d passes all32 required protocol jobs/48 reports and fresh
+Android/native/Desktop checks, including579 ordinary Services,437 Core,139 Google,
+99 Protocol,9 LAN,27 Web and original scale/reference/source/full-log gates. This
+component still enables no engine/gallery route. Current producer birth and actual
+revoked-work disposition/handover, ambiguity recovery/reuse, processing/plugins,
+finished web workflows, six installers and final0.6 acceptance remain unfinished.
+PC-first priority, deferred mobile work, Drive-only Android,127.0.0.1 development,
+schema/signing identities and all original storage/index budgets remain unchanged.
+
 ## Canonical query and refresh lifetime owner
 
 The new canonical read runtime composes the actual current reader and shared

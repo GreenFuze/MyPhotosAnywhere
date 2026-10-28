@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
 namespace Mpa.Processor.Core;
@@ -47,16 +45,11 @@ public sealed partial class LibraryAuthorityRepository
         if (account.ExecuteScalar() is not long accountRevision || accountRevision < 1) throw new StaleLibraryConfigurationException();
         // Credential revision stays in the captured access scope. Reconnection cannot
         // change human source authority or the signed publisher/source-policy digest.
-        var bytes = new Mpa.Processor.Protocol.CanonicalJson(8192).Encode(JsonSerializer.SerializeToUtf8Bytes(new
-        {
-            format = "mpa-local-publication-authority", major = 1, libraryId = pin.LibraryId.ToString("D"),
-            controllerId = pin.ActorId.ToString("D"), controllerEpoch = pin.Epoch.ToString(CultureInfo.InvariantCulture), controllerKeyId = pin.KeyId,
-            publisherId = actor.ActorId.ToString("D"), publisherEpoch = actor.Epoch.ToString(CultureInfo.InvariantCulture), publisherKeyId = publisher.PublisherKeyId,
-            publisherSequence, publisherPolicySha256 = publisher.EnvelopeSha256, sourceSequence = source.Sequence.ToString(CultureInfo.InvariantCulture),
-            sourcePolicySha256 = source.EnvelopeSha256, accountId = pin.AccountId, folderId = pin.FolderId, configurationRevision = configurationRevision.ToString(CultureInfo.InvariantCulture)
-        }));
+        var descriptor=new LocalPublicationAuthorityDescriptor(pin.LibraryId,pin.ActorId,pin.Epoch,pin.KeyId,
+            actor.ActorId,actor.Epoch,publisher.PublisherKeyId ?? throw new InvalidDataException("Active publisher lost its public key identity."),
+            Counter(publisherSequence),publisher.EnvelopeSha256,source.Sequence,source.EnvelopeSha256,pin.AccountId,pin.FolderId,configurationRevision);
         return new(pin.LibraryId, actor.ActorId, actor.Epoch, pin.AccountId, accountRevision, pin.FolderId, configurationRevision,
-            publisher.PublisherKeyId ?? throw new InvalidDataException("Active publisher lost its public key identity."), Hash(bytes));
+            publisher.PublisherKeyId ?? throw new InvalidDataException("Active publisher lost its public key identity."), descriptor.Sha256());
     }
 
     /// <summary>Local human source approval only. Unlike publication authority this
