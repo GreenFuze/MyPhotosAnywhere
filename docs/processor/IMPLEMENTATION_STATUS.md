@@ -1,5 +1,44 @@
 # MPA 0.6.0 implementation ledger
 
+## Atomic current-authority admission for a new catalog generation
+
+The same-reader current owner can now admit NEW captured work only after its
+actual complete immutable inventory and final Root fence. One native transaction
+rechecks that exact inventory, actual selected publisher/source policy pair,
+local human approval, native publisher identity, permanent revocation history,
+unresolved Root/signing/outbox work, acknowledged selected anchor and exact native
+publisher tip. Selected catalog sequence is never substituted for native high-water.
+An immutable JSON body without its original native/outbox witness blocks admission
+for explicit recovery; transport completion alone does not authorize new work.
+
+Existing captures remain with their separate recovery owner. Admission does not
+relabel them, adopt/reset counters, allocate a Drive file, sign/upload anything,
+complete a legacy observation, activate a catalog or retire a snapshot. New IDs and
+their original immutable scope are born only inside the guarded transaction.
+Capture insertion now borrows that transaction and owns its storage reservation
+through commit; original Begin idempotence and assertions remain. Post-insert
+scope/inventory/record checks roll back trigger-induced drift and failed writes.
+
+Actual isolated validation passes all10 new Services cases and all447
+existing Core cases, with zero warnings/errors in the strict Desktop
+build. Coverage includes foreign/stale proof, second admission, atomic insert/
+human-change rollback, revocation/cancellation, pending Root and captured signing
+work, actual selected native-tip verification after private snapshot retirement,
+and unwitnessed JSON preservation. The earlier6/3 case identity sets remain in
+the final10. Fixtures own synthetic accounts/Drive transport and real native state,
+canonical files and snapshots where required; this is not live Drive acceptance.
+
+Exact parentad7fb4f completed all32 protocol jobs/48 reports:447 Core and588 ordinary
+Services on each of four platforms, with the original Google/Protocol/LAN/Web,
+scale, reference, source/hash, log and deadline gates and fresh other workflows.
+Fresh committed checks must retain every prior identity plus these10 Services:
+447 Core /598 ordinary Services, partitioned47 headers /39 continuity /512 app.
+
+This completes a guarded new-generation admission API, not engine integration,
+existing-generation recovery, revoked disposition/handover, dependency reuse,
+full processing/plugins or finished web workflows/installers/final0.6 acceptance.
+PC-first/Drive-only Android and loopback-only development remain unchanged.
+
 ## Bounded canonical timeline navigation
 
 The canonical index now supports previous pages, inclusive UTC-date seeking and

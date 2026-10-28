@@ -27,11 +27,22 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
     public CatalogGenerationCapture Begin(WorkspacePublicationScope scope, Guid snapshotId, Guid commitIntentId)
     {
         WorkspacePublicationRepository.ValidateScope(scope); Id(snapshotId); Id(commitIntentId);
-        using var transaction = _database.Connection.BeginTransaction(); var old = Read(scope.GenerationId, transaction);
+        using var transaction = _database.Connection.BeginTransaction();
+        using var mutation=BeginIn(scope,snapshotId,commitIntentId,transaction);
+        mutation.Recheck();transaction.Commit();return mutation.Value;
+    }
+
+    // Borrow the actual admission transaction; keep the storage reservation alive
+    // through its commit. The public legacy entry point retains its idempotence.
+    private LibraryPolicySelection<CatalogGenerationCapture> BeginIn(WorkspacePublicationScope scope,Guid snapshotId,Guid commitIntentId,Microsoft.Data.Sqlite.SqliteTransaction transaction)
+    {
+        WorkspacePublicationRepository.ValidateScope(scope);Id(snapshotId);Id(commitIntentId);
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Capture birth requires its owning transaction.");
+        var old=Read(scope.GenerationId,transaction);
         if (old is not null)
         {
             if (old.Scope != scope || old.SnapshotId != snapshotId || old.CommitIntentId != commitIntentId || old.Phase == "abandoned") throw new CatalogGenerationCaptureConflictException();
-            transaction.Commit(); return old; // Read/recover captured work even after a disconnect; live use requires fresh admission.
+            return new(old,null); // Read/recover captured work even after a disconnect; live use requires fresh admission.
         }
         new LibraryAuthorityRepository(_database).AssertLocalPublicationScope(scope, transaction);
         ValidateRetiredHistory(transaction);
@@ -42,14 +53,20 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
               (SELECT count(*) FROM workspace_publication WHERE json_extract(scope,'$.GenerationId')=$id)
             """, ("$intent", commitIntentId.ToString("D")), ("$id", scope.GenerationId.ToString("D"))))
             if ((long)work.ExecuteScalar()! != 0) throw new CatalogGenerationCaptureConflictException();
-        var encoded = WorkspacePublicationRepository.EncodeScope(scope); using var reservation = _budget.Reserve(65536); reservation.RecheckBeforeWrite(reservation.Bytes);
+        var encoded = WorkspacePublicationRepository.EncodeScope(scope);StorageReservation? reservation=_budget.Reserve(65536);
+        try
+        {
+        reservation.RecheckBeforeWrite(reservation.Bytes);
         using var insert = Command(transaction, """
             INSERT INTO catalog_generation_capture(id,library_id,snapshot_id,commit_intent_id,scope,context_hash,phase)
             VALUES($id,$library,$snapshot,$intent,$scope,$hash,'capturing')
             """, ("$id", scope.GenerationId.ToString("D")), ("$library", scope.LibraryId.ToString("D")), ("$snapshot", snapshotId.ToString("D")),
             ("$intent", commitIntentId.ToString("D")), ("$scope", encoded), ("$hash", ContextHash(encoded, snapshotId, commitIntentId)));
         if (insert.ExecuteNonQuery() != 1) throw new InvalidOperationException("Catalog capture admission did not insert exactly one record.");
-        transaction.Commit(); return new(scope, snapshotId, commitIntentId, "capturing", null);
+        var mutation=new LibraryPolicySelection<CatalogGenerationCapture>(new(scope,snapshotId,commitIntentId,"capturing",null),reservation);
+        reservation=null;return mutation;
+        }
+        finally {reservation?.Dispose();}
     }
 
     public CatalogGenerationCapture? Read(Guid generationId) { Id(generationId); using var transaction=_database.Connection.BeginTransaction(); var result=Read(generationId,transaction); transaction.Commit(); return result; }

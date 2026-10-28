@@ -67,6 +67,20 @@ public sealed partial class CatalogGenerationCaptureRepository
             _intents=native.Intents.Where(v=>v.ActorId==scope.ActorId && v.Epoch==scope.ActorEpoch).ToDictionary(v=>v.Sequence);
         }
 
+        // Native high-water is authoritative; the selected Root can lag behind a
+        // terminal unselected signed commit. Never infer native sequence from Root.
+        internal void RequireNativeTip(CatalogObjectReference? anchor)
+        {
+            if(Publisher.Sequence==0) {RequirePath(null,0,anchor);return;}
+            if(!_intents.TryGetValue(Publisher.Sequence,out var intent) || intent.Kind!="catalog-commit" || intent.EnvelopeSha256 is null)
+                throw new SigningHistoryRecoveryRequiredException();
+            var work=new WorkspacePublicationRepository(_owner._database,_owner._budget).Read(intent.Id,_transaction)
+                ?? throw new WorkspacePublicationConflictException();
+            if(work.FileId is null) throw new WorkspacePublicationConflictException();
+            var tip=new CatalogObjectReference(work.Scope.AccountId,work.FileId,work.Scope.FolderId,work.Payload.Length,work.Sha256);
+            _=Read(Publisher.Sequence,tip);RequirePath(tip,Publisher.Sequence,anchor);
+        }
+
         internal void RequirePath(CatalogObjectReference? parent,long sequence,CatalogObjectReference? anchor)
         {
             if(sequence<0 || sequence>Publisher.Sequence || (parent is null)!=(sequence==0)) throw new CatalogGenerationCaptureConflictException();
