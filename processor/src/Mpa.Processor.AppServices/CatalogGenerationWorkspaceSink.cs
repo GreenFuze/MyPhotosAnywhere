@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text.Json;
 using Mpa.Processor.Core;
 using Mpa.Processor.Protocol;
 
@@ -67,12 +66,7 @@ public sealed class CatalogGenerationWorkspaceSink : ICatalogGenerationObjectSin
         cancellationToken.ThrowIfCancellationRequested(); return reference;
     }
 
-    internal static Guid ObjectId(WorkspacePublicationScope scope, string role, string mimeType, string hash)
-    {
-        var context = new CanonicalJson(8192).Encode(JsonSerializer.SerializeToUtf8Bytes(new
-        { format = "mpa-catalog-dependency-outbox", major = 1, scope, role, mimeType, payloadSha256 = hash }));
-        var digest = SHA256.HashData(context); digest[6] = (byte)((digest[6] & 15) | 128); digest[8] = (byte)((digest[8] & 63) | 128);
-        return new(digest.AsSpan(0, 16), bigEndian: true);
-    }
+    internal static Guid ObjectId(WorkspacePublicationScope scope, string role, string mimeType, string hash)=>
+        CatalogDependencyPayload.ObjectId(scope,role,mimeType,hash);
     private static bool Identity(string? value) => value is { Length: > 0 and <= 256 } && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
 }

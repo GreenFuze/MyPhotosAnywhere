@@ -1,5 +1,49 @@
 # MPA 0.6.0 implementation ledger
 
+## Current dependency preparation with exact local postconditions
+
+The current reader can now prepare one original dependency retry record after
+actual current inventory and final Root reads. It captures and bounds caller bytes
+before queuing, restricts role/MIME/canonical JSON and retains the established stable
+GUID format. The legacy sink delegates to the same unchanged identity encoding;
+all13 original independent dependency-reference cases still pass.
+
+One transaction checks the original prepared snapshot/basis, accepted policy pair,
+native tip, human/account scope and acknowledged selected anchor, then saves only
+the deterministic local outbox record. Its storage owner remains alive through the
+actual caller commit. Generic historical exact retries preserve their former read
+semantics and original allocation/receipt. The public generic API retains its
+existing budget-check timing; the current owner adds its own commit recheck.
+
+Preparing a new object spends the original complete inventory. The postcondition
+allows only that exact local row delta and rechecks the original observation,
+native/signing/human/capture/Root inputs. It does not create a replacement checkpoint
+or network grant. Failed insertion, human drift and an unexpected trigger-assigned
+file ID roll back the whole write. Signed/advanced work, published revocation and
+changed human scopes cannot be relabeled or populated with fresh dependency facts.
+
+All11 new cases pass, including actual selected native-parent preservation, private
+queued-byte ownership, stable retry after reader recreation, invalid input and early
+cancellation, rollback, low storage and joined reader Exit. The broader81-case
+affected family union plus the additional selected-parent case pass, including every
+original reference identity; all447 prior Core cases pass. Strict isolated Desktop
+has zero warnings/errors. The additional case changes only a new test source file;
+all previously tested production and test bytes remain unchanged.
+
+Initial CA1068 was fixed in source by keeping CancellationToken last. The validation
+corpus includes separately partitioned reference/scale receipts; no assertion or
+deadline was relaxed. Exact parent5609fb7 passes all32jobs/48reports,447 Core and625
+ordinaryServices on four platforms. Its unchanged workflow routes the eight unsigned
+cases into continuity:47headers/47continuity/531application. The mistaken external
+verifier grouping was corrected from the unchanged workflow and all exact identities,
+without rerunning or changing CI. Fresh checks must preserve625+11 ordinary cases.
+
+This is local dependency preparation, not allocation, create/readback/receipt IO,
+dependency reuse admission, signing, Root activation, engine/gallery composition or
+final0.6 product acceptance. Original media and human metadata, schema/signing and
+storage/document bounds remain unchanged. PC-first, Drive-only Android and loopback
+development remain; full processing/workflows/installers/release are still pending.
+
 ## Immutable unsigned terminal-work recovery
 
 A reproduced local defect allowed a late Drive ID assignment to change an unsigned

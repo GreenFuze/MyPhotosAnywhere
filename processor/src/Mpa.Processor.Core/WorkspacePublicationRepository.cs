@@ -28,29 +28,45 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
     {
         CheckId(id); ValidateScope(scope); ValidateContent(role, mimeType);
         if (payload.Length is < 1 or > MaximumPayloadBytes) throw new ArgumentException("A bounded metadata payload is required.", nameof(payload));
-        var owned = payload.ToArray(); var hash = Hash(owned); var scopeJson = EncodeScope(scope);
-        using var transaction = _database.Connection.BeginTransaction();
-        using (var selected = Command(transaction, "SELECT 1 FROM processor_meta WHERE key=$key", ("$key", "catalog_dependency_reference_v1:" + id.ToString("D"))))
-            if (selected.ExecuteScalar() is not null) throw new WorkspacePublicationConflictException();
-        var existing = Read(id, transaction);
-        if (existing is not null)
+        var owned=payload.ToArray();
+        using var transaction=_database.Connection.BeginTransaction();
+        using var write=PrepareOwnedIn(id,scope,role,mimeType,owned,transaction,localAccess);
+        transaction.Commit();return write.Value;
+    }
+
+    // Only synchronous owners in this assembly pass already-private byte arrays.
+    // The generic public API retains its old exact historical retry semantics.
+    internal WorkspacePublicationWrite PrepareOwnedIn(Guid id,WorkspacePublicationScope scope,string role,string mimeType,byte[] owned,
+        SqliteTransaction transaction,CatalogGenerationLocalAccess? localAccess=null)
+    {
+        ArgumentNullException.ThrowIfNull(owned);ArgumentNullException.ThrowIfNull(transaction);
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Outbox preparation requires its owning transaction.");
+        CheckId(id);ValidateScope(scope);ValidateContent(role,mimeType);
+        if(owned.Length is <1 or >MaximumPayloadBytes) throw new ArgumentException("A bounded metadata payload is required.",nameof(owned));
+        var hash=Hash(owned);var scopeJson=EncodeScope(scope);
+        using(var selected=Command(transaction,"SELECT 1 FROM processor_meta WHERE key=$key",("$key","catalog_dependency_reference_v1:"+id.ToString("D"))))
+            if(selected.ExecuteScalar() is not null) throw new WorkspacePublicationConflictException();
+        var existing=Read(id,transaction);
+        if(existing is not null)
         {
-            if (existing.Scope != scope || existing.Role != role || existing.MimeType != mimeType || existing.Sha256 != hash ||
+            if(existing.Scope!=scope || existing.Role!=role || existing.MimeType!=mimeType || existing.Sha256!=hash ||
                 !existing.Payload.Span.SequenceEqual(owned)) throw new WorkspacePublicationConflictException();
-            transaction.Commit(); return existing;
+            return new(existing,null);
         }
-        CheckCurrent(scope, transaction, localAccess);
-        // Includes payload, WAL copy and bounded page overhead. Actual writes still fail
-        // explicitly if another process consumes disk space; no cleanup/reset is inferred.
-        using var reservation = _budget.Reserve(checked(owned.LongLength * 3 + 65536));
-        reservation.RecheckBeforeWrite(reservation.Bytes);
-        using (var insert = Command(transaction, """
-            INSERT INTO workspace_publication(id,account_id,scope,context_hash,role,mime_type,payload,payload_hash)
-            VALUES($id,$account,$scope,$scopeHash,$role,$mime,$payload,$hash)
-            """, ("$id", id.ToString("D")), ("$account", scope.AccountId), ("$scope", scopeJson),
-            ("$scopeHash", ContextHash(id, scopeJson, role, mimeType, hash)), ("$role", role), ("$mime", mimeType), ("$payload", owned), ("$hash", hash)))
-            if (insert.ExecuteNonQuery() != 1) throw new InvalidOperationException("Publication preparation did not insert exactly one record.");
-        transaction.Commit(); return new(id, scope, role, mimeType, hash, null, null, owned);
+        CheckCurrent(scope,transaction,localAccess);
+        StorageReservation? storage=_budget.Reserve(checked(owned.LongLength*3+65536));
+        try
+        {
+            storage.RecheckBeforeWrite(storage.Bytes);
+            using(var insert=Command(transaction,"""
+                INSERT INTO workspace_publication(id,account_id,scope,context_hash,role,mime_type,payload,payload_hash)
+                VALUES($id,$account,$scope,$scopeHash,$role,$mime,$payload,$hash)
+                """,("$id",id.ToString("D")),("$account",scope.AccountId),("$scope",scopeJson),
+                ("$scopeHash",ContextHash(id,scopeJson,role,mimeType,hash)),("$role",role),("$mime",mimeType),("$payload",owned),("$hash",hash)))
+                if(insert.ExecuteNonQuery()!=1) throw new InvalidOperationException("Publication preparation did not insert exactly one record.");
+            var result=new WorkspacePublicationWrite(new(id,scope,role,mimeType,hash,null,null,owned),storage);storage=null;return result;
+        }
+        finally {storage?.Dispose();}
     }
 
     public WorkspacePublicationRecord? Read(Guid id) { CheckId(id); return Read(id, null); }

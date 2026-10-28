@@ -38,7 +38,7 @@ public sealed partial class WorkspaceObservationRepository
         ArgumentNullException.ThrowIfNull(signing);ArgumentNullException.ThrowIfNull(fenced);ArgumentNullException.ThrowIfNull(publications);
         if(!ValidAttemptCursor(cursor) || completeInventory.Count>MaximumDocuments) throw new ArgumentException("A complete bounded actual inventory/cursor is required.");
         using var transaction=_database.Connection.BeginTransaction();
-        var history=RequireCurrentInventoryInputsIn(attempt,completeInventory,signing,fenced,publications,transaction,token);
+        var history=RequireCurrentInventoryInputsIn(attempt,completeInventory,signing,fenced,publications,transaction,null,token);
         var root=history.Signing.Roots.Single(value=>value.Intent.EnvelopeSha256==fenced.ContentSha256 && value.Observed).Intent;
         var result=new CurrentWorkspaceInventoryCheckpoint(attempt.Context,attempt.Id,attempt.Revision,cursor,fenced.Id,root.Id,
             fenced.ConnectionSha256,fenced.ContentSha256,root.Sequence,fenced.Version!.Value,history.Signing.Sha256,publications.Sha256,
@@ -86,14 +86,23 @@ public sealed partial class WorkspaceObservationRepository
     }
 
     internal void AssertCurrentInventoryUnchangedIn(CurrentWorkspaceInventoryCheckpoint checkpoint,CurrentControlSigningInventory signing,
-        LocalCurrentControlAttempt fenced,WorkspacePublicationInventory publications,SqliteTransaction transaction,CancellationToken token)
+        LocalCurrentControlAttempt fenced,WorkspacePublicationInventory publications,SqliteTransaction transaction,CancellationToken token)=>
+        AssertCurrentInventoryIn(checkpoint,signing,fenced,publications,transaction,null,token);
+
+    // A local post-write condition, not a replacement observation or IO permission.
+    internal void AssertCurrentInventoryAfterPreparedObjectIn(CurrentWorkspaceInventoryCheckpoint checkpoint,CurrentControlSigningInventory signing,
+        LocalCurrentControlAttempt fenced,WorkspacePublicationInventory publications,WorkspacePublicationRecord prepared,SqliteTransaction transaction,CancellationToken token)=>
+        AssertCurrentInventoryIn(checkpoint,signing,fenced,publications,transaction,prepared,token);
+
+    private void AssertCurrentInventoryIn(CurrentWorkspaceInventoryCheckpoint checkpoint,CurrentControlSigningInventory signing,
+        LocalCurrentControlAttempt fenced,WorkspacePublicationInventory publications,SqliteTransaction transaction,WorkspacePublicationRecord? prepared,CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);ArgumentNullException.ThrowIfNull(signing);
         ArgumentNullException.ThrowIfNull(fenced);ArgumentNullException.ThrowIfNull(publications);ArgumentNullException.ThrowIfNull(transaction);
         if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Inventory admission requires its owning live transaction.");
         if(ReadCurrentInventoryIn(transaction,token)!=checkpoint) throw new WorkspaceObservationConflictException();
         var attempt=ReadAttempt(transaction) ?? throw new WorkspaceObservationConflictException();
-        var history=RequireCurrentInventoryInputsIn(attempt,null,signing,fenced,publications,transaction,token);
+        var history=RequireCurrentInventoryInputsIn(attempt,null,signing,fenced,publications,transaction,prepared,token);
         var currentRoot=history.Signing.Roots.Single(value=>value.Intent.EnvelopeSha256==fenced.ContentSha256 && value.Observed).Intent;
         if(attempt.Id!=checkpoint.AttemptId || attempt.Revision!=checkpoint.AttemptRevision || checkpoint.Context!=attempt.Context ||
             checkpoint.RootAttemptId!=fenced.Id || checkpoint.RootIntentId!=currentRoot.Id || checkpoint.RootSequence!=currentRoot.Sequence ||
@@ -107,7 +116,7 @@ public sealed partial class WorkspaceObservationRepository
 
     private CurrentWorkspaceObservationHistory RequireCurrentInventoryInputsIn(WorkspaceObservationAttempt attempt,
         IReadOnlyCollection<WorkspaceDocumentObservation>? completeInventory,CurrentControlSigningInventory signing,
-        LocalCurrentControlAttempt fenced,WorkspacePublicationInventory publications,SqliteTransaction transaction,CancellationToken token)
+        LocalCurrentControlAttempt fenced,WorkspacePublicationInventory publications,SqliteTransaction transaction,WorkspacePublicationRecord? prepared,CancellationToken token)
     {
         if(fenced.Phase!="fenced") throw new CurrentControlObservationConflictException();
         var history=CaptureCurrentHistoryIn(signing,fenced,transaction,token);
@@ -123,7 +132,9 @@ public sealed partial class WorkspaceObservationRepository
         foreach(var candidate in history.ImmutableCandidates)
             if(!read.TryGetValue(candidate.FileId,out var actual) || actual.Bytes!=candidate.Bytes || actual.Version<candidate.Version || actual.MimeType!=candidate.MimeType)
                 throw new WorkspaceObservationConflictException();
-        new WorkspacePublicationRepository(_database,_budget).AssertInventoryUnchanged(publications,transaction);
+        var outbox=new WorkspacePublicationRepository(_database,_budget);
+        if(prepared is null) outbox.AssertInventoryUnchanged(publications,transaction);
+        else outbox.AssertInventoryAfterPreparedObjectIn(publications,prepared,transaction);
         foreach(var work in publications.Objects)
         {
             token.ThrowIfCancellationRequested();

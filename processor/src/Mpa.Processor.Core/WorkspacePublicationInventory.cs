@@ -52,6 +52,22 @@ public sealed partial class WorkspacePublicationRepository
         if (Inventory(inventory.Context, inventory.Maximum, transaction).Sha256 != inventory.Sha256) throw new WorkspacePublicationInventoryChangedException();
     }
 
+    // Postcondition for ONE prepared local object only. This does not refresh an
+    // observation/checkpoint, and cannot authorize a physical provider request.
+    internal void AssertInventoryAfterPreparedObjectIn(WorkspacePublicationInventory before,WorkspacePublicationRecord prepared,SqliteTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(before);ArgumentNullException.ThrowIfNull(prepared);
+        if(before.Objects is null || InventoryDigest(before.Context,before.Maximum,before.Objects)!=before.Sha256)
+            throw new WorkspacePublicationConflictException();
+        var actual=Inventory(before.Context,before.Maximum,transaction);
+        var expected=new WorkspacePublicationExpectation(prepared.Id,prepared.Scope,prepared.Role,prepared.MimeType,
+            prepared.Payload.Length,prepared.Sha256,prepared.FileId,prepared.VerifiedVersion);
+        var prior=before.Objects.SingleOrDefault(value=>value.Id==prepared.Id);
+        if(prior is not null && prior!=expected) throw new WorkspacePublicationInventoryChangedException();
+        var replacement=before.Objects.Where(value=>value.Id!=prepared.Id).Append(expected).OrderBy(value=>value.Id.ToString("D"),StringComparer.Ordinal);
+        if(!actual.Objects.SequenceEqual(replacement)) throw new WorkspacePublicationInventoryChangedException();
+    }
+
     private static string InventoryDigest(WorkspaceObservationContext context, int maximum, IReadOnlyCollection<WorkspacePublicationExpectation> objects)
     {
         ArgumentNullException.ThrowIfNull(context);
