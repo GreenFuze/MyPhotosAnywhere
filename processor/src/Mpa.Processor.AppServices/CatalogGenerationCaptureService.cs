@@ -10,6 +10,14 @@ internal interface ICatalogGenerationLocalAccessProvider
     CatalogGenerationLocalAccess? ForScope(WorkspacePublicationScope scope);
 }
 
+// Internal private-copy admission only. A current owner supplies its own atomic
+// state callbacks; it cannot fabricate the legacy renewed-credential capability.
+internal interface ICurrentCatalogSnapshotAdmission
+{
+    CatalogGenerationCapture Begin(ProcessorStateDatabase database,WorkspacePublicationScope scope,Guid snapshotId,Guid intentId,CancellationToken token);
+    CatalogGenerationCapture Seal(ProcessorStateDatabase database,Guid generationId,CatalogSnapshotDescriptor descriptor,CancellationToken token);
+}
+
 /// <summary>Serial application owner of journaled capture and retained readers. The
 /// caller supplies the generation's original identities and complete current authority;
 /// this service grants no cloud reconciliation, head scheduling or publication rights.
@@ -56,8 +64,9 @@ public sealed class CatalogGenerationCaptureService : IAsyncDisposable
             {
                 lock (_gate) AssertRunning(); var token = linked.Token;
                 await ValidateAsync(scope, token).ConfigureAwait(false);
-                var claim = await _state.ExecuteAsync(database => new CatalogGenerationCaptureRepository(database, _budget)
-                    .Begin(scope, snapshotId, commitIntentId), token).ConfigureAwait(false);
+                var claim=await _state.ExecuteAsync(database=>_authority is ICurrentCatalogSnapshotAdmission current
+                    ? current.Begin(database,scope,snapshotId,commitIntentId,token)
+                    : new CatalogGenerationCaptureRepository(database,_budget).Begin(scope,snapshotId,commitIntentId),token).ConfigureAwait(false);
                 await OpenStoreAsync(token).ConfigureAwait(false);
                 if (claim.Phase == "capturing")
                 {
@@ -68,8 +77,9 @@ public sealed class CatalogGenerationCaptureService : IAsyncDisposable
                         ? await Task.Run(() => _store!.Inspect(claim, token), CancellationToken.None).ConfigureAwait(false)
                         : await _preparation.RunAsync((frozen, captureToken) => Task.Run(() => _store!.Save(frozen, claim, captureToken), CancellationToken.None), token).ConfigureAwait(false);
                     token.ThrowIfCancellationRequested(); await ValidateAsync(scope, token).ConfigureAwait(false);
-                    claim = await _state.ExecuteAsync(database => new CatalogGenerationCaptureRepository(database, _budget)
-                        .SealSnapshot(scope.GenerationId, descriptor), token).ConfigureAwait(false);
+                    claim=await _state.ExecuteAsync(database=>_authority is ICurrentCatalogSnapshotAdmission current
+                        ? current.Seal(database,scope.GenerationId,descriptor,token)
+                        : new CatalogGenerationCaptureRepository(database,_budget).SealSnapshot(scope.GenerationId,descriptor),token).ConfigureAwait(false);
                     CloseResources(); await OpenStoreAsync(token).ConfigureAwait(false); // Refresh the durable frozen claim.
                 }
                 _reader = await Task.Run(() => _store!.Open(claim, token), CancellationToken.None).ConfigureAwait(false);

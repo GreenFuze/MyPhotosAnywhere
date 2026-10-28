@@ -1,5 +1,54 @@
 # MPA 0.6.0 implementation ledger
 
+## Actual current-authority private snapshot preparation and recovery
+
+A joined current snapshot service now performs the actual private facts copy and
+seals its retained file using current Drive control. It resumes the same capturing
+or frozen claim before creating new work. The entire copy, retained-reader close
+and child retirement remain inside the actual current-reader operation, so reader
+or service Exit joins entered work before borrowed owners release. The constructor
+rejects a different state/budget owner. No provider account lease is held for copying.
+
+Private permission is immutable for one operation and never escapes as a cloud
+write grant. State callbacks use the exact same complete inventory/final Root,
+native keys, original capture IDs/scope and accepted human/policy/account state.
+Current Begin/resume and sealing use their own exact callbacks; no legacy renewed-
+credential capability or completed legacy checkpoint is fabricated. Source/account
+revision or publisher changes preserve the claim and require separate recovery.
+Signed/prepared publication work cannot be reinterpreted as a new private capture.
+
+Current sealing checks scope/native/inventory before AND after its sole mutation
+in one transaction. A failed insert, changed human state or corrupt post-write
+record rolls back the seal while retaining the actually closed private file. A lost
+seal checkpoint inspects and reuses that same file, rather than recapturing newer
+facts. Existing partial/corrupt files remain unchanged. The old public sealing API
+retains its existing semantics; its factored write owns storage through commit.
+
+All9 new current snapshot cases pass, with actual private SQLite files, real native
+owners and synthetic Drive/account transport. The exact final broader set passes
+all45 Services cases:9 new,10 prior current-birth and every26 existing capture-
+service case. All447 prior Core identities pass and strict isolated Desktop has
+zero warnings/errors. Coverage includes original native/outbox/head/human state,
+recreated-owner retry after new imports, actual complete-file/failed-seal recovery,
+transactional human-change rollback, partial-file preservation, actual published
+revocation, pending signed work, shared budget identity and both reader/service
+Exit during an entered uncooperative Root read. This is not live Drive acceptance,
+a final100k responsiveness claim or native platform installer validation.
+
+The new test helper's initial CA1859 finding is resolved with its concrete Task<bool>
+return; the initial compile log and passing identity/source evidence are retained.
+No severity, baseline, suppression, assertion or deadline changed. Exact parent
+27a0d4a passes all32 mandatory jobs/48 reports,447 Core/598 ordinary Services exactly
+once on four platforms and all prior Google/Protocol/LAN/Web/scale/reference/source/
+full-stream/deadline/fresh-workflow gates. Fresh committed checks must preserve every
+identity plus these9 new Services:447 Core/607 Services (47/39/521).
+
+This finishes private current snapshot preparation, not dependency preparation/
+upload/signing, renewed-credential recovery, revoked disposition/handover, actual
+engine/gallery integration, the remaining processing/web/installer work or0.6
+release acceptance. PC-first, Drive-only Android and loopback-only development,
+originals/human metadata, schemas, signing identities and storage budgets remain.
+
 ## Atomic current-authority admission for a new catalog generation
 
 The same-reader current owner can now admit NEW captured work only after its

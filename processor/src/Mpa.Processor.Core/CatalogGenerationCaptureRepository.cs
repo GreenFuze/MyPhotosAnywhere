@@ -90,15 +90,30 @@ public sealed partial class CatalogGenerationCaptureRepository(ProcessorStateDat
     public CatalogGenerationCapture SealSnapshot(Guid generationId, CatalogSnapshotDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor); Id(generationId); ValidateDescriptor(descriptor);
-        using var transaction = _database.Connection.BeginTransaction(); var current = Read(generationId, transaction) ?? throw new InvalidOperationException("The generation capture is missing.");
+        using var transaction=_database.Connection.BeginTransaction();
+        using var mutation=SealSnapshotIn(generationId,descriptor,transaction);
+        mutation.Recheck();transaction.Commit();return mutation.Value;
+    }
+
+    private LibraryPolicySelection<CatalogGenerationCapture> SealSnapshotIn(Guid generationId,CatalogSnapshotDescriptor descriptor,Microsoft.Data.Sqlite.SqliteTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);Id(generationId);ValidateDescriptor(descriptor);
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Snapshot sealing requires its owning transaction.");
+        var current=Read(generationId,transaction) ?? throw new InvalidOperationException("The generation capture is missing.");
         MatchDescriptor(current, descriptor);
         if (current.Phase == "abandoned" || current.Snapshot is not null && current.Snapshot != descriptor) throw new CatalogGenerationCaptureConflictException();
-        if (current.Snapshot is not null) { transaction.Commit(); return current; }
-        var encoded = Encode(descriptor); using var reservation = _budget.Reserve(65536); reservation.RecheckBeforeWrite(reservation.Bytes);
+        if(current.Snapshot is not null) return new(current,null);
+        var encoded=Encode(descriptor);StorageReservation? reservation=_budget.Reserve(65536);
+        try
+        {
+        reservation.RecheckBeforeWrite(reservation.Bytes);
         using var update = Command(transaction, "UPDATE catalog_generation_capture SET phase='frozen',snapshot=$snapshot,snapshot_hash=$hash WHERE id=$id AND phase='capturing' AND snapshot IS NULL",
             ("$snapshot", encoded), ("$hash", Hash(Encoding.UTF8.GetBytes(encoded))), ("$id", generationId.ToString("D")));
         if (update.ExecuteNonQuery() != 1) throw new InvalidOperationException("Snapshot sealing lost its durable captured owner.");
-        transaction.Commit(); return current with { Phase = "frozen", Snapshot = descriptor };
+        var result=new LibraryPolicySelection<CatalogGenerationCapture>(current with {Phase="frozen",Snapshot=descriptor},reservation);
+        reservation=null;return result;
+        }
+        finally {reservation?.Dispose();}
     }
 
     /// <summary>No cleanup permission exists once any upload or signing work references
