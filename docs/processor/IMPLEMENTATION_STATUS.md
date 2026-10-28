@@ -1,5 +1,49 @@
 # MPA 0.6.0 implementation ledger
 
+## Bounded canonical timeline navigation
+
+The canonical index now supports previous pages, inclusive UTC-date seeking and
+exact photo-identity lookup through its existing date/identity indexes. Previous
+pages select the nearest earlier entries and return normal gallery order; their
+HasMore flag describes that direction. Equal timestamps use the same stable ID
+order and unknown dates remain last. Missing identity resolution returns null,
+while a cursor for an absent identity remains an explicit ordering boundary.
+No neighboring photo is silently substituted.
+
+All four read modes share the original per-row identity, digest, date and payload
+size guards, sealed-file requirement, physical read lease and90-item page bound.
+No offset walk, full-library subscription, file mutation or extra persistent table
+was introduced. UTC conversion from device-local day boundaries remains the caller's
+responsibility. The query position is private typed input with fixed SQL variants.
+
+Historical and runtime reads now share their existing joined query lane across
+every mode. Pages and identity results carry the exact historical selection;
+requests for a replaced selection fail explicitly. A missing photo retains that
+selection context and an empty identity result. Reads remain independent of a
+blocked network refresh, and Exit still joins actual refresh/read work before
+owned handles or borrowed pool/reader/state owners can release.
+
+All17 native-index cases pass: every11 prior identity plus six navigation cases.
+All34 read/lifecycle cases pass: every30 prior identity plus four runtime behaviors.
+They cover both directions across equal/unknown dates, inclusive timestamp bounds,
+missing identities/cursors, unchanged sealed bytes, cancellation/limits, corrupted
+private-row rejection, old-context refusal after actual activation and reads during
+blocked refresh with joined Exit. Strict isolated Desktop has zero warnings/errors.
+The outgoing test snapshot descriptor remains synthetic; these are real canonical
+files and metadata-transport/native-owner tests, not live Drive acceptance.
+
+Exact parenta26a612 passes all32 required protocol jobs/48 actual reports and fresh
+Android/native/Desktop checks:441 Core,584 ordinary Services,139 Google,99 Protocol,
+9 LAN,27 Web and unchanged scale/reference/source/full-log/deadline gates. Fresh
+committed checks must preserve every prior identity and add six Core/four Services
+cases:447 Core and588 ordinary Services across the same32 jobs/48 reports.
+
+This finishes the bounded canonical query API, not the running gallery/producer
+composition, visibility filters, final100k responsiveness, current-authority birth/
+revoked disposition/handover/reuse, processing/plugins, finished web workflows,
+installers or final0.6 release acceptance. PC-first priority, deferred Android work,
+Drive-only mobile access,127.0.0.1 development, schemas/signers and budgets remain.
+
 ## Original captured-authority evidence after publisher revocation
 
 The current reader can now inspect a capture's exact original publisher/source

@@ -12,7 +12,7 @@ public sealed record CurrentCatalogStagePage(ReadOnlyCollection<DriveCatalogAsse
 /// <summary>Owns one claimed generated SQLite index. Complete leaves commit atomically;
 /// identical replay verifies every retained row. Sealing closes writable native handles
 /// before hashing and grants no activation. Dispose preserves claimed recovery files.</summary>
-public sealed class CurrentCatalogStageIndex : IDisposable
+public sealed partial class CurrentCatalogStageIndex : IDisposable
 {
     private const int ApplicationId=0x4d504143;
     private readonly string _path;
@@ -132,25 +132,8 @@ public sealed class CurrentCatalogStageIndex : IDisposable
         var descriptor=new CurrentCatalogStageDescriptor(_claim.Id,_readLease.Length,Hash(_readLease,token),expectedAssets,_seen.Count);CurrentCatalogStageJournal.ValidateDescriptor(descriptor);
         token.ThrowIfCancellationRequested();_connection=Connect(_path,true);VerifyHeader(_connection,_claim);_sealed=descriptor;return descriptor;
     }
-    public CurrentCatalogStagePage ReadPage(CatalogCursor? after=null,int limit=60,CancellationToken token=default)
-    {
-        RequireOpen();if(_sealed is null) throw new InvalidOperationException("Seal and verify private staging before reading its gallery projection.");
-        if(limit is <1 or >90 || after is not null && (after.Id==Guid.Empty || after.EffectiveUtc is < -62135596800000L or >253402300799999L)) throw new ArgumentException("A bounded valid catalog continuation is required.");
-        token.ThrowIfCancellationRequested();using var query=_connection!.CreateCommand();query.CommandText="SELECT id,prefix,length(payload),payload,sha256,date_unknown,date_sort FROM fact"+
-            (after is null ? "" : " WHERE (date_unknown,date_sort,id)>($unknown,$sort,$id)")+" ORDER BY date_unknown,date_sort,id LIMIT $limit";query.Parameters.AddWithValue("$limit",limit+1);
-        if(after is not null) {query.Parameters.AddWithValue("$unknown",after.EffectiveUtc is null);query.Parameters.AddWithValue("$sort",after.EffectiveUtc is null ? 0L : -after.EffectiveUtc.Value);query.Parameters.AddWithValue("$id",after.Id.ToString("D"));}
-        var assets=new List<DriveCatalogAsset>();var more=false;using var rows=query.ExecuteReader();
-        while(rows.Read())
-        {
-            token.ThrowIfCancellationRequested();if(assets.Count==limit){more=true;break;}
-            if(rows.GetInt64(2) is <1 or >CatalogChunkDecoder.MaximumExpandedBytes) throw new InvalidDataException("A staged row exceeds its byte bound.");
-            var bytes=rows.GetFieldValue<byte[]>(3);var fact=_codec.Read(bytes,rows.GetString(1));
-            if(Hash(bytes)!=rows.GetString(4) || fact.Assets.Count!=1 || fact.Assets[0].Id.ToString("D")!=rows.GetString(0) ||
-                rows.GetBoolean(5)!=(fact.Assets[0].EffectiveUtc is null) || rows.GetInt64(6)!=(fact.Assets[0].EffectiveUtc is null ? 0L : -fact.Assets[0].EffectiveUtc!.Value)) throw new InvalidDataException("Staged gallery row failed identity, digest or date validation.");
-            assets.Add(fact.Assets[0]);
-        }
-        return new(assets.AsReadOnly(),more);
-    }
+    public CurrentCatalogStagePage ReadPage(CatalogCursor? after=null,int limit=60,CancellationToken token=default)=>
+        ReadOrderedPage(after is null?new(StageReadKind.First):new(StageReadKind.After,Cursor:after),limit,token);
     private void VerifyRow(DriveCatalogAsset asset,string prefix)
     {
         var expected=_codec.Encode(prefix,[asset]);using var query=_connection!.CreateCommand();query.CommandText="SELECT prefix,length(payload),payload,sha256,date_unknown,date_sort FROM fact WHERE id=$id";query.Parameters.AddWithValue("$id",asset.Id.ToString("D"));using var row=query.ExecuteReader();

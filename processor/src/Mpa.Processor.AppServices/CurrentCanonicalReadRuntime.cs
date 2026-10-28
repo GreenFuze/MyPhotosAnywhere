@@ -1,10 +1,12 @@
 using Mpa.Processor.Core;
+using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.AppServices;
 
 public sealed class CurrentCanonicalPositionChangedException() : InvalidOperationException(
     "The shared photo catalog changed. Restore the visible photo before continuing.");
 public sealed record CurrentCanonicalReadPage(CurrentCatalogActivation Selection,CurrentCatalogStagePage Page);
+public sealed record CurrentCanonicalReadAsset(CurrentCatalogActivation Selection,DriveCatalogAsset? Asset);
 
 /// <summary>Owns opened canonical handles; borrows the actual reader, shared two-
 /// index pool and serialized state. Historical queries use a separate lane from
@@ -60,10 +62,51 @@ public sealed class CurrentCanonicalReadRuntime(ProcessorStateCoordinator state,
         Check(token);return activation;
     },caller);
 
-    public async Task<CurrentCanonicalReadPage?> ReadPageAsync(Guid? expectedStageId,CatalogCursor? after,int limit,CancellationToken caller)
+    public Task<CurrentCanonicalReadPage?> ReadPageAsync(Guid? expectedStageId,CatalogCursor? after,int limit,CancellationToken caller)
     {
-        if(limit is <1 or >90 || expectedStageId==Guid.Empty || expectedStageId is null && after is not null)
-            throw new ArgumentException("A bounded page and its exact catalog context are required.");
+        ValidatePage(expectedStageId,limit);
+        if(expectedStageId is null && after is not null) throw new ArgumentException("A continuation requires its exact catalog context.");
+        return ReadCatalogAsync(expectedStageId,async (active,token)=>
+            new CurrentCanonicalReadPage(active.Selection,await active.ReadPageAsync(after,limit,token).ConfigureAwait(false)),caller);
+    }
+
+    /// <summary>Previous entries are returned in normal timeline order. Preserve
+    /// this selection context and use the first returned entry to continue back.</summary>
+    public Task<CurrentCanonicalReadPage?> ReadPreviousPageAsync(Guid expectedStageId,CatalogCursor before,int limit,CancellationToken caller)
+    {
+        ArgumentNullException.ThrowIfNull(before);ValidatePage(expectedStageId,limit);
+        if(before.Id==Guid.Empty || before.EffectiveUtc is < -62135596800000L or >253402300799999L)
+            throw new ArgumentException("A valid previous-page identity and date are required.");
+        return ReadCatalogAsync(expectedStageId,async (active,token)=>
+            new CurrentCanonicalReadPage(active.Selection,await active.ReadPreviousPageAsync(before,limit,token).ConfigureAwait(false)),caller);
+    }
+
+    /// <summary>Inclusive UTC milliseconds; the caller converts its own local-day
+    /// boundary. No new current-authority or publication claim is made by seeking.</summary>
+    public Task<CurrentCanonicalReadPage?> ReadAtOrBeforeAsync(Guid? expectedStageId,long utcMilliseconds,int limit,CancellationToken caller)
+    {
+        ValidatePage(expectedStageId,limit);
+        if(utcMilliseconds is < -62135596800000L or >253402300799999L) throw new ArgumentException("A supported UTC date is required.");
+        return ReadCatalogAsync(expectedStageId,async (active,token)=>
+            new CurrentCanonicalReadPage(active.Selection,await active.ReadAtOrBeforeAsync(utcMilliseconds,limit,token).ConfigureAwait(false)),caller);
+    }
+
+    /// <summary>Returns the exact historical selection even when the identity is
+    /// absent. A missing photo is never replaced by a neighboring entry.</summary>
+    public Task<CurrentCanonicalReadAsset?> FindAssetAsync(Guid expectedStageId,Guid assetId,CancellationToken caller)
+    {
+        if(expectedStageId==Guid.Empty || assetId==Guid.Empty) throw new ArgumentException("Exact catalog and photo identities are required.");
+        return ReadCatalogAsync(expectedStageId,async (active,token)=>
+            new CurrentCanonicalReadAsset(active.Selection,await active.FindAssetAsync(assetId,token).ConfigureAwait(false)),caller);
+    }
+
+    private static void ValidatePage(Guid? expectedStageId,int limit)
+    {
+        if(limit is <1 or >90 || expectedStageId==Guid.Empty) throw new ArgumentException("A bounded page and valid catalog context are required.");
+    }
+
+    private async Task<T?> ReadCatalogAsync<T>(Guid? expectedStageId,Func<LocalHistoricalCatalog,CancellationToken,Task<T>> query,CancellationToken caller) where T:class
+    {
         LocalHistoricalCatalog? active;CancellationTokenSource linked;
         lock(_gate)
         {
@@ -77,8 +120,8 @@ public sealed class CurrentCanonicalReadRuntime(ProcessorStateCoordinator state,
         {
             try
             {
-                var page=await active.ReadPageAsync(after,limit,linked.Token).ConfigureAwait(false);
-                Check(linked.Token);return new(active.Selection,page);
+                var result=await query(active,linked.Token).ConfigureAwait(false);
+                Check(linked.Token);return result;
             }
             finally {lock(_gate) {_queries--;if(_stopping && _queries==0) _queriesDrained.TrySetResult();}}
         }

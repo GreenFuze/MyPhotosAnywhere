@@ -25,7 +25,16 @@ public sealed class LocalHistoricalCatalog : ILocalCurrentIndexOwner
     internal LocalHistoricalCatalog(CurrentCatalogActivation selection,CurrentCatalogStageIndex index)
     {Selection=selection ?? throw new ArgumentNullException(nameof(selection));_index=index ?? throw new ArgumentNullException(nameof(index));}
 
-    public async Task<CurrentCatalogStagePage> ReadPageAsync(CatalogCursor? after,int limit,CancellationToken caller)
+    public Task<CurrentCatalogStagePage> ReadPageAsync(CatalogCursor? after,int limit,CancellationToken caller)=>
+        ReadAsync(token=>_index.ReadPage(after,limit,token),caller);
+    public Task<CurrentCatalogStagePage> ReadPreviousPageAsync(CatalogCursor before,int limit,CancellationToken caller)=>
+        ReadAsync(token=>_index.ReadPreviousPage(before,limit,token),caller);
+    public Task<CurrentCatalogStagePage> ReadAtOrBeforeAsync(long utcMilliseconds,int limit,CancellationToken caller)=>
+        ReadAsync(token=>_index.ReadAtOrBefore(utcMilliseconds,limit,token),caller);
+    public Task<DriveCatalogAsset?> FindAssetAsync(Guid assetId,CancellationToken caller)=>
+        ReadAsync(token=>_index.FindAsset(assetId,token),caller);
+
+    private async Task<T> ReadAsync<T>(Func<CancellationToken,T> query,CancellationToken caller)
     {
         CancellationTokenSource linked;
         lock(_gate) {ObjectDisposedException.ThrowIf(_stopping,this);linked=CancellationTokenSource.CreateLinkedTokenSource(caller,_stop.Token);}
@@ -35,8 +44,8 @@ public sealed class LocalHistoricalCatalog : ILocalCurrentIndexOwner
             try
             {
                 Check(linked.Token);
-                var page=await Task.Run(()=>_index.ReadPage(after,limit,linked.Token),CancellationToken.None).ConfigureAwait(false);
-                Check(linked.Token);return page;
+                var result=await Task.Run(()=>query(linked.Token),CancellationToken.None).ConfigureAwait(false);
+                Check(linked.Token);return result;
             }
             finally {_serial.Release();}
         }
