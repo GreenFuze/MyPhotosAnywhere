@@ -1,5 +1,46 @@
 # MPA 0.6.0 implementation ledger
 
+## Immutable unsigned terminal-work recovery
+
+A reproduced local defect allowed a late Drive ID assignment to change an unsigned
+generation after its terminal disposition had frozen the original pending-work
+hash. The exact new regression first failed because no conflict was thrown. Its
+assertion and source bytes remain unchanged in the passing final verification.
+
+The same transactional terminal-work owner now validates both unsigned and signed
+partial dispositions before ID assignment, current-use checks or receipt admission.
+New preparation into a terminal scope fails; exact historical Prepare retries can
+still read their original bytes without receiving a write grant. Every original
+row, scope, ID, payload, allocation, receipt, human state and selected head remains.
+Dependency references already require the original publication-planned phase.
+
+Pending enumeration and current capture/basis admission exclude unsigned unfinished
+work only through its complete typed disposition. Candidate lookup uses opaque
+exact stored scope equality; incomplete receipts or changed original-work hashes
+fail. Damaged ordinary rows retain their existing visible retry identities. Nothing
+is deleted, silently verified, retargeted or uploaded to make recovery proceed.
+
+All8 new cases pass: the original reproduced allocation, four materialization states
+and all mutation gates, two corrupt scheduling records, and actual first unsigned
+retirement followed by source-policy Root publication and the next real current
+snapshot/basis. The complete affected Services identity union and all447 prior Core
+cases pass with unchanged assertions/deadlines, and strict isolated Desktop has
+zero warnings/errors. Transport/account fixtures are synthetic; native private
+files and owners are real. No live-client or final product acceptance is inferred.
+
+Two local infrastructure attempts were rejected as evidence: an interrupted
+unbounded build and a restricted testhost that connected zero tests within its
+unchanged90-second deadline. Only proven orphaned task build nodes were stopped.
+Bounded builds and native-IPC execution validate the exact original regression;
+no timeout was increased and no application warning exception was added.
+
+Exact parenta12f85a passes all32 required jobs/48 reports,447 Core/617 Services on
+four platforms and every original contract/scale/reference/source/log/deadline and
+fresh-workflow gate. Fresh committed checks must include all617 prior Services
+plus8 new, with no weakening of schema, signing, ownership or warning policy.
+Current dependency IO/producer/engine/gallery composition, processing/plugins,
+remaining workflows/installers and final0.6 acceptance remain unfinished.
+
 ## Actual snapshot and internally derived native publication basis
 
 The current basis preparation owner now performs real private snapshot preparation

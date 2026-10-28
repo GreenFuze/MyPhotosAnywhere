@@ -82,7 +82,7 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
 
     private void CheckCurrent(WorkspacePublicationScope scope, SqliteTransaction? transaction, CatalogGenerationLocalAccess? localAccess = null)
     {
-        AssertSignedPartialWorkMutable(scope,transaction);
+        AssertCurrentPartialWorkMutable(scope,transaction);
         if (localAccess is not null) { localAccess.AssertCurrent(_database, scope, transaction); return; }
         using var command = Command(transaction, """
             SELECT 1 FROM drive_account a JOIN library_configuration c ON c.id=1
@@ -115,7 +115,7 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
         {
             // Enumeration deliberately keeps damaged ordinary records visible.
             // Their payload/scope is validated only when an owner reads the ID.
-            if(captures.IsSignedPartialPublicationDisposedIn(id,transaction,terminal)) continue;
+            if(captures.IsCurrentPartialPublicationDisposedIn(id,transaction,terminal)) continue;
             ids.Add(id);if(ids.Count==limit) break;
         }
         transaction.Commit();return ids.AsReadOnly();
@@ -125,7 +125,7 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
     {
         CheckId(id); if (!Digest(expectedSha256) || !Identity(allocatedId) || allocatedId == "root") throw new ArgumentException("Captured file identity and digest are required.");
         using var transaction = _database.Connection.BeginTransaction(); var captured = Required(id, transaction);
-        AssertSignedPartialWorkMutable(captured.Scope,transaction);
+        AssertCurrentPartialWorkMutable(captured.Scope,transaction);
         if (captured.Sha256 != expectedSha256 || allocatedId == captured.Scope.FolderId || captured.FileId is not null && captured.FileId != allocatedId)
             throw new WorkspacePublicationConflictException();
         if (captured.FileId is null)

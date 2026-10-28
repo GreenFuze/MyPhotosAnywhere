@@ -41,7 +41,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         foreach(var work in publications.Objects)
         {
             token.ThrowIfCancellationRequested();
-            if(work.VerifiedVersion is null && !IsSignedPartialPublicationDisposedIn(work.Id,transaction,terminal))
+            if(work.VerifiedVersion is null && !IsCurrentPartialPublicationDisposedIn(work.Id,transaction,terminal))
                 throw new CatalogGenerationInProgressException();
         }
         // An immutable JSON body without an original native/outbox witness can

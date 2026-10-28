@@ -29,7 +29,7 @@ public sealed partial class CatalogGenerationCaptureRepository
     // Locate terminal work using opaque stored scope equality, never JSON parsing
     // or payload decoding. Damaged ordinary work must remain identifiable for retry.
     // Only a complete typed disposition can exclude an identity from scheduling.
-    internal bool IsSignedPartialPublicationDisposedIn(Guid publicationId,SqliteTransaction transaction,
+    internal bool IsCurrentPartialPublicationDisposedIn(Guid publicationId,SqliteTransaction transaction,
         IDictionary<Guid,bool> terminal)
     {
         var candidates=new List<Guid>();
@@ -38,9 +38,10 @@ public sealed partial class CatalogGenerationCaptureRepository
             JOIN catalog_generation_capture c ON c.scope=w.scope
             WHERE w.id=$id AND EXISTS(
               SELECT 1 FROM processor_meta m
-              WHERE m.key=$prefix||c.id OR m.key=$prefix||c.id||':sha256')
+              WHERE m.key=$signed||c.id OR m.key=$signed||c.id||':sha256'
+                 OR m.key=$unsigned||c.id OR m.key=$unsigned||c.id||':sha256')
             LIMIT 2
-            """,("$id",publicationId.ToString("D")),("$prefix",SignedPartialDispositionPrefix)))
+            """,("$id",publicationId.ToString("D")),("$signed",SignedPartialDispositionPrefix),("$unsigned",UnsignedDispositionPrefix)))
         using(var reader=query.ExecuteReader())
             while(reader.Read()) candidates.Add(ParseId(reader.GetString(0)));
         if(candidates.Count==0) return false;
@@ -49,21 +50,24 @@ public sealed partial class CatalogGenerationCaptureRepository
         if(terminal.TryGetValue(generation,out var disposed)) return disposed;
         var capture=ReadOriginalCaptureFields(generation,transaction)
             ?? throw new InvalidDataException("Terminal partial work lost its exact capture.");
-        disposed=IsSignedPartialDisposedIn(capture.Scope,transaction);
+        disposed=IsCurrentPartialDisposedIn(capture.Scope,transaction);
         if(!disposed) throw new InvalidDataException("Terminal partial work lost its disposition during enumeration.");
         terminal.Add(generation,disposed);return disposed;
     }
 
     // Historical state only. The account lease owner must separately join all
     // entered IO before recording a partial disposition. No network grant escapes.
-    internal bool IsSignedPartialDisposedIn(WorkspacePublicationScope scope,SqliteTransaction transaction)
+    internal bool IsCurrentPartialDisposedIn(WorkspacePublicationScope scope,SqliteTransaction transaction)
     {
-        var key=SignedPartialDispositionPrefix+scope.GenerationId.ToString("D");
-        using(var query=Command(transaction,"SELECT 1 FROM processor_meta WHERE key=$key OR key=$hash",("$key",key),("$hash",key+":sha256")))
+        var id=scope.GenerationId.ToString("D");
+        var signed=SignedPartialDispositionPrefix+id;var unsigned=UnsignedDispositionPrefix+id;
+        using(var query=Command(transaction,"SELECT 1 FROM processor_meta WHERE key=$signed OR key=$signedHash OR key=$unsigned OR key=$unsignedHash",
+            ("$signed",signed),("$signedHash",signed+":sha256"),("$unsigned",unsigned),("$unsignedHash",unsigned+":sha256")))
             if(query.ExecuteScalar() is null) return false;
         var capture=ReadOriginalCaptureFields(scope.GenerationId,transaction)
             ?? throw new InvalidDataException("Terminal partial work lost its exact capture.");
-        if(capture.Scope!=scope || ReadSignedPartialDisposition(capture,transaction,CancellationToken.None) is null)
+        if(capture.Scope!=scope || (ReadSignedPartialDisposition(capture,transaction,CancellationToken.None) is null &&
+            ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is null))
             throw new InvalidDataException("Terminal partial work lost its complete typed disposition.");
         return true;
     }

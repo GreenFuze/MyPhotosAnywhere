@@ -72,7 +72,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         foreach(var work in publications.Objects)
         {
             token.ThrowIfCancellationRequested();
-            if(work.VerifiedVersion is null && work.Scope!=scope && !IsSignedPartialPublicationDisposedIn(work.Id,transaction,terminal))
+            if(work.VerifiedVersion is null && work.Scope!=scope && !IsCurrentPartialPublicationDisposedIn(work.Id,transaction,terminal))
                 throw new CatalogGenerationInProgressException();
         }
         var witnessed=signing.Signing.Intents.Where(value=>value.EnvelopeSha256 is not null)
