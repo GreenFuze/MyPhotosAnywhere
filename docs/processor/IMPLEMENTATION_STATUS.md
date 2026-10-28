@@ -1,5 +1,50 @@
 # MPA 0.6.0 implementation ledger
 
+## Actual snapshot and internally derived native publication basis
+
+The current basis preparation owner now performs real private snapshot preparation
+and derives the exact predecessor/source configuration internally after fresh actual
+Drive inventory/final Root observation. Callers supply no parent, sequence, snapshot
+substitution or source summary. One transaction verifies original capture scope,
+current native/human/policy/account state, pending work, acknowledged selected anchor,
+exact native tip and bounded typed retired ancestry, then records basis and phase.
+It rechecks actual scope/inventory/native inputs after the mutation before commit.
+
+The actual retained native tip remains distinct from the selected catalog. A real
+unselected first signed generation can be superseded/privately retired while Root
+selects no catalog. After its actual source-policy Root publication and canonical
+admission, the next prepared basis correctly retains that exact header as parent
+at native sequence1; no sequence0 reset, invented PublishedHead or obsolete facts
+selection occurs. The previous native-tip assertion retains its original guards
+and delegates to this same verified retrieval path.
+
+Retry uses the same frozen file, IDs, basis and already captured settings/history
+flags even after newer discovery or owner recreation. New work retains established
+0/1 settings/history defaults. Signed/advanced captures require their own recovery;
+revocation cannot overwrite the plan or resume old-source work. The joined owner
+retires its actual snapshot child before borrowed reader/state can release, with
+service/reader cancellation observed before any false Exit acknowledgement.
+
+All10 new Services cases pass, including actual genesis/selected/unselected native
+tips, real file reuse, atomic record/phase and human-drift rollback, input/cancellation
+checks, published revocation, advanced work and joined Exit. All55 affected Services
+pass (every45 preceding capture/snapshot/birth case plus10 new), as do all447 prior
+Core identities. Strict isolated Desktop has zero warnings/errors. Files/native
+owners are real and account/Drive transport is synthetic; no live-client acceptance
+or final100k responsiveness is inferred. Scalar post-write comparisons use verified
+source signature hash/sequence and publisher key, not model object identity.
+
+Exact parent34539c7 passes all32 required jobs/48 reports,447 Core/607 Services on
+four platforms and every prior Google/Protocol/LAN/Web/scale/reference/source/full-
+stream/log/deadline/fresh-workflow gate. Fresh committed checks must preserve all
+identities plus10 new Services:447 Core/617 Services, partitioned47/39/531.
+
+This is immutable basis preparation, not dependency allocation/upload/readback,
+signing, Root selection, current producer/engine/gallery composition, remaining
+plugins/web workflows/installers or final0.6 acceptance. No cloud or original-write
+grant escapes. PC-first/Drive-only Android/loopback development, original/human
+metadata, schemas, established signers and storage/document budgets remain.
+
 ## Actual current-authority private snapshot preparation and recovery
 
 A joined current snapshot service now performs the actual private facts copy and
