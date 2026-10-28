@@ -39,7 +39,7 @@ public sealed partial class CatalogGenerationCaptureRepository
     {
         Id(generationId);using var transaction=_database.Connection.BeginTransaction();token.ThrowIfCancellationRequested();
         var capture=RequiredCapture(generationId,transaction);
-        if(capture.Phase is not ("commit-sealed" or "complete") || ReadUnsignedCurrentDisposition(capture,transaction,token) is not null) throw new CatalogGenerationCaptureConflictException();
+        if(capture.Phase is not ("commit-sealed" or "complete") || ReadUnsignedCurrentDisposition(capture,transaction,token) is not null || ReadSignedPartialDisposition(capture,transaction,token) is not null) throw new CatalogGenerationCaptureConflictException();
         var inputs=SelectionInputsIn(capture,transaction);
         var selected=new CurrentCatalogGenerationSelectionRepository(_database,_budget).ReadForCaptureIn(inputs,transaction,token)
             ?? throw new CatalogGenerationCaptureConflictException();

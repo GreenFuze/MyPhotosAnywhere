@@ -86,6 +86,7 @@ public sealed partial class CatalogGenerationCaptureRepository
 
     private CurrentCatalogGenerationSupersession? ReadCurrentSupersession(CatalogGenerationCapture capture,SqliteTransaction? transaction,CancellationToken token)
     {
+        AssertExclusiveCurrentDisposition(capture,transaction);
         var value=ReadOriginalCurrentSupersession(capture,transaction,token);
         if(value is null) return null;
         ArgumentNullException.ThrowIfNull(transaction);

@@ -1,5 +1,70 @@
 # MPA 0.6.0 implementation ledger
 
+## Signed partial disposition with immutable pending work
+
+A verified original signed header can now receive a distinct historical partial
+disposition after the human source policy changes, while its unfinished metadata
+rows remain intact. The existing fully materialized inspection and actual selected
+completion retain their original contracts. A partial receipt never selects that
+header, writes a publisher head, reuses its obsolete facts, resets an epoch or
+authorizes an original-media operation.
+
+The actual current reader joins the provider account before freezing all original
+pending descriptions. An entered allocation/create receipt therefore settles before
+the disposition transaction checks inventory, native history, the exact original
+header, selected anchor, human bindings and independent Root withdrawals. Paired
+receipt/phase writes and their post-write checks share one transaction and storage
+claim. Terminal dispositions are exclusive and join iterative owned ancestry.
+Subsequent generation selection still follows its genuine acknowledged anchor.
+
+Pending scheduling preserves identity-only enumeration of ordinary work, including
+damaged records that their eventual read/receipt must reject. An opaque stored-scope
+join finds candidate terminal captures; only a complete typed disposition can hide
+their IDs from scheduling. Allocation/receipt guards make terminal work immutable.
+Source reenable cannot revive those pending rows. A separate joined owner retires
+only the exact generated private publication snapshot; outbox identities, payloads,
+assignments, verification versions, counters, human metadata and originals remain.
+
+On fifteen frozen sources, all437 prior Core identities and all280 affected Services
+identities pass: all270 previous plus the ten signed-partial cases. The latter cover
+unallocated/assigned pending work, offline retirement, paired-record/phase/human
+corruption rollback, stale/foreign readers, the actual entered account receipt,
+source reenable, a real next selected generation, pending Root refusal and a genuine
+null head. Strict isolated Desktop reports zero warnings/errors; the actual main-tree
+Desktop build also passes with zero warnings/errors on identical source hashes.
+The existing seven frontend API cases/typecheck/build passed on unchanged assets.
+
+The first full isolated Core run retained435 passes/two failures. Its damaged-journal
+assertion identified the Pending payload-decoding regression, corrected without
+changing that assertion. All nine original outbox tests then passed. A later full
+run retained433 passes/four failures: two product-worker test-peer directory-cleanup
+exceptions obscured their original startup/stop results, and two native exit waits
+missed their existing deadlines. The test peer now retains and joins an actual
+failed-stop owner before frame/directory retirement, preserving the original failure.
+This does not change production stop budgets or any test expectation.
+
+Temporary timing diagnostics passed nine native/product cases and a separate13-case
+large-fixture/native sequence. Both exact uninstrumented test files were restored
+before the successful437/280 regression. The native test bytes and all original
+30/10/5-second assertions remain unchanged. The successful full run records host
+load independently; those measurements do not establish the causes of earlier
+timing failures. Their complete failed reports remain retained and unwaived. No
+runtime warning, original assertion or deadline is suppressed or relaxed.
+
+The exact preceding f2728f3 revision passes all32 required protocol jobs/48 actual
+reports and fresh Android/native/Desktop statuses. Independent source/report/log
+verification preserves all565 ordinary Services per platform,437 Core exactly once,
+139 Google,99 Protocol,9 LAN,27 Web and original scale/reference/fixture evidence.
+Fresh committed signed-partial CI must preserve those identities and add all ten
+cases:575 ordinary Services, with47 header/39 continuity/489 application cases.
+Component validation is not final runtime/physical/live-client acceptance.
+
+PC runtime composition, remaining authority/reuse cases, processing/plugins, complete
+web workflows, six installers and exact final acceptance/publication remain unfinished.
+New Android implementation remains deferred; its Drive-only boundary and final joint
+release gates remain explicit. Schemas12/13/private7/canonical1, one publication
+capture and the shared two-index/512MiB budget are unchanged.
+
 ## Exact original-header P1 receipt and real P2 retirement
 
 The original assigned signed header now has its own joined immutable upload owner.

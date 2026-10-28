@@ -154,7 +154,9 @@ public sealed partial class AccountServiceTests
         internal PublishedCatalogHead Head {get;}=head;
         internal LineageFrozenCapture Pending {get;}=pending;
         internal ProtocolSigningIntent Original {get;}=original;
-        internal static async Task<HeaderRecoveryFixture> CreateAsync(bool seal)
+        internal CurrentCompletionFixture Selected=>selected;
+        internal static async Task<HeaderRecoveryFixture> CreateAsync(bool seal,
+            Action<ProcessorStateDatabase,StorageBudgetManager,WorkspacePublicationScope>? beforeSourceChange=null)
         {
             var selected=await CurrentCompletionFixture.CreateAsync().ConfigureAwait(false);
             try
@@ -183,6 +185,7 @@ public sealed partial class AccountServiceTests
                     var journal=new ProtocolSigningJournal(database,data.Budget);
                     var work=journal.Reserve(pending.Capture.CommitIntentId,pending.Capture.Scope.ActorId,pending.Capture.Scope.ActorEpoch,"catalog-commit",sequence=>plan.EncodeBody(pending.Capture.Scope,sequence));
                     if(seal) work=journal.Seal(work.Id,work.BodySha256,data.Setup.Keys.SignCatalogDocument(work.Body.Span));
+                    beforeSourceChange?.Invoke(database,data.Budget,pending.Capture.Scope);
                     var sources=new LibrarySourceRepository(database);var snapshot=sources.Snapshot();var source=snapshot.Sources.Single();
                     sources.Update(source.Id,false,source.IncludeDescendants,source.Revision,snapshot.Revision);return work;
                 },CancellationToken.None).ConfigureAwait(false);

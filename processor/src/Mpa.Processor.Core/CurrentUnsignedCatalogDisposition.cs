@@ -92,6 +92,7 @@ public sealed partial class CatalogGenerationCaptureRepository
     // or signed intent to satisfy selected/materialized completion invariants.
     private CurrentUnsignedCatalogDisposition? ReadUnsignedCurrentDisposition(CatalogGenerationCapture capture,SqliteTransaction? transaction,CancellationToken token)
     {
+        AssertExclusiveCurrentDisposition(capture,transaction);
         var key=UnsignedDispositionPrefix+capture.Scope.GenerationId.ToString("D");string? text=null;string? digest=null;
         using(var query=Command(transaction,"SELECT key,length(CAST(value AS BLOB)),value FROM processor_meta WHERE key=$key OR key=$hash",("$key",key),("$hash",key+":sha256")))
         using(var reader=query.ExecuteReader()) while(reader.Read())

@@ -82,6 +82,7 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
 
     private void CheckCurrent(WorkspacePublicationScope scope, SqliteTransaction? transaction, CatalogGenerationLocalAccess? localAccess = null)
     {
+        AssertSignedPartialWorkMutable(scope,transaction);
         if (localAccess is not null) { localAccess.AssertCurrent(_database, scope, transaction); return; }
         using var command = Command(transaction, """
             SELECT 1 FROM drive_account a JOIN library_configuration c ON c.id=1
@@ -97,16 +98,34 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
     public IReadOnlyList<Guid> Pending(int limit = 32)
     {
         if (limit is < 1 or > 128) throw new ArgumentOutOfRangeException(nameof(limit));
-        using var command = Command(null, "SELECT id FROM workspace_publication WHERE verified_version IS NULL ORDER BY id LIMIT $limit", ("$limit", limit));
-        using var reader = command.ExecuteReader(); var ids = new List<Guid>();
-        while (reader.Read()) ids.Add(ParseId(reader.GetString(0)));
-        return ids.AsReadOnly();
+        using var transaction=_database.Connection.BeginTransaction();
+        var pending=new List<Guid>();
+        using(var command=Command(transaction,"SELECT id FROM workspace_publication WHERE verified_version IS NULL ORDER BY id LIMIT $bound",
+            ("$bound",WorkspaceObservationRepository.MaximumDocuments+1)))
+        using(var reader=command.ExecuteReader())
+            while(reader.Read())
+            {
+                if(pending.Count==WorkspaceObservationRepository.MaximumDocuments)
+                    throw new InvalidDataException("Pending metadata exceeds its existing complete inventory bound.");
+                pending.Add(ParseId(reader.GetString(0)));
+            }
+        var ids=new List<Guid>();var terminal=new Dictionary<Guid,bool>();
+        var captures=new CatalogGenerationCaptureRepository(_database,_budget);
+        foreach(var id in pending)
+        {
+            // Enumeration deliberately keeps damaged ordinary records visible.
+            // Their payload/scope is validated only when an owner reads the ID.
+            if(captures.IsSignedPartialPublicationDisposedIn(id,transaction,terminal)) continue;
+            ids.Add(id);if(ids.Count==limit) break;
+        }
+        transaction.Commit();return ids.AsReadOnly();
     }
 
     public WorkspacePublicationRecord AssignFileId(Guid id, string expectedSha256, string allocatedId)
     {
         CheckId(id); if (!Digest(expectedSha256) || !Identity(allocatedId) || allocatedId == "root") throw new ArgumentException("Captured file identity and digest are required.");
         using var transaction = _database.Connection.BeginTransaction(); var captured = Required(id, transaction);
+        AssertSignedPartialWorkMutable(captured.Scope,transaction);
         if (captured.Sha256 != expectedSha256 || allocatedId == captured.Scope.FolderId || captured.FileId is not null && captured.FileId != allocatedId)
             throw new WorkspacePublicationConflictException();
         if (captured.FileId is null)

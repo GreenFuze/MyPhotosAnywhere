@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -107,8 +108,19 @@ public sealed class InstalledWorkerTests
             var digest = Convert.ToHexStringLower(await SHA256.HashDataAsync(executable, token).ConfigureAwait(false));
             var fixture = Path.Combine(AppContext.BaseDirectory, "ProductWorker", "Mpa.Processor.WorkerHost.dll");
             var session = Guid.NewGuid(); var diagnostics = Path.Combine(root, "product-diagnostics.log");
-            var process = await FramedWorkerProcess.StartAsync(new(host, digest, [fixture, "--session", session.ToString("D"), "--staging", root],
-                Path.GetDirectoryName(fixture)!, diagnostics), token).ConfigureAwait(false);
+            FramedWorkerProcess process;
+            try
+            {
+                process = await FramedWorkerProcess.StartAsync(new(host, digest, [fixture, "--session", session.ToString("D"), "--staging", root],
+                    Path.GetDirectoryName(fixture)!, diagnostics), token).ConfigureAwait(false);
+            }
+            catch (WorkerStartCleanupException error)
+            {
+                Console.WriteLine("Product fixture startup retained its actual failed-stop owner: " + error);
+                try { await error.RetainedWorker.JoinAfterFailedStopAsync().ConfigureAwait(false); }
+                catch (Exception cleanup) { throw new AggregateException("Product fixture startup and actual recovery join both failed.", error, cleanup); }
+                throw;
+            }
             var peer = new Peer(process, session, diagnostics, token);
             try
             {
@@ -118,7 +130,12 @@ public sealed class InstalledWorkerTests
                 Assert.AreEqual(Recipe, reply.Payload.GetProperty("recipeSha256").GetString());
                 return peer;
             }
-            catch { await peer.DisposeAsync().ConfigureAwait(false); throw; }
+            catch (Exception error)
+            {
+                try { await peer.DisposeAsync().ConfigureAwait(false); }
+                catch (Exception cleanup) { throw new AggregateException("Product fixture handshake and joined disposal both failed.", error, cleanup); }
+                throw;
+            }
         }
         public async Task SendAsync<T>(string type, T payload, WorkerAttempt? attempt = null)
         {
@@ -141,8 +158,19 @@ public sealed class InstalledWorkerTests
         }
         public async ValueTask DisposeAsync()
         {
+            var failures = new List<Exception>();
             try { await _process.DisposeAsync().ConfigureAwait(false); }
-            finally { await _frames.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception error)
+            {
+                failures.Add(error);
+                Console.WriteLine("Product fixture stop failure retained before directory cleanup: " + error);
+                try { await _process.JoinAfterFailedStopAsync().ConfigureAwait(false); }
+                catch (Exception cleanup) { failures.Add(cleanup); }
+            }
+            try { await _frames.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception cleanup) { failures.Add(cleanup); }
+            if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            if (failures.Count > 1) throw new AggregateException("Product fixture stop/frame retirement failures are retained.", failures);
         }
     }
 }

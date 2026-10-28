@@ -78,8 +78,7 @@ public sealed partial class CatalogGenerationCaptureRepository
                     throw new InvalidDataException("Owned lineage is missing, cyclic or exceeds its existing native bound.");
                 var inputs=Read(sequence,parent);var capture=inputs.Publication.Capture;
                 if(capture.Phase!="retired") throw new CatalogGenerationCaptureConflictException();
-                var disposition=_owner.ReadOriginalCurrentSupersession(capture,_transaction,_token)
-                    ?? throw new CatalogGenerationCaptureConflictException();
+                var disposition=_owner.ReadOriginalOwnedDisposition(capture,_transaction,_token);
                 if(disposition.SelectedAnchor!=anchor || inputs.Publication.Basis.ParentSequence!=sequence-1)
                     throw new InvalidDataException("Owned lineage changed its actual selected anchor or contiguous native parent.");
                 parent=inputs.Publication.Basis.Parent;sequence=inputs.Publication.Basis.ParentSequence;

@@ -82,7 +82,7 @@ public sealed partial class CatalogGenerationCaptureRepository
     public CatalogGenerationCapture BeginSnapshotRetirement(Guid generationId)
     {
         Id(generationId); using var transaction = _database.Connection.BeginTransaction(); var capture = RequiredCapture(generationId, transaction);
-        if (capture.Phase is not ("complete" or "snapshot-retiring") || ReadCurrentSupersession(capture,transaction,CancellationToken.None) is not null || ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is not null)
+        if (capture.Phase is not ("complete" or "snapshot-retiring") || ReadCurrentSupersession(capture,transaction,CancellationToken.None) is not null || ReadSignedPartialDisposition(capture,transaction,CancellationToken.None) is not null || ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is not null)
             throw new CatalogGenerationCaptureConflictException();
         if (ReadPublishedHead(transaction)?.GenerationId != generationId || ReadVerification(capture, transaction) is null && ReadCurrentGenerationVerification(capture,transaction) is null)
             throw new InvalidDataException("Snapshot retirement lost its completed publication owner.");
@@ -99,7 +99,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         ArgumentNullException.ThrowIfNull(actual); using var transaction = _database.Connection.BeginTransaction();
         var capture = RequiredCapture(actual.Capture.Scope.GenerationId, transaction); actual.AssertOwned(capture);
         if (capture.Phase != "snapshot-retiring" || ReadCurrentSupersession(capture,transaction,CancellationToken.None) is not null ||
-            ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is not null ||
+            ReadSignedPartialDisposition(capture,transaction,CancellationToken.None) is not null || ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is not null ||
             ReadPublishedHead(transaction)?.GenerationId != capture.Scope.GenerationId)
             throw new CatalogGenerationCaptureConflictException();
         using var storage = _budget.Reserve(65536); storage.RecheckBeforeWrite(storage.Bytes);
@@ -143,7 +143,7 @@ public sealed partial class CatalogGenerationCaptureRepository
 
     private void ValidateVerificationState(CatalogGenerationCapture capture, SqliteTransaction? transaction)
     {
-        if(ReadCurrentSupersession(capture,transaction,CancellationToken.None) is not null || ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is not null)
+        if(ReadCurrentSupersession(capture,transaction,CancellationToken.None) is not null || ReadSignedPartialDisposition(capture,transaction,CancellationToken.None) is not null || ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is not null)
         {
             if(capture.Phase is not ("complete" or "snapshot-retiring" or "retired")) throw new InvalidDataException("Supersession lost its atomic terminal phase.");
             return;
@@ -173,7 +173,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         foreach(var id in ids)
         {
             var capture=Read(id,transaction) ?? throw new InvalidDataException("Retired capture history disappeared.");
-            if(ReadCurrentSupersession(capture,transaction,CancellationToken.None) is null && ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is null) selectedHistory=true;
+            if(ReadCurrentSupersession(capture,transaction,CancellationToken.None) is null && ReadSignedPartialDisposition(capture,transaction,CancellationToken.None) is null && ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is null) selectedHistory=true;
         }
         if(selectedHistory && ReadPublishedHead(transaction) is null) throw new InvalidDataException("Retired selected history lost its completed publisher head.");
     }
@@ -256,7 +256,7 @@ public sealed partial class CatalogGenerationCaptureRepository
             foreach(var id in completedIds)
             {
                 var capture=Read(id,transaction) ?? throw new InvalidDataException("Completed capture disappeared.");
-                if(ReadCurrentSupersession(capture,transaction,CancellationToken.None) is null && ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is null)
+                if(ReadCurrentSupersession(capture,transaction,CancellationToken.None) is null && ReadSignedPartialDisposition(capture,transaction,CancellationToken.None) is null && ReadUnsignedCurrentDisposition(capture,transaction,CancellationToken.None) is null)
                     throw new InvalidDataException("Completed selected publication history lost its atomic head pointer.");
             }
             return null;
