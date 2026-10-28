@@ -21,7 +21,15 @@ public sealed partial class CatalogGenerationCaptureRepository
         CurrentControlSigningInventory signing,LocalCurrentControlAttempt fenced,WorkspacePublicationInventory publications,CancellationToken token=default)
     {
         Id(publicationId);using var transaction=_database.Connection.BeginTransaction();
-        var row=new WorkspacePublicationRepository(_database,_budget).Read(publicationId,transaction) ?? throw new WorkspacePublicationConflictException();
+        var result=ReadCurrentDependencyCloudInputsIn(publicationId,inventory,signing,fenced,publications,transaction,token);
+        token.ThrowIfCancellationRequested();transaction.Commit();return result;
+    }
+
+    private CurrentCatalogDependencyCloudInspection ReadCurrentDependencyCloudInputsIn(Guid publicationId,CurrentWorkspaceInventoryCheckpoint inventory,
+        CurrentControlSigningInventory signing,LocalCurrentControlAttempt fenced,WorkspacePublicationInventory publications,
+        SqliteTransaction transaction,CancellationToken token)
+    {
+        Id(publicationId);var row=new WorkspacePublicationRepository(_database,_budget).Read(publicationId,transaction) ?? throw new WorkspacePublicationConflictException();
         if(row.Role is not("facts-chunk" or "facts-index" or "coverage-page" or "coverage-root")) throw new WorkspacePublicationConflictException();
         var payload=CatalogDependencyPayload.Capture(row.Role,row.MimeType,row.Payload.Span);
         if(payload.IdFor(row.Scope)!=row.Id) throw new WorkspacePublicationConflictException();
@@ -33,6 +41,6 @@ public sealed partial class CatalogGenerationCaptureRepository
         var pin=new LocalCurrentControlObservations(_database,_budget).TransitionBasisIn(fenced,transaction,token).Pin;
         if(row.FileId is {} file && (file==pin.CurrentFileId || file==inputs.Root.Publishers.Reference.FileId ||
             file==inputs.Root.Sources.Reference.FileId || file==inputs.Root.Catalog?.FileId)) throw new WorkspacePublicationConflictException();
-        token.ThrowIfCancellationRequested();transaction.Commit();return new(publication,row,inventory);
+        token.ThrowIfCancellationRequested();return new(publication,row,inventory);
     }
 }

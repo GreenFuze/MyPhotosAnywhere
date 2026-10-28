@@ -11,6 +11,15 @@ public sealed partial class LocalCurrentControlReader
     {
         if(generationId==Guid.Empty) throw new ArgumentException("An original generation identity is required.",nameof(generationId));
         caller.ThrowIfCancellationRequested();var owned=CatalogDependencyPayload.Capture(role,mime,payload.Span);
+        return PrepareCurrentDependencyAsync(generationId,owned,caller);
+    }
+
+    // Internal immutable input for the joined builder sink: caller bytes were
+    // captured before its own queue. The same real current factory stays shared.
+    internal Task<WorkspacePublicationRecord> PrepareCurrentDependencyAsync(Guid generationId,CatalogDependencyPayload owned,CancellationToken caller)
+    {
+        if(generationId==Guid.Empty) throw new ArgumentException("An original generation identity is required.",nameof(generationId));
+        ArgumentNullException.ThrowIfNull(owned);caller.ThrowIfCancellationRequested();
         return OperationAsync(async token=>
         {
             var capture=await CaptureCoreAsync(caller,token).ConfigureAwait(false);

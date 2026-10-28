@@ -1,5 +1,72 @@
 # MPA 0.6.0 implementation ledger
 
+## Current metadata create/readback/receipt and joined frozen-builder sink
+
+The current-authority metadata path now creates only an assigned original
+dependency after genuine current inventory and final Root reads. It checks the
+same actual admission before every physical provider request. Exact downloaded
+account/folder/ID/MIME/version/length/bytes/SHA256 are checked in the transaction
+that records verification; its storage reservation remains held until commit.
+The postcondition permits only that one local receipt delta and independently
+rechecks observation/history/native signing, original capture/basis, accepted
+policies, human scope and selected native parent. Receipt spends the scan and
+returns progress, never a manufactured refreshed grant.
+
+Wrong readback, changed human/publisher authority, SQL errors, rewritten versions,
+unrelated outbox mutation and low storage leave the original assigned unverified
+retry intact. Ambiguous creates retain the exact original ID and bytes. Exit joins
+an actual uncooperative entered create; no late reference is admitted after stop.
+
+CurrentCatalogGenerationObjectSink implements the real frozen dependency builder
+contract. It owns the actual allocator and uploader, borrows the reader's exact
+state/account/storage owners, captures input before its queue and uses the same
+typed current local preparation factory. A real assignment requires a new actual
+scan; an unchanged read-only assigned retry can retain its actual still-checked
+admission. Both children, including any RAM-known-ID checkpoint, must confirm
+retirement before borrowed owners close. Originals and native heads are untouched.
+
+All17 new cases pass, including actual frozen-builder output for all four roles
+(gzip facts, index, coverage page/root), both genesis and an acknowledged selected
+native parent, exact retry references without extra creates/allocations, and
+queued caller-byte ownership with joined sink Exit. All30 directly preceding
+allocation/preparation cases and all447 Core cases pass with exact identity
+preservation. Strict isolated Desktop has zero warnings/errors. The focused
+application/test inputs remain identical after the workflow-only addition.
+
+CA1725 in the new interface implementation was fixed by matching existing parameter
+names; CA1861 in the new fixture was fixed by a static readonly expected array.
+No assertion, deadline, diagnostic gate or warning suppression changed. Parent
+c6aa4d5 has31 of32 required Protocol jobs successful; Mac ARM continuity
+never acquired a hosted runner in three attempts. All fresh Android, desktop and
+native Android workflows succeeded. Its Protocol matrix remains INCOMPLETE.
+The earlier 8cb67d3 matrix passed all32jobs/48reports/all447Core636Services;
+C6's additional19 allocation cases also passed locally with exact-source binding.
+Those655 original identities and all17 additions remain mandatory on all four
+platforms for this new revision. Continuing independent implementation does not
+accept, skip or waive the missing Mac check or final exact-revision CI.
+GitHub copies successful job records across retry attempts with new IDs; actual
+execution timings, runner and steps prove the original30 successes were retained.
+The metadata retry succeeded; continuity remained unassigned. No MPA failure was
+waived. Original failed collectors and raw API records remain retained.
+
+That parent Windows application group took26m49s of the unchanged30m job budget.
+The new workflow therefore requires a separate current-publication group on all
+four existing platforms:47headers/47continuity/47publication/531application,
+all672 ordinary cases exactly once. Every old category exclusion, native hang,
+stream/diagnostic/deadline, scale/reference and source-hash gate remains required.
+Fresh checks must independently verify36jobs/52reports and every preceding case.
+
+This establishes functional metadata IO and a builder sink, not the running
+producer, dependency sealing/signing, Root activation or canonical gallery
+composition. Current verified dependency reuse and efficiency remain unfinished.
+The scan currently rereads every immutable candidate; measure and fix repeated
+metadata IO with genuine live version/delta evidence before product acceptance.
+The local one-photo and selected-parent test durations are not live Drive latency
+measurements. Full processing/plugins, human operations, web workflows, all six
+installers and final acceptance/publication remain substantial. Android stays
+Drive-only with new mobile work deferred; development stays on loopback. Schema,
+signing/upgrade identities, originals and human metadata remain unchanged.
+
 ## Current dependency allocation and joined immutable local checkpoints
 
 An actual complete current inventory can now describe one original prepared
