@@ -1,5 +1,52 @@
 # MPA 0.6.0 implementation ledger
 
+## Current dependency allocation and joined immutable local checkpoints
+
+An actual complete current inventory can now describe one original prepared
+dependency, including its fixed local object ID, payload, private snapshot, native
+basis and selected parent. The reader-owned admission is checked in the state lane
+before each physical GenerateIds attempt under the actual account lease. It admits
+only the four dependency roles and never grants obsolete-source or scope-wide IO.
+
+The allocator borrows the reader's exact state, account and storage owners. Once
+the provider returns an actual canonical ID, it retains that ID before cancellation
+or result admission. The local transaction re-verifies the original native Root and
+policy witness, original generation/snapshot/basis/bytes, and protected-object
+aliases. A bounded streaming local fingerprint allows only the target file-ID
+delta and rolls back changes to every other outbox row without requiring current
+access or treating the fingerprint as a refreshed network observation. Its storage reservation survives until commit. It never substitutes fresh
+authority, a new nonce, payload or generation for old pending work. Source changes
+after the entered request cannot erase the known returned allocation.
+
+A failed valid checkpoint stays owned in RAM and blocks confirmed Exit until
+persisted. A later operation flushes it before any new provider IO. Exit joins the
+actual uncooperative provider and its checkpoint. Only a proven invalid protected-
+object collision is rejected without creating poisoned pending work. Already owned
+observed metadata remains idempotent. Original discovered media, control objects,
+other outbox objects and unknown observed metadata cannot be overwritten by an ID
+receipt. No original media read or update is introduced.
+
+All19 new cases pass: spent-inventory/fresh-observation retry, original bytes and
+private file preservation, cancellation/Exit, low-storage recovery and failed Exit,
+foreign/stale owners, alias rejection, actual SQL rollback/human drift/ID rewrite/unrelated outbox retargeting,
+human changes after physical entry, actual published revocation, and observed-own-
+object retry. All36 selected preceding cases pass with exact identities,
+including selected native-parent preparation and existing header allocation/legacy
+sink behavior; all447 prior Core cases pass. Strict isolated Desktop has zero
+warnings/errors. Transport is synthetic; private files/native owners are real.
+
+Exact parent8cb67d3 passed all32jobs48reports/all447Core636ordinaryServices exactly
+once on four platforms, every original Protocol/Google/LAN/Web, scale/reference,
+source/log/deadline gate and all four fresh workflows. New revision CI remains
+required. No warning, assertion, deadline or earlier-version exception was changed.
+
+This is GenerateIds-only allocation and local progress. Allocation spends the old
+inventory. No metadata create/readback/receipt, renewed grant, current producer,
+engine/gallery route, processing pipeline, installer or final0.6 acceptance is
+enabled. The PC scope remains substantially unfinished. Android stays Drive-only;
+new mobile work is deferred, development listens only on loopback. Schema, exact
+signing identities, originals and human metadata remain unchanged.
+
 ## Current dependency preparation with exact local postconditions
 
 The current reader can now prepare one original dependency retry record after
