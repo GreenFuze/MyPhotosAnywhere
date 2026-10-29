@@ -1,0 +1,134 @@
+name: Processor native feasibility
+on:
+  push:
+    paths:
+      - 'processor/probes/NativeFeasibility/**'
+      - 'processor/probes/fetch_models.py'
+      - 'processor/probes/normalize_models.py'
+      - 'processor/probes/run_native.py'
+      - 'processor/probes/patch_native_source.py'
+      - 'processor/probes/flatbuffer_append_check.cpp'
+      - 'processor/probes/requirements.txt'
+      - 'processor/probes/models.json'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - 'processor/NuGet.Config'
+      - '.github/workflows/processor-feasibility.yml'
+  pull_request:
+    paths:
+      - 'processor/probes/NativeFeasibility/**'
+      - 'processor/probes/fetch_models.py'
+      - 'processor/probes/normalize_models.py'
+      - 'processor/probes/run_native.py'
+      - 'processor/probes/patch_native_source.py'
+      - 'processor/probes/flatbuffer_append_check.cpp'
+      - 'processor/probes/requirements.txt'
+      - 'processor/probes/models.json'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - 'processor/NuGet.Config'
+      - '.github/workflows/processor-feasibility.yml'
+permissions:
+  contents: read
+concurrency:
+  group: processor-feasibility-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  models:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install --only-binary=:all: -r processor/probes/requirements.txt
+      - run: python processor/probes/fetch_models.py
+      - run: python processor/probes/normalize_models.py
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: feasibility-models
+          path: processor/.models/normalized/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+  native:
+    needs: models
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - runner: windows-2025
+            target: windows-x64
+            sourceRuntime: false
+          - runner: ubuntu-24.04
+            target: linux-x64
+            sourceRuntime: true
+          - runner: macos-15
+            target: macos-arm64
+            sourceRuntime: false
+          - runner: macos-15-intel
+            target: macos-x64
+            sourceRuntime: true
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.303'
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: feasibility-models
+          path: processor/.models/normalized/
+      # The NuGet omits Intel macOS; Linux's VM device discovery emits a
+      # warning while probing unused accelerators. Build the same official
+      # CPU runtime with hardware discovery and telemetry disabled.
+      - uses: actions/checkout@v7.0.1
+        if: matrix.sourceRuntime
+        with:
+          repository: microsoft/onnxruntime
+          ref: 402979ac1bef89dcd55add41eaa7277c407599eb
+          path: processor/.runtime-source
+          submodules: recursive
+          persist-credentials: false
+      - name: Build pinned CPU runtime
+        if: matrix.sourceRuntime
+        working-directory: processor/.runtime-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 402979ac1bef89dcd55add41eaa7277c407599eb
+          mkdir -p ../build/feasibility
+          python ../probes/patch_native_source.py runtime .
+          mpa_build_platform=Linux
+          mpa_build_args=(--config Release --build_shared_lib --parallel 2 --skip_tests --targets onnxruntime --skip_submodule_sync --no_telemetry --no_sve --no_kleidiai --cmake_extra_defines onnxruntime_DISABLE_DEVICE_DISCOVERY=ON "MPA_NATIVE_PATCHER=$PWD/../probes/patch_native_source.py")
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            mpa_build_platform=MacOS
+            mpa_build_args+=(CMAKE_OSX_ARCHITECTURES=x86_64)
+          fi
+          ./build.sh "${mpa_build_args[@]}" 2>&1 | tee ../build/feasibility/native-dependency-build.log
+          grep -q '^onnxruntime_DISABLE_DEVICE_DISCOVERY:BOOL=ON$' "build/$mpa_build_platform/Release/CMakeCache.txt"
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            readelf -W -l "build/$mpa_build_platform/Release/libonnxruntime.so" | tee ../build/feasibility/native-elf-program-headers.log
+            python -c 'from pathlib import Path; p=Path("../build/feasibility/native-elf-program-headers.log"); rows=[line.split() for line in p.read_text().splitlines() if "GNU_STACK" in line]; assert len(rows)==1 and rows[0][-2]=="RW", "Runtime must declare a non-executable stack"'
+          fi
+          echo "MPA_ORT_NATIVE_DIRECTORY=$PWD/build/$mpa_build_platform/Release" >> "$GITHUB_ENV"
+      - name: Strict native model and decoder probe
+        run: python processor/probes/run_native.py
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-feasibility-${{ matrix.target }}
+          path: processor/build/feasibility/
+          if-no-files-found: error
+          retention-days: 14

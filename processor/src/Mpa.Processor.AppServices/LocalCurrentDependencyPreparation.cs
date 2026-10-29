@@ -1,0 +1,38 @@
+using Mpa.Processor.Core;
+
+namespace Mpa.Processor.AppServices;
+
+public sealed partial class LocalCurrentControlReader
+{
+    /// <summary>Captures caller bytes before queuing; prepares only original local
+    /// dependency retry work after genuine current inventory/final Root reads.</summary>
+    public Task<WorkspacePublicationRecord> PrepareCurrentDependencyAsync(Guid generationId,string role,string mime,
+        ReadOnlyMemory<byte> payload,CancellationToken caller)
+    {
+        if(generationId==Guid.Empty) throw new ArgumentException("An original generation identity is required.",nameof(generationId));
+        caller.ThrowIfCancellationRequested();var owned=CatalogDependencyPayload.Capture(role,mime,payload.Span);
+        return PrepareCurrentDependencyOwnedAsync(generationId,owned,false,caller);
+    }
+
+    // Internal immutable input for the joined builder sink: caller bytes were
+    // captured before its own queue. The same real current factory stays shared.
+    internal Task<WorkspacePublicationRecord> PrepareCurrentDependencyAsync(Guid generationId,CatalogDependencyPayload owned,CancellationToken caller)=>
+        PrepareCurrentDependencyOwnedAsync(generationId,owned,true,caller);
+
+    private Task<WorkspacePublicationRecord> PrepareCurrentDependencyOwnedAsync(Guid generationId,CatalogDependencyPayload owned,bool reuseCompletedReads,CancellationToken caller)
+    {
+        if(generationId==Guid.Empty) throw new ArgumentException("An original generation identity is required.",nameof(generationId));
+        ArgumentNullException.ThrowIfNull(owned);caller.ThrowIfCancellationRequested();
+        return OperationAsync(async token=>
+        {
+            var capture=await CaptureCoreAsync(caller,token).ConfigureAwait(false);
+            var inventory=await ObserveWorkspaceInventoryCoreAsync(capture,caller,token,reuseCompletedReads).ConfigureAwait(false);
+            return await _state.ExecuteAsync(database=>
+            {
+                Check(caller,token);AssertSnapshotInventory(database,inventory);
+                return new CatalogGenerationCaptureRepository(database,_budget).PrepareCurrentDependency(generationId,owned,
+                    inventory.Checkpoint,inventory.Signing,inventory.Fence.Attempt,inventory.Publications,token);
+            },token).ConfigureAwait(false);
+        },caller);
+    }
+}

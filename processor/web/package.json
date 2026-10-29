@@ -1,0 +1,14 @@
+{
+  "name": "mpa-desktop-web",
+  "version": "0.6.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.22.0" },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "npm run check && npm test && node build.mjs",
+    "test": "node --test api.test.mjs"
+  },
+  "dependencies": { "react": "19.3.1", "react-dom": "19.3.1" },
+  "devDependencies": { "@types/react": "19.3.0", "@types/react-dom": "19.3.0", "esbuild": "0.28.2", "typescript": "7.0.2" }
+}

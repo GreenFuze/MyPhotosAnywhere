@@ -1,0 +1,77 @@
+{
+  "date": "2026-10-20",
+  "status": "Stage 0 provisional candidates; not final release inventory or license acceptance",
+  "lockedProbeDependencies": {
+    "dotnetSdk": "10.0.303",
+    "dotnetRuntime": "10.0.13",
+    "Microsoft.ML.OnnxRuntime": "1.31.0",
+    "SkiaSharp": "4.153.1",
+    "Google.Apis.Auth": "1.77.0",
+    "System.Security.Cryptography.ProtectedData": "10.0.13",
+    "closureHashes": "processor/probes/*/packages.lock.json",
+    "buildOnlyGraphTools": "processor/probes/requirements.txt"
+  },
+  "candidates": [
+    {
+      "capability": "face detection",
+      "candidate": "OpenCV Zoo YuNet 2023mar",
+      "license": "MIT",
+      "source": "https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_detection_yunet",
+      "pins": "processor/probes/models.json",
+      "status": "Windows and Apple Silicon native smoke passed; Linux and Intel source-runtime path in progress; quality not measured"
+    },
+    {
+      "capability": "face embedding",
+      "candidate": "OpenCV Zoo SFace 2021dec with reviewed initializer-input correction",
+      "license": "Apache-2.0",
+      "source": "https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface",
+      "pins": "processor/probes/models.json",
+      "status": "Structural correction proof and three-input numerical comparison passed; native smoke on Windows/Apple Silicon; identity quality and other targets pending"
+    },
+    {
+      "capability": "object categories",
+      "candidate": "OpenCV Zoo YOLOX-s",
+      "license": "Apache-2.0 according to model-directory license",
+      "source": "https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98/models/object_detection_yolox",
+      "status": "Immutable source/weights/license pinned; static NCHW contract checked; provisional Windows CPU execution finite/nonempty with zero warnings. Postprocessing, vocabulary/quality and other native targets pending.",
+      "pins": "processor/probes/models.json"
+    },
+    {
+      "capability": "OCR",
+      "candidate": "Tesseract and explicitly selected language data",
+      "source": "https://github.com/tesseract-ocr/tesseract/releases/tag/5.5.3",
+      "status": "Official stable release and Windows asset digest observed; native package/closure, language data and quality not accepted.",
+      "observedStableVersion": "5.5.3"
+    },
+    {
+      "capability": "video facts/posters",
+      "candidate": "Restricted FFmpeg build without GPL/nonfree options",
+      "source": "https://ffmpeg.org/legal.html",
+      "status": "Official source release observed; source signature, exact restricted flags/codec inventory, native execution and redistribution closure pending.",
+      "observedStableVersion": "9.0.2"
+    },
+    {
+      "capability": "desktop status/tray",
+      "candidate": "Avalonia",
+      "observedStableNugetVersion": "12.1.4",
+      "source": "https://www.nuget.org/packages/Avalonia",
+      "status": "Metadata checked; not selected/restored/tested for the product yet"
+    }
+  ],
+  "nativeRuntimeIssue": {
+    "officialRevision": "402979ac1bef89dcd55add41eaa7277c407599eb",
+    "intelMac": "Official ONNX Runtime 1.31.0 NuGet omits osx-x64; native source-build proof required",
+    "linux": "Stock VM run blocked device-discovery GetPciBusId warning; test CPU source build with onnxruntime_DISABLE_DEVICE_DISCOVERY=ON and no telemetry",
+    "exceptionsGranted": false,
+    "sourceFixIncrement": "67607b119d7e1c6b89dcbafec67c95da72964e6c; all four native jobs passed run 39373514740. Source/hash/full-diagnostic review verified independently. Two-model compatibility proof, not final plugin acceptance.",
+    "memoryMeasurement": "Positive Process peak on Windows/Linux; zero from Mac Process API is unavailable, not a zero footprint. Resource-budget acceptance remains open."
+  },
+  "remainingExitRequirements": [
+    "All required native targets and complete diagnostic review",
+    "All final models/tools/data pinned with verified hashes and license notices",
+    "Representative quality evidence, separate from smoke tests",
+    "Resource/process ownership and CPU limits validated",
+    "No phone inference or paid-service dependency introduced"
+  ],
+  "modelDerivativeNotice": "Changed SFace embeds a dated modification notice; restoring original declarations and notice presence restores exact original protobuf. Other model bytes unchanged."
+}

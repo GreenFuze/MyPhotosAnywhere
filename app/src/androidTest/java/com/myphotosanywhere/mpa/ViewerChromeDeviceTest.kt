@@ -91,13 +91,7 @@ class ViewerChromeDeviceTest {
             compose.onNodeWithText("Export original").performScrollTo().assertIsDisplayed()
             val screenshot=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
             try {
-                val values=android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"viewer-details-$name.png")
-                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE,"image/png")
-                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA")
-                }
-                val uri=requireNotNull(app.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,values))
-                requireNotNull(app.contentResolver.openOutputStream(uri)).use { check(screenshot.compress(Bitmap.CompressFormat.PNG,100,it)) }
+                NativeScreenshotEvidence(app).write("viewer-details-$name",screenshot)
             } finally { screenshot.recycle() }
             compose.onNodeWithTag("photo-details-close").performClick()
             compose.onNodeWithTag("photo-details").assertDoesNotExist()

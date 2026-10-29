@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.provider.MediaStore
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -165,16 +164,7 @@ class ShellNavigationDeviceTest {
 
     private fun saveScreenshot(name: String) {
         if(android.os.Build.VERSION.SDK_INT<29) return
-        val bitmap=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
-        try {
-            val values=android.content.ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME,name)
-                put(MediaStore.MediaColumns.MIME_TYPE,"image/png")
-                put(MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA")
-            }
-            val uri=requireNotNull(app.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values))
-            app.contentResolver.openOutputStream(uri)?.use { check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it)) }
-                ?: error("Cannot save shell screenshot")
-        } finally { bitmap.recycle() }
+        require(name.endsWith(".png"))
+        CompletedScreenshotEvidence(InstrumentationRegistry.getInstrumentation()).capture(name.removeSuffix(".png"))
     }
 }

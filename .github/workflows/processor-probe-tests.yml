@@ -1,0 +1,50 @@
+name: Processor probe ownership tests
+on:
+  push:
+    paths:
+      - 'processor/probes/*.py'
+      - 'processor/probes/*.json'
+      - 'processor/probes/tests/**'
+      - '.github/workflows/processor-probe-tests.yml'
+  pull_request:
+    paths:
+      - 'processor/probes/*.py'
+      - 'processor/probes/*.json'
+      - 'processor/probes/tests/**'
+      - '.github/workflows/processor-probe-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: processor-probe-tests-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  ownership:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: true
+      matrix:
+        runner: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Fail-fast offline ownership checks
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force processor/build/probe-tests | Out-Null
+          python -m unittest discover -s processor/probes/tests -v -f *> processor/build/probe-tests/ownership.log
+          $mpaTestExit = $LASTEXITCODE
+          Get-Content processor/build/probe-tests/ownership.log
+          exit $mpaTestExit
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-probe-tests-${{ matrix.runner }}
+          path: processor/build/probe-tests/
+          if-no-files-found: error
+          retention-days: 14

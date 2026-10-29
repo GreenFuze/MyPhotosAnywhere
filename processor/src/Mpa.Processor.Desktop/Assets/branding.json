@@ -1,0 +1,9 @@
+{
+  "format": "mpa-branding-derivation",
+  "major": 1,
+  "originalVector": "app/src/main/res/drawable/ic_launcher_foreground.xml",
+  "originalVectorSha256": "a7d00b5445adbd298e251fe792a7b5964e7d80b309f59d8bf719a27b27657498",
+  "iconSha256": "e0059c635d123442cc6eb246f2719b762ea367c83530bfa91ef2db80fc414e81",
+  "renderer": "BrandingAssetWriter using the exact locked desktop SkiaSharp dependency; CPU vector rendering at 16/32/48/64/128/256 pixels",
+  "scope": "Original MPA emblem paths and colors, no replacement branding"
+}

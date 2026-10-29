@@ -1,0 +1,38 @@
+{
+  "originalConsentAtUtc": "2026-10-20T04:33:16.4537787+00:00",
+  "originalConsentReportSha256": "cdf28fd348b70c2a5176d32247d670e2a9379a3913020ba88433557268023026",
+  "earliestActualSevenDayBoundaryUtc": "2026-10-27T04:33:16.453778+00:00",
+  "startedAtUtc": "2026-10-27T04:34:12.933399+00:00",
+  "finishedAtUtc": "2026-10-27T04:34:13.539221+00:00",
+  "refreshStartedAtUtc": "2026-10-27T04:34:13.1113788+00:00",
+  "elapsedSinceOriginalConsentSeconds": 604856.6576,
+  "interactiveAuthorizationOccurred": false,
+  "protectedRefreshTokenPresent": true,
+  "grantedScopes": [
+    "https://www.googleapis.com/auth/drive"
+  ],
+  "accessTokenIssuedAtUtc": "2026-10-27T04:34:13.4816343Z",
+  "previousAccessTokenExpiresAtUtc": "2026-10-25T13:30:19.2325036Z",
+  "previousAccessTokenExpiredBeforeRefresh": true,
+  "rawPrivateObservationSha256": "aca83a8206623b0a827591d0252dbe100e9f8591856e1db9c7a42c86708c3dc1",
+  "runtimeFiles": {
+    "DriveFeasibility.deps.json": "e24fcc081ce4a5a2127c751499057dc4446a26073c90d86f539a3dfa8b3d34b2",
+    "DriveFeasibility.dll": "21b0bc7f7028ba66f8cdab19577617fc93a525e21305f5e5f2ddf2445f5bc7cf",
+    "DriveFeasibility.exe": "125542c7287582d621d9a767e55a5bacc64ef5e93777190d2492991a1787a66f",
+    "DriveFeasibility.pdb": "f09ff5238dda7c078aab499b1bcb114b96996a2b03da02b233b8c1d9af452221",
+    "DriveFeasibility.runtimeconfig.json": "c230a317a54dd960bcbeb5f347f52e18dc665a26f7efda2159fced9a5ac7e097",
+    "Google.Apis.Auth.dll": "1c6ccab2c4e06910f9f954d186984656f3c2ba285f37f70b68bfac81159cf4de",
+    "Google.Apis.Core.dll": "20cabb7679ac53042c71743390b962e490a313578edd3ee31dc40a83248997c3",
+    "Google.Apis.dll": "ec2f5f5ecde9e4cc0bda19a39d2ac7f7acd50bfa1f41ecc3f5fff6e127f43980",
+    "Newtonsoft.Json.dll": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b",
+    "System.CodeDom.dll": "4d33e2986a84d4460853e2b98d3a1ba9f8aa2950f7fa12ff6ad2e15a4bccfd18",
+    "System.Management.dll": "36056b240f488b7da63720585d84f93183cf7bd05da68d5340151ebdd85e4d88",
+    "System.Security.Cryptography.ProtectedData.dll": "2495a79b01bf74ec3a5d2029fa9b94e0c167ab09b0cba1b9b7e9b89661f3ebe6",
+    "runtimes/win/lib/net7.0/System.Management.dll": "979fee559e30cc0fc4af6f34548a225b6f08cae0a6c61d24a3e389b3f22dc9d1"
+  },
+  "originalProtectedStorePresent": true,
+  "authorizationHistoryUnchanged": true,
+  "driveWritePerformed": false,
+  "clockChanged": false,
+  "scope": "Actual original Windows Stage0 full-Drive grant refreshed in a new standalone process after more than seven real days, without browser/interactive consent. This is grant-viability evidence; it does not establish product vault/platform, background suspension/network recovery, independent clients or final0.6 acceptance."
+}

@@ -1,0 +1,88 @@
+{
+  "note": "Independently generated with Python cryptography P-256. Ephemeral private key is not retained; public material is a synthetic test actor only.",
+  "publicKeySpki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4KDNSKL45tTo4IqHgkOyBY+QZ4qEpj5C5eay4m45KUhXDnAYQNRN4+SFiPTYdGkhw6kOQGZT6gJ+FhpFs2bPlQ==",
+  "body": "{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"}",
+  "envelope": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+  "signature": {
+    "algorithm": "ES256",
+    "keyId": "dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b",
+    "value": "yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g"
+  },
+  "invalid": [
+    {
+      "name": "unsigned",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1}",
+      "compatibility": false
+    },
+    {
+      "name": "embedded-key-is-not-authority",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1,\"publicKeySpki\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4KDNSKL45tTo4IqHgkOyBY+QZ4qEpj5C5eay4m45KUhXDnAYQNRN4+SFiPTYdGkhw6kOQGZT6gJ+FhpFs2bPlQ==\",\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": false
+    },
+    {
+      "name": "unknown-format",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"other\",\"major\":1,\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": false
+    },
+    {
+      "name": "future-version",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":2,\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": true
+    },
+    {
+      "name": "text-version",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":\"1\",\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": false
+    },
+    {
+      "name": "null-document",
+      "json": "{\"document\":null,\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": false
+    },
+    {
+      "name": "null-signature",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":null}",
+      "compatibility": false
+    },
+    {
+      "name": "missing-key-id",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"algorithm\":\"ES256\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": false
+    },
+    {
+      "name": "signature-extra-field",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"accepted\":true,\"algorithm\":\"ES256\",\"keyId\":\"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": false
+    },
+    {
+      "name": "wrong-algorithm",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"algorithm\":\"RS256\",\"keyId\":\"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": false
+    },
+    {
+      "name": "padded-signature",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g=\"}}",
+      "compatibility": false
+    },
+    {
+      "name": "wrong-key",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": false
+    },
+    {
+      "name": "tampered-caption",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"Different caption\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": false
+    },
+    {
+      "name": "noncanonical-spacing",
+      "json": "{\"document\": {\"actorId\": \"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\", \"epoch\": \"1\", \"format\": \"mpa\", \"kind\": \"user-operation\", \"libraryId\": \"94a81164-e980-4ec1-a566-cec36475b839\", \"major\": 1, \"minor\": 0, \"payload\": {\"caption\": \"שלום 📷\", \"sequence\": \"1\"}, \"requiredCapabilities\": [], \"sequence\": \"1\"}, \"format\": \"mpa-signed-document\", \"major\": 1, \"signature\": {\"algorithm\": \"ES256\", \"keyId\": \"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\", \"value\": \"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": false
+    },
+    {
+      "name": "duplicate-major",
+      "json": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"major\":1,\"minor\":0,\"payload\":{\"caption\":\"שלום 📷\",\"sequence\":\"1\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"dafe9be00f3a96c7e504277cc4ba57478c1742d249a08c64696e20ee76bbdf4b\",\"value\":\"yyuJ9ML7OVtF6TESb0_oq-jTshvTNu1RmMQD12v2o1mq1DcCd0ZnGlnIZZQ41U0dhfTGzl5tJ_y2Nj_hO-Im_g\"}}",
+      "compatibility": false
+    }
+  ]
+}

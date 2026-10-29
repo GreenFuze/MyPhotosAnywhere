@@ -74,4 +74,20 @@ class XmpCodecTest {
         assertThrows(IllegalArgumentException::class.java) { XmpCodec.encode(c.copy(people=listOf(PortablePerson("person","a".repeat(201))))) }
     }
 
+    @Test fun oversizedCatalogIsRejectedBeforeParsingPreviousXmlOrBuildingItsDom() {
+        val asset=catalog().assets.single().copy(instructions="a".repeat(XmpCodec.MAX_BYTES+1))
+        val error=assertThrows(XmpSizeLimitException::class.java) {
+            XmpCodec.encode(catalog().copy(assets=listOf(asset)),"not XML")
+        }
+        assertTrue(error.message.orEmpty().contains("2 MiB"))
+    }
+    @Test fun escapingAndRetainedForeignXmlCannotExceedTheOutputLimit() {
+        val asset=catalog().assets.single().copy(instructions="&".repeat(XmpCodec.MAX_BYTES/4))
+        assertThrows(XmpSizeLimitException::class.java) { XmpCodec.encode(catalog().copy(assets=listOf(asset))) }
+        val previous=XmpCodec.encode(catalog()).replace("</rdf:Description>",
+            "<other:Note xmlns:other=\"urn:other\">${"x".repeat(XmpCodec.MAX_BYTES-3000)}</other:Note></rdf:Description>")
+        val changed=catalog().let { it.copy(assets=it.assets.map { a -> a.copy(instructions="x".repeat(4000)) }) }
+        assertThrows(XmpSizeLimitException::class.java) { XmpCodec.encode(changed,previous) }
+    }
+
 }

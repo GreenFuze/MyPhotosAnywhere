@@ -1,0 +1,50 @@
+name: Processor authorization storage probe
+on:
+  push:
+    paths:
+      - 'processor/probes/DriveFeasibility/**'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - '.github/workflows/processor-auth-feasibility.yml'
+  pull_request:
+    paths:
+      - 'processor/probes/DriveFeasibility/**'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - '.github/workflows/processor-auth-feasibility.yml'
+permissions:
+  contents: read
+concurrency:
+  group: processor-auth-probe-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  storage:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.303'
+      - name: Strict build and synthetic protected-store checks
+        working-directory: processor
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/auth-checks | Out-Null
+          dotnet restore probes/DriveFeasibility/DriveFeasibility.csproj --locked-mode --verbosity minimal *> build/auth-checks/restore.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build probes/DriveFeasibility/DriveFeasibility.csproj --no-restore -c Release --verbosity minimal *> build/auth-checks/build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet probes/DriveFeasibility/bin/Release/net10.0/DriveFeasibility.dll vault-check unused.json .private/ci-synthetic-vault file *> build/auth-checks/storage.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Content build/auth-checks/storage.log
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-authorization-storage-probe
+          path: processor/build/auth-checks/
+          if-no-files-found: error
+          retention-days: 14

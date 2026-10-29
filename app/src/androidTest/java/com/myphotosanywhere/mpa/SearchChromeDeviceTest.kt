@@ -1,6 +1,5 @@
 package com.myphotosanywhere.mpa
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -51,12 +50,7 @@ class SearchChromeDeviceTest {
         val image=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         try {
-            val values=android.content.ContentValues().apply {
-                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,if(dark) "search-dark-rtl-large.png" else "search-light-large.png")
-                put(android.provider.MediaStore.MediaColumns.MIME_TYPE,"image/png");put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/MPA")
-            }
-            val uri=requireNotNull(context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,values))
-            requireNotNull(context.contentResolver.openOutputStream(uri)).use { check(image.compress(Bitmap.CompressFormat.PNG,100,it)) }
+            NativeScreenshotEvidence(context).write(if(dark) "search-dark-rtl-large" else "search-light-large",image)
         } finally { image.recycle() }
     }
 }

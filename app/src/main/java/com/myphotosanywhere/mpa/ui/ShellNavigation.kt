@@ -10,7 +10,7 @@ enum class ShellDestination(val id: Int, val title: String) {
     PLACES(3,"Places"), STORAGE(4,"Sources"), SEARCH(5,"Search"), AI_ACTIVITY(6,"AI activity"),
     ACTIVITY(7,"Activity"), IMPORTS(8,"Import photos"), IMPORT_HISTORY(9,"Import history"),
     SETTINGS(10,"Settings"), CACHE(11,"Storage and cache"), RECOGNITION(12,"Recognition"),
-    ANNOTATIONS(13,"Backup and metadata"), PRIVACY(14,"Privacy and permissions"), ABOUT(15,"About MPA"), TRASH(16,"Trash"), PREFERENCES(17,"Preferences"), PHOTO_VIEW(18,"Photos view"), DEVICE_FOLDERS(19,"On this device");
+    ANNOTATIONS(13,"Backup and metadata"), PRIVACY(14,"Privacy and permissions"), ABOUT(15,"About MPA"), TRASH(16,"Trash"), PREFERENCES(17,"Preferences"), PHOTO_VIEW(18,"Photos view"), DEVICE_FOLDERS(19,"On this device"), SHARED_LIBRARY(20,"Shared library");
     val primary: Boolean get()=this in listOf(PHOTOS,COLLECTIONS,SEARCH)
 }
 

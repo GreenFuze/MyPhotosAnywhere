@@ -47,6 +47,71 @@ class DriveGateway(
     suspend fun children(parent: String, page: String? = null): DrivePage = list(
         "'${literal(parent)}' in parents and trashed = false and (mimeType = '$FOLDER_MIME' or mimeType contains 'image/' or mimeType contains 'video/' or name contains '.json')", page)
 
+    /** Bounded actual account observation for the independent catalog transport. */
+    internal suspend fun catalogWorkspaceAccount(): DriveUser = withContext(Dispatchers.IO) {
+        DriveWorkspaceMetadata.account(workspaceResponse(Request.Builder().url(url("about","fields" to "user(permissionId,emailAddress)")),16384))
+    }
+
+    internal suspend fun catalogWorkspaceCursor(sharedDriveId: String? = null): String = withContext(Dispatchers.IO) {
+        sharedDriveId?.let(DriveWorkspaceMetadata::opaque)
+        DriveWorkspacePage.startCursor(workspaceResponse(Request.Builder().url(url("changes/startPageToken","supportsAllDrives" to "true","fields" to "startPageToken","driveId" to sharedDriveId)),16384))
+    }
+
+    internal suspend fun catalogWorkspaceChanges(cursor: DriveWorkspaceCursor): DriveWorkspaceChangesPage = withContext(Dispatchers.IO) {
+        val fields = "nextPageToken,newStartPageToken,changes(fileId,driveId,changeType,removed,file($WORKSPACE_FIELDS))"
+        val request = Request.Builder().url(url("changes","pageSize" to "100","spaces" to "drive","supportsAllDrives" to "true",
+            "includeItemsFromAllDrives" to "true","includeRemoved" to "true","includeCorpusRemovals" to "true","fields" to fields,
+            "pageToken" to cursor.token,"driveId" to cursor.sharedDriveId))
+        DriveWorkspaceChangesPage.decode(workspaceResponse(request,512 * 1024),cursor)
+    }
+
+    /** All workspace children, including binary chunks excluded by legacy media queries. */
+    internal suspend fun catalogWorkspacePage(parent: String,page: String? = null): DriveWorkspacePage = withContext(Dispatchers.IO) {
+        DriveWorkspaceMetadata.opaque(parent); page?.let(DriveWorkspacePage::pageToken)
+        val request = Request.Builder().url(url("files","q" to "'${literal(parent)}' in parents and trashed = false",
+            "pageSize" to "100","fields" to "nextPageToken,incompleteSearch,files($WORKSPACE_FIELDS)","pageToken" to page,
+            "supportsAllDrives" to "true","includeItemsFromAllDrives" to "true"))
+        DriveWorkspacePage.decode(workspaceResponse(request,1024 * 1024))
+    }
+
+    internal suspend fun catalogWorkspaceFile(id: String): DriveWorkspaceMetadata = withContext(Dispatchers.IO) {
+        DriveWorkspaceMetadata.opaque(id)
+        DriveWorkspaceMetadata.decode(workspaceResponse(Request.Builder().url(url("files/$id","fields" to WORKSPACE_FIELDS,
+            "supportsAllDrives" to "true")),16384))
+    }
+
+    internal suspend fun catalogWorkspaceBytes(id: String,expectedBytes: Long): ByteArray {
+        DriveWorkspaceMetadata.opaque(id)
+        require(expectedBytes in 1..4L * 1024 * 1024)
+        return workspaceResponse(Request.Builder().url(url("files/$id","alt" to "media","supportsAllDrives" to "true")),
+            expectedBytes.toInt(),expectedBytes.toInt())
+    }
+
+    private suspend fun workspaceResponse(request: Request.Builder,maximum: Int,exact: Int? = null): ByteArray {
+        val context = currentCoroutineContext()
+        return execute(request) { response ->
+            // Do not consume an unbounded provider error body at this strict boundary.
+            if (!response.isSuccessful) throw DriveHttpException(response.code,null)
+            if (response.code != 200) throw IOException("Unexpected partial Drive workspace response.")
+            val body = response.body
+            if (body.contentLength() > maximum || exact != null && body.contentLength() >= 0 && body.contentLength() != exact.toLong())
+                throw IOException("Drive workspace response changed its declared length.")
+            body.byteStream().use { input -> java.io.ByteArrayOutputStream(minOf(maximum,65536)).use { output ->
+                val buffer = ByteArray(16384)
+                while (true) {
+                    context.ensureActive()
+                    val count = input.read(buffer,0,minOf(buffer.size,maximum - output.size() + 1))
+                    if (count < 0) break
+                    if (count == 0 || count > maximum - output.size()) throw IOException("Drive workspace response exceeds its bound.")
+                    output.write(buffer,0,count)
+                }
+                context.ensureActive()
+                if (exact != null && output.size() != exact) throw IOException("Drive workspace object was truncated.")
+                output.toByteArray()
+            } }
+        }
+    }
+
     suspend fun startToken(): String = json(Request.Builder().url(url("changes/startPageToken", "supportsAllDrives" to "true")))
         .string("startPageToken") ?: error("Drive change token missing.")
 
@@ -321,6 +386,7 @@ class DriveGateway(
 
     companion object {
         const val FOLDER_MIME = "application/vnd.google-apps.folder"
+        private const val WORKSPACE_FIELDS = "id,mimeType,size,sha256Checksum,version,parents,trashed,capabilities(canDownload),driveId"
         private const val FILE_FIELDS = "id,name,mimeType,size,md5Checksum,sha256Checksum,version,parents,capabilities(canAddChildren,canTrash,canUntrash),modifiedTime,thumbnailLink,trashed,imageMediaMetadata(time,location(latitude,longitude)),appProperties"
         private val JSON = "application/json; charset=utf-8".toMediaType()
         fun literal(value: String) = value.replace("\\", "\\\\").replace("'", "\\'")
