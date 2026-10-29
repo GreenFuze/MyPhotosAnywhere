@@ -1,5 +1,52 @@
 # MPA 0.6.0 implementation ledger
 
+## Actual desktop engine composition with current canonical ownership
+
+The desktop now composes an engine-lifetime bundle owning the initial fixed Root
+publisher, actual current control reader, shared two-index pool, canonical reader
+and generation drain. It borrows exact accounts, signing keys, state and budget.
+Startup reopens acknowledged historical photos without provider IO. Browser
+cancellation cannot cancel admitted background publication; Exit joins real work
+and every semantic child before borrowed native state can retire.
+
+Cold approved libraries publish the actual two initial policies, one create-only
+fixed Root and then the first real catalog. A genuine retained initial-Root receipt
+prevents replaying bootstrap over later catalog Roots; it provides no fresh grant.
+The generation drain still performs actual current admission. Source changes show
+attention and preserve frozen/native/outbox work instead of silently retargeting it.
+The optional legacy composition remains available to its existing callers, while
+foreign owner combinations fail before IO.
+
+Six new native composition cases pass, including genuine cold start, background
+publication, historical reopen, unchanged-ready recheck, physical Root Exit/retry,
+source attention and foreign owners. All45 affected prior runtime identities and
+all27 Web identities pass; strict isolated Web/Desktop builds have zero warnings
+or errors. Every existing fixture method/assertion/deadline is retained verbatim;
+the existing reader fixture only gains a separate genuine cold factory.
+
+The first six-case run passed5 and failed the new cold case. Its diagnostic showed
+the old initial-policy fake correctly rejecting application/gzip: that endpoint
+only modeled JSON policy creates. The new cold test now models a separate gzip
+facts endpoint, validating its actual captured outbox role, scope, hash and bytes.
+The old JSON-only assertion, all product code and every expectation/deadline stay
+unchanged. Original five-pass/one-fail and diagnostic reports remain retained.
+
+Core/Protocol source and test bytes are unchanged since the actual parent15a
+447Core/113Protocol proof and were not redundantly rerun locally. Parent15a has
+independently verified52-job/68-report native evidence. This component requires
+56jobs/72reports,113Protocol447Core728 ordinary Services exactly once per platform:
+47headers/47continuity/47publication/12graphs/15fresh/9outgoing/7drain/6composition/
+538application. All previous identities and source/scale/reference/stream/log,
+30-minute ordinary and Windows5-minute hang gates remain mandatory and unchanged.
+
+This enables the running background engine composition. The web gallery/viewer
+still reads local discovery and needs a genuine canonical account index, exact
+stage-bound cursors and canonical frozen viewer identities. Current recovery/reuse,
+efficient reconciliation, processing/plugins, human/web workflows, six native
+installers/lifecycle, live Drive/performance and exact release remain unfinished.
+Android stays Drive-only; new mobile work is deferred and final joint acceptance
+remains explicit. Development binds only127.0.0.1; no release is claimed.
+
 ## Current generation drain and bounded owned signature verification
 
 The standalone current-generation runtime finishes immutable pending work before

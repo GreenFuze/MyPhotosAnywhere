@@ -68,10 +68,10 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
             owner._viewers = new(state, stateDirectory, installationId, storage);
             owner._preparations = new(state, stateDirectory, installationId, storage);
             var setup = new LibraryWorkspaceSetup(state, owner._accounts, owner._signing, storage);
-            var catalog = new LocalCatalogReconciliationService(state, owner._accounts, owner._signing, storage);
-            owner._publication = new(state, owner._accounts, owner._signing, storage, catalog,
-                new CatalogGenerationRuntime(state, stateDirectory, installationId, storage, catalog, owner._signing));
+            owner._publication = new(state, owner._accounts, owner._signing, storage,
+                currentCatalog: new CurrentLibraryCatalogRuntime(state, stateDirectory, installationId, owner._accounts, owner._signing, storage));
             owner._publication.Failed += owner.OnFailure;
+            await owner._publication.InitializeCurrentCatalogAsync(cancellationToken).ConfigureAwait(false);
             owner._sources.CatalogChanged += owner._publication.NotifyLocalCatalogChanged;
             var application = new DesktopEngineApplication(library, state, owner._accounts, owner._sources.Work, owner._sources, owner._viewers, setup, owner._publication);
             owner._host = await DesktopWebHost.StartAsync(application, assetsDirectory, enableLan ? owner._identity.Identity : null, cancellationToken).ConfigureAwait(false);

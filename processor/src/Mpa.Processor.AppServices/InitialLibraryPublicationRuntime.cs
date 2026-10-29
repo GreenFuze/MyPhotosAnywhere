@@ -15,7 +15,7 @@ public sealed record InitialLibraryPublicationActivity(InitialLibraryPublication
 /// Stop joins the actual attempt/uploader before borrowed keys/accounts/state may retire.</summary>
 public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator state, ProcessorAccountService accounts,
     LibrarySigningIdentityOwner keys, StorageBudgetManager budget, LocalCatalogReconciliationService? catalog = null,
-    CatalogGenerationRuntime? generations = null) : IAsyncDisposable
+    CatalogGenerationRuntime? generations = null, CurrentLibraryCatalogRuntime? currentCatalog = null) : IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
@@ -25,6 +25,8 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
     private readonly LocalCatalogReconciliationService? _catalog = catalog;
     private readonly CatalogGenerationRuntime? _generations = generations is null || catalog is not null && generations.Borrows(catalog)
         ? generations : throw new ArgumentException("Generation work must borrow this runtime's owned current reconciler.", nameof(generations));
+    private readonly CurrentLibraryCatalogRuntime? _currentCatalog = currentCatalog is null || catalog is null && generations is null && currentCatalog.Borrows(state, accounts, keys, budget)
+        ? currentCatalog : throw new ArgumentException("Current engine work must own its exact state/account/key/budget bundle, with no parallel legacy reconciler.", nameof(currentCatalog));
     private readonly object _gate = new();
     private readonly CancellationTokenSource _stop = new();
     private Task? _attempt;
@@ -39,11 +41,17 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
     private string? _workspaceAccountId;
     private InitialLibraryPublicationActivity _activity = new(InitialLibraryPublicationStage.NeedsApproval, null, false);
     public event Action<Exception>? Failed;
-    public Exception? Failure { get { lock (_gate) return _failure; } }
+    public Exception? Failure { get { lock (_gate) return _failure ?? _currentCatalog?.Failure; } }
     public Exception? LastAttemptFailure { get { lock (_gate) return _lastAttemptFailure; } }
     public bool ExitConfirmed { get { lock (_gate) return _exitConfirmed; } }
     public InitialLibraryPublicationActivity Activity { get { lock (_gate) return _activity; } }
     public ReconciledLocalCatalog? CurrentCatalog => _catalog?.Current;
+    public CurrentCanonicalReadRuntime? CurrentCanonicalCatalog => _currentCatalog?.Catalog;
+    public Task<CurrentCatalogActivation?> InitializeCurrentCatalogAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested(); ThrowIfStopping();
+        return _currentCatalog?.InitializeHistoricalAsync(cancellationToken) ?? Task.FromResult<CurrentCatalogActivation?>(null);
+    }
 
     /// <summary>Called on engine startup and after committed workspace approval. The
     /// caller can cancel before admission; after admission only this owner's Stop can
@@ -145,13 +153,14 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
                 await _publication.PublishAsync(_stop.Token).ConfigureAwait(false); ThrowIfStopping();
                 readiness = InitialLibraryPublicationStage.PoliciesPublished;
             }
-            if (readiness == InitialLibraryPublicationStage.PoliciesPublished && _catalog is not null)
+            if (readiness == InitialLibraryPublicationStage.PoliciesPublished && (_catalog is not null || _currentCatalog is not null))
             {
                 lock (_gate) { ThrowIfStopping(); _activity = new(InitialLibraryPublicationStage.Running, "Checking current library history.", false); }
-                if (_generations is not null) await _generations.RunUntilCurrentAsync(_stop.Token).ConfigureAwait(false);
+                if (_currentCatalog is not null) await _currentCatalog.RunUntilCurrentAsync(_stop.Token).ConfigureAwait(false);
+                else if (_generations is not null) await _generations.RunUntilCurrentAsync(_stop.Token).ConfigureAwait(false);
                 else while (true)
                 {
-                    try { await _catalog.ReconcileAsync(_stop.Token).ConfigureAwait(false); break; }
+                    try { await (_catalog ?? throw new InvalidOperationException("The configured legacy catalog owner is missing.")).ReconcileAsync(_stop.Token).ConfigureAwait(false); break; }
                     // Each batch has committed real cursor progress. Continue the next
                     // bounded batch without involving a browser or restarting bootstrap.
                     catch (WorkspaceHistoryReplayPendingException) { ThrowIfStopping(); }
@@ -176,7 +185,7 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
 
     private static bool Recoverable(Exception error) => error is IOException or HttpRequestException or OperationCanceledException or ProtocolFormatException or
         TokenResponseException or CredentialVaultException or
-        StaleLibraryConfigurationException or StaleDriveConnectionException or LibraryWorkspaceApprovalException or
+        StaleLibraryConfigurationException or StaleDriveConnectionException or CurrentControlObservationConflictException or LibraryWorkspaceApprovalException or
         LibraryInitialPublicationConflictException or LibraryInitialPolicyConflictException or LibraryInitialPublicationCompletionMissingException or
         WorkspaceObservationConflictException or WorkspaceHistoryRecoveryRequiredException or SigningHistoryRecoveryRequiredException or WorkspaceInventoryIncompleteException or WorkspacePublicationInventoryChangedException or ProtocolSigningInventoryChangedException or InsufficientStorageBudgetException or
         CatalogPublicationNotAuthorizedException or ControllerAuthorityConflictException ||
@@ -190,7 +199,7 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
             InsufficientStorageBudgetException => "Free space on this computer, then retry library setup.",
             TokenResponseException or HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized } => "Reconnect Google Drive in Settings. Saved library work will resume after authorization.",
             CredentialVaultException => "Unlock this computer’s credential storage, then retry library setup. Saved progress has been kept.",
-            StaleDriveConnectionException or StaleLibraryConfigurationException => "Google Drive access or the approved source settings changed. Review them before retrying.",
+            StaleDriveConnectionException or StaleLibraryConfigurationException or CurrentControlObservationConflictException => "Google Drive access or the approved source settings changed. Review them before retrying.",
             LibraryWorkspaceApprovalException => "Review this workspace’s sharing permission before publishing private metadata.",
             LibraryInitialPublicationCompletionMissingException or LibraryInitialPublicationConflictException or LibraryInitialPolicyConflictException or
                 WorkspaceObservationConflictException or WorkspaceHistoryRecoveryRequiredException or SigningHistoryRecoveryRequiredException or CatalogPublicationNotAuthorizedException or ControllerAuthorityConflictException or InvalidDataException or ProtocolFormatException =>
@@ -223,9 +232,11 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
         var publicationStop = _publication.DisposeAsync().AsTask(); Task attempt;
         var generationStop = _generations?.DisposeAsync().AsTask() ?? Task.CompletedTask;
         lock (_gate) attempt = _attempt ?? Task.CompletedTask;
-        var joined = Task.WhenAll(publicationStop, generationStop, attempt);
+        var currentStop = _currentCatalog?.DisposeAsync().AsTask() ?? Task.CompletedTask;
+        var joined = Task.WhenAll(publicationStop, generationStop, currentStop, attempt);
         try { await joined.ConfigureAwait(false); }
         catch { if (joined.Exception is not null) throw joined.Exception; throw; }
+        if (_currentCatalog is { ExitConfirmed: false }) throw new InvalidOperationException("The current library bundle has not physically joined; retain borrowed accounts, keys and state.", _currentCatalog.Failure);
         if (_catalog is not null) await _catalog.DisposeAsync().ConfigureAwait(false); // All borrowers and their actual I/O have joined first.
         if (cancellationFailure is not null) throw new AggregateException("Library setup cancellation needs attention; retain its borrowed owners.", cancellationFailure);
         _stop.Dispose(); lock (_gate) { _exitConfirmed = true; _activity = new(InitialLibraryPublicationStage.Stopped, null, false); }

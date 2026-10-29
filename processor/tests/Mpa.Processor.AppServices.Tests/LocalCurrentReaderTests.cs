@@ -180,6 +180,22 @@ public sealed partial class AccountServiceTests
             catch {await data.DisposeAsync().ConfigureAwait(false);if(connection is not null) await connection.DisposeAsync().ConfigureAwait(false);http.Dispose();await vault.DisposeAsync().ConfigureAwait(false);throw;}
             finally {File.Delete(path);}
         }
+        public static async Task<CurrentReaderFixture> CreateBeforeInitialPoliciesAsync(bool addSource=false)
+        {
+            var data=await InitialPublicationFixture.CreateAsync(addSource:addSource).ConfigureAwait(false);var vault=new SetupSigningVault();var http=new CurrentReadHttp(data);
+            GoogleAccountConnection? connection=null;
+            var path=Path.Combine(Path.GetTempPath(),"mpa-current-reader-client-"+Guid.NewGuid().ToString("N")+".json");
+            try
+            {
+                var id=Guid.NewGuid();var store=new GoogleCredentialDataStore(vault,id,()=>CancellationToken.None);
+                await store.StoreAsync(store.UserId,new TokenResponse {AccessToken="synthetic-access",RefreshToken="synthetic-refresh",Scope=GoogleCredentialDataStore.DriveScope,
+                    TokenType="Bearer",ExpiresInSeconds=3600,IssuedUtc=DateTime.UtcNow}).ConfigureAwait(false);
+                File.WriteAllText(path,JsonSerializer.Serialize(new {installed=new {client_id="synthetic.apps.googleusercontent.com",client_secret="synthetic-public-client"}}));
+                connection=new(DesktopOAuthConfiguration.Load(path),vault,id,"permission-A",http);return new(data,connection,http,vault);
+            }
+            catch {await data.DisposeAsync().ConfigureAwait(false);if(connection is not null) await connection.DisposeAsync().ConfigureAwait(false);http.Dispose();await vault.DisposeAsync().ConfigureAwait(false);throw;}
+            finally {File.Delete(path);}
+        }
         public async ValueTask DisposeAsync()
         {await Reader.DisposeAsync().ConfigureAwait(false);await Data.DisposeAsync().ConfigureAwait(false);await _connection.DisposeAsync().ConfigureAwait(false);await _vault.DisposeAsync().ConfigureAwait(false);}
     }
