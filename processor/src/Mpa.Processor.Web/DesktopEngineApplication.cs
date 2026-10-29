@@ -7,7 +7,7 @@ namespace Mpa.Processor.Web;
 /// <summary>Browser adapter borrowing engine-lifetime accounts, read owners, state and work.</summary>
 public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoordinator state, ProcessorAccountService accounts,
     IProcessorWorkControl work, ProcessorSourceRuntime? sources = null, CatalogViewerSessions? viewers = null, LibraryWorkspaceSetup? setup = null,
-    InitialLibraryPublicationRuntime? publication = null) : IDesktopWebApplication, IDesktopLibraryCatalogApplication
+    InitialLibraryPublicationRuntime? publication = null) : IDesktopWebApplication, IDesktopLibraryCatalogApplication, IDesktopLibraryPreviewApplication
 {
     private readonly Guid _libraryId = libraryId != Guid.Empty ? libraryId : throw new ArgumentException("Library identity is required.", nameof(libraryId));
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
@@ -57,6 +57,8 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
             var photo = catalog.ResolveVisible(entry.AssetId); return new DesktopViewerEntry(entry.Position, entry.AssetId, photo is null ? null : DesktopCatalogReader.Photo(photo));
         }).ToArray());
     }, cancellationToken);
+    public Task<DesktopPreview?> LibraryPreviewAsync(Guid stageId,Guid assetId,string? accountId,CancellationToken cancellationToken)=>
+        new DesktopLibraryPreviewReader(_publication?.CurrentCanonicalCatalog ?? throw new DesktopLibraryCatalogUnavailableException(),new DesktopLibraryPreviewTransport(_accounts)).ReadAsync(stageId,assetId,accountId,cancellationToken);
     public Task<DesktopLibraryCatalogPage> LibraryCatalogAsync(string? accountId,string? position,bool newer,long? dateUtc,CancellationToken cancellationToken)
     {
         var current=_publication?.CurrentCanonicalCatalog ?? throw new DesktopLibraryCatalogUnavailableException();

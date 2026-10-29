@@ -183,6 +183,10 @@ public sealed class DesktopWebHost : IAsyncDisposable
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
             catch (DesktopLibraryCatalogUnavailableException error)
             { context.Response.StatusCode = 503; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
+            catch (DriveMediaVersionChangedException error)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
+            catch (DesktopLibraryPreviewUnavailableException error)
+            { context.Response.StatusCode = 503; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
             catch (InvalidDesktopCatalogQueryException error)
             { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
             catch (CatalogSessionSelectionUnavailableException error)
@@ -226,6 +230,15 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 context.Response.Cookies.Delete(CookieName, CookieOptions(RequestEndpoint(context)!)); context.Response.StatusCode = 204; break;
             case ("GET", "/api/status"):
                 await context.Response.WriteAsJsonAsync(await _application.SnapshotAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("GET", "/api/library/preview"):
+                if (_application is not IDesktopLibraryPreviewApplication libraryPreview) {context.Response.StatusCode=404;break;}
+                var previewStageText=RequiredQuery(context,"stage");var previewAssetText=RequiredQuery(context,"asset");
+                if(!Guid.TryParseExact(previewStageText,"D",out var previewStage) || previewStage==Guid.Empty || previewStage.ToString("D")!=previewStageText ||
+                    !Guid.TryParseExact(previewAssetText,"D",out var previewAsset) || previewAsset==Guid.Empty || previewAsset.ToString("D")!=previewAssetText)
+                    throw new BadHttpRequestException("Invalid captured preview identity.");
+                var previewAccount=OptionalQuery(context,"account",256);
+                if(previewAccount is not null && !Identity(previewAccount)) throw new BadHttpRequestException("Invalid preview account.");
+                await WritePreviewAsync(context,await libraryPreview.LibraryPreviewAsync(previewStage,previewAsset,previewAccount,token).ConfigureAwait(false),token).ConfigureAwait(false);break;
             case ("GET", "/api/library/catalog"):
                 if (_application is not IDesktopLibraryCatalogApplication libraryCatalog)
                 { context.Response.StatusCode = 404; break; }

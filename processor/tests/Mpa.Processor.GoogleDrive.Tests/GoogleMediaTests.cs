@@ -6,7 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Mpa.Processor.GoogleDrive.Tests;
 
 [TestClass]
-public sealed class GoogleMediaTests
+public sealed partial class GoogleMediaTests
 {
     [TestMethod]
     public async Task BoundedReadOnlyMediaPageKeepsIdsTimestampsAndPartialStatusWithoutThumbnailUrls()

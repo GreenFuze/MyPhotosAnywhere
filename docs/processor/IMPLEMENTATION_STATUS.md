@@ -1,5 +1,64 @@
 # MPA 0.6.0 implementation ledger
 
+## Canonical PC gallery, frozen viewer UI and version-observed private previews
+
+The PC gallery now uses the authenticated canonical library metadata API. It keeps
+actual selected stages and accounts in page cursors, opened viewer requests/windows
+and preview URLs. Runtime response validation bounds pages and IDs, rejects foreign
+accounts/stages, duplicate identities, malformed continuations and false empty
+selections. No discovery/configuration revision is fabricated. A genuinely unselected
+catalog has a separate getting-ready state. Missing viewer positions remain missing.
+Background/account changes cannot retarget a captured viewer; explicit navigation
+uses its original frozen context. The separate legacy APIs retain their old bodies.
+
+Private previews use the actual current account reader and an optional read-only
+Google capability. Actual file identity/version observations surround the bounded
+thumbnail fetch; a changed or trashed final observation rejects the bytes. The same
+HTTPS lh3 credential-origin allowlist,4MiB JPEG/PNG/WebP bounds and physical network
+cancellation/Exit ownership apply. Original media is never downloaded. Provider URLs
+and credentials stay on the host. Historical metadata supplies IDs/versions, not
+provider/write permission. After provider IO the exact canonical stage/account/file/
+version is checked again; missing/substituted or late results never become previews.
+Version changes return409 and unsupported capability503 without ending the session.
+Provider-observed stability is not a cryptographic promise about Google's thumbnail
+cache, nor a substitute for independent live-provider acceptance.
+
+Actual independent local evidence:10 new Google cases plus139 exact prior Google;
+6 new Web plus42 exact prior Web. The original Google CA1859 new-fixture diagnostic
+is retained; a concrete call and separate capability assertion fixed the fixture,
+without changing any expectation/deadline/production byte. All old test bodies stay
+verbatim, with only two partial keywords added. Existing Core/AppServices sources
+and every other old native test byte remain unchanged.
+
+Strict frontend typecheck, production bundle and all7 old+4 new API contracts pass
+exactly once with no skip/cancellation/failure. Locked npm install/audit reports zero
+vulnerabilities. Original TS2345/TS7053 failure is retained; explicit string/property
+guards fixed indexed-access validation without suppressions or weaker contracts.
+Strict isolated Desktop passes with zero warnings/errors. Its actual packaged4 web
+assets match the exact tested production bundle. Prior generated assets were backed
+up; transferring these exact bytes avoids rerunning passed tests to regenerate them.
+
+Parent36279d5 has actual PC-only acceptance:56 Protocol jobs/72 reports plus
+4 Desktop builds. Android compatibility is deferred to final joint release; its
+existing build failure is recorded and is not a gate for these PC commits. The original718d
+Windows cancellation failure and deterministic two-case red/green repair remain
+recorded, with unchanged original assertions and deadlines. This packet requires the same
+workflow and full113Protocol469Core737Services, plus149Google48Web once per platform.
+Every old identity/scale/reference/source/full-stream/log/30-minute ordinary/
+Windows5-minute hang gate and exact15 AGP records remain unchanged. Additionally,
+all4 native Desktop artifact reports must carry this exact revision, the same4 web
+asset hashes, matching lockfile, zero audited vulnerabilities and all11 exact API
+cases. Native build/assets are distinct from browser/live/install acceptance.
+
+The canonical gallery/viewer/preview data paths are now connected in source and
+validated components. Chrome synthetic UI checks passed: account/page/frozen-missing navigation, stale
+stage retention and explicit recovery with an empty console. Native backend, date
+seek, independent live Drive and installer acceptance remain required.
+Current recovery/reuse/incremental efficiency, processing/plugins, human/web flows,
+six installers/lifecycle, resource/performance diagnostics and exact final release
+remain unfinished. Android stays Drive-only; new mobile work is deferred and final
+joint acceptance is explicit. Development binds only127.0.0.1. No0.6 release claimed.
+
 ## Viewer result admission rejects shutdown and original-caller cancellation
 
 Windows CI on718d executed113 Protocol successfully and463 Core with462 passed,

@@ -3,6 +3,10 @@ export interface StorageBudget { reserveBytes: number; cacheLimitBytes: number; 
 export interface Snapshot { libraryId: string; state: string; accounts: Account[]; pending: { id: string; expectedAccountId: string | null }[]; credentialCleanupCount: number; storageAttention: StorageBudget | null }
 export interface CatalogPhoto { id: string; accountId: string; name: string; mimeType: string; width: number | null; height: number | null; effectiveUtc: number | null; dateProvenance: 'Unknown' | 'DriveCapture' | 'DriveModification'; rawCapture: string | null }
 export interface CatalogPage { discoveryRevision: number; configurationRevision: number; photos: CatalogPhoto[]; olderCursor: string | null; newerCursor: string | null }
+export type LibraryCatalogPage = { available: false; stageId: null; photos: []; olderCursor: null; newerCursor: null } | { available: true; stageId: string; photos: CatalogPhoto[]; olderCursor: string | null; newerCursor: string | null };
+export interface LibraryViewerWindow extends ViewerWindow { stageId: string; accountId: string | null }
+const libraryIdentity = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value) && value !== '00000000-0000-0000-0000-000000000000';
+const libraryAccount = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9_-]{1,256}$/.test(value);
 export interface ViewerEntry { position: number; assetId: string; photo: CatalogPhoto | null }
 export interface ViewerWindow { id: string; count: number; position: number; entries: ViewerEntry[] }
 export interface Source { id: string; accountId: string; folderId: string; displayName: string; includeDescendants: boolean; enabled: boolean; revision: number; accountConnected: boolean }
@@ -57,6 +61,65 @@ export class DesktopApi {
   }
   async status(signal: AbortSignal): Promise<Snapshot> {
     return await this.get<Snapshot>('/api/status', signal);
+  }
+  async libraryCatalog(account: string | null, cursor: string | null, newer: boolean, date: number | null, signal: AbortSignal): Promise<LibraryCatalogPage> {
+    if (account !== null && !libraryAccount(account)) throw new Error('Invalid shared-library account.');
+    const query = new URLSearchParams(); if (account !== null) query.set('account', account); if (cursor !== null) query.set('cursor', cursor);
+    if (newer) query.set('direction', 'newer'); if (date !== null) query.set('date', date.toString());
+    const value = await this.get<unknown>('/api/library/catalog?' + query, signal);
+    const invalid = () => new Error('MPA returned an invalid shared photo page. The visible photos were retained.');
+    if (typeof value !== 'object' || value === null || !('available' in value) || typeof value.available !== 'boolean' || !('stageId' in value) ||
+      !('photos' in value) || !Array.isArray(value.photos) || value.photos.length > 60 || !('olderCursor' in value) || !('newerCursor' in value)) throw invalid();
+    if (!value.available) {
+      if (cursor !== null || value.stageId !== null || value.photos.length !== 0 || value.olderCursor !== null || value.newerCursor !== null) throw invalid();
+    } else {
+      if (!libraryIdentity(value.stageId)) throw invalid();
+      if (cursor !== null) this.libraryCursor(cursor, value.stageId, account);
+      if (value.olderCursor !== null) this.libraryCursor(value.olderCursor, value.stageId, account);
+      if (value.newerCursor !== null) this.libraryCursor(value.newerCursor, value.stageId, account);
+      const ids = new Set<string>();
+      for (const photo of value.photos) { const valid = this.libraryPhoto(photo, account); if (ids.has(valid.id)) throw invalid(); ids.add(valid.id); }
+    }
+    return value as unknown as LibraryCatalogPage;
+  }
+  libraryPreview(stage: string, asset: string, account: string | null): string {
+    if (!libraryIdentity(stage) || !libraryIdentity(asset) || account !== null && !libraryAccount(account)) throw new Error('Invalid captured shared photo identity.');
+    const query = new URLSearchParams({ stage, asset }); if (account !== null) query.set('account', account); return '/api/library/preview?' + query;
+  }
+  async openLibraryViewer(id: string, selectedId: string, accountId: string | null, stageId: string, signal: AbortSignal): Promise<LibraryViewerWindow> {
+    if (!libraryIdentity(id) || !libraryIdentity(selectedId) || !libraryIdentity(stageId) || accountId !== null && !libraryAccount(accountId)) throw new Error('Invalid captured shared viewer context.');
+    const response = await fetch('/api/viewers', { method: 'POST', credentials: 'same-origin', signal,
+      headers: { 'Content-Type': 'application/json', 'X-MPA-CSRF': this.csrf }, body: JSON.stringify({ id, selectedId, accountId, stageId }) });
+    await this.check(response); return this.libraryViewerWindow(await response.json(), stageId, accountId);
+  }
+  async libraryViewer(id: string, position: number, stage: string, account: string | null, signal: AbortSignal): Promise<LibraryViewerWindow> {
+    return this.libraryViewerWindow(await this.get<unknown>('/api/viewers?' + new URLSearchParams({ viewer: id, position: position.toString() }), signal), stage, account);
+  }
+  private libraryViewerWindow(value: unknown, stage: string, account: string | null): LibraryViewerWindow {
+    const frame = this.viewerWindow(value);
+    if (!('stageId' in frame) || frame.stageId !== stage || !('accountId' in frame) || frame.accountId !== account)
+      throw new Error('MPA returned another shared viewer context. Navigation stopped.');
+    const ids = new Set<string>();
+    for (const entry of frame.entries) { if (!libraryIdentity(entry.assetId) || ids.has(entry.assetId)) throw new Error('MPA returned conflicting shared photo identities.'); ids.add(entry.assetId); if (entry.photo !== null) this.libraryPhoto(entry.photo, account); }
+    return frame as LibraryViewerWindow;
+  }
+  private libraryCursor(value: unknown, stage: string, account: string | null): void {
+    const invalid = () => new Error('MPA returned an invalid shared photo cursor. The visible photos were retained.');
+    if (typeof value !== 'string' || value.length > 400) throw invalid();
+    const fields = value.split('|');
+    if (fields.length !== 5 || fields[0] !== 'c1' || fields[1] !== stage || fields[2] !== (account ?? '*') || !libraryIdentity(fields[4])) throw invalid();
+    const date = fields[3]; if (typeof date !== 'string') throw invalid(); if (date !== 'unknown' && (!/^(0|[1-9][0-9]*|-[1-9][0-9]*)$/.test(date) || !Number.isSafeInteger(Number(date)) || Number(date) < -62135596800000 || Number(date) > 253402300799999)) throw invalid();
+  }
+  private libraryPhoto(value: unknown, account: string | null): CatalogPhoto {
+    const invalid = () => new Error('MPA returned an invalid shared photo identity. The visible photos were retained.');
+    if (typeof value !== 'object' || value === null || !('id' in value) || !libraryIdentity(value.id) || !('accountId' in value) || !libraryAccount(value.accountId) || account !== null && value.accountId !== account ||
+      !('name' in value) || typeof value.name !== 'string' || value.name.length > 4096 || !('mimeType' in value) || typeof value.mimeType !== 'string' || value.mimeType.length > 256 || !/^(image|video)\//.test(value.mimeType) ||
+      !('effectiveUtc' in value) || value.effectiveUtc !== null && (typeof value.effectiveUtc !== 'number' || !Number.isSafeInteger(value.effectiveUtc) || value.effectiveUtc < -62135596800000 || value.effectiveUtc > 253402300799999) ||
+      !('dateProvenance' in value) || !['Unknown', 'DriveCapture', 'DriveModification'].includes(value.dateProvenance as string) ||
+      !('rawCapture' in value) || value.rawCapture !== null && (typeof value.rawCapture !== 'string' || value.rawCapture.length > 128)) throw invalid();
+    if (!('width' in value) || !('height' in value)) throw invalid();
+    for (const dimension of [value.width, value.height]) if (dimension !== null && (typeof dimension !== 'number' || !Number.isInteger(dimension) || dimension < 1 || dimension > 1000000)) throw invalid();
+    return value as CatalogPhoto;
   }
   async catalog(account: string | null, cursor: string | null, newer: boolean, date: number | null, signal: AbortSignal): Promise<CatalogPage> {
     const query = new URLSearchParams(); if (account) query.set('account', account); if (cursor) query.set('cursor', cursor);

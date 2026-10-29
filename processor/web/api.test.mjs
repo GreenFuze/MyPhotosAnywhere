@@ -100,3 +100,62 @@ test('canceling connection export never creates a client enrollment or setup req
   }, async api => { await assert.rejects(api.libraryConnection(controller.signal), { name: 'AbortError' }); });
   assert.equal(requests, 1);
 });
+
+
+const sharedStage = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const sharedAsset = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const sharedOther = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const sharedViewer = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const sharedPhoto = { id: sharedAsset, accountId: 'account-A', name: 'Literal <tag> שלום.jpg', mimeType: 'image/jpeg', width: 40, height: 30, effectiveUtc: 100, dateProvenance: 'DriveCapture', rawCapture: null };
+const sharedPage = { available: true, stageId: sharedStage, rootSequence: 7, photos: [sharedPhoto], olderCursor: null, newerCursor: null };
+
+test('canonical photo reads use the shared route with a captured stage/account cursor and preserve literal metadata', async () => {
+  const signal = new AbortController().signal; const cursor = `c1|${sharedStage}|account-A|100|${sharedAsset}`;
+  await withBrowser(async (url, options) => {
+    const uri = new URL(url, 'https://local.invalid'); assert.equal(uri.pathname, '/api/library/catalog'); assert.equal(uri.searchParams.get('account'), 'account-A');
+    assert.equal(uri.searchParams.get('cursor'), cursor); assert.equal(uri.searchParams.get('direction'), 'newer'); assert.equal(options.signal, signal); assert.equal(options.credentials, 'same-origin'); assert.equal(options.method, undefined);
+    return json({ ...sharedPage, olderCursor: cursor });
+  }, async api => { const page = await api.libraryCatalog('account-A', cursor, true, null, signal); assert.deepEqual(page.photos, [sharedPhoto]); assert.equal(page.stageId, sharedStage); assert.equal('discoveryRevision' in page, false); });
+});
+
+test('canonical photo responses cannot replace a retained page with another stage/account, duplicate identities or a false empty selection', async () => {
+  const invalid = [null, {}, { ...sharedPage, stageId: '00000000-0000-0000-0000-000000000000' }, { ...sharedPage, photos: [sharedPhoto, sharedPhoto] },
+    { ...sharedPage, photos: [{ ...sharedPhoto, accountId: 'account-B' }] }, { ...sharedPage, photos: [{ ...sharedPhoto, effectiveUtc: 253402300800000 }] },
+    { ...sharedPage, olderCursor: `c1|${sharedOther}|account-A|100|${sharedAsset}` }, { ...sharedPage, olderCursor: `c1|${sharedStage}|account-B|100|${sharedAsset}` },
+    { ...sharedPage, olderCursor: `c1|${sharedStage}|account-A|+100|${sharedAsset}` }, { ...sharedPage, available: false }];
+  for (const value of invalid) await withBrowser(async () => json(value), async api => { await assert.rejects(api.libraryCatalog('account-A', null, false, null, new AbortController().signal), /invalid shared photo/); });
+  const cursor = `c1|${sharedStage}|account-A|100|${sharedAsset}`;
+  for (const value of [{ ...sharedPage, stageId: sharedOther }, { available: false, stageId: null, photos: [], olderCursor: null, newerCursor: null }])
+    await withBrowser(async () => json(value), async api => { await assert.rejects(api.libraryCatalog('account-A', cursor, false, null, new AbortController().signal), /invalid shared photo/); });
+  await withBrowser(async () => json({ available: false, stageId: null, photos: [], olderCursor: null, newerCursor: null }), async api => {
+    assert.equal((await api.libraryCatalog(null, null, false, null, new AbortController().signal)).available, false);
+  });
+});
+
+test('canonical viewer commands keep the captured stage/account and reject a different context while retaining missing slots', async () => {
+  const csrf = 'a'.repeat(64); const signal = new AbortController().signal; let reads = 0;
+  const frame = { id: sharedViewer, count: 2, position: 0, stageId: sharedStage, accountId: 'account-A', entries: [{ position: 0, assetId: sharedAsset, photo: sharedPhoto }, { position: 1, assetId: sharedOther, photo: null }] };
+  await withBrowser(async (url, options) => {
+    if (url === '/api/session') return json({ csrf, hostOwner: true });
+    assert.equal(options.credentials, 'same-origin'); assert.equal(options.signal, signal);
+    if (options.method === 'POST') {
+      assert.equal(url, '/api/viewers'); assert.equal(options.headers['X-MPA-CSRF'], csrf); assert.deepEqual(JSON.parse(options.body), { id: sharedViewer, selectedId: sharedAsset, accountId: 'account-A', stageId: sharedStage }); return json(frame);
+    }
+    const uri = new URL(url, 'https://local.invalid'); assert.equal(uri.pathname, '/api/viewers'); assert.equal(uri.searchParams.get('viewer'), sharedViewer); assert.equal(uri.searchParams.get('position'), '1');
+    return json({ ...frame, position: 1, stageId: ++reads === 1 ? sharedStage : sharedOther });
+  }, async api => {
+    await api.connect(); assert.equal((await api.openLibraryViewer(sharedViewer, sharedAsset, 'account-A', sharedStage, signal)).stageId, sharedStage);
+    const missing = await api.libraryViewer(sharedViewer, 1, sharedStage, 'account-A', signal); assert.equal(missing.entries[1].assetId, sharedOther); assert.equal(missing.entries[1].photo, null);
+    await assert.rejects(api.libraryViewer(sharedViewer, 1, sharedStage, 'account-A', signal), /another shared viewer context/);
+  });
+});
+
+test('canonical preview URLs carry only captured identities and cancellation remains an abortable same-origin read', async () => {
+  const controller = new AbortController(); controller.abort(); let requests = 0;
+  await withBrowser(async (url, options) => { requests++; assert.equal(new URL(url, 'https://local.invalid').pathname, '/api/library/catalog'); assert.equal(options.signal, controller.signal); assert.equal(options.method, undefined); throw new DOMException('Read canceled', 'AbortError'); }, async api => {
+    const uri = new URL(api.libraryPreview(sharedStage, sharedAsset, 'account-A'), 'https://local.invalid'); assert.equal(uri.pathname, '/api/library/preview'); assert.equal(uri.searchParams.get('stage'), sharedStage); assert.equal(uri.searchParams.get('asset'), sharedAsset); assert.equal(uri.searchParams.get('account'), 'account-A');
+    assert.throws(() => api.libraryPreview('00000000-0000-0000-0000-000000000000', sharedAsset, null), /Invalid captured shared/);
+    assert.throws(() => api.libraryPreview(sharedStage, sharedAsset, 'someone@example.com'), /Invalid captured shared/);
+    await assert.rejects(api.libraryCatalog(null, null, false, null, controller.signal), { name: 'AbortError' });
+  }); assert.equal(requests, 1);
+});

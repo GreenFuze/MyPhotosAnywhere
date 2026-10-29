@@ -6,7 +6,7 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.Web.Tests;
 
 [TestClass]
-public sealed class DesktopLibraryViewerReaderTests
+public sealed partial class DesktopLibraryViewerReaderTests
 {
     [TestMethod]
     public async Task CanonicalViewerMetadataKeepsFrozenStageAccountPositionsAndMissingIdentities()
