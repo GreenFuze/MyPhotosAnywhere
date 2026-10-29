@@ -97,22 +97,40 @@ public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase databa
 
     public ProtocolSigningIntent Seal(Guid id, string expectedBodySha256, DocumentSignature signature)
     {
-        CheckId(id); ArgumentNullException.ThrowIfNull(signature);
-        using var transaction = _database.Connection.BeginTransaction(); var intent = Read(id, transaction) ?? throw new InvalidOperationException("The reserved signing intent is missing.");
-        if (intent.BodySha256 != expectedBodySha256) throw new ProtocolSigningConflictException();
-        var actor = Actor(intent.ActorId, intent.Epoch, transaction);
-        _ = new ProtocolDocumentReader(Capabilities).VerifyAndRead(intent.Body.Span, signature, Authority(actor));
-        var envelope = new SignedProtocolDocuments(Capabilities).Encode(intent.Body.Span, signature); var hash = Hash(envelope);
-        if (intent.Envelope is not null)
+        CheckId(id);ArgumentNullException.ThrowIfNull(signature);
+        using var transaction=_database.Connection.BeginTransaction();
+        using var sealedWrite=SealIn(id,expectedBodySha256,signature,transaction);
+        sealedWrite.Recheck();transaction.Commit();return sealedWrite.Value;
+    }
+
+    // Borrow the exact transaction while the caller retains this native write's
+    // storage owner through every phase/outbox postcondition and actual commit.
+    // The body, actor, counter, signature and first envelope are unchanged.
+    internal ProtocolSigningReservation SealIn(Guid id,string expectedBodySha256,DocumentSignature signature,SqliteTransaction transaction)
+    {
+        CheckId(id);ArgumentNullException.ThrowIfNull(signature);ArgumentNullException.ThrowIfNull(transaction);
+        if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Native envelope sealing requires its owner's live transaction.");
+        var intent=Read(id,transaction)??throw new InvalidOperationException("The reserved signing intent is missing.");
+        if(intent.BodySha256!=expectedBodySha256) throw new ProtocolSigningConflictException();
+        var actor=Actor(intent.ActorId,intent.Epoch,transaction);
+        _=new ProtocolDocumentReader(Capabilities).VerifyAndRead(intent.Body.Span,signature,Authority(actor));
+        var envelope=new SignedProtocolDocuments(Capabilities).Encode(intent.Body.Span,signature);var hash=Hash(envelope);
+        if(intent.Envelope is not null)
         {
-            if (!intent.Envelope.Value.Span.SequenceEqual(envelope)) throw new ProtocolSigningConflictException();
-            transaction.Commit(); return intent;
+            if(!intent.Envelope.Value.Span.SequenceEqual(envelope)) throw new ProtocolSigningConflictException();
+            return new(intent,null);
         }
-        using var reservation = _budget.Reserve(checked(envelope.LongLength * 3 + 65536)); reservation.RecheckBeforeWrite(reservation.Bytes);
-        using (var update = Command(transaction, "UPDATE signing_intent SET envelope=$bytes,envelope_hash=$hash WHERE id=$id AND body_hash=$bodyHash AND envelope IS NULL",
-            ("$bytes", envelope), ("$hash", hash), ("$id", id.ToString("D")), ("$bodyHash", expectedBodySha256)))
-            if (update.ExecuteNonQuery() != 1) throw new ProtocolSigningConflictException();
-        transaction.Commit(); return intent with { Envelope = envelope, EnvelopeSha256 = hash };
+        StorageReservation? reservation=_budget.Reserve(checked(envelope.LongLength*3+65536));
+        try
+        {
+            reservation.RecheckBeforeWrite(reservation.Bytes);
+            using(var update=Command(transaction,"UPDATE signing_intent SET envelope=$bytes,envelope_hash=$hash WHERE id=$id AND body_hash=$bodyHash AND envelope IS NULL",
+                ("$bytes",envelope),("$hash",hash),("$id",id.ToString("D")),("$bodyHash",expectedBodySha256)))
+                if(update.ExecuteNonQuery()!=1) throw new ProtocolSigningConflictException();
+            var owned=new ProtocolSigningReservation(intent with{Envelope=envelope,EnvelopeSha256=hash},reservation);
+            reservation=null;return owned;
+        }
+        finally {reservation?.Dispose();}
     }
 
     internal ProtocolSigningIntent? Read(Guid id, SqliteTransaction? transaction)

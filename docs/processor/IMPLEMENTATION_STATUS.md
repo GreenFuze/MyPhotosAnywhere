@@ -1,5 +1,67 @@
 # MPA 0.6.0 implementation ledger
 
+## Current native header preparation and actual metadata provider path
+
+A joined current-only owner now prepares the original frozen dependency graph,
+reserves its exact plan-derived native header and obtains a new actual complete
+scan before signing. A distinct validator requires the exact current human scope,
+accepted Root source/publisher, original native body/counter, selected parent,
+complete bounded inventory and unchanged human/native/outbox inputs. Existing
+obsolete-original-scope public inspection/recovery retains its strict behavior.
+Cloud admission and receipt derive the branch again from actual human state.
+
+Native reservation admits only the intended publisher counter and original
+unsigned intent. Native sealing admits only the first exact envelope. Root work,
+other actors/intents and original observations stay unchanged. The old scan's
+native hash is retained and spent; no refreshed checkpoint or nonce is invented.
+The first envelope, exact pending header and commit-sealed phase are one Core
+transaction with all storage held through postconditions and commit. Public
+native Seal uses the same reserved helper and preserves original semantics.
+
+Actual account allocation/upload/readback/receipt accepts current headers through
+the same per-request checks and exact original bytes/identity. Lost replies retain
+the first assigned ID. A later operation needs a genuine new scan. This does not
+select Root, activate the catalog or retire the private original snapshot.
+Cancellation and Exit join dependency/file/reader work before borrowed owners
+retire. Foreign state/account/budget owners fail before IO or native capture.
+
+All15 new cases pass: actual genesis/selected parent and reopen first signature;
+SQL, other actor, human and outbox reservation rollback; atomic envelope/pending/
+phase rollback and original reserved counter retry; actual current allocation,
+upload/readback/receipt and lost-reply recovery; joined cancellation/Exit and
+owner identity. All447 original Core identities, including all four scale cases,
+and71 affected old header/signed-partial/preparation/completion cases pass. Strict
+isolated Desktop has zero warnings/errors. No old test assertion/deadline changed.
+
+Strict first compilation rejected use of a private inventory overload from a
+different Core owner. The new internal read-only transaction bridge checks exact
+database ownership and retains the existing4096 bound. No visibility of a public
+write grant, diagnostic suppression or old recovery relaxation was introduced.
+One new corruption fixture expected a later recoverable exception. The unchanged
+native Actor validator rejected the damage earlier with fatal InvalidDataException.
+The corrected new fixture requires that exact fatal type and exact message while
+retaining every rollback/retry assertion and deadline. Product bytes and every
+prior test remain unchanged; the same15 cases were rerun on final exact LF bytes.
+Original v2 failure report and raw new test source remain retained.
+
+All original failure evidence remains retained. Exact main build and fresh native
+CI remain distinct required gates. Parent graph CI is not inferred from its local
+proof; the new exact native matrix retains every preceding identity and gate.
+
+Require the15 new cases in a separate mandatory fresh group on all four existing
+platforms:44jobs/60reports,447Core and706 ordinary Services exactly once per
+platform, including47headers/47continuity/47publication/12graphs/15fresh/538app.
+Original30-minute jobs and5-minute Windows hang diagnostics, Protocol99/Google139/
+LAN9/Web27, scale/reference/source/fullstream/log checks remain unchanged.
+
+This is current first-header preparation and metadata publication, not a running
+current engine or a complete0.6 product. Current verified reuse, efficient
+incremental reconciliation, renewed-account original-scope recovery, Root/runtime/
+engine/gallery composition, processing/plugins, human/web workflows, six native
+installers, live Drive/performance/diagnostic acceptance and release remain
+unfinished. Android remains Drive-only; new mobile work is deferred. Development
+binds only127.0.0.1. No release or release asset is published here.
+
 ## Current frozen dependency graph producer
 
 The joined current-only dependency owner now derives the original basis, opens

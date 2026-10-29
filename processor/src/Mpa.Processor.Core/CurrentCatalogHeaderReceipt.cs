@@ -47,7 +47,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         journal.AssertOnlyOriginalHeaderReceiptChangedIn(publications,header.Id,version,transaction);
         new WorkspaceObservationRepository(_database,_budget).AssertHeaderReceiptObservationHistoryUnchangedIn(
             expected.Inventory,signing,fenced,transaction,token);
-        var after=ReadCurrentHeaderInputsIn(generation,signing,fenced,transaction,token);
+        var after=ReadCurrentHeaderProviderInputsIn(generation,signing,fenced,transaction,token);
         var afterHeader=after.Header ?? throw new WorkspacePublicationConflictException();
         var plan=after.Publication.Plan ?? throw new CatalogGenerationCaptureConflictException();
         var normalized=afterHeader with{VerifiedVersion=header.VerifiedVersion};

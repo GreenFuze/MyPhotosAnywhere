@@ -38,7 +38,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Header admission requires its owning transaction.");
         new WorkspaceObservationRepository(_database,_budget).AssertCurrentInventoryUnchangedIn(
             inventory,signing,fenced,publications,transaction,token);
-        var original=ReadCurrentHeaderInputsIn(generationId,signing,fenced,transaction,token);
+        var original=ReadCurrentHeaderProviderInputsIn(generationId,signing,fenced,transaction,token);
         var header=original.Header ?? throw new SigningHistoryRecoveryRequiredException();
         if(original.Capture.Phase!="commit-sealed" || original.Intent.Envelope is null ||
             header.Id!=original.Capture.CommitIntentId || header.Scope!=original.Capture.Scope ||
