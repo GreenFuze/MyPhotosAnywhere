@@ -1,5 +1,58 @@
 # MPA 0.6.0 implementation ledger
 
+## Indexed canonical account pages with genuine historical-file compatibility
+
+Canonical account queries now seek through a compound account/date/identity index
+instead of scanning and discarding other accounts. New derived SQLite files use
+private physical format2 and store each account from the verified canonical fact.
+Replay and every returned row validate that projection against the canonical body.
+Missing account indexes fail; native query-plan evidence comes from the actual
+paging command. Exact photo resolution uses the primary key and compares the
+canonical account, preserving a missing or foreign identity as missing.
+
+Genuine physical format1 sealed files/descriptors remain byte-identical and
+readable. Their all-account/date navigation and exact account/ID lookup remain
+available offline. Original partial format1 work resumes and seals using its same
+layout, with no in-place migration or relabeling. Account paging on those files
+returns an explicit typed rebuild-needed result rather than an invented empty
+page. The ordinary online current refresh builds/adopts a new format2 index using
+its actual claim/complete graph/inventory/Root-last admission; no fresh authority
+or Root write is inferred from the old historical file.
+
+An immutable account query value is not a provider/source/publication grant.
+Actual historical/canonical owners expose the new bounded queries through their
+existing read lane and exact selected-stage checks, including during blocked
+refresh and after offline reopen. Exit retains the existing joined native order.
+Room12, Processor13, signing-private7, directory/claim/active-receipt format1 and
+exact signing/upgrade identities remain unchanged; only the derived SQLite file
+format advances to2. All previous capacities and storage admission remain fixed.
+
+All10 new Core cases and all447 prior Core identities pass against frozen LF
+source. Coverage includes multi-account equal/unknown dates, both directions and
+date seeks, actual native index-seek plans, missing-index rejection, canonical
+account mismatch/replay, genuine sealed/partial format1 compatibility, unknown
+format preservation, validation and cancellation. All3 new canonical account
+runtime cases and25 affected prior canonical/staging/composition identities pass.
+Strict isolated Desktop has zero warnings/errors. Every prior test byte,
+assertion, deadline and warning gate is unchanged.
+
+Parent3c has independently verified56-job/72-report native evidence,113Protocol,
+447Core and728 ordinary Services once per platform and all four workflows passed.
+This component requires the same56jobs72reports with113Protocol457Core731 ordinary
+Services:47headers/47continuity/47publication/12graphs/15fresh/9outgoing/7drain/
+9composition/538application. All previous identities, source/scale/reference,
+stream/log, 30-minute ordinary and Windows5-minute hang gates remain mandatory.
+The full457 Core identity set is all447 old plus10 new, never a duplicated scale
+or partially executed report. Fresh exact-revision CI is required.
+
+These methods are prerequisites for the shared web client. The browser gallery
+and viewer still use local discovery and need actual canonical routes, stage/
+account-bound cursors and frozen canonical viewer identities. Current recovery,
+verified reuse/incremental efficiency, processing/plugins, human/web workflows,
+six installers/lifecycle, live Drive/performance and exact release remain unfinished.
+Android remains Drive-only, new mobile implementation is deferred and final joint
+acceptance remains explicit. Development binds only127.0.0.1; no release is claimed.
+
 ## Actual desktop engine composition with current canonical ownership
 
 The desktop now composes an engine-lifetime bundle owning the initial fixed Root

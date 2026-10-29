@@ -15,6 +15,8 @@ public sealed record CurrentCatalogStagePage(ReadOnlyCollection<DriveCatalogAsse
 public sealed partial class CurrentCatalogStageIndex : IDisposable
 {
     private const int ApplicationId=0x4d504143;
+    private int _formatVersion=2;
+    public bool SupportsAccountPaging=>_formatVersion==2;
     private readonly string _path;
     private readonly CurrentCatalogStageClaim _claim;
     private readonly StorageBudgetManager _budget;
@@ -44,19 +46,20 @@ public sealed partial class CurrentCatalogStageIndex : IDisposable
                 using var setup=owner._connection.CreateCommand();setup.CommandText="""
                     PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA page_size=4096;
                     PRAGMA cache_size=-2048; PRAGMA temp_store=FILE; PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF;
-                    PRAGMA max_page_count=131072; PRAGMA application_id=1297105219; PRAGMA user_version=1;
+                    PRAGMA max_page_count=131072; PRAGMA application_id=1297105219; PRAGMA user_version=2;
                     CREATE TABLE identity(payload BLOB NOT NULL,sha256 TEXT NOT NULL) STRICT;
                     CREATE TABLE leaf(prefix TEXT PRIMARY KEY,sha256 TEXT NOT NULL,assets INTEGER NOT NULL CHECK(assets>0)) STRICT;
                     CREATE TABLE fact(id TEXT PRIMARY KEY,prefix TEXT NOT NULL REFERENCES leaf(prefix),payload BLOB NOT NULL,sha256 TEXT NOT NULL,
-                      date_unknown INTEGER NOT NULL CHECK(date_unknown IN(0,1)),date_sort INTEGER NOT NULL) STRICT;
+                      date_unknown INTEGER NOT NULL CHECK(date_unknown IN(0,1)),date_sort INTEGER NOT NULL,account_id TEXT NOT NULL) STRICT;
                     CREATE INDEX current_stage_date ON fact(date_unknown,date_sort,id);
+                    CREATE INDEX current_stage_account_date ON fact(account_id,date_unknown,date_sort,id);
                     """;setup.ExecuteNonQuery();var identity=CurrentCatalogStageJournal.Identity(claim);
                 using var insert=owner._connection.CreateCommand();insert.CommandText="INSERT INTO identity VALUES($body,$hash)";insert.Parameters.AddWithValue("$body",identity);insert.Parameters.AddWithValue("$hash",Hash(identity));
                 if(insert.ExecuteNonQuery()!=1) throw new InvalidOperationException("Current-stage ownership header did not persist.");
             }
             else
             {
-                VerifyIdentity(path,claim); // Immutable read first; never recover an unknown file.
+                owner._formatVersion=VerifyIdentity(path,claim); // Immutable read first; never recover or upgrade an unknown file.
                 if(claim.Descriptor is not null)
                 {
                     owner._readLease=new(path,FileMode.Open,FileAccess.Read,FileShare.Read);VerifyDescriptor(owner._readLease,claim.Descriptor,token);owner._sealed=claim.Descriptor;
@@ -102,11 +105,12 @@ public sealed partial class CurrentCatalogStageIndex : IDisposable
                 insertLeaf.Transaction=transaction;insertLeaf.CommandText="INSERT INTO leaf VALUES($prefix,$hash,$count)";insertLeaf.Parameters.AddWithValue("$prefix",leaf.Prefix);insertLeaf.Parameters.AddWithValue("$hash",leafHash);insertLeaf.Parameters.AddWithValue("$count",facts.Assets.Count);
                 if(insertLeaf.ExecuteNonQuery()!=1) throw new InvalidOperationException("Staging partition did not persist exactly once.");
             }
-            using var insert=_connection.CreateCommand();insert.Transaction=transaction;insert.CommandText="INSERT INTO fact VALUES($id,$prefix,$body,$hash,$unknown,$sort)";
-            var id=insert.Parameters.Add("$id",SqliteType.Text);var prefix=insert.Parameters.AddWithValue("$prefix",leaf.Prefix);var body=insert.Parameters.Add("$body",SqliteType.Blob);var hash=insert.Parameters.Add("$hash",SqliteType.Text);var unknown=insert.Parameters.Add("$unknown",SqliteType.Integer);var sort=insert.Parameters.Add("$sort",SqliteType.Integer);insert.Prepare();
+            using var insert=_connection.CreateCommand();insert.Transaction=transaction;insert.CommandText="INSERT INTO fact(id,prefix,payload,sha256,date_unknown,date_sort"+(_formatVersion==2?",account_id":"")+") VALUES($id,$prefix,$body,$hash,$unknown,$sort"+(_formatVersion==2?",$account":"")+")";
+            var id=insert.Parameters.Add("$id",SqliteType.Text);var prefix=insert.Parameters.AddWithValue("$prefix",leaf.Prefix);var body=insert.Parameters.Add("$body",SqliteType.Blob);var hash=insert.Parameters.Add("$hash",SqliteType.Text);var unknown=insert.Parameters.Add("$unknown",SqliteType.Integer);var sort=insert.Parameters.Add("$sort",SqliteType.Integer);
+            var account=_formatVersion==2?insert.Parameters.Add("$account",SqliteType.Text):null;insert.Prepare();
             foreach(var asset in facts.Assets)
             {
-                token.ThrowIfCancellationRequested();var payload=_codec.Encode(leaf.Prefix,[asset]);id.Value=asset.Id.ToString("D");prefix.Value=leaf.Prefix;body.Value=payload;hash.Value=Hash(payload);unknown.Value=asset.EffectiveUtc is null;sort.Value=asset.EffectiveUtc is null ? 0L : -asset.EffectiveUtc.Value;
+                token.ThrowIfCancellationRequested();var payload=_codec.Encode(leaf.Prefix,[asset]);id.Value=asset.Id.ToString("D");prefix.Value=leaf.Prefix;body.Value=payload;hash.Value=Hash(payload);unknown.Value=asset.EffectiveUtc is null;sort.Value=asset.EffectiveUtc is null ? 0L : -asset.EffectiveUtc.Value;if(account is not null) account.Value=asset.AccountId;
                 if(insert.ExecuteNonQuery()!=1) throw new InvalidOperationException("Staging asset did not persist exactly once.");
             }
             token.ThrowIfCancellationRequested();reservation.RecheckBeforeWrite(reservation.Bytes);transaction.Commit();
@@ -136,23 +140,24 @@ public sealed partial class CurrentCatalogStageIndex : IDisposable
         ReadOrderedPage(after is null?new(StageReadKind.First):new(StageReadKind.After,Cursor:after),limit,token);
     private void VerifyRow(DriveCatalogAsset asset,string prefix)
     {
-        var expected=_codec.Encode(prefix,[asset]);using var query=_connection!.CreateCommand();query.CommandText="SELECT prefix,length(payload),payload,sha256,date_unknown,date_sort FROM fact WHERE id=$id";query.Parameters.AddWithValue("$id",asset.Id.ToString("D"));using var row=query.ExecuteReader();
-        if(!row.Read() || row.GetString(0)!=prefix || row.GetInt64(1)!=expected.Length || !row.GetFieldValue<byte[]>(2).AsSpan().SequenceEqual(expected) || row.GetString(3)!=Hash(expected) || row.GetBoolean(4)!=(asset.EffectiveUtc is null) || row.GetInt64(5)!=(asset.EffectiveUtc is null ? 0L : -asset.EffectiveUtc.Value)) throw new InvalidDataException("A retained staging row changed or disappeared.");
+        var expected=_codec.Encode(prefix,[asset]);using var query=_connection!.CreateCommand();query.CommandText="SELECT prefix,length(payload),payload,sha256,date_unknown,date_sort"+(_formatVersion==2?",account_id":"")+" FROM fact WHERE id=$id";query.Parameters.AddWithValue("$id",asset.Id.ToString("D"));using var row=query.ExecuteReader();
+        if(!row.Read() || row.GetString(0)!=prefix || row.GetInt64(1)!=expected.Length || !row.GetFieldValue<byte[]>(2).AsSpan().SequenceEqual(expected) || row.GetString(3)!=Hash(expected) || row.GetBoolean(4)!=(asset.EffectiveUtc is null) || row.GetInt64(5)!=(asset.EffectiveUtc is null ? 0L : -asset.EffectiveUtc.Value) || _formatVersion==2 && row.GetString(6)!=asset.AccountId) throw new InvalidDataException("A retained staging row changed or disappeared.");
     }
     internal static void VerifyForRemoval(string path,CurrentCatalogStageClaim claim,CancellationToken token)
     {token.ThrowIfCancellationRequested();VerifyIdentity(path,claim);if(claim.Descriptor is not null){using var lease=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read);VerifyDescriptor(lease,claim.Descriptor,token);}}
-    private static void VerifyIdentity(string path,CurrentCatalogStageClaim claim)
+    private static int VerifyIdentity(string path,CurrentCatalogStageClaim claim)
     {
-        CurrentCatalogStageArea.Regular(path,false);using(var file=File.OpenRead(path))
+        int version;CurrentCatalogStageArea.Regular(path,false);using(var file=File.OpenRead(path))
         {
             if(file.Length is <100 or >CatalogGenerationCaptureRepository.MaximumSnapshotBytes) throw new InvalidDataException("A retained current-stage file exceeds its exact bounded ownership header.");
             Span<byte> header=stackalloc byte[100];file.ReadExactly(header);
-            if(!header[..16].SequenceEqual("SQLite format 3\0"u8) || BinaryPrimitives.ReadInt32BigEndian(header[68..72])!=ApplicationId || BinaryPrimitives.ReadInt32BigEndian(header[60..64])!=1)
+            version=BinaryPrimitives.ReadInt32BigEndian(header[60..64]);
+            if(!header[..16].SequenceEqual("SQLite format 3\0"u8) || BinaryPrimitives.ReadInt32BigEndian(header[68..72])!=ApplicationId || version is not (1 or 2))
                 throw new InvalidDataException("Refusing to open an unknown or truncated claimed current-stage file.");
         }
         // Identity is committed once and never modified by leaf transactions. An
         // immutable read can inspect it BEFORE any native hot-journal recovery.
-        using var connection=new SqliteConnection(new SqliteConnectionStringBuilder {DataSource=new Uri(path).AbsoluteUri+"?immutable=1",Mode=SqliteOpenMode.ReadOnly,Pooling=false}.ToString());connection.Open();VerifyHeader(connection,claim);
+        using var connection=new SqliteConnection(new SqliteConnectionStringBuilder {DataSource=new Uri(path).AbsoluteUri+"?immutable=1",Mode=SqliteOpenMode.ReadOnly,Pooling=false}.ToString());connection.Open();VerifyHeader(connection,claim);return version;
     }
     private static void VerifyHeader(SqliteConnection connection,CurrentCatalogStageClaim claim)
     {

@@ -104,6 +104,36 @@ public sealed class CurrentCanonicalReadRuntime(ProcessorStateCoordinator state,
             new CurrentCanonicalReadAsset(active.Selection,await active.FindAssetAsync(assetId,token).ConfigureAwait(false)),caller);
     }
 
+    public Task<CurrentCanonicalReadPage?> ReadAccountPageAsync(Guid? expectedStageId,CurrentCatalogAccountFilter account,CatalogCursor? after,int limit,CancellationToken caller)
+    {
+        ArgumentNullException.ThrowIfNull(account);ValidatePage(expectedStageId,limit);
+        if(expectedStageId is null && after is not null) throw new ArgumentException("A continuation requires its exact catalog context.");
+        return ReadCatalogAsync(expectedStageId,async (active,token)=>
+            new CurrentCanonicalReadPage(active.Selection,await active.ReadAccountPageAsync(account,after,limit,token).ConfigureAwait(false)),caller);
+    }
+    public Task<CurrentCanonicalReadPage?> ReadAccountPreviousPageAsync(Guid expectedStageId,CurrentCatalogAccountFilter account,CatalogCursor before,int limit,CancellationToken caller)
+    {
+        ArgumentNullException.ThrowIfNull(account);ArgumentNullException.ThrowIfNull(before);ValidatePage(expectedStageId,limit);
+        if(before.Id==Guid.Empty || before.EffectiveUtc is < -62135596800000L or >253402300799999L)
+            throw new ArgumentException("A valid previous-page identity and date are required.");
+        return ReadCatalogAsync(expectedStageId,async (active,token)=>
+            new CurrentCanonicalReadPage(active.Selection,await active.ReadAccountPreviousPageAsync(account,before,limit,token).ConfigureAwait(false)),caller);
+    }
+    public Task<CurrentCanonicalReadPage?> ReadAccountAtOrBeforeAsync(Guid? expectedStageId,CurrentCatalogAccountFilter account,long utcMilliseconds,int limit,CancellationToken caller)
+    {
+        ArgumentNullException.ThrowIfNull(account);ValidatePage(expectedStageId,limit);
+        if(utcMilliseconds is < -62135596800000L or >253402300799999L) throw new ArgumentException("A supported UTC date is required.");
+        return ReadCatalogAsync(expectedStageId,async (active,token)=>
+            new CurrentCanonicalReadPage(active.Selection,await active.ReadAccountAtOrBeforeAsync(account,utcMilliseconds,limit,token).ConfigureAwait(false)),caller);
+    }
+    public Task<CurrentCanonicalReadAsset?> FindAccountAssetAsync(Guid expectedStageId,CurrentCatalogAccountFilter account,Guid assetId,CancellationToken caller)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        if(expectedStageId==Guid.Empty || assetId==Guid.Empty) throw new ArgumentException("Exact catalog and photo identities are required.");
+        return ReadCatalogAsync(expectedStageId,async (active,token)=>
+            new CurrentCanonicalReadAsset(active.Selection,await active.FindAccountAssetAsync(account,assetId,token).ConfigureAwait(false)),caller);
+    }
+
     private static void ValidatePage(Guid? expectedStageId,int limit)
     {
         if(limit is <1 or >90 || expectedStageId==Guid.Empty) throw new ArgumentException("A bounded page and valid catalog context are required.");

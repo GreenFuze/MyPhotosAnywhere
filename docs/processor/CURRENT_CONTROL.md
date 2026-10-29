@@ -480,3 +480,37 @@ Old failed attempts, candidate evidence and earliest unresolved cursors remain.
 No scan completion, history repair, policy/current admission or cleanup follows.
 The actual v2 scanner and typed completion still need composition under a final
 Root fence after its last immutable network/change-feed operation.
+
+
+### Indexed historical account projection
+
+New derived canonical SQLite files use private physical format2. They store the
+account from each verified canonical fact and index(account_id,date_unknown,
+date_sort,id). Account/date pages use that actual compound index with strict
+keyset ordering and the existing90-row bound; a missing index fails rather than
+falling back to a whole-catalog scan. Replay and row reads compare the account
+column with the canonical fact. Exact photo resolution remains one primary-key
+lookup, then compares the requested account; no neighboring photo is substituted.
+
+The account filter is immutable query input only, never Google access or current
+publication/source authority. The historical/canonical owners retain their actual
+read lane, selected-stage checks and joined native retirement. Account queries do
+not scan Google Drive, publish a Root or claim current availability.
+
+Genuine physical format1 files remain supported. Sealed files/descriptors are
+never edited, migrated in place or relabeled. Original partial work resumes and
+seals using its original format1 layout. All-account navigation and exact-ID/
+account comparison work offline on these files. Account paging reports a typed
+upgrade-needed result; it does not invent an empty page or scan every record.
+The normal online current-capture/complete-graph/inventory/Root-last refresh builds
+a new format2 index under its own claim and admits it using actual live evidence.
+Until then, retained all-account photos remain available. Unknown formats still
+fail closed and are preserved, including during retirement.
+
+The main Processor schema13, Android Room12, native signing-private7, directory
+ownership format1, stage-claim format1 and active-receipt format1 are unchanged.
+Only the derived SQLite file's physical format advances. Original images, human
+metadata, signing identities and immutable pending publication work are unchanged.
+The web gallery/viewer still requires its own actual canonical adapter, stage/
+account cursor binding and frozen viewer-identity integration; these query methods
+alone do not enable or complete that client.

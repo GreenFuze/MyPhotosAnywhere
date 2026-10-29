@@ -58,6 +58,9 @@ jobs:
     # Require a drain group on all four platforms; retain all715 previous identities.
     # Six actual desktop composition/cold-bootstrap/background/restart cases have
     # a mandatory composition group on all platforms; retain all722 prior cases.
+    # Three indexed canonical account/legacy/offline cases remain mandatory in
+    # the composition group. All728 prior Services and447 prior Core plus10 new
+    # private-index/compatibility Core cases stay required on every platform.
     # No test assertion, original job deadline or scale benchmark is relaxed.
     timeout-minutes: 30
     env:
@@ -112,7 +115,7 @@ jobs:
               $mpaFreshFamilies = @('CurrentFreshHeader')
               $mpaOutgoingFamilies = @('CurrentPublicationOwner')
               $mpaDrainFamilies = @('CurrentGenerationDrain')
-              $mpaCompositionFamilies = @('CurrentDesktopComposition')
+              $mpaCompositionFamilies = @('CurrentDesktopComposition', 'CurrentCanonicalAccount')
               $mpaHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
               $mpaNotHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
               $mpaContinuity = ($mpaContinuityFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'

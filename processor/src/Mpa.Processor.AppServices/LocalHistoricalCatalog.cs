@@ -34,6 +34,15 @@ public sealed class LocalHistoricalCatalog : ILocalCurrentIndexOwner
     public Task<DriveCatalogAsset?> FindAssetAsync(Guid assetId,CancellationToken caller)=>
         ReadAsync(token=>_index.FindAsset(assetId,token),caller);
 
+    public Task<CurrentCatalogStagePage> ReadAccountPageAsync(CurrentCatalogAccountFilter account,CatalogCursor? after,int limit,CancellationToken caller)=>
+        ReadAsync(token=>_index.ReadAccountPage(account,after,limit,token),caller);
+    public Task<CurrentCatalogStagePage> ReadAccountPreviousPageAsync(CurrentCatalogAccountFilter account,CatalogCursor before,int limit,CancellationToken caller)=>
+        ReadAsync(token=>_index.ReadAccountPreviousPage(account,before,limit,token),caller);
+    public Task<CurrentCatalogStagePage> ReadAccountAtOrBeforeAsync(CurrentCatalogAccountFilter account,long utcMilliseconds,int limit,CancellationToken caller)=>
+        ReadAsync(token=>_index.ReadAccountAtOrBefore(account,utcMilliseconds,limit,token),caller);
+    public Task<DriveCatalogAsset?> FindAccountAssetAsync(CurrentCatalogAccountFilter account,Guid assetId,CancellationToken caller)=>
+        ReadAsync(token=>_index.FindAccountAsset(account,assetId,token),caller);
+
     private async Task<T> ReadAsync<T>(Func<CancellationToken,T> query,CancellationToken caller)
     {
         CancellationTokenSource linked;
