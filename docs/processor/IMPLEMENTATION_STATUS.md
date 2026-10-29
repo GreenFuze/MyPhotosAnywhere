@@ -1,5 +1,47 @@
 # MPA 0.6.0 implementation ledger
 
+## Restart recovery of an original header before complete inventory
+
+The actual desktop header preparation owner now resumes a reserved original
+header after a human source revision increased. It first performs the real live
+Root/policy/final-fence traversal and calls the existing strict local original
+header recovery. A crash after the first signature but before its pending outbox
+row can otherwise make a complete inventory impossible. The fresh-source branch
+and every old native recovery/authority method retain their bodies.
+
+The recovered record retains its original scope, ID, body, counter and first
+signature. This local bookkeeping grants no obsolete cloud or original-file
+permission. Subsequent provider allocation/upload still needs its own actual
+complete inventory and native admission. Revoked/handover/ambiguous Root cases
+are not silently converted into this branch or claimed resolved.
+
+Three actual new cases failed against unchanged production, then passed with
+this owner composition. They cover reserved/sealed original restart, repeat
+identity, SQL insertion failure retaining the first signature, retry, unchanged
+snapshot/human settings/selected head, no Drive allocations/writes or original
+reads, and continued refusal of new old-scope facts. All23 exact prior fresh and
+original-header native cases pass. Strict isolated Desktop has zero warnings/
+errors and retains the exact four canonical frontend assets. Initial missing
+restore assets and a local helper path error are retained; neither ran tests.
+Locked audited restores passed, with all assertions/deadlines/warnings unchanged.
+
+This focused commit changes only the preparation owner and a separate3-case
+test file plus this ledger. The existing workflow naturally places the new
+CurrentHeader family in headers50 instead of47. Fresh/native/platform acceptance
+must preserve all737 prior Services plus these3 (740),469Core,149Google,48Web and
+113Protocol in56Protocoljobs/72reports plus4Desktopbuilds, all four native frontend/API/audit reports and
+every prior identity/scale/reference/source/stream/log/deadline/AGP15 gate.
+
+Android is deferred and does not gate these intermediate PC commits. Final joint
+release still requires its separate acceptance. No Android changes or reruns are
+part of this PC component.
+
+Complete PC current recovery/reuse/incremental reconciliation, processing/plugins,
+human workflows, six installers/lifecycle, independent live Drive, performance,
+diagnostics and exact release acceptance remain unfinished. Android stays Drive-
+only, new mobile work is deferred and final joint acceptance remains explicit.
+Development binds only127.0.0.1. No0.6 release is claimed.
+
 ## Canonical PC gallery, frozen viewer UI and version-observed private previews
 
 The PC gallery now uses the authenticated canonical library metadata API. It keeps

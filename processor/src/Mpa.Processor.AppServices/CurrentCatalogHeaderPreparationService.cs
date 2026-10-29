@@ -42,7 +42,8 @@ public sealed class CurrentCatalogHeaderPreparationService : IAsyncDisposable
                 var active=await _state.ExecuteAsync(database=>
                 {
                     var capture=new CatalogGenerationCaptureRepository(database,_budget).Active().SingleOrDefault();
-                    return(Capture:capture,HasHeader:capture is not null && new ProtocolSigningJournal(database,_budget).Read(capture.CommitIntentId) is not null);
+                    return(Capture:capture,HasHeader:capture is not null && new ProtocolSigningJournal(database,_budget).Read(capture.CommitIntentId) is not null,
+                        HumanRevision:new LibrarySourceRepository(database).Snapshot().Revision);
                 },token).ConfigureAwait(false);
                 Guid generation;
                 if(active.HasHeader)
@@ -50,6 +51,20 @@ public sealed class CurrentCatalogHeaderPreparationService : IAsyncDisposable
                     var original=active.Capture??throw new CatalogGenerationCaptureConflictException();
                     if(original.Phase is not("dependencies-ready" or "commit-sealed")) throw new CatalogGenerationCaptureConflictException();
                     generation=original.Scope.GenerationId;
+                    if(active.HumanRevision>original.Scope.ConfigurationRevision)
+                    {
+                        // Complete inventory can be impossible after the first
+                        // signature but before durable outbox insertion. Repair
+                        // only the exact old LOCAL header under a real live fence;
+                        // this grants no obsolete-scope cloud/write admission.
+                        var capture=await _reader.CaptureAsync(token).ConfigureAwait(false);
+                        _=await _reader.ReadSelectedPoliciesAsync(capture,token).ConfigureAwait(false);
+                        var fence=await _reader.FenceAsync(capture,token).ConfigureAwait(false);
+                        var recovered=await _reader.RecoverCatalogHeaderPendingAsync(fence,generation,token).ConfigureAwait(false);
+                        if(recovered.Scope!=original.Scope || recovered.Id!=original.CommitIntentId)
+                            throw new CatalogGenerationCaptureConflictException();
+                        lock(_gate) {caller.ThrowIfCancellationRequested();Check(token);return recovered;}
+                    }
                 }
                 else generation=(await _dependencies.PrepareAsync(token).ConfigureAwait(false)).Capture.Scope.GenerationId;
                 var inventory=await ObserveAsync(token).ConfigureAwait(false);
