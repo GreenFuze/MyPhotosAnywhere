@@ -32,6 +32,7 @@ public sealed class CatalogViewerSessions(ProcessorStateCoordinator state, strin
     {
         ArgumentNullException.ThrowIfNull(request);
         if (browser == Guid.Empty || request.Id == Guid.Empty || request.SelectedId == Guid.Empty || request.StageId==Guid.Empty) throw new ArgumentException("Captured browser, session and media identities are required.");
+        Session? created=null;
         return ExecuteAsync(async token =>
         {
             if(request.StageId is not null && _canonical is null) throw new CatalogViewerUnavailableException();
@@ -71,13 +72,16 @@ public sealed class CatalogViewerSessions(ProcessorStateCoordinator state, strin
             }
             catch (CatalogSessionCaptureException error) { _retained.Add(error.RetainedOwner); throw; }
             var session = new Session(browser, request, index, _time.GetTimestamp());
-            _sessions.Add((browser, request.Id), session); _retained.Remove(index);
+            _sessions.Add((browser, request.Id), session); _retained.Remove(index);created=session;
             // The snapshot may have finished just as the HTTP caller canceled. Retain
             // ownership until actual cleanup; never orphan a completed private index.
             if (token.IsCancellationRequested)
             { Close(session); token.ThrowIfCancellationRequested(); }
             return await WindowAsync(session, index.SelectedPosition).ConfigureAwait(false);
-        }, cancellationToken);
+        }, cancellationToken,_=>
+        {
+            if(created is not null && _sessions.TryGetValue((created.Browser,created.Request.Id),out var retained) && ReferenceEquals(retained,created)) Close(created);
+        });
     }
     public Task<CatalogViewerWindow> ReadAsync(Guid browser, Guid id, long position, CancellationToken cancellationToken) => ExecuteAsync(async token =>
     {
@@ -107,13 +111,30 @@ public sealed class CatalogViewerSessions(ProcessorStateCoordinator state, strin
     }
     private void Close(Session session)
     { session.Index.Dispose(); _sessions.Remove((session.Browser, session.Request.Id)); }
-    private async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
+    private async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken,Action<T>? reject=null)
     {
         CancellationToken stopping;
         lock (_gate) { ObjectDisposedException.ThrowIf(_stopping, this); stopping = _stop.Token; }
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stopping);
         await _serial.WaitAsync(linked.Token).ConfigureAwait(false);
-        try { lock (_gate) ObjectDisposedException.ThrowIf(_stopping, this); linked.Token.ThrowIfCancellationRequested(); return await operation(linked.Token).ConfigureAwait(false); }
+        try
+        {
+            lock (_gate) ObjectDisposedException.ThrowIf(_stopping, this);
+            linked.Token.ThrowIfCancellationRequested();cancellationToken.ThrowIfCancellationRequested();
+            var result=await operation(linked.Token).ConfigureAwait(false);
+            OperationCanceledException refusal;
+            lock(_gate)
+            {
+                // CancelAsync can still be dispatching a linked callback. The
+                // owner's actual stop flag and original caller token decide
+                // admission, serialized against DisposeAsync, not callback timing.
+                if(!_stopping && !cancellationToken.IsCancellationRequested && !linked.IsCancellationRequested) return result;
+                refusal=new OperationCanceledException("The viewer owner or caller retired before result admission.",cancellationToken.IsCancellationRequested?cancellationToken:linked.Token);
+            }
+            try {reject?.Invoke(result);}
+            catch(Exception cleanup) {throw new AggregateException("Viewer admission and private index cleanup failed; ownership is retained.",refusal,cleanup);}
+            throw refusal;
+        }
         finally { _serial.Release(); }
     }
     public ValueTask DisposeAsync()

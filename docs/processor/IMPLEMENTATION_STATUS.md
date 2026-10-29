@@ -1,5 +1,40 @@
 # MPA 0.6.0 implementation ledger
 
+## Viewer result admission rejects shutdown and original-caller cancellation
+
+Windows CI on718d executed113 Protocol successfully and463 Core with462 passed,
+1 failed: the unchanged canonical viewer Exit case returned a window instead of
+its expected cancellation exception. Other jobs were canceled by fail-fast and
+are not passes. This was a real admission race, not a test deadline failure.
+The private index could finish while CancelAsync was still dispatching the linked
+callback; testing only that linked token could admit a result after shutdown.
+
+The viewer owner now serializes final result admission against its actual stop
+flag and checks the original caller plus linked token. Rejected newly created
+sessions physically close their generated index; replay/read cancellation does
+not delete a previously owned viewer. Cleanup failure retains the existing owner
+and reports both refusal and cleanup errors. Exit still joins capture/serial work
+before closing borrowed native state. Capacities, expiry, source context, signing,
+storage and immutable original/human data protections remain unchanged.
+
+Two deterministic native regressions hold the caller's callback ahead of linked
+cancellation and let an actual completed canonical private index return. Both fail
+on the original code with the exact missing-exception outcome, then pass after the
+production fix with the original expectations/deadlines. The actual CI failing
+assertion and every old test byte stay unchanged. All13 prior viewer identities,
+including the original Exit row, and1 actual runtime composition case pass. Strict
+isolated Desktop has zero warnings/errors. Red/green and original CI reports stay
+retained; no cancellation/assertion/deadline/warning exception was waived.
+
+This focused repair changes only the owner and its two new regression cases.
+The separately tested canonical gallery/preview/frontend packet remains outside
+this commit. Parent718d failed and has no completed native-pass claim; last full
+verified97d proof remains historical evidence. Fresh native CI must pass56jobs/
+72reports,113Protocol469Core737Services139Google42Web on all4 platforms, preserving
+all463 original failed-Windows identities plus the2 regressions and4 scale cases.
+Every old source/scale/reference/full-stream/log/30-minute ordinary/Windows5-minute
+hang gate and exact15 AGP records remain unchanged. No0.6 release is claimed.
+
 ## Actual canonical frozen viewer ownership and desktop composition
 
 The desktop viewer now accepts an explicit canonical stage and account. It captures
