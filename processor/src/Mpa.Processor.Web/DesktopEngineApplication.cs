@@ -47,7 +47,9 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
         catch (ObjectDisposedException) when (_work.State is ProcessorWorkState.Stopping or ProcessorWorkState.Stopped or ProcessorWorkState.Faulted)
         { throw new CatalogViewerUnavailableException(); }
     }
-    private Task<DesktopViewerWindow> ResolveWindowAsync(CatalogViewerWindow window, CancellationToken cancellationToken) => _state.ExecuteAsync(database =>
+    private Task<DesktopViewerWindow> ResolveWindowAsync(CatalogViewerWindow window,CancellationToken cancellationToken)=>window.StageId is null?
+        ResolveDiscoveredWindowAsync(window,cancellationToken):new DesktopLibraryViewerReader(_publication?.CurrentCanonicalCatalog ?? throw new DesktopLibraryCatalogUnavailableException()).ReadAsync(window,cancellationToken);
+    private Task<DesktopViewerWindow> ResolveDiscoveredWindowAsync(CatalogViewerWindow window, CancellationToken cancellationToken) => _state.ExecuteAsync(database =>
     {
         var catalog = new DiscoveredCatalogRepository(database);
         return new DesktopViewerWindow(window.Id, window.Count, window.Position, window.Entries.Select(entry =>

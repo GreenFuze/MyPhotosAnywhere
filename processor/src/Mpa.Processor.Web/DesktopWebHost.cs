@@ -259,7 +259,7 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 await WritePreviewAsync(context, await _application.CatalogPreviewAsync(assetId, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
             case ("POST", "/api/viewers"):
                 var viewer = await context.Request.ReadFromJsonAsync<CatalogViewerRequest>(token).ConfigureAwait(false) ?? throw new BadHttpRequestException("A captured viewer request is required.");
-                if (viewer.Id == Guid.Empty || viewer.SelectedId == Guid.Empty || viewer.AccountId is not null && !Identity(viewer.AccountId)) throw new BadHttpRequestException("Invalid viewer context.");
+                if (viewer.Id == Guid.Empty || viewer.SelectedId == Guid.Empty || viewer.StageId==Guid.Empty || viewer.AccountId is not null && !Identity(viewer.AccountId)) throw new BadHttpRequestException("Invalid viewer context.");
                 _access.Authenticate(context.Request.Cookies[CookieName], RequestEndpoint(context)!, context.Request.Headers["X-MPA-CSRF"], mutation: true);
                 var opened = await _application.OpenViewerAsync(session.Id, viewer, token).ConfigureAwait(false);
                 try { _access.Authenticate(context.Request.Cookies[CookieName], RequestEndpoint(context)!, null, mutation: false); }

@@ -12,7 +12,7 @@ public sealed record DesktopFolderLocation(DesktopFolder Current, IReadOnlyList<
 public sealed record DesktopAddSource(string AccountId, string FolderId, bool IncludeDescendants, long ExpectedRevision);
 public sealed record DesktopUpdateSource(Guid Id, bool Enabled, bool IncludeDescendants, long ExpectedSourceRevision, long ExpectedRevision);
 public sealed record DesktopViewerEntry(long Position, Guid AssetId, DesktopCatalogPhoto? Photo);
-public sealed record DesktopViewerWindow(Guid Id, long Count, long Position, IReadOnlyList<DesktopViewerEntry> Entries);
+public sealed record DesktopViewerWindow(Guid Id, long Count, long Position, IReadOnlyList<DesktopViewerEntry> Entries,Guid? StageId=null,string? AccountId=null);
 public sealed record DesktopLibraryPublication(string Stage, string? Detail, bool CanRetry);
 
 /// <summary>UI-independent bounded operations. Requests may cancel reads; admitted durable

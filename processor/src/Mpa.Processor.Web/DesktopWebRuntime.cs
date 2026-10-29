@@ -65,13 +65,14 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
             await owner._signing.InitializeAsync(cancellationToken).ConfigureAwait(false);
             owner._sources = await ProcessorSourceRuntime.CreatePausedAsync(state, owner._accounts, work, storage, cancellationToken).ConfigureAwait(false);
             owner._sources.Failed += owner.OnFailure;
-            owner._viewers = new(state, stateDirectory, installationId, storage);
             owner._preparations = new(state, stateDirectory, installationId, storage);
             var setup = new LibraryWorkspaceSetup(state, owner._accounts, owner._signing, storage);
             owner._publication = new(state, owner._accounts, owner._signing, storage,
                 currentCatalog: new CurrentLibraryCatalogRuntime(state, stateDirectory, installationId, owner._accounts, owner._signing, storage));
             owner._publication.Failed += owner.OnFailure;
             await owner._publication.InitializeCurrentCatalogAsync(cancellationToken).ConfigureAwait(false);
+            owner._viewers=new(state,stateDirectory,installationId,storage,canonical:new CurrentCanonicalViewerSource(
+                owner._publication.CurrentCanonicalCatalog ?? throw new InvalidOperationException("The engine canonical query owner has not initialized.")));
             owner._sources.CatalogChanged += owner._publication.NotifyLocalCatalogChanged;
             var application = new DesktopEngineApplication(library, state, owner._accounts, owner._sources.Work, owner._sources, owner._viewers, setup, owner._publication);
             owner._host = await DesktopWebHost.StartAsync(application, assetsDirectory, enableLan ? owner._identity.Identity : null, cancellationToken).ConfigureAwait(false);

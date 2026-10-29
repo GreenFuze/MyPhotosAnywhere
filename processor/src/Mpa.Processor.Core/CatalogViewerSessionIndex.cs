@@ -13,7 +13,7 @@ public sealed class CatalogSessionCaptureException(Exception cause, CatalogViewe
 /// <summary>A disposable private SQLite identity sequence, separate from durable media state.
 /// Serial owner only. Capture uses an owned read-only WAL snapshot outside the source
 /// coordinator; rows stream into a bounded-cache SQLite index, never a full-library list.</summary>
-public sealed class CatalogViewerSessionIndex : IDisposable
+public sealed partial class CatalogViewerSessionIndex : IDisposable
 {
     private const int ApplicationId = 0x4d504156;
     private readonly string _path;

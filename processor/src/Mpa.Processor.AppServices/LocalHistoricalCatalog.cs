@@ -11,7 +11,7 @@ internal interface ILocalCurrentIndexOwner : IAsyncDisposable
 /// <summary>Read-only historical content under the pool's native area lease. It has
 /// no capture, graph-staging, activation, publication, account or original-write
 /// members. Retire before the pool and its borrowed state owner.</summary>
-public sealed class LocalHistoricalCatalog : ILocalCurrentIndexOwner
+public sealed partial class LocalHistoricalCatalog : ILocalCurrentIndexOwner
 {
     private readonly CurrentCatalogStageIndex _index;
     private readonly object _gate=new();

@@ -82,7 +82,7 @@ public sealed class DesktopLibraryCatalogReader(ICurrentCanonicalCatalogQueries 
     }
     private sealed record Position(Guid Stage,CatalogCursor Key);
     private static CatalogCursor Key(DriveCatalogAsset asset)=>new(asset.EffectiveUtc,asset.Id);
-    private static DesktopCatalogPhoto Photo(DriveCatalogAsset asset)=>new(asset.Id,asset.AccountId,asset.Name,asset.MimeType,asset.Width,asset.Height,asset.EffectiveUtc,
+    internal static DesktopCatalogPhoto Photo(DriveCatalogAsset asset)=>new(asset.Id,asset.AccountId,asset.Name,asset.MimeType,asset.Width,asset.Height,asset.EffectiveUtc,
         (asset.CapturedUtc is not null?CatalogDateProvenance.DriveCapture:asset.ModifiedUtc is not null?CatalogDateProvenance.DriveModification:CatalogDateProvenance.Unknown).ToString(),asset.RawCapture);
     private static string Encode(Guid stage,string? account,CatalogCursor key)=>string.Join('|',"c1",stage.ToString("D"),account ?? "*",
         key.EffectiveUtc?.ToString(CultureInfo.InvariantCulture) ?? "unknown",key.Id.ToString("D"));

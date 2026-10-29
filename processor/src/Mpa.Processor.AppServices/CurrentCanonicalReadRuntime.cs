@@ -12,7 +12,7 @@ public sealed record CurrentCanonicalReadAsset(CurrentCatalogActivation Selectio
 /// index pool and serialized state. Historical queries use a separate lane from
 /// network refresh. Join this owner before its borrowed owners. No publication or
 /// original-media permission can be obtained from historical content.</summary>
-public sealed class CurrentCanonicalReadRuntime(ProcessorStateCoordinator state,StorageBudgetManager budget,
+public sealed partial class CurrentCanonicalReadRuntime(ProcessorStateCoordinator state,StorageBudgetManager budget,
     LocalCurrentControlReader reader,LocalCurrentStagePool pool) : IAsyncDisposable, ICurrentCanonicalCatalogQueries
 {
     private readonly ProcessorStateCoordinator _state=state ?? throw new ArgumentNullException(nameof(state));

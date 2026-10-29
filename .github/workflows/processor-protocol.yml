@@ -61,6 +61,9 @@ jobs:
     # Three indexed canonical account/legacy/offline cases remain mandatory in
     # the composition group. All728 prior Services and447 prior Core plus10 new
     # private-index/compatibility Core cases stay required on every platform.
+    # Six canonical viewer capture/composition cases hold actual native owners.
+    # Keep their mandatory checks in composition on all four platforms, with
+    # every prior731 Services/457 Core/38 Web identity and the same job limits.
     # No test assertion, original job deadline or scale benchmark is relaxed.
     timeout-minutes: 30
     env:
@@ -115,7 +118,7 @@ jobs:
               $mpaFreshFamilies = @('CurrentFreshHeader')
               $mpaOutgoingFamilies = @('CurrentPublicationOwner')
               $mpaDrainFamilies = @('CurrentGenerationDrain')
-              $mpaCompositionFamilies = @('CurrentDesktopComposition', 'CurrentCanonicalAccount')
+              $mpaCompositionFamilies = @('CurrentDesktopComposition', 'CurrentCanonicalAccount', 'CanonicalViewerCapture', 'CanonicalViewerComposition')
               $mpaHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
               $mpaNotHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
               $mpaContinuity = ($mpaContinuityFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'

@@ -1,5 +1,58 @@
 # MPA 0.6.0 implementation ledger
 
+## Actual canonical frozen viewer ownership and desktop composition
+
+The desktop viewer now accepts an explicit canonical stage and account. It captures
+real sealed canonical IDs directly into the existing private SQLite viewer format,
+with256-row batches, bounded cache/windows and the original storage reservations.
+Every canonical row validates its identity, payload/hash, account and date; counts
+must match the sealed descriptor. Missing or foreign selected photos are rejected,
+never replaced. Genuine format1 all-account capture preserves the original file;
+filtered enumeration reports the explicit rebuild-needed state.
+
+Historical and canonical owners hold the actual source read lane throughout capture.
+A completed private index rejected by late cancellation is physically disposed;
+unconfirmed cleanup carries that exact retained owner. Exit joins real capture and
+all admitted queries before native source/pool retirement. Frozen identity indexes
+can remain readable after their source closes and grant no provider/write authority.
+
+The existing browser-scoped session owner composes an explicit canonical source,
+checks its borrowed state/budget identities before IO and carries stage/account
+through frozen windows. Replay cannot alias another context or browser. Original
+8-global/2-browser capacity,15-minute expiry and joined cleanup remain unchanged.
+Late completed native results and failed-capture retained owners are tracked until
+physical retirement. The actual desktop composes its source after historical init.
+Web metadata resolves only captured IDs in the same stage/account. Missing slots
+remain missing; changed selections reject the whole result. Legacy callers retain
+their separate discovery branch. No discovery revision is fabricated for canonical
+photos, and no credential/provider rights come from the historical index.
+
+Actual local proof:5 new native capture Core +5 actual runtime Services,35 prior
+Core +28 prior Services;5 new viewer owner Core +1 actual composed Services +4 Web,
+8 prior viewer-owner +38 prior Web identities; strict isolated Desktop passes with
+zero warnings/errors. Existing test bytes, assertions and deadlines are unchanged.
+Three old production files only add partial keywords; their existing method bodies
+match committed LF blobs verbatim. One original work file had CRLF but its committed
+blob was already LF. The initial new Web fixture passed3/failed1 because it omitted
+required Origin; the product correctly returned403. The fixture now supplies the
+normal Origin header, retaining every assertion and request-protection gate. The
+original failure/source/report remains preserved. No product byte changed for it.
+
+Parent97d has actual56-job/72-report native proof. This component requires the same
+56jobs72reports,113Protocol467Core737Services42Web exactly once per platform. All
+731 previous Services remain required; the six new native capture/composition cases
+join the mandatory composition group15, with application538 unchanged. All prior
+Core457 and Web38 identities, source/scale/reference/full-stream/log/30-minute
+ordinary/Windows5-minute hang gates and exact15 AGP records remain unchanged.
+Fresh exact-revision CI is required; local component proof is not full acceptance.
+
+The browser source still uses discovery. Version-observed provider previews and the
+frontend switch remain required before canonical gallery/viewer UI acceptance.
+Current recovery/reuse/incremental efficiency, processing/plugins, human/web flows,
+six installers/lifecycle, independent live Drive/performance and exact release are
+unfinished. Android remains Drive-only, new mobile work is deferred, final joint
+acceptance is explicit. Development binds only127.0.0.1. No0.6 release is claimed.
+
 ## Authenticated shared-library metadata queries with canonical cursors
 
 The actual desktop engine now exposes a read-only canonical metadata route at

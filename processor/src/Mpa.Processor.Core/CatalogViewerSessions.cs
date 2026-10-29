@@ -1,15 +1,16 @@
 namespace Mpa.Processor.Core;
 
-public sealed record CatalogViewerRequest(Guid Id, Guid SelectedId, string? AccountId);
-public sealed record CatalogViewerWindow(Guid Id, long Count, long Position, IReadOnlyList<CatalogSessionEntry> Entries);
+public sealed record CatalogViewerRequest(Guid Id, Guid SelectedId, string? AccountId, Guid? StageId=null);
+public sealed record CatalogViewerWindow(Guid Id, long Count, long Position, IReadOnlyList<CatalogSessionEntry> Entries, Guid? StageId=null,string? AccountId=null);
 public sealed class CatalogViewerUnavailableException() : IOException("This photo viewer session is unavailable. Return to the gallery to reopen the same photo.");
 public sealed class CatalogViewerCapacityException() : IOException("Close another photo viewer on this library, then try again. Existing viewers and progress were retained.");
 
 /// <summary>One serial owner for bounded, browser-scoped disposable identity indexes. It
 /// borrows the state coordinator and storage budget, joins capture before Exit, and never
 /// permits another browser to read, close or overwrite an existing session.</summary>
-public sealed class CatalogViewerSessions(ProcessorStateCoordinator state, string stateDirectory, Guid installationId, StorageBudgetManager storage, TimeProvider? time = null) : IAsyncDisposable
+public sealed class CatalogViewerSessions(ProcessorStateCoordinator state, string stateDirectory, Guid installationId, StorageBudgetManager storage, TimeProvider? time = null, ICanonicalCatalogViewerSource? canonical = null) : IAsyncDisposable
 {
+    private readonly ICanonicalCatalogViewerSource? _canonical=canonical is null || canonical.Borrows(state,storage)?canonical:throw new ArgumentException("The canonical viewer source belongs to different state or storage owners.",nameof(canonical));
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly StorageBudgetManager _storage = storage ?? throw new ArgumentNullException(nameof(storage));
     private readonly TimeProvider _time = time ?? TimeProvider.System;
@@ -30,9 +31,10 @@ public sealed class CatalogViewerSessions(ProcessorStateCoordinator state, strin
     public Task<CatalogViewerWindow> OpenAsync(Guid browser, CatalogViewerRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (browser == Guid.Empty || request.Id == Guid.Empty || request.SelectedId == Guid.Empty) throw new ArgumentException("Captured browser, session and media identities are required.");
+        if (browser == Guid.Empty || request.Id == Guid.Empty || request.SelectedId == Guid.Empty || request.StageId==Guid.Empty) throw new ArgumentException("Captured browser, session and media identities are required.");
         return ExecuteAsync(async token =>
         {
+            if(request.StageId is not null && _canonical is null) throw new CatalogViewerUnavailableException();
             Prune();
             if (_sessions.TryGetValue((browser, request.Id), out var current))
             {
@@ -50,14 +52,22 @@ public sealed class CatalogViewerSessions(ProcessorStateCoordinator state, strin
             try
             {
                 var path = _directory.NewIndexPath();
-                var snapshot = await _state.ExecuteAsync(database => database.OpenReadSnapshot(), token).ConfigureAwait(false);
-                _snapshots.Add(snapshot);
-                try
+                if(request.StageId is not null)
                 {
-                    index = await Task.Run(() => CatalogViewerSessionIndex.Capture(snapshot, path, request.SelectedId, request.AccountId, _storage, token), CancellationToken.None).ConfigureAwait(false);
+                    index=await (_canonical ?? throw new CatalogViewerUnavailableException()).CaptureAsync(request,path,token).ConfigureAwait(false);
                     _retained.Add(index);
                 }
-                finally { snapshot.Dispose(); _snapshots.Remove(snapshot); }
+                else
+                {
+                    var snapshot = await _state.ExecuteAsync(database => database.OpenReadSnapshot(), token).ConfigureAwait(false);
+                    _snapshots.Add(snapshot);
+                    try
+                    {
+                        index = await Task.Run(() => CatalogViewerSessionIndex.Capture(snapshot, path, request.SelectedId, request.AccountId, _storage, token), CancellationToken.None).ConfigureAwait(false);
+                        _retained.Add(index);
+                    }
+                    finally { snapshot.Dispose(); _snapshots.Remove(snapshot); }
+                }
             }
             catch (CatalogSessionCaptureException error) { _retained.Add(error.RetainedOwner); throw; }
             var session = new Session(browser, request, index, _time.GetTimestamp());
@@ -88,7 +98,7 @@ public sealed class CatalogViewerSessions(ProcessorStateCoordinator state, strin
     private async Task<CatalogViewerWindow> WindowAsync(Session session, long position)
     {
         var entries = await Task.Run(() => session.Index.ReadWindow(position), CancellationToken.None).ConfigureAwait(false);
-        session.Touched = _time.GetTimestamp(); return new(session.Request.Id, session.Index.Count, position, entries);
+        session.Touched = _time.GetTimestamp(); return new(session.Request.Id, session.Index.Count, position, entries,session.Request.StageId,session.Request.AccountId);
     }
     private void Prune()
     {
