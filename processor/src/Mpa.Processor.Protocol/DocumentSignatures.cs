@@ -29,44 +29,58 @@ public sealed class ProtocolDocumentSigner
     }
 }
 
-/// <summary>Owns an imported PUBLIC key. Its caller must separately establish actor/library/epoch
-/// authority through pairing; a valid self-supplied key is never sufficient authority.</summary>
+/// <summary>Owns a public-key verifier. Explicit owned scopes may reuse exact
+/// successful cryptographic mathematics; callers must still establish actual
+/// actor/library/epoch/history/permission on every read. No scope is a grant.</summary>
 public sealed class ProtocolDocumentVerifier : IDisposable
 {
-    private readonly ECDsa _key;
+    private readonly object _gate=new();
+    private ECDsa? _key;
     private readonly CanonicalJson _canonical;
+    private readonly ProtocolSignatureVerificationOwner.Scope? _mathematics;
+    private bool _disposed;
     internal CanonicalProtocolPublicKey PublicKey { get; }
     public string KeyId => PublicKey.KeyId;
 
     public ProtocolDocumentVerifier(ReadOnlySpan<byte> publicKeyInfo, int documentLimit = 256 * 1024)
     {
-        if (publicKeyInfo.Length is < 1 or > 512) throw new ProtocolFormatException("Public key exceeds its encoding bound.");
-        _canonical = new CanonicalJson(documentLimit);
-        (PublicKey, _key) = CanonicalProtocolPublicKey.ImportAndValidate(publicKeyInfo);
+        if(publicKeyInfo.Length is <1 or >512) throw new ProtocolFormatException("Public key exceeds its encoding bound.");
+        _canonical=new CanonicalJson(documentLimit);_mathematics=ProtocolSignatureVerificationOwner.Capture();
+        if(_mathematics is not null && CanonicalProtocolPublicKey.FindValidated(publicKeyInfo) is {} known) PublicKey=known;
+        else (PublicKey,_key)=CanonicalProtocolPublicKey.ImportAndValidate(publicKeyInfo);
     }
 
-    // The immutable value was produced only by the strict native factory above.
-    // Each verifier still owns a fresh actual native key and verifies every signature.
     internal ProtocolDocumentVerifier(CanonicalProtocolPublicKey publicKey, int documentLimit = 256 * 1024)
     {
-        ArgumentNullException.ThrowIfNull(publicKey);
-        _canonical = new CanonicalJson(documentLimit);
-        PublicKey = publicKey; _key = publicKey.ImportForVerification();
+        ArgumentNullException.ThrowIfNull(publicKey);_canonical=new CanonicalJson(documentLimit);PublicKey=publicKey;
+        _mathematics=ProtocolSignatureVerificationOwner.Capture();
+        if(_mathematics is null) _key=publicKey.ImportForVerification();
     }
 
-    public bool Verify(ReadOnlySpan<byte> document, DocumentSignature signature)
+    public bool Verify(ReadOnlySpan<byte> document,DocumentSignature signature)
     {
         ArgumentNullException.ThrowIfNull(signature);
-        if (signature.Algorithm != "ES256" || signature.KeyId is null || signature.KeyId.Length != 64 ||
-            signature.KeyId.Any(character => character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
-            throw new ProtocolFormatException("Unsupported signature/key encoding.");
-        var bytes = SignatureEncoding.Decode(signature.Value);
-        if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(signature.KeyId), Convert.FromHexString(KeyId))) return false;
-        var canonical = _canonical.Encode(document);
-        return _key.VerifyData(canonical, bytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        lock(_gate)
+        {
+            if(signature.Algorithm!="ES256" || signature.KeyId is null || signature.KeyId.Length!=64 ||
+                signature.KeyId.Any(character=>character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+                throw new ProtocolFormatException("Unsupported signature/key encoding.");
+            var bytes=SignatureEncoding.Decode(signature.Value);
+            if(!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(signature.KeyId),Convert.FromHexString(KeyId))) return false;
+            // Parsing, limits and canonical/algorithm/key/signature checks are never
+            // memoized. A changed body, actual key or signature gets its own math.
+            var canonical=_canonical.Encode(document);ObjectDisposedException.ThrowIf(_disposed,this);
+            var scope=_mathematics is {IsActive:true}?_mathematics:null;
+            var fingerprint=scope is null?null:ProtocolSignatureVerificationOwner.Fingerprint(KeyId,canonical,bytes);
+            if(scope is not null && fingerprint is not null && scope.Contains(fingerprint)) return true;
+            _key??=PublicKey.ImportForVerification();scope?.NativeAttempt();
+            var valid=_key.VerifyData(canonical,bytes,HashAlgorithmName.SHA256,DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+            if(valid && scope is not null && fingerprint is not null) scope.Remember(fingerprint);
+            return valid;
+        }
     }
-
-    public void Dispose() => _key.Dispose();
+    public void Dispose()
+    {lock(_gate) {if(_disposed) return;_key?.Dispose();_key=null;_disposed=true;}}
 }
 
 internal static class SignatureEncoding

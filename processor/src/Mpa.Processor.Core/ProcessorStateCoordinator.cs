@@ -1,3 +1,5 @@
+using Mpa.Processor.Protocol;
+
 namespace Mpa.Processor.Core;
 
 /// <summary>One shared serial background owner for SQLite repository calls. Delegates are
@@ -7,6 +9,7 @@ public sealed class ProcessorStateCoordinator(ProcessorStateDatabase database) :
 {
     private readonly ProcessorStateDatabase _database = database ?? throw new ArgumentNullException(nameof(database));
     private readonly SemaphoreSlim _serial = new(1, 1);
+    private readonly ProtocolSignatureVerificationOwner _signatureMathematics = new();
     private readonly object _gate = new();
     private bool _stopping;
     private Task? _disposal;
@@ -22,7 +25,15 @@ public sealed class ProcessorStateCoordinator(ProcessorStateDatabase database) :
             cancellationToken.ThrowIfCancellationRequested();
             // Once started, join SQLite work even if its caller cancels. The result may have
             // committed and must not be disguised as a rollback by a timeout wrapper.
-            return await Task.Run(() => operation(_database), CancellationToken.None).ConfigureAwait(false);
+            return await Task.Run(() =>
+            {
+                // Exact successful signature mathematics only. Every delegate still
+                // reads/revalidates actual native history, counters, policy, human
+                // metadata, inventory and current nonce. Scope closes on failure;
+                // it cannot flow as current authority into later provider work.
+                using var mathematics=_signatureMathematics.EnterScope();
+                return operation(_database);
+            }, CancellationToken.None).ConfigureAwait(false);
         }
         finally { _serial.Release(); }
     }
@@ -37,6 +48,7 @@ public sealed class ProcessorStateCoordinator(ProcessorStateDatabase database) :
     private async Task StopAsync()
     {
         await _serial.WaitAsync().ConfigureAwait(false);
-        _serial.Release();
+        try {_signatureMathematics.Dispose();}
+        finally {_serial.Release();}
     }
 }

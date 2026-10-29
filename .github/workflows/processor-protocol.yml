@@ -28,7 +28,7 @@ jobs:
       fail-fast: true
       matrix:
         runner: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
-        contract_group: [metadata, application, headers, continuity, publication, graphs, fresh, outgoing]
+        contract_group: [metadata, application, headers, continuity, publication, graphs, fresh, outgoing, drain]
     runs-on: ${{ matrix.runner }}
     # All six projects and every original case remain required on this exact SHA.
     # Windows run40296922461 passed all404 Core cases but its two unchanged100k
@@ -53,6 +53,9 @@ jobs:
     # Nine joined outgoing cases perform actual graph/header/Root/canonical/private
     # retirement and retry. Require their own outgoing group on all four existing
     # platforms; retain all706 prior Services identities and unchanged30m deadlines.
+    # Seven drain cases complete real original/next generations and independently
+    # recheck unchanged-ready, joined Root recovery and offline historical cleanup.
+    # Require a drain group on all four platforms; retain all715 previous identities.
     # No test assertion, original job deadline or scale benchmark is relaxed.
     timeout-minutes: 30
     env:
@@ -82,13 +85,13 @@ jobs:
             @('protocol', 'core', 'google')
           } elseif ('${{ matrix.contract_group }}' -eq 'application') {
             @('setup', 'lan', 'web')
-          } elseif ('${{ matrix.contract_group }}' -in @('headers', 'continuity', 'publication', 'graphs', 'fresh', 'outgoing')) {
+          } elseif ('${{ matrix.contract_group }}' -in @('headers', 'continuity', 'publication', 'graphs', 'fresh', 'outgoing', 'drain')) {
             @('setup')
           } else {
             throw 'Unknown required contract group.'
           }
           $mpaProjects = @($mpaAllProjects | Where-Object { $_.Name -in $mpaProjectNames })
-          $mpaExpectedProjects = if ('${{ matrix.contract_group }}' -in @('headers', 'continuity', 'publication', 'graphs', 'fresh', 'outgoing')) { 1 } else { 3 }
+          $mpaExpectedProjects = if ('${{ matrix.contract_group }}' -in @('headers', 'continuity', 'publication', 'graphs', 'fresh', 'outgoing', 'drain')) { 1 } else { 3 }
           if ($mpaProjects.Count -ne $mpaExpectedProjects) { throw 'The contract group lost a required project.' }
           foreach ($mpaProject in $mpaProjects) {
             $mpaName = $mpaProject.Name
@@ -106,6 +109,7 @@ jobs:
               $mpaGraphFamilies = @('CurrentPreparedGraph')
               $mpaFreshFamilies = @('CurrentFreshHeader')
               $mpaOutgoingFamilies = @('CurrentPublicationOwner')
+              $mpaDrainFamilies = @('CurrentGenerationDrain')
               $mpaHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
               $mpaNotHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
               $mpaContinuity = ($mpaContinuityFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
@@ -118,6 +122,8 @@ jobs:
               $mpaNotFresh = ($mpaFreshFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
               $mpaOutgoing = ($mpaOutgoingFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
               $mpaNotOutgoing = ($mpaOutgoingFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaDrain = ($mpaDrainFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotDrain = ($mpaDrainFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
               $mpaServiceFilter = switch ('${{ matrix.contract_group }}') {
                 'headers' { "$mpaBaseFilter&($mpaHeaders)" }
                 'continuity' { "$mpaBaseFilter&$mpaNotHeaders&($mpaContinuity)" }
@@ -125,7 +131,8 @@ jobs:
                 'graphs' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&($mpaGraphs)" }
                 'fresh' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&$mpaNotGraphs&($mpaFresh)" }
                 'outgoing' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&$mpaNotGraphs&$mpaNotFresh&($mpaOutgoing)" }
-                'application' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&$mpaNotGraphs&$mpaNotFresh&$mpaNotOutgoing" }
+                'drain' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&$mpaNotGraphs&$mpaNotFresh&$mpaNotOutgoing&($mpaDrain)" }
+                'application' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&$mpaNotGraphs&$mpaNotFresh&$mpaNotOutgoing&$mpaNotDrain" }
                 default { throw 'Unknown required Services partition.' }
               }
               $mpaArguments += @('--filter', $mpaServiceFilter)

@@ -2,6 +2,10 @@ using Mpa.Processor.Core;
 
 namespace Mpa.Processor.AppServices;
 
+// Actual result of this joined operation, not a reusable current-read/IO grant.
+// Historical completion supplies no selection from this operation.
+internal sealed record CurrentGenerationPublicationOutcome(PublishedCatalogHead Head,CurrentCatalogActivation? Selection);
+
 /// <summary>One joined outgoing current generation: original header preparation,
 /// actual metadata allocation/upload, fixed Root publication, canonical admission
 /// and acknowledged private-snapshot retirement. Owns its four semantic children;
@@ -40,7 +44,10 @@ public sealed class CurrentCatalogPublicationService : IAsyncDisposable
         _allocation=new(state,accounts,budget,reader);_upload=new(accounts,reader);_completion=new(state,budget);
     }
 
-    public async Task<PublishedCatalogHead> PublishAsync(CancellationToken caller)
+    public async Task<PublishedCatalogHead> PublishAsync(CancellationToken caller)=>
+        (await PublishForRuntimeAsync(caller).ConfigureAwait(false)).Head;
+
+    internal async Task<CurrentGenerationPublicationOutcome> PublishForRuntimeAsync(CancellationToken caller)
     {
         CancellationTokenSource linked;lock(_gate) {AssertRunning();linked=CancellationTokenSource.CreateLinkedTokenSource(caller,_stop.Token);}
         using(linked)
@@ -51,7 +58,7 @@ public sealed class CurrentCatalogPublicationService : IAsyncDisposable
                 lock(_gate) AssertRunning();var token=linked.Token;Check(token);
                 var progress=await ReadProgressAsync(token).ConfigureAwait(false);
                 if(progress.Capture is {} complete && (progress.Selected || complete.Phase is "complete" or "snapshot-retiring"))
-                    return await FinishAsync(complete.Scope.GenerationId,token).ConfigureAwait(false);
+                    return new(await FinishAsync(complete.Scope.GenerationId,token).ConfigureAwait(false),null);
                 WorkspacePublicationRecord? header=progress.Header;
                 var plan=progress.Transition;
                 if(plan is null)
@@ -60,7 +67,7 @@ public sealed class CurrentCatalogPublicationService : IAsyncDisposable
                     progress=await ReadProgressAsync(token).ConfigureAwait(false);
                     if(progress.Capture is not {} original || original.Scope!=header.Scope || header.Id!=original.CommitIntentId)
                         throw new CatalogGenerationCaptureConflictException();
-                    if(progress.Selected) return await FinishAsync(original.Scope.GenerationId,token).ConfigureAwait(false);
+                    if(progress.Selected) return new(await FinishAsync(original.Scope.GenerationId,token).ConfigureAwait(false),null);
                     plan=progress.Transition;
                     if(plan is null)
                     {
@@ -75,7 +82,7 @@ public sealed class CurrentCatalogPublicationService : IAsyncDisposable
                     var capture=await _reader.CaptureAsync(token).ConfigureAwait(false);
                     var inventory=await _reader.ObserveWorkspaceInventorySessionAsync(capture,token).ConfigureAwait(false);
                     var prepared=await _reader.PrepareGenerationRootAsync(inventory,header.Scope.GenerationId,token).ConfigureAwait(false);
-                    if(prepared.Selected) return await FinishAsync(header.Scope.GenerationId,token).ConfigureAwait(false);
+                    if(prepared.Selected) return new(await FinishAsync(header.Scope.GenerationId,token).ConfigureAwait(false),null);
                     plan=prepared.Transition??throw new CatalogGenerationCaptureConflictException();
                     }
                 }
@@ -88,7 +95,7 @@ public sealed class CurrentCatalogPublicationService : IAsyncDisposable
                 // atomic pointer/selection/Root-terminal transaction before cleanup.
                 var selected=await _canonical.RefreshAsync(token).ConfigureAwait(false);
                 if(selected.Catalog!=plan.Catalog) throw new CurrentControlObservationConflictException();
-                return await FinishAsync(header.Scope.GenerationId,token).ConfigureAwait(false);
+                return new(await FinishAsync(header.Scope.GenerationId,token).ConfigureAwait(false),selected);
             }
             finally {_serial.Release();}
         }

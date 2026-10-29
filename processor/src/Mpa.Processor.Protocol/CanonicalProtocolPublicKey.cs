@@ -46,6 +46,15 @@ internal sealed class CanonicalProtocolPublicKey
         catch { key.Dispose(); throw; }
     }
 
+    // Only an explicitly owned mathematical scope may defer a native import.
+    // The pool value still originates exclusively from the strict native factory;
+    // this lookup grants no signature conclusion or actor/current authority.
+    internal static CanonicalProtocolPublicKey? FindValidated(ReadOnlySpan<byte> encoded)
+    {
+        if(encoded.Length is <1 or >512) throw new ProtocolFormatException("Public key exceeds its encoding bound.");
+        var owned=encoded.ToArray();return Evidence.Find(Convert.ToBase64String(owned));
+    }
+
     internal ECDsa ImportForVerification()
     {
         var key = ECDsa.Create();

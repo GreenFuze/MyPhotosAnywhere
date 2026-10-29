@@ -1,5 +1,49 @@
 # MPA 0.6.0 implementation ledger
 
+## Current generation drain and bounded owned signature verification
+
+The standalone current-generation runtime finishes immutable pending work before
+admitting later imports. A matching local scheduling hint still requires actual
+Root/inventory/canonical admission. Publication carries its same-operation stage
+result so the drain preserves the actual stage and cursor without rebuilding it.
+Historical cleanup cannot claim current readiness. Original images and human
+metadata are preserved; cancellation and Exit join physical provider work.
+
+The first six drain cases caught a redundant refresh changing stage identity.
+Production was corrected with every assertion/deadline retained and a seventh
+SQL-fault/disconnect case added. The resulting seven cases passed, but an existing
+publication cancellation case then failed its unchanged ten-second pre-write
+deadline. A retained bounded CPU trace showed repeated native key imports; it
+alone did not establish a precise timing cause or grant an exception.
+
+State coordinators now own a bounded cache of exact successful ES256 mathematics.
+Scopes enclose actual synchronous serialized state callbacks and must join before
+retirement. Only framed SHA256 digests are retained (at most1024); no key handles,
+documents, signatures, authority or history are cached. Algorithm, signature/key
+encoding and canonical bounds are checked on every verification. Changed bytes
+require native verification. Every domain, actor/counter/history, human, nonce,
+permission and current provider check remains independently required.
+
+All14 new protocol cases, all99 prior Protocol identities, all447 Core identities,
+the same7 drain cases and all9 prior publication API cases pass against frozen LF
+source, including the unchanged cancellation/Exit deadlines. Strict isolated
+Desktop has zero warnings/errors. Original failed and interrupted reports remain
+retained. No assertion, deadline, warning or version exception was relaxed.
+
+The preceding D780 has complete independently verified48-job/64-report native CI.
+This packet requires52jobs/68reports:113Protocol,447Core and722 ordinary Services
+exactly once per platform (47headers/47continuity/47publication/12graphs/15fresh/
+9outgoing/7drain/538application), plus every original Google/LAN/Web, source,
+scale/reference, stream/log and unchanged native timing gate. New exact CI is
+mandatory; local passes do not imply those checks have completed.
+
+The drain is not yet composed into the running desktop engine/canonical gallery.
+Current recovery/reuse/incremental IO, processing/plugins, human/web workflows,
+six installers/native lifecycle, actual independent Drive/performance acceptance
+and final publication remain unfinished. Android stays Drive-only, new mobile
+work is deferred, final joint acceptance remains explicit and development binds
+only127.0.0.1. No product release is claimed.
+
 ## Joined current generation through actual Root selection and private retirement
 
 A joined outgoing owner now composes real current frozen graph/header preparation,
