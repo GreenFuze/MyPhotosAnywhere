@@ -13,7 +13,7 @@ public sealed record CurrentCanonicalReadAsset(CurrentCatalogActivation Selectio
 /// network refresh. Join this owner before its borrowed owners. No publication or
 /// original-media permission can be obtained from historical content.</summary>
 public sealed class CurrentCanonicalReadRuntime(ProcessorStateCoordinator state,StorageBudgetManager budget,
-    LocalCurrentControlReader reader,LocalCurrentStagePool pool) : IAsyncDisposable
+    LocalCurrentControlReader reader,LocalCurrentStagePool pool) : IAsyncDisposable, ICurrentCanonicalCatalogQueries
 {
     private readonly ProcessorStateCoordinator _state=state ?? throw new ArgumentNullException(nameof(state));
     private readonly StorageBudgetManager _budget=budget ?? throw new ArgumentNullException(nameof(budget));

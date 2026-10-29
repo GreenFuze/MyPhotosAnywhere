@@ -1,5 +1,45 @@
 # MPA 0.6.0 implementation ledger
 
+## Authenticated shared-library metadata queries with canonical cursors
+
+The actual desktop engine now exposes a read-only canonical metadata route at
+GET /api/library/catalog. It borrows its existing historical query owner through
+a narrow interface, without provider requests, publication rights or new native
+ownership. The canonical runtime only adds that interface; all query, refresh,
+admission, cancellation and retirement bodies remain byte-identical.
+
+Account/date/previous queries use the actual indexed canonical methods. Every
+continuation binds its stage and account, validates canonical encodings and
+retains the exact photo identity. Page and edge queries must report the same
+selection; replacement rejects the whole result. Missing or foreign exact photos
+remain missing. No local discovery/configuration revision is invented. No selected
+catalog is an explicit state; provider/storage failures never become empty photos.
+Authentication remains required. Changed-stage and genuine legacy-index attention
+return409, uninitialized shared ownership returns503, and these operational states
+preserve the browser session. Existing discovery routes and browser source remain.
+
+All11 new reader/cursor/HTTP cases and all27 prior Web identities pass. Strict
+isolated Desktop has zero warnings/errors. The old host fixture only becomes
+partial; all old methods, assertions and deadlines remain verbatim. The original
+strict CA1869 compile failure is retained: one new test now reuses class-owned
+JSON options, without changing an expectation, deadline or production byte.
+Core/Protocol and every old non-Web test byte remain unchanged and their actual
+parent native proof is retained without redundant local reruns.
+
+Parent34b has independently verified56jobs72reports113Protocol457Core731Services
+once per platform, all four workflows succeeded. This packet requires the same
+unchanged workflow and gates with all38Web exactly once:27 prior plus11 new.
+Source/scale/reference/full-stream/log/30-minute ordinary/Windows5-minute hang
+gates and the exact15 AGP records remain unchanged. Fresh revision CI is required.
+
+This provides the real metadata API for subsequent browser integration. The
+browser gallery/viewer still uses discovery; canonical frozen viewer identities,
+version-bound previews and the frontend switch remain unfinished. Current recovery,
+verified reuse/incremental efficiency, processing/plugins, human/web workflows,
+six installers/lifecycle, live Drive/performance and exact release remain required.
+Android stays Drive-only; new mobile work is deferred, final joint acceptance
+remains explicit. Development binds only127.0.0.1. No0.6 release is claimed.
+
 ## Indexed canonical account pages with genuine historical-file compatibility
 
 Canonical account queries now seek through a compound account/date/identity index

@@ -177,6 +177,12 @@ public sealed class DesktopWebHost : IAsyncDisposable
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "The original source approval was retained. Review later changes in Sources." }, context.RequestAborted).ConfigureAwait(false); }
             catch (ProcessorWorkStateConflictException)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Processing state changed. Refresh Activity before trying again." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (CurrentCanonicalPositionChangedException error)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
+            catch (CurrentCatalogAccountPagingUnavailableException error)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
+            catch (DesktopLibraryCatalogUnavailableException error)
+            { context.Response.StatusCode = 503; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
             catch (InvalidDesktopCatalogQueryException error)
             { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
             catch (CatalogSessionSelectionUnavailableException error)
@@ -220,6 +226,21 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 context.Response.Cookies.Delete(CookieName, CookieOptions(RequestEndpoint(context)!)); context.Response.StatusCode = 204; break;
             case ("GET", "/api/status"):
                 await context.Response.WriteAsJsonAsync(await _application.SnapshotAsync(token).ConfigureAwait(false), token).ConfigureAwait(false); break;
+            case ("GET", "/api/library/catalog"):
+                if (_application is not IDesktopLibraryCatalogApplication libraryCatalog)
+                { context.Response.StatusCode = 404; break; }
+                var libraryAccount = OptionalQuery(context, "account", 256);
+                if (libraryAccount is not null && !Identity(libraryAccount)) throw new BadHttpRequestException("Invalid account filter.");
+                var libraryDirection = OptionalQuery(context, "direction", 5);
+                if (libraryDirection is not (null or "older" or "newer")) throw new BadHttpRequestException("Invalid gallery direction.");
+                var libraryRawDate = OptionalQuery(context, "date", 16); long? libraryDate = null;
+                if (libraryRawDate is not null)
+                {
+                    if (!long.TryParse(libraryRawDate, System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out var parsedLibraryDate) || parsedLibraryDate.ToString(System.Globalization.CultureInfo.InvariantCulture) != libraryRawDate)
+                        throw new BadHttpRequestException("Invalid gallery date.");
+                    libraryDate = parsedLibraryDate;
+                }
+                await context.Response.WriteAsJsonAsync(await libraryCatalog.LibraryCatalogAsync(libraryAccount, OptionalQuery(context, "cursor", 400), libraryDirection == "newer", libraryDate, token).ConfigureAwait(false), token).ConfigureAwait(false); break;
             case ("GET", "/api/catalog"):
                 var filter = OptionalQuery(context, "account", 256);
                 if (filter is not null && !Identity(filter)) throw new BadHttpRequestException("Invalid account filter.");

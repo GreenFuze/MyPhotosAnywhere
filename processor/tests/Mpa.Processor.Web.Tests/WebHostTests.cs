@@ -11,7 +11,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Mpa.Processor.Web.Tests;
 
 [TestClass]
-public sealed class WebHostTests
+public sealed partial class WebHostTests
 {
     [TestMethod]
     public async Task PublicConnectionExportRequiresAnAuthenticatedHostAndNeverApprovesOrPublishes()
@@ -372,7 +372,7 @@ public sealed class WebHostTests
         request.Headers.Add("Origin", endpoint.GetLeftPart(UriPartial.Authority)); if (csrf is not null) request.Headers.Add("X-MPA-CSRF", csrf);
         return await http.SendAsync(request).ConfigureAwait(false);
     }
-    private sealed class Engine : IDesktopWebApplication
+    private sealed partial class Engine : IDesktopWebApplication
     {
         public int PublicationRequests { get; private set; }
         public Task<DesktopLibraryPublication> LibraryPublicationAsync(CancellationToken cancellationToken) => Task.FromResult(new DesktopLibraryPublication("NeedsAttention", "Retry library setup.", true));
