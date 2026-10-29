@@ -32,6 +32,10 @@ public sealed class CurrentCanonicalReadRuntime(ProcessorStateCoordinator state,
     public bool ExitConfirmed {get {lock(_gate) return _exitConfirmed;}}
     public Exception? Failure {get {lock(_gate) return _failure;}}
     public CurrentCatalogActivation? Selection {get {lock(_gate) return _active?.Selection;}}
+    internal bool BorrowsPublicationOwners(ProcessorStateCoordinator state,StorageBudgetManager budget,
+        LocalCurrentControlReader reader,LocalCurrentStagePool pool)=>
+        ReferenceEquals(state,_state) && ReferenceEquals(budget,_budget) && ReferenceEquals(reader,_reader) && ReferenceEquals(pool,_pool);
+
 
     public Task<CurrentCatalogActivation?> InitializeHistoricalAsync(CancellationToken caller)=>OperationAsync(async token=>
     {

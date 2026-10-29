@@ -19,6 +19,9 @@ public sealed partial class LocalCurrentStagePool(ProcessorStateCoordinator stat
     private bool _stopping,_exitConfirmed;
     private Task? _disposal;
     public bool ExitConfirmed {get {lock(_gate) return _exitConfirmed;}}
+    internal bool BorrowsPublicationOwners(ProcessorStateCoordinator state,StorageBudgetManager budget)=>
+        ReferenceEquals(state,_state) && ReferenceEquals(budget,_budget);
+
 
     public Task<LocalCurrentSqliteStage> OpenAsync(LocalCurrentControlCapture capture,Guid id,CancellationToken cancellationToken)=>OperationAsync(async token=>
     {

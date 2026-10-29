@@ -1,5 +1,51 @@
 # MPA 0.6.0 implementation ledger
 
+## Joined current generation through actual Root selection and private retirement
+
+A joined outgoing owner now composes real current frozen graph/header preparation,
+allocation/upload/readback, exact original-generation Root reservation, conditional
+same-file Root publication, actual canonical traversal/indexing/Root-last admission,
+and typed completion with physical private-snapshot retirement. A stored transport
+reply never substitutes for the canonical selection transaction. No original image
+or human metadata write is introduced.
+
+Derive the new generation target only from the actual current inventory and original
+verified header. Inspect and reserve within one serialized state callback. Existing
+Root work resumes before any header work, retaining its plan, native counter/body,
+first signature and assigned IDs. Historical selected cleanup has a separate offline
+API, including an older generation after a later selection. It provides no new grant.
+
+The owner borrows the exact reader, state, account, budget, canonical runtime and
+shared two-index pool, owns four semantic children, and joins actual operations
+and children before reporting Exit. Foreign owner combinations fail before IO.
+Cancellation during an uncooperative physical Root write cannot admit late selection
+or delete the original frozen snapshot. Retry observes the actual written Root and
+uses the same original work without another Put or native counter.
+
+All9 new native cases pass against exact LF source: genesis, second generation,
+offline older/current selected cleanup, same/restarted owner lost Root reply, joined
+cancel/Exit, actual pointer and selected-receipt SQL rollback/retry, and foreign
+owners. All81 selected prior dependency/header/completion/canonical/pool/navigation
+identities pass, and strict isolated Desktop has zero warnings/errors. Every prior
+test byte, assertion and deadline is unchanged. Core production/tests are identical
+to the retained actual447-case native pass and were not redundantly rerun locally;
+all447 remain required on each platform in fresh CI.
+
+The preceding EEF revision has independently verified44-job/60-report evidence,
+447Core and706 ordinary Services exactly once on each of four platforms, with all
+four fresh workflows successful. This new component requires48jobs/64reports and
+715 ordinary Services per platform:47headers/47continuity/47publication/12graphs/
+15fresh/9outgoing/538application. Original30m ordinary jobs, Windows5m hang checks,
+Protocol99/Google139/LAN9/Web27, scale/reference/source/fullstream/log gates remain
+required. No native timing exception or diagnostic waiver is granted.
+
+This outgoing service is not yet composed into the running desktop engine/gallery.
+Current original-scope recovery, verified reuse and efficient incremental IO, the
+full processing/plugin pipeline, human/web workflows, six installers/lifecycle,
+live Drive/performance/final diagnostics and exact release remain unfinished.
+Android remains Drive-only; new mobile implementation is deferred, and its final
+joint-release acceptance is not waived. Development binds only127.0.0.1.
+
 ## Current native header preparation and actual metadata provider path
 
 A joined current-only owner now prepares the original frozen dependency graph,
