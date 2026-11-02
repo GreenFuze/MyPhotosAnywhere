@@ -22,6 +22,11 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
     private LibrarySigningIdentityOwner? _signing;
     private DesktopWebHost? _host;
     private ProcessorSourceRuntime? _sources;
+    private TakeoutInventoryService? _imports;
+    private ProcessorWorkGroup? _importWork;
+    private ProcessorWorkGroup? _importChildrenWork;
+    private TakeoutDesktopImportRuntime? _importQueue;
+    private bool _importAdmissionClosed;
     private CatalogViewerSessions? _viewers;
     private CatalogPreparationService? _preparations;
     private InitialLibraryPublicationRuntime? _publication;
@@ -35,18 +40,24 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
     private bool _identityClosed;
     private bool _signingClosed;
     private bool _vaultClosed;
+    private bool _importWorkClosed;
     private bool _exitConfirmed;
-    public Exception? Failure { get { lock (_gate) return _publication?.Failure ?? _preparations?.Failure ?? _sources?.Failure ?? _failure ?? _native.Failure; } }
+    public Exception? Failure { get { lock (_gate) return _publication?.Failure ?? _preparations?.Failure ?? _imports?.Failure ?? _importWork?.Failure ?? _sources?.Failure ?? _failure ?? _native.Failure; } }
     public bool ExitConfirmed { get { lock (_gate) return _exitConfirmed; } }
     public event Action<Exception>? Failed;
     public DesktopWebHost Host => _host ?? throw new InvalidOperationException("The desktop web interface has not started.");
     public ProcessorAccountService Accounts => _accounts ?? throw new InvalidOperationException("The account service has not started.");
     public CatalogPreparationService Preparations => _preparations ?? throw new InvalidOperationException("The catalog preparation owner has not started.");
-    public IProcessorWorkControl Work => _sources is { } sources ? sources.Work : _native;
+    public IProcessorWorkControl Work => _importWork is { } imports ? imports : _sources is { } sources ? sources.Work : _native;
+    public TakeoutInventoryService Imports=>_imports??throw new InvalidOperationException("The desktop import owner has not started.");
 
     private DesktopWebRuntime(ProcessorWorkSupervisor native) => _native = native;
     public static async Task<DesktopWebRuntime> StartAsync(ProcessorStateCoordinator state, Guid installationId, string stateDirectory,
         ProcessorWorkSupervisor work, string oauthConfigurationPath, string assetsDirectory, bool enableLan, CancellationToken cancellationToken)
+        =>await StartAsync(state,installationId,stateDirectory,work,oauthConfigurationPath,assetsDirectory,enableLan,null,cancellationToken).ConfigureAwait(false);
+    public static async Task<DesktopWebRuntime> StartAsync(ProcessorStateCoordinator state, Guid installationId, string stateDirectory,
+        ProcessorWorkSupervisor work, string oauthConfigurationPath, string assetsDirectory, bool enableLan,
+        Func<CancellationToken,Task<string?>>? importFolderPicker,CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(work);
         var owner = new DesktopWebRuntime(work);
@@ -65,19 +76,28 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
             await owner._signing.InitializeAsync(cancellationToken).ConfigureAwait(false);
             owner._sources = await ProcessorSourceRuntime.CreatePausedAsync(state, owner._accounts, work, storage, cancellationToken).ConfigureAwait(false);
             owner._sources.Failed += owner.OnFailure;
+            owner._imports=await TakeoutInventoryService.CreatePausedAfterExclusiveRestartAsync(state,storage,cancellationToken).ConfigureAwait(false);
+            owner._imports.Failed+=owner.OnFailure;
+            await state.ExecuteAsync(database=>new TakeoutOriginalJobRepository(database).RecoverInterruptedAfterExclusiveRestart(),cancellationToken).ConfigureAwait(false);
             owner._preparations = new(state, stateDirectory, installationId, storage);
             var setup = new LibraryWorkspaceSetup(state, owner._accounts, owner._signing, storage);
             owner._publication = new(state, owner._accounts, owner._signing, storage,
                 currentCatalog: new CurrentLibraryCatalogRuntime(state, stateDirectory, installationId, owner._accounts, owner._signing, storage));
             owner._publication.Failed += owner.OnFailure;
             await owner._publication.InitializeCurrentCatalogAsync(cancellationToken).ConfigureAwait(false);
+            owner._importQueue=new(state,storage,owner._imports,owner._publication.CurrentOperations,importFolderPicker,owner._sources.NotifySourcesChanged);
+            owner._importQueue.Failed+=owner.OnFailure;
+            owner._importChildrenWork=new(owner._imports,owner._importQueue);
+            owner._importWork=new(owner._sources.Work,owner._importChildrenWork);
             owner._viewers=new(state,stateDirectory,installationId,storage,canonical:new CurrentCanonicalViewerSource(
                 owner._publication.CurrentCanonicalCatalog ?? throw new InvalidOperationException("The engine canonical query owner has not initialized.")));
             owner._sources.CatalogChanged += owner._publication.NotifyLocalCatalogChanged;
-            var application = new DesktopEngineApplication(library, state, owner._accounts, owner._sources.Work, owner._sources, owner._viewers, setup, owner._publication);
+            var application = new DesktopEngineApplication(library, state, owner._accounts, owner.Work, owner._sources, owner._viewers, setup, owner._publication,owner._importQueue);
             owner._host = await DesktopWebHost.StartAsync(application, assetsDirectory, enableLan ? owner._identity.Identity : null, cancellationToken).ConfigureAwait(false);
             owner._host.Diagnostic += owner.ReportFailure;
             await owner._sources.ActivateAsync(cancellationToken).ConfigureAwait(false);
+            if(owner._sources.Work.State is ProcessorWorkState.Ready or ProcessorWorkState.Running)await owner._imports.ResumeAsync().ConfigureAwait(false);
+            if(owner._sources.Work.State is ProcessorWorkState.Ready or ProcessorWorkState.Running)await owner._importQueue.ResumeAsync().ConfigureAwait(false);
             owner._publication.Request(cancellationToken);
             return owner;
         }
@@ -123,9 +143,17 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
         static async Task StopViewersAsync(CatalogViewerSessions? viewers) { if (viewers is not null) await viewers.DisposeAsync().ConfigureAwait(false); }
         static async Task StopPreparationsAsync(CatalogPreparationService? preparations) { if (preparations is not null) await preparations.DisposeAsync().ConfigureAwait(false); }
         static async Task StopPublicationAsync(InitialLibraryPublicationRuntime? publication) { if (publication is not null) await publication.DisposeAsync().ConfigureAwait(false); }
-        var joined = Task.WhenAll(StopSourcesAsync(_sources), StopNativeAsync(_native), StopViewersAsync(_viewers), StopPreparationsAsync(_preparations), StopPublicationAsync(_publication));
+        async Task StopImportControlsAsync(){if(_importWork is not null)await _importWork.DisposeAsync().ConfigureAwait(false);if(_importChildrenWork is not null)await _importChildrenWork.DisposeAsync().ConfigureAwait(false);_importWorkClosed=true;}
+        async Task StopImportsAsync(){if(_imports is not null)await _imports.DisposeAsync().ConfigureAwait(false);}
+        async Task StopImportQueueAsync(){if(_importQueue is not null)await _importQueue.DisposeAsync().ConfigureAwait(false);}
+        // Close browser/tray control admission and join already admitted grouped
+        // commands before retiring either borrowed processing owner.
+        Exception? controlsFailure=null;
+        try{await StopImportControlsAsync().ConfigureAwait(false);}catch(Exception error){controlsFailure=error;Retain(error);}
+        var joined = Task.WhenAll(StopSourcesAsync(_sources), StopNativeAsync(_native), StopViewersAsync(_viewers), StopPreparationsAsync(_preparations), StopPublicationAsync(_publication),StopImportsAsync(),StopImportQueueAsync());
         try { await joined.ConfigureAwait(false); }
-        catch { if (joined.Exception is not null) throw joined.Exception; throw; }
+        catch { if (joined.Exception is not null) {if(controlsFailure is not null)throw new AggregateException(controlsFailure,joined.Exception);throw joined.Exception;} throw; }
+        if(controlsFailure is not null)throw new AggregateException("Desktop import controls have not retired.",controlsFailure);
     }
     public ValueTask DisposeAsync()
     {
@@ -137,6 +165,12 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
     }
     private async Task StopAsync()
     {
+        if(!_importAdmissionClosed)
+        {
+            try{if(_importQueue is not null)await _importQueue.CloseAdmissionAsync().ConfigureAwait(false);}
+            catch(Exception error){Retain(error);}
+            _importAdmissionClosed=true;
+        }
         if (!_hostClosed)
         {
             try { if (_host is not null) await _host.DisposeAsync().ConfigureAwait(false); }
@@ -146,7 +180,7 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
         // A listener failure cannot bypass independent background-work shutdown.
         try { await StopProcessingAsync().ConfigureAwait(false); }
         catch (Exception error) { Retain(error); }
-        if (!_hostClosed || _sources is { ExitConfirmed: false } || _viewers is { ExitConfirmed: false } || _preparations is { ExitConfirmed: false } ||
+        if (!_hostClosed || !_importWorkClosed || _imports is { ExitConfirmed:false } || _importQueue is{ExitConfirmed:false} || _sources is { ExitConfirmed: false } || _viewers is { ExitConfirmed: false } || _preparations is { ExitConfirmed: false } ||
             _publication is { ExitConfirmed: false } || _native.State != ProcessorWorkState.Stopped)
             throw new InvalidOperationException("Desktop requests or processing resources have not joined; account/vault/state ownership is retained.", Failure);
         if (!_accountsClosed) { if (_accounts is not null) await _accounts.DisposeAsync().ConfigureAwait(false); _accountsClosed = true; }

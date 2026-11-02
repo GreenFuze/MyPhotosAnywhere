@@ -28,6 +28,15 @@ public sealed class CurrentLibraryCatalogRuntime : IAsyncDisposable
     // Borrow for bounded historical gallery queries. This is not a publication
     // grant and does not transfer ownership of the canonical handles or pool.
     public CurrentCanonicalReadRuntime Catalog=>_canonical;
+    public Task<ProtocolSigningIntent> ApproveTakeoutImportAsync(TakeoutCompletedInventory completed,CancellationToken caller)
+        =>OperationAsync(token=>_reader.ApproveTakeoutImportAsync(completed,token),caller);
+    public Task<Mpa.Processor.GoogleDrive.DriveOriginalObject> UploadTakeoutOriginalAsync(Guid jobId,TakeoutCompletedInventory completed,
+        TakeoutAssociationCatalog catalog,TakeoutOriginalReader source,CancellationToken caller)=>OperationAsync(async token=>
+    {
+        var authority=await _reader.OpenTakeoutOriginalAuthorityAsync(completed,token).ConfigureAwait(false);
+        await using var upload=new TakeoutOriginalUploadService(_state,_accounts,_budget,authority,_stop.Token);
+        return await upload.UploadPreparedAsync(jobId,catalog,source,caller).ConfigureAwait(false);
+    },caller);
     internal bool Borrows(ProcessorStateCoordinator state,ProcessorAccountService accounts,LibrarySigningIdentityOwner keys,StorageBudgetManager budget)=>
         ReferenceEquals(state,_state) && ReferenceEquals(accounts,_accounts) && ReferenceEquals(keys,_keys) && ReferenceEquals(budget,_budget);
 

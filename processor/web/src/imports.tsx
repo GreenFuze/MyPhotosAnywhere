@@ -1,0 +1,52 @@
+import { useEffect, useState } from 'react';
+import type { DesktopApi, PhotoImports, Source } from './api';
+
+export function Imports({ api, back }: { api: DesktopApi; back: () => void }) {
+  const [data, setData] = useState<PhotoImports | null>(null);
+  const [sources, setSources] = useState<Source[]>([]);
+  const [destination, setDestination] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    const stop = new AbortController(); let timer: ReturnType<typeof setTimeout> | undefined;
+    async function refresh() {
+      try {
+        const [imports, sourceList] = await Promise.all([api.imports(stop.signal), api.sources(stop.signal)]);
+        if (!stop.signal.aborted) { setData(imports); setSources(sourceList.sources); }
+      } catch (error) { if (!stop.signal.aborted) setNotice(error instanceof Error ? error.message : 'Import progress could not refresh.'); }
+      finally { if (!stop.signal.aborted) timer = setTimeout(() => { void refresh(); }, 2500); }
+    }
+    void refresh(); return () => { stop.abort(); if (timer !== undefined) clearTimeout(timer); };
+  }, [api]);
+  async function act(action: 'folders' | 'start' | 'retry', id: string) {
+    setBusy(true); setNotice(action === 'folders' ? 'Choose a folder in the dialog on this computer.' : null);
+    try { await api.importAction(action, id); setData(await api.imports(new AbortController().signal)); setNotice(null); }
+    catch (error) { setNotice(error instanceof Error ? error.message : 'Import could not continue. Saved progress was retained.'); }
+    finally { setBusy(false); }
+  }
+  const labels = { reviewing: 'Reviewing selected files', ready: 'Ready to import', copying: 'Copying and verifying originals', 'originals-verified': 'Originals verified · catalog processing pending', 'needs-attention': 'Needs attention', paused: 'Paused', canceled: 'Canceled' };
+  const enabled = sources.filter(source => source.enabled && source.accountConnected);
+  return <section className="settings"><button className="back" onClick={back}>‹ Back to Photos</button><h1>Import photos</h1>
+    <p>Copy photos from a local photo folder or an extracted Takeout folder to Google Drive. Your selected files stay unchanged.</p>
+    {notice && <p role="alert">{notice}</p>}
+    {data?.paused && <p role="status">Processing is paused. Saved imports will continue when you resume processing in Settings.</p>}
+    <section className="setting-card"><h2>Choose a destination</h2><label>Drive folder <select value={destination} onChange={event => setDestination(event.target.value)} disabled={busy}>
+      <option value="">Choose an enabled Source…</option>{enabled.map(source => <option key={source.id} value={source.id}>{source.displayName}</option>)}</select></label>
+      {!enabled.length && <p>Add and enable a Drive folder in Sources first.</p>}
+      {data?.canChooseFolder ? <button disabled={busy || !enabled.some(source => source.id === destination)} onClick={() => { void act('folders', destination); }}>Choose folder on this computer</button> : data && <p>Open the desktop application on this computer to choose a local folder.</p>}
+      <p>You can review the photo count before starting the copy.</p>
+    </section>
+    {!data && <p role="status">Loading saved imports…</p>}
+    {data?.imports.map(item => {
+      const target = sources.find(source => source.accountId === item.target.accountId && source.folderId === item.target.folderId);
+      return <section className="setting-card" key={item.id}><h2>{item.inputName}</h2><p>{labels[item.state]}</p>
+        <p>Destination: {target?.displayName ?? 'Captured Drive folder'}</p>
+        {item.media !== null && <p>{BigInt(item.verified).toLocaleString()} of {BigInt(item.media).toLocaleString()} photo and video originals verified</p>}
+        {item.state === 'ready' && <button disabled={busy || item.media === '0'} onClick={() => {
+          if (window.confirm(`Import all ${item.media ?? ''} photo and video originals from ${item.inputName} into ${target?.displayName ?? 'the captured Drive folder'}? The source files will stay unchanged.`)) void act('start', item.id);
+        }}>Import all originals</button>}
+        {item.state === 'needs-attention' && <><p>{item.issue === 'drive-unavailable' ? 'Google Drive is unavailable. Reconnect or wait for access to return.' : item.issue === 'input-unavailable' ? 'The selected input is unavailable. Restore access to the same folder.' : 'The captured destination or account permission changed. Review Sources and the account connection.'}</p><button disabled={busy} onClick={() => { void act('retry', item.id); }}>Retry unfinished work</button></>}
+      </section>;
+    })}
+  </section>;
+}

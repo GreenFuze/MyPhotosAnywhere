@@ -34,6 +34,8 @@ export interface SourceJob {
 export interface ActivityPage { jobs: SourceJob[]; nextCursor: string | null }
 
 export class AuthenticationRequired extends Error {}
+export interface PhotoImport { id: string; inputName: string; target: { libraryId: string; accountId: string; accountRevision: string; folderId: string; configurationRevision: string }; state: 'reviewing' | 'ready' | 'copying' | 'originals-verified' | 'needs-attention' | 'paused' | 'canceled'; entries: string | null; media: string | null; verified: string; requested: boolean; issue: string | null }
+export interface PhotoImports { canChooseFolder: boolean; paused: boolean; imports: PhotoImport[] }
 export interface LibraryPublication {
   stage: 'NeedsApproval' | 'Running' | 'PoliciesPublished' | 'NeedsAttention' | 'Stopping' | 'Stopped';
   detail: string | null; canRetry: boolean;
@@ -212,6 +214,31 @@ export class DesktopApi {
   async folders(account: string, folder: string, cursor: string | null, signal: AbortSignal): Promise<FolderLocation> {
     const query = new URLSearchParams({ account, folder }); if (cursor !== null) query.set('cursor', cursor);
     return await this.get<FolderLocation>('/api/folders?' + query, signal);
+  }
+  async imports(signal: AbortSignal): Promise<PhotoImports> {
+    const value = await this.get<unknown>('/api/imports', signal);
+    if (typeof value !== 'object' || value === null || !('canChooseFolder' in value) || typeof value.canChooseFolder !== 'boolean' || !('paused' in value) || typeof value.paused !== 'boolean' || !('imports' in value) || !Array.isArray(value.imports) || value.imports.length > 64) throw new Error('MPA returned invalid import progress. Saved work was retained.');
+    return { canChooseFolder: value.canChooseFolder, paused: value.paused, imports: value.imports.map(item => this.importItem(item)) };
+  }
+  async importAction(action: 'folders' | 'start' | 'retry', id: string): Promise<PhotoImport | null> {
+    if (!libraryIdentity(id)) throw new Error('Choose a captured import or destination.');
+    const value = await this.sourceCommand('/api/import-' + action, { id });
+    if (typeof value !== 'object' || value === null || !('import' in value)) throw new Error('The import reply was lost. Refresh Imports before retrying.');
+    return value.import === null ? null : this.importItem(value.import);
+  }
+  private importItem(value: unknown): PhotoImport {
+    const invalid = () => new Error('MPA returned conflicting import progress. Saved work was retained.');
+    if (typeof value !== 'object' || value === null || !('id' in value) || !libraryIdentity(value.id) || !('inputName' in value) || typeof value.inputName !== 'string' || value.inputName.length > 4096 ||
+      !('state' in value) || !['reviewing', 'ready', 'copying', 'originals-verified', 'needs-attention', 'paused', 'canceled'].includes(String(value.state)) ||
+      !('target' in value) || typeof value.target !== 'object' || value.target === null || !('libraryId' in value.target) || !libraryIdentity(value.target.libraryId) ||
+      !('accountId' in value.target) || !libraryAccount(value.target.accountId) || !('folderId' in value.target) || !libraryAccount(value.target.folderId) || value.target.folderId === 'root' ||
+      !('accountRevision' in value.target) || !('configurationRevision' in value.target) || !('entries' in value) || !('media' in value) || !('verified' in value) || !('requested' in value) || typeof value.requested !== 'boolean' || !('issue' in value) || value.issue !== null && !['input-unavailable', 'drive-unavailable', 'permission-changed'].includes(String(value.issue))) throw invalid();
+    const decimal = (x: unknown): x is string => typeof x === 'string' && /^(0|[1-9][0-9]{0,18})$/.test(x) && BigInt(x) <= 9223372036854775807n;
+    if (!decimal(value.target.accountRevision) || value.target.accountRevision === '0' || !decimal(value.target.configurationRevision) || value.target.configurationRevision === '0' ||
+      !decimal(value.verified) || value.entries !== null && !decimal(value.entries) || value.media !== null && !decimal(value.media) ||
+      value.media !== null && BigInt(value.verified) > BigInt(value.media as string) || value.entries !== null && value.media !== null && BigInt(value.media as string) > BigInt(value.entries as string) ||
+      value.state === 'originals-verified' && (!value.requested || value.media === null || value.verified !== value.media)) throw invalid();
+    return value as unknown as PhotoImport;
   }
   async addSource(accountId: string, folderId: string, includeDescendants: boolean, expectedRevision: number): Promise<Sources> {
     return await this.sourceChange('POST', { accountId, folderId, includeDescendants, expectedRevision });

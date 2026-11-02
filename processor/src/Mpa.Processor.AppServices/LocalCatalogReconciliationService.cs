@@ -186,6 +186,12 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
             {
                 if (_signed.Contains(intent.Id)) continue;
                 if (intent.EnvelopeSha256 is null) { _pendingSigning.Add(intent.Id); continue; }
+                if(intent.Kind==TakeoutOriginalApprovalRepository.Kind)
+                {
+                    await owner._state.ExecuteAsync(database=>
+                    {owner.Check(token);new TakeoutOriginalApprovalRepository(database,owner._budget).AssertLocalIntentOwned(intent.Id);return true;},token).ConfigureAwait(false);
+                    continue;
+                }
                 if (captured.Recovery is { } recovery && recovery.IntentId == intent.Id && recovery.BodySha256 == intent.BodySha256 &&
                     recovery.EnvelopeSha256 == intent.EnvelopeSha256 && recovery.EnvelopeBytes == intent.EnvelopeBytes)
                 { _pendingSigning.Add(intent.Id); continue; }

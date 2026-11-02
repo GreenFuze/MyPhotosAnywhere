@@ -172,13 +172,16 @@ public sealed partial class WebHostTests
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/accounts") { Content = JsonContent.Create(new { operation = "connect" }) };
         request.Headers.Add("Origin", host.HttpsEndpoint.GetLeftPart(UriPartial.Authority)); request.Headers.Add("X-MPA-CSRF", session.GetProperty("csrf").GetString());
         using var denied = await http.SendAsync(request).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
-        foreach (var path in new[] { "api/library", "api/workspace-inspection?account=account&folder=metadata", "api/library-publication", "api/library-connection" })
+        foreach (var path in new[] { "api/library", "api/workspace-inspection?account=account&folder=metadata", "api/library-publication", "api/library-connection", "api/imports" })
         { using var setup = await http.GetAsync(path).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, setup.StatusCode); }
         var approval = new Mpa.Processor.AppServices.ApproveLibraryWorkspace("account", "metadata", 1, 7, 1, new string('a', 64), false, true);
         using (var setup = await SourceMutationAsync(http, host.HttpsEndpoint, HttpMethod.Post, approval, session.GetProperty("csrf").GetString(), "api/library").ConfigureAwait(false))
             Assert.AreEqual(HttpStatusCode.Forbidden, setup.StatusCode);
         using (var retry = await SourceMutationAsync(http, host.HttpsEndpoint, HttpMethod.Post, new { }, session.GetProperty("csrf").GetString(), "api/library-publication").ConfigureAwait(false))
             Assert.AreEqual(HttpStatusCode.Forbidden, retry.StatusCode);
+        foreach (var route in new[] { "api/import-folders", "api/import-start", "api/import-retry" })
+        { using var import = await SourceMutationAsync(http, host.HttpsEndpoint, HttpMethod.Post, new { id = Guid.NewGuid() }, session.GetProperty("csrf").GetString(), route).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, import.StatusCode); }
+        Assert.AreEqual(0, engine.ImportCommands.Count);
         Assert.AreEqual(0, engine.PublicationRequests);
         using var status = await http.GetAsync("api/status").ConfigureAwait(false); status.EnsureSuccessStatusCode();
         Assert.AreEqual(0, host.FrameworkDiagnostics.Count);

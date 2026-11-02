@@ -8,11 +8,21 @@ using Mpa.Processor.WorkerRuntime;
 using Mpa.Processor.TestSupport;
 
 // Synthetic child-process fixture only. Never included in the product installer/plugin registry.
-if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "partial-frame" or "malformed" or "exit-error" or "exit-clean" or "parent-launcher" or "startup-stall" or "native-exit-gate"))
+if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "partial-frame" or "malformed" or "exit-error" or "exit-clean" or "parent-launcher" or "startup-stall" or "native-exit-gate" or "takeout-inventory-crash"))
     throw new ArgumentException("Expected a known synthetic scenario and an owned test directory.");
 var root = Path.GetFullPath(args[1]);
 if (!Directory.Exists(root) || !Path.GetFileName(root).StartsWith("MPA-Worker-Test-", StringComparison.Ordinal))
     throw new ArgumentException("Synthetic worker requires its dedicated test directory.");
+if(args[0]=="takeout-inventory-crash")
+{
+    using var database=new ProcessorStateDatabase(Path.Combine(root,"state"));var job=Guid.ParseExact(await File.ReadAllTextAsync(Path.Combine(root,"inventory-job.txt")).ConfigureAwait(false),"D");
+    var inventoryWork=new TakeoutImportInventoryRepository(database).Claim(job)??throw new InvalidOperationException("Missing exact synthetic captured import.");
+    var budget=new StorageBudgetManager(new InventoryCrashSpace(database.StateDirectory));using var catalog=TakeoutAssociationCatalog.Open(database,inventoryWork,budget);
+    var part=inventoryWork.Parts[0];using var source=TakeoutSelectedInput.OpenFolder(part.PartId,part.Location);catalog.AddPart(source);
+    await Console.Out.WriteLineAsync("takeout-inventory-ready").ConfigureAwait(false);await Console.Out.FlushAsync().ConfigureAwait(false);
+    await Console.In.ReadLineAsync().ConfigureAwait(false); // Parent deliberately terminates this exact fixture before cleanup.
+    return 0;
+}
 if (args[0] == "native-exit-gate")
 {
     // Test-only direct child: hold a real preexisting input until explicit exit.

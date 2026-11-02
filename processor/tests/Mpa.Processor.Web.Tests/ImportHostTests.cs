@@ -1,0 +1,62 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Mpa.Processor.Core;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace Mpa.Processor.Web.Tests;
+
+public sealed partial class WebHostTests
+{
+    [TestMethod]
+    public async Task ImportRoutesRequireHostSessionCsrfAndExactCapturedIdentitiesBeforeNativeAdmission()
+    {
+        using var assets=new Assets();var engine=new Engine();
+        await using var host=await DesktopWebHost.StartAsync(engine,assets.Path,null,CancellationToken.None).ConfigureAwait(false);
+        using var http=Client(host.LocalEndpoint);var diagnostics=new List<Exception>();host.Diagnostic+=diagnostics.Add;
+        using(var anonymous=await http.GetAsync("api/imports").ConfigureAwait(false))Assert.AreEqual(HttpStatusCode.Unauthorized,anonymous.StatusCode);
+        using var login=await LoginAsync(http,host.OpenLocalBrowser(),host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false);login.EnsureSuccessStatusCode();
+        var csrf=(await login.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("csrf").GetString();
+        using(var read=await http.GetAsync("api/imports").ConfigureAwait(false))
+        {
+            read.EnsureSuccessStatusCode();var body=await read.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false);
+            Assert.IsTrue(body.GetProperty("canChooseFolder").GetBoolean());var item=body.GetProperty("imports")[0];
+            Assert.AreEqual("0",item.GetProperty("verified").GetString());Assert.AreEqual("1",item.GetProperty("media").GetString());
+            Assert.AreEqual("photos",item.GetProperty("inputName").GetString());Assert.IsFalse(item.GetProperty("requested").GetBoolean());
+        }
+        foreach(var route in new[]{"api/import-folders","api/import-start","api/import-retry"})
+        {
+            using var forged=await SourceMutationAsync(http,host.LocalEndpoint,HttpMethod.Post,new{id=engine.Import.Id},null,route).ConfigureAwait(false);
+            Assert.AreEqual(HttpStatusCode.Unauthorized,forged.StatusCode);
+        }
+        foreach(var body in new object[]{new{id=Guid.Empty},new{id=Guid.NewGuid()},new{id=engine.Import.Id,path=@"C:\untrusted"},new{id=engine.Import.Id,verified=true}})
+        {
+            using var invalid=await SourceMutationAsync(http,host.LocalEndpoint,HttpMethod.Post,body,csrf,"api/import-start").ConfigureAwait(false);
+            Assert.AreEqual(HttpStatusCode.BadRequest,invalid.StatusCode);
+        }
+        Assert.AreEqual(0,engine.ImportCommands.Count);
+        engine.Import=engine.Import with{State="reviewing",Entries=null,Media=null};
+        using(var pending=await SourceMutationAsync(http,host.LocalEndpoint,HttpMethod.Post,new{id=engine.Import.Id},csrf,"api/import-start").ConfigureAwait(false))Assert.AreEqual(HttpStatusCode.Conflict,pending.StatusCode);
+        Assert.AreEqual(0,engine.ImportCommands.Count);engine.Import=engine.Import with{State="ready",Entries=1,Media=1};
+        var destination=Guid.NewGuid();
+        using(var picked=await SourceMutationAsync(http,host.LocalEndpoint,HttpMethod.Post,new{id=destination},csrf,"api/import-folders").ConfigureAwait(false))
+        {picked.EnsureSuccessStatusCode();Assert.AreEqual(JsonValueKind.Null,(await picked.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("import").ValueKind);}
+        using(var started=await SourceMutationAsync(http,host.LocalEndpoint,HttpMethod.Post,new{id=engine.Import.Id},csrf,"api/import-start").ConfigureAwait(false))started.EnsureSuccessStatusCode();
+        using(var retried=await SourceMutationAsync(http,host.LocalEndpoint,HttpMethod.Post,new{id=engine.Import.Id},csrf,"api/import-retry").ConfigureAwait(false))retried.EnsureSuccessStatusCode();
+        CollectionAssert.AreEqual(new[]{("choose",destination),("start",engine.Import.Id),("retry",engine.Import.Id)},engine.ImportCommands);
+        Assert.AreEqual(0,diagnostics.Count);Assert.AreEqual(0,host.FrameworkDiagnostics.Count);
+    }
+
+    private sealed partial class Engine:IDesktopImportApplication
+    {
+        public TakeoutImportActivity Import{get;set;}=new(Guid.NewGuid(),"photos",new(Guid.NewGuid(),"account",1,"destination",1),"ready",1,1,0,false,null);
+        public List<(string Action,Guid Id)> ImportCommands{get;}=[];
+        public Task<DesktopImports> ImportsAsync(CancellationToken token){token.ThrowIfCancellationRequested();return Task.FromResult(new DesktopImports(true,[Import]));}
+        public Task<TakeoutImportActivity?> ChooseImportFolderAsync(Guid sourceId,CancellationToken token)
+        {token.ThrowIfCancellationRequested();ImportCommands.Add(("choose",sourceId));return Task.FromResult<TakeoutImportActivity?>(null);}
+        public Task<TakeoutImportActivity> StartImportAsync(Guid importId,CancellationToken token)
+        {token.ThrowIfCancellationRequested();ImportCommands.Add(("start",importId));return Task.FromResult(Import with{Requested=true,State="copying"});}
+        public Task<TakeoutImportActivity> RetryImportAsync(Guid importId,CancellationToken token)
+        {token.ThrowIfCancellationRequested();ImportCommands.Add(("retry",importId));return Task.FromResult(Import);}
+    }
+}

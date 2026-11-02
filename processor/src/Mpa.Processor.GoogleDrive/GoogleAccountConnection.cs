@@ -53,6 +53,7 @@ public sealed partial class GoogleAccountConnection : IGoogleAccountConnection, 
         if (expectedPermissionId is not null && !ValidIdentity(expectedPermissionId)) throw new ArgumentException("Invalid captured Google account identity.", nameof(expectedPermissionId));
         _connectionId = connectionId; _expectedPermissionId = expectedPermissionId;
         _store = new GoogleCredentialDataStore(vault, connectionId, () => _activeCancellation);
+        _originalSessions=new OriginalUploadSessionStore(vault,connectionId);
         _flow = new PkceGoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
         {
             ClientSecrets = configuration.Secrets, Scopes = [GoogleCredentialDataStore.DriveScope], DataStore = _store

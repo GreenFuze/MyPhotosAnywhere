@@ -7,7 +7,7 @@ namespace Mpa.Processor.Web;
 /// <summary>Browser adapter borrowing engine-lifetime accounts, read owners, state and work.</summary>
 public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoordinator state, ProcessorAccountService accounts,
     IProcessorWorkControl work, ProcessorSourceRuntime? sources = null, CatalogViewerSessions? viewers = null, LibraryWorkspaceSetup? setup = null,
-    InitialLibraryPublicationRuntime? publication = null) : IDesktopWebApplication, IDesktopLibraryCatalogApplication, IDesktopLibraryPreviewApplication
+    InitialLibraryPublicationRuntime? publication = null,TakeoutDesktopImportRuntime? imports=null) : IDesktopWebApplication, IDesktopLibraryCatalogApplication, IDesktopLibraryPreviewApplication,IDesktopImportApplication
 {
     private readonly Guid _libraryId = libraryId != Guid.Empty ? libraryId : throw new ArgumentException("Library identity is required.", nameof(libraryId));
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
@@ -18,6 +18,12 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
     private readonly CatalogViewerSessions? _viewers = viewers;
     private readonly LibraryWorkspaceSetup? _setup = setup;
     private readonly InitialLibraryPublicationRuntime? _publication = publication;
+    private readonly TakeoutDesktopImportRuntime? _imports=imports;
+    private TakeoutDesktopImportRuntime Imports=>_imports??throw new InvalidOperationException("Desktop import has not been configured.");
+    public async Task<DesktopImports> ImportsAsync(CancellationToken token)=>new(Imports.CanChooseFolder,await Imports.ListAsync(token).ConfigureAwait(false),Imports.State is ProcessorWorkState.Paused or ProcessorWorkState.Pausing);
+    public Task<TakeoutImportActivity?> ChooseImportFolderAsync(Guid sourceId,CancellationToken token)=>Imports.ChooseFolderAsync(sourceId,token);
+    public Task<TakeoutImportActivity> StartImportAsync(Guid importId,CancellationToken token)=>Imports.StartAsync(importId,token);
+    public Task<TakeoutImportActivity> RetryImportAsync(Guid importId,CancellationToken token)=>Imports.RetryAsync(importId,token);
     private InitialLibraryPublicationRuntime Publication => _publication ?? throw new InvalidOperationException("The engine library publication owner has not been configured.");
     private LibraryWorkspaceSetup Setup => _setup ?? throw new InvalidOperationException("The native library setup owner has not been configured.");
     public Task<LibraryControllerPin?> LibraryAsync(CancellationToken cancellationToken) => Setup.CurrentAsync(cancellationToken);

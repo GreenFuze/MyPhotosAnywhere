@@ -159,3 +159,25 @@ test('canonical preview URLs carry only captured identities and cancellation rem
     await assert.rejects(api.libraryCatalog(null, null, false, null, controller.signal), { name: 'AbortError' });
   }); assert.equal(requests, 1);
 });
+const importIdentity = '22222222-2222-4222-8222-222222222222';
+const validImport = () => ({ id: importIdentity, inputName: 'Takeout photos', target: { libraryId: '33333333-3333-4333-8333-333333333333', accountId: 'account-one', accountRevision: '1', folderId: 'photos', configurationRevision: '2' }, state: 'copying', entries: '12', media: '10', verified: '3', requested: true, issue: null });
+test('import progress keeps exact decimal counts and never infers verified originals from an offset', async () => {
+  await withBrowser(async () => json({ canChooseFolder: true, paused: false, imports: [validImport()] }), async api => {
+    const actual = await api.imports(new AbortController().signal); assert.equal(actual.imports[0].verified, '3'); assert.equal(actual.imports[0].state, 'copying');
+  });
+  const bad = [ { ...validImport(), verified: '11' }, { ...validImport(), state: 'originals-verified' }, { ...validImport(), media: 10 }, { ...validImport(), verified: '03' }, { ...validImport(), id: 'not-an-identity' }, { ...validImport(), state: 'ready', issue: 'unknown' } ];
+  for (const item of bad) await withBrowser(async () => json({ canChooseFolder: true, paused: false, imports: [item] }), async api => { await assert.rejects(api.imports(new AbortController().signal), /conflicting import progress/); });
+});
+test('explicit import actions send captured identifiers and CSRF, never local paths or caller-made backup proofs', async () => {
+  let calls = 0;
+  await withBrowser(async (url, options) => {
+    if (url === '/api/session') return json({ csrf: 'a'.repeat(64), hostOwner: true });
+    calls++; assert.equal(url, '/api/import-start'); assert.equal(options.method, 'POST'); assert.equal(options.credentials, 'same-origin'); assert.equal(options.headers['X-MPA-CSRF'], 'a'.repeat(64)); assert.deepEqual(JSON.parse(options.body), { id: importIdentity });
+    return json({ import: validImport() });
+  }, async api => { await api.connect(); await api.importAction('start', importIdentity); await assert.rejects(api.importAction('start', 'arbitrary-path'), /captured import/); });
+  assert.equal(calls, 1);
+});
+test('canceled native folder chooser has no import and malformed import pages fail closed', async () => {
+  await withBrowser(async () => json({ import: null }), async api => { assert.equal(await api.importAction('folders', importIdentity), null); });
+  for (const page of [{ canChooseFolder: true, imports: [] }, { canChooseFolder: true, paused: false, imports: Array(65).fill(validImport()) }]) await withBrowser(async () => json(page), async api => { await assert.rejects(api.imports(new AbortController().signal), /invalid import progress/); });
+});

@@ -39,6 +39,8 @@ public sealed partial class ProcessorStateStorageReader : IStorageSpaceReader
         }
         owned = checked(owned + CatalogGenerationSnapshotStore.MeasureOwnedBytes(_directory));
         owned = checked(owned + CurrentCatalogStageArea.MeasureOwnedBytes(_directory));
+        owned = checked(owned + TakeoutMetadataStageStorage.MeasureOwnedBytes(_directory));
+        owned = checked(owned + TakeoutAssociationCatalog.MeasureOwnedBytes(_directory));
 
         if (OperatingSystem.IsWindows())
         {

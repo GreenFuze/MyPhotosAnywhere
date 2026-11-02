@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
+using Mpa.Processor.Core;
 using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.AppServices;
@@ -15,7 +16,7 @@ internal sealed class LibrarySigningKeys : IDisposable
     private readonly ECDsa _publisher;
     private bool _closed;
     public LibrarySigningPublicIdentity Public { get; }
-    private static readonly string[] ControllerKinds = ["library-publisher-authorization", "library-source-configuration",LibraryCurrentControl.Kind];
+    private static readonly string[] ControllerKinds = ["library-publisher-authorization", "library-source-configuration",LibraryCurrentControl.Kind,TakeoutOriginalApprovalRepository.Kind];
     private static readonly string[] PublisherKinds = ["catalog-commit"];
     private static readonly string[] Capabilities = [CatalogPublisherAuthorization.Capability, CatalogSourceConfiguration.Capability,
         CatalogPublicationReader.Capability, DriveCatalogFacts.Capability,LibraryCurrentControl.Capability];
@@ -91,7 +92,8 @@ internal sealed class LibrarySigningKeys : IDisposable
         var authority = new TrustedProtocolActor(Public.LibraryId, controller ? Public.ControllerId : Public.PublisherId,
             controller ? Public.ControllerEpoch : Public.PublisherEpoch, key.ExportSubjectPublicKeyInfo(), controller ? ControllerKinds : PublisherKinds);
         var signature = new ProtocolDocumentSigner(key).Sign(bytes);
-        _ = new ProtocolDocumentReader(Capabilities).VerifyAndRead(bytes, signature, authority);
+        var document=new ProtocolDocumentReader(Capabilities).VerifyAndRead(bytes, signature, authority);
+        if(document.Kind==TakeoutOriginalApprovalRepository.Kind)_=new ApprovedOriginalActionReader(Public.ControllerId).Read(document);
         return signature;
     }
     public void Dispose() { if (_closed) return; try { _controller.Dispose(); } finally { _publisher.Dispose(); _closed = true; } }

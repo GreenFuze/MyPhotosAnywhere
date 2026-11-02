@@ -1,9 +1,38 @@
 # Current PC implementation scope
 
-Owner direction, 2026-10-27: focus this stage on the PC application and processor.
-Defer new Android implementation. Preserve the existing Drive-only Android
-boundary; the phone never connects to Desktop or its LAN API. This changes work
-priority, not the final joint-release acceptance requirements.
+Latest explicit owner direction, 2026-10-29: make the PC application and processor
+work end to end first. Android may break and will be rebuilt or fixed afterward.
+Android compatibility, Android checks, S23 and joint-release acceptance do not
+gate PC implementation, PC acceptance or publication of the tested PC version.
+The PC workflow must be usable without requiring the mobile app. Do no Android
+implementation, investigation or test reruns in this stage. This direction
+supersedes earlier instructions requiring joint acceptance before PC release.
+
+Owner scope concern, 2026-11-02: the owner is concerned about implementing
+unwanted things. Every new addition must map to an included user behavior in
+REDESIGN_PLAN.md plus DESKTOP_WEB_REVISION.md and the later PC-only directions.
+Finish usable PC workflows; do not add optional product features or general
+infrastructure without a demonstrated need in the current approved workflow.
+Prefer the existing owners/components and keep changes narrowly scoped. Technical
+component evidence does not establish a usable product. A consequential product
+scope departure needs a concrete owner decision; routine implementation stays
+unattended. Original protection, human metadata, current permission, immutable
+recovery, fail-fast, ownership and required PC validation remain mandatory.
+
+Current next vertical step (2026-11-02): finish import metadata and portable catalog/
+gallery integration. Native folder selection, review/start/progress/retry, shared
+current-Root original transfers and scoped interrupted-upload recovery are now wired.
+Completed copies request exactly one durable source scan; the actual scanner reads
+the first Drive ID and preserves the human filename in discovered photo facts.
+Evidence: current-takeout-import-ui-validation-v51.json in preflight-060. These are
+focused native/synthetic-provider checks; actual OS chooser/browser, live Drive and
+portable catalog activation remain unverified. See PC_IMPORT_VALIDATION_2026_11_02.md.
+Canonical Drive asset identity stays library/account/file based. Inventory MediaId
+is a separate stable processing/provenance identity requiring an explicit metadata
+association; do not replace canonical IDs or infer a second asset defect. Preserve
+human metadata. Complete hierarchy and ZIP/Drive ZIP input paths as approved.
+Do not restart passed inventory/worker/signing foundations or use the overly broad
+AccountServiceTests class filter.
 
 The product remains substantially unfinished. A passing component build is not
 a usable, validated 0.6 release. Complete these five milestones in order where
@@ -27,8 +56,8 @@ dependent, and perform independent desktop work while checks run:
    credentials are unavailable; do not claim unperformed native platform tests.
 5. Validate an immutable release revision, actual independent Drive clients,
    warnings, performance, safety and installers. Verify exact assets, signatures,
-   checksums, tag and publication. Keep deferred Android/final-device acceptance
-   explicit before claiming the originally approved joint release complete.
+   checksums, tag and publication. PC acceptance and publication stand on their
+   own required gates. Android rebuilding and acceptance are subsequent work.
 
 Do not restart passed checks without a source change, a failure or a concrete
 unresolved concern. Do not increase a failing test's deadline, discard assertions,

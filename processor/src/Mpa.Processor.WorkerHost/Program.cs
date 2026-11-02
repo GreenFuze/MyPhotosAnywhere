@@ -12,7 +12,7 @@ await using var parent = await ParentLifetimeGuard.ConnectAsync(new(port, key), 
 using var cancellation = new CancellationTokenSource();
 using var input = Console.OpenStandardInput();
 using var output = Console.OpenStandardOutput();
-var worker = new ByteFactsWorker(session, args[3], input, output);
+var worker = new InstalledSnapshotWorker(session, args[3], input, output);
 var work = worker.RunAsync(cancellation.Token);
 if (await Task.WhenAny(work, parent.Completion).ConfigureAwait(false) == work)
 {

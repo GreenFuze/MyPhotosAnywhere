@@ -47,6 +47,7 @@ public sealed class InitialLibraryPublicationRuntime(ProcessorStateCoordinator s
     public InitialLibraryPublicationActivity Activity { get { lock (_gate) return _activity; } }
     public ReconciledLocalCatalog? CurrentCatalog => _catalog?.Current;
     public CurrentCanonicalReadRuntime? CurrentCanonicalCatalog => _currentCatalog?.Catalog;
+    public CurrentLibraryCatalogRuntime CurrentOperations=>_currentCatalog??throw new InvalidOperationException("The current library engine has not been configured.");
     public Task<CurrentCatalogActivation?> InitializeCurrentCatalogAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested(); ThrowIfStopping();

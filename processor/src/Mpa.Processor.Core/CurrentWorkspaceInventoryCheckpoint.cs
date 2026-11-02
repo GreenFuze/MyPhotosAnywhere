@@ -152,6 +152,8 @@ public sealed partial class WorkspaceObservationRepository
         foreach(var intent in history.Signing.Signing.Intents)
         {
             token.ThrowIfCancellationRequested();if(roots.Contains(intent.Id) || intent.EnvelopeSha256 is null) continue;
+            if(intent.Kind==TakeoutOriginalApprovalRepository.Kind)
+            {new TakeoutOriginalApprovalRepository(_database,_budget).AssertLocalIntentOwnedIn(intent.Id,transaction);continue;}
             var role=intent.Kind switch {"library-publisher-authorization"=>"publisher-authorization","library-source-configuration"=>"source-configuration",
                 "catalog-commit"=>"catalog-commit",_=>throw new ProtocolSigningConflictException()};
             var bytes=intent.EnvelopeBytes ?? throw new ProtocolSigningConflictException();

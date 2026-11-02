@@ -6,6 +6,17 @@ public enum ProcessorWorkState { Ready, Running, Pausing, Paused, Stopping, Stop
 /// transfers only when Start accepts it. Dispose may run only after the exact worker exits.</summary>
 public abstract class OwnedWorkerOperation : IAsyncDisposable
 {
+    private ProcessorWorkSupervisor? _resultOwner;
+    internal void AttachResultOwner(ProcessorWorkSupervisor owner)
+    {
+        if(Interlocked.CompareExchange(ref _resultOwner,owner,null) is not null)
+            throw new InvalidOperationException("An operation cannot transfer to a second supervisor.");
+    }
+    /// <summary>A bounded native commit only. The actual supervisor serializes
+    /// admission with Pause/Exit and checks its original caller before linked
+    /// callbacks can run. Never perform provider work or await inside this gate.</summary>
+    protected void AdmitDurableResult(Action commit,CancellationToken token)
+        =>(_resultOwner??throw new InvalidOperationException("A durable result requires its actual supervising owner.")).AdmitDurableResult(this,commit,token);
     public abstract WorkerLaunchSpec Launch { get; }
     public abstract Task ExecuteAsync(FramedWorkerProcess worker, CancellationToken cancellationToken);
     public abstract ValueTask DisposeAsync();
@@ -22,6 +33,9 @@ public sealed class ProcessorWorkSupervisor : IProcessorWorkControl, IAsyncDispo
     private ProcessorWorkState _state;
     private Exception? _failure;
     private RetainedOperation? _retained;
+    private OwnedWorkerOperation? _activeOperation;
+    private CancellationToken _originalCancellation;
+    private sealed class ResultAdmissionClosedException(CancellationToken token) : OperationCanceledException("The actual worker owner has stopped result admission.",token);
     private sealed record RetainedOperation(FramedWorkerProcess? Worker, OwnedWorkerOperation Operation);
     public ProcessorWorkState State { get { lock (_gate) return _state; } }
     public Exception? Failure { get { lock (_gate) return _failure; } }
@@ -34,12 +48,26 @@ public sealed class ProcessorWorkSupervisor : IProcessorWorkControl, IAsyncDispo
             if (_state != ProcessorWorkState.Ready || _active is { IsCompleted: false })
                 throw new InvalidOperationException("Processor is busy, paused, stopping, or faulted; retain durable queued work.");
             cancellationToken.ThrowIfCancellationRequested();
+            operation.AttachResultOwner(this);
             _runCancellation?.Dispose();
             _runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var token = _runCancellation.Token;
+            _activeOperation=operation;_originalCancellation=cancellationToken;
             _state = ProcessorWorkState.Running;
-            _active = Task.Run(() => ExecuteOwnedAsync(operation, token), CancellationToken.None);
+            _active = Task.Run(() => ExecuteOwnedAsync(operation, token,cancellationToken), CancellationToken.None);
             return _active;
+        }
+    }
+
+    internal void AdmitDurableResult(OwnedWorkerOperation operation,Action commit,CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(commit);
+        lock(_gate)
+        {
+            _originalCancellation.ThrowIfCancellationRequested();token.ThrowIfCancellationRequested();
+            if(_state!=ProcessorWorkState.Running||!ReferenceEquals(_activeOperation,operation))
+                throw new ResultAdmissionClosedException(token);
+            commit();
         }
     }
 
@@ -138,7 +166,7 @@ public sealed class ProcessorWorkSupervisor : IProcessorWorkControl, IAsyncDispo
         }
     }
 
-    private async Task ExecuteOwnedAsync(OwnedWorkerOperation operation, CancellationToken token)
+    private async Task ExecuteOwnedAsync(OwnedWorkerOperation operation, CancellationToken token,CancellationToken original)
     {
         FramedWorkerProcess? worker = null;
         Exception? failure = null;
@@ -178,9 +206,10 @@ public sealed class ProcessorWorkSupervisor : IProcessorWorkControl, IAsyncDispo
             }
             lock (_gate)
             {
-                if (failure is not null && !(failure is OperationCanceledException && token.IsCancellationRequested))
+                if (failure is not null && !(failure is ResultAdmissionClosedException || failure is OperationCanceledException && (token.IsCancellationRequested||original.IsCancellationRequested)))
                 { _failure = failure; if (_state == ProcessorWorkState.Running) _state = ProcessorWorkState.Faulted; }
                 else if (_state == ProcessorWorkState.Running) _state = ProcessorWorkState.Ready;
+                if(_retained is null)_activeOperation=null;
             }
         }
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();

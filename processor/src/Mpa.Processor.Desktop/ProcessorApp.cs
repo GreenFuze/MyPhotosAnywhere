@@ -4,6 +4,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform;
+using Avalonia.Platform.Storage;
 using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
 using Mpa.Processor.Core;
@@ -114,7 +115,7 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
             _controlMonitor = ObserveControlAsync(_control);
             RefreshReadyStatus();
             _webStartup = Task.Run(() => DesktopWebRuntime.StartAsync(_stateCoordinator, _installationId, Program.StateDirectory, _work,
-                Path.Combine(AppContext.BaseDirectory, "MPA.Processor.oauth.json"), Path.Combine(AppContext.BaseDirectory, "wwwroot"), enableLan: false, _stop.Token));
+                Path.Combine(AppContext.BaseDirectory, "MPA.Processor.oauth.json"), Path.Combine(AppContext.BaseDirectory, "wwwroot"), enableLan: false, importFolderPicker:ChooseImportFolderAsync,cancellationToken:_stop.Token));
             _web = await _webStartup;
             _web.Failed += error => Dispatcher.UIThread.Post(() => ShowFailure("Desktop engine needs attention", error));
             if (_shutdown is not null) return;
@@ -170,6 +171,32 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
         }
     }
 
+    private async Task<string?> ChooseImportFolderAsync(CancellationToken token)
+    {
+        var operation=await Dispatcher.UIThread.InvokeAsync<Task<string?>>(()=>ChooseImportFolderOnUiAsync(token));
+        return await operation.ConfigureAwait(false);
+    }
+    private async Task<string?> ChooseImportFolderOnUiAsync(CancellationToken token)
+    {
+        using var linked=CancellationTokenSource.CreateLinkedTokenSource(token,_stop.Token);linked.Token.ThrowIfCancellationRequested();
+        var picker=new Window{Title="Choose photos to import",Width=380,Height=130,ShowInTaskbar=false,
+            Content=new TextBlock{Text="Choose the folder containing the photos you want to import.",Margin=new Thickness(20),TextWrapping=TextWrapping.Wrap}};
+        picker.Show();using var cancel=linked.Token.Register(()=>Dispatcher.UIThread.Post(()=>picker.Close()));
+        try
+        {
+            if(!picker.StorageProvider.CanPickFolder)throw new InvalidOperationException("Folder selection is unavailable on this desktop.");
+            var selected=await picker.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions{Title="Choose a photo or extracted Takeout folder",AllowMultiple=false});
+            try
+            {
+                token.ThrowIfCancellationRequested();_stop.Token.ThrowIfCancellationRequested();
+                if(selected.Count==0)return null;
+                if(selected.Count!=1||!selected[0].Path.IsFile)throw new InvalidOperationException("Choose one local folder on this computer.");
+                return selected[0].Path.LocalPath;
+            }
+            finally {foreach(var folder in selected)folder.Dispose();}
+        }
+        finally {picker.Close();}
+    }
     private async Task RequestExitAsync()
     {
         if (_shutdown is not null) return;

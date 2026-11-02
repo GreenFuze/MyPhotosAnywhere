@@ -218,9 +218,11 @@ public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase databa
                 throw new ProtocolFormatException("Current-control signing requires its exact native root scope and capability.");
             new LibraryCurrentControlWriter(connection).ValidateUnsignedPayload(Encoding.UTF8.GetBytes(root.GetProperty("payload").GetRawText()),sequence);
         }
+        if(kind==TakeoutOriginalApprovalRepository.Kind)
+            new TakeoutOriginalApprovalRepository(_database,_budget).AssertUnsignedIn(body,transaction??throw new InvalidOperationException("Original approval requires its owning native transaction."));
     }
     private static TrustedProtocolActor Authority(ActorRecord actor) => new(actor.Library, actor.Id, actor.Epoch, actor.PublicKey,
-        actor.Role == "controller" ? ["library-publisher-authorization", "library-source-configuration", LibraryCurrentControl.Kind] : ["catalog-commit"]);
+        actor.Role == "controller" ? ["library-publisher-authorization", "library-source-configuration", LibraryCurrentControl.Kind,TakeoutOriginalApprovalRepository.Kind] : ["catalog-commit"]);
     private SqliteCommand Command(SqliteTransaction? transaction, string sql, params (string Key, object Value)[] values)
     {
         var command = _database.Connection.CreateCommand(); command.Transaction = transaction; command.CommandText = sql;

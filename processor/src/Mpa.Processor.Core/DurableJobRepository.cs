@@ -180,20 +180,23 @@ public sealed class DurableJobRepository(ProcessorStateDatabase database)
     }
     private sealed record PreparedItem(Guid Id, string InputFingerprint, JobStageSpec[] Stages, string Context);
 
-    public StageLease? ClaimNext(string? kind = null, string? stage = null)
+    public StageLease? ClaimNext(string? kind = null, string? stage = null,Guid? jobId=null)
     {
         if (kind is not null && !Identifier(kind)) throw new ArgumentException("Invalid admitted job kind.", nameof(kind));
         if (stage is not null && !Identifier(stage)) throw new ArgumentException("Invalid admitted stage.", nameof(stage));
+        if(jobId==Guid.Empty)throw new ArgumentException("A requested job identity cannot be empty.",nameof(jobId));
         using var transaction = _database.Connection.BeginTransaction();
-        using var select = Command(transaction, """
+        using var select = Command(transaction, $"""
             SELECT s.job_id,s.item_id,s.name,s.attempt,j.captured_context,s.checkpoint,i.captured_context
             FROM item_stage s JOIN job j ON j.id=s.job_id JOIN job_item i ON i.job_id=s.job_id AND i.id=s.item_id
             WHERE s.state='queued' AND j.paused=0 AND j.canceled=0 AND ($kind IS NULL OR j.kind=$kind) AND ($stage IS NULL OR s.name=$stage)
+              {(jobId is null ? "" : "AND s.job_id=$requestedJob")}
               AND NOT EXISTS(SELECT 1 FROM stage_dependency d JOIN item_stage parent
                 ON parent.job_id=d.job_id AND parent.item_id=d.item_id AND parent.name=d.depends_on
                 WHERE d.job_id=s.job_id AND d.item_id=s.item_id AND d.stage_name=s.name AND parent.state!='ready')
             ORDER BY s.job_id,s.item_id,s.name LIMIT 1
             """, ("$kind", kind is null ? DBNull.Value : kind), ("$stage", stage is null ? DBNull.Value : stage));
+        if(jobId is not null)select.Parameters.AddWithValue("$requestedJob",Key(jobId.Value));
         Guid job; Guid item; string name; int attempt; string context; string? checkpoint; string itemContext;
         using (var reader = select.ExecuteReader())
         {

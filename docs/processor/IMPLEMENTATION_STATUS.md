@@ -1,5 +1,101 @@
 # MPA 0.6.0 implementation ledger
 
+## Latest owner scope: PC end to end, Android afterward
+
+On2026-10-29 the owner explicitly authorized PC completion and publication without
+Android compatibility or Android/S23/joint acceptance gates. Android may break and
+will be rebuilt or fixed afterward. The PC must work without requiring the mobile
+app. Earlier joint-release gate statements below are historical and superseded
+for this PC release; PC safety, signing, preservation and validation stay required.
+See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists.
+
+## Current PC import increment (2026-11-02; not complete PC acceptance)
+
+The native folder picker and host-only Imports screen now connect review, explicit
+Start, progress and retry to the background engine. Explicit Start is durable before
+its reply; closing a browser does not cancel admitted copies. Native input/index
+owners are borrowed for bounded sequential upload, sharing the existing current-Root
+lane. Pause/Exit join actual requests and chooser tasks. Cold-reopen recovery keeps
+the first original ID/context/offset; offsets never imply verified backup. Missing
+input is retained per import and can resume from the same review without stopping
+the engine. No mobile implementation or compatibility work is included.
+
+Verified originals request one durable source scan and wake the existing source
+scheduler. Retries/restarts reuse its first scope; changed permissions cannot retarget
+it or grant IO. An actual SourceDiscoveryRunner check observes the first uploaded
+Drive ID and human filename as canonical photo facts. Discovery facts are not proof
+of portable catalog publication or final gallery activation.
+
+The final packet is current-takeout-import-ui-input-v51.json (730 source files),
+verified identical in the isolated validation tree and repository. Focused evidence
+is current-takeout-import-ui-validation-v51.json: the initial38 native cases passed;
+the changed discovery path then passed all5 import cases and the strengthened actual
+source-scanner case. The final frontend passes typecheck and14 API tests. Final
+strict Desktop build has zero warnings/errors and all4 packaged assets match.
+Reports distinguish the source revisions; repeated cases are not additional coverage.
+See PC_IMPORT_VALIDATION_2026_11_02.md for scope and limitations.
+
+Actual OS chooser/browser acceptance, live Drive, metadata/provenance-to-canonical
+association, portable catalog integration, folder hierarchy, ZIP/Drive ZIP UI,
+remaining PC photo/human operations, installers and final release gates remain.
+The import screen reports verified originals separately from pending processing.
+This increment does not establish a complete0.6 product or authorize early release.
+
+## Prior isolated PC import components (historical, superseded where noted above)
+
+The isolated Takeout implementation now has a bounded original transport, protected
+resume records, native source capture/replay and durable upload attempts retaining
+the first Drive identity. The application upload owner connects actual source,
+SQLite and account owners and refuses a backup receipt until source replay and
+provider checksum or independent bounded content verification complete. Original
+permission is an explicit required interface with no permissive production default.
+
+Evidence in preflight-060: current-original-transfer-validation-v36.json binds30
+new transport and149prior Google cases; current-original-source-validation-v38.json
+binds12new source/job and31affected input/completed-inventory cases; and
+current-original-owner-validation-v41.json binds11new native source/state/account
+owner cases. The provider and original authority in the last group are synthetic.
+The v38 source/job proof predates the added final receipt method, which is exercised
+by the v41 owner cases. These are component proofs, not whole-PC/live-Drive passes.
+All strict analyzer failures were fixed without suppressions or weaker assertions.
+The overly broad old-account class run was stopped without inferring a result.
+Sixteen explicitly selected affected old account/setup/reader/upload cases then
+passed. current-original-owner-validation-v42.json binds the final11+16reports,
+all715source hashes and a strict13.52sec Desktop build with zero warnings/errors
+and exact four packaged frontend assets. No native owners remain running.
+
+The following section records newer native approval evidence. Interrupted
+original-attempt recovery, browser import/progress/retry, metadata/catalog integration,
+remaining photo/human workflows and full PC platform/release acceptance remain
+unfinished. Android remains deferred and is not a PC gate. No new product commit,
+CI result, installer or publication is claimed for this isolated source packet.
+
+## Explicit PC import permission component (2026-11-02; UI remains unfinished)
+
+The isolated engine now reuses its native controller and shared signing counter to
+capture one private signed original-action import intent per completed manifest,
+selection policy and destination. Native signing/history inventories explicitly
+validate the exact local binding and signature; no cloud publication role or mobile
+inbox was added. Current original permission refreshes actual Root, selected signed
+policies and final fence outside the account lease, with state-only checks before
+physical requests and final receipt admission. Reconnection renews current access
+separately; original context, source IDs and first signatures remain immutable.
+
+current-takeout-native-approval-validation-v46.json binds718source hashes, actual
+8new approval +11affected upload cases (19/19),20exact prior native key/signer/
+current-inventory cases and33prior Core journal/inventory/completed-read cases.
+Strict Desktop passed10.07sec with zero warnings/errors and four exact packaged
+frontend assets. Tests use real native state/crypto/Root transport/ownership with
+synthetic Google responses; no live Google or complete PC acceptance is claimed.
+A fixture-only compile failure was corrected without weaker assertions/visibility
+or deadline changes. The4096 signing bound and earlier safety gates are unchanged.
+
+Actual browser selection/start/progress/retry, shared-runtime scheduling, interrupted
+original recovery, identity-preserving metadata/catalog integration and remaining
+PC release requirements remain unfinished. No new product commit or publication.
+Next: current-takeout-import-ui-next-v46.md in preflight-060; complete this user flow
+and do not extend unrelated infrastructure. Android remains deferred.
+
 ## Restart recovery of an original header before complete inventory
 
 The actual desktop header preparation owner now resumes a reserved original
