@@ -15,7 +15,7 @@ internal sealed record TakeoutInventoryResult(long Bytes,string Sha256,long Entr
 /// <summary>Disk-backed multipart inventory and conservative sidecar association.
 /// A durable captured job precedes files. Private entry IDs/asset IDs survive
 /// replay; duplicate names/content never merge originals. No provider/human write.</summary>
-public sealed class TakeoutAssociationCatalog : IDisposable
+public sealed partial class TakeoutAssociationCatalog : IDisposable
 {
     private const string DirectoryName="takeout-associations";
     private const int ApplicationId=0x4d504154;

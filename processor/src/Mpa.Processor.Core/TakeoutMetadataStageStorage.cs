@@ -20,6 +20,7 @@ public sealed class TakeoutMetadataStageStorage : IDisposable
     private readonly StorageBudgetManager _budget;
     private FileStream? _lease;
     private bool _closed;
+    private bool _recoveryAvailable=true;
 
     public TakeoutMetadataStageStorage(ProcessorStateDatabase database,StorageBudgetManager budget)
     {
@@ -102,6 +103,19 @@ public sealed class TakeoutMetadataStageStorage : IDisposable
         finally {Release(name);}
     }
 
+    /// <summary>Composition-root startup only, while this fresh owner holds the
+    /// exclusive native stage area and before exposing any work admission. Raw
+    /// snapshots, attempt evidence and immutable identities are all retained.</summary>
+    public int RecoverInterruptedAfterExclusiveRestart()
+    {
+        lock(_gate)
+        {
+            ObjectDisposedException.ThrowIf(_closed,this);
+            if(!_recoveryAvailable||_users.Count!=0||_lease is null)throw new InvalidOperationException("Recover metadata only under a fresh exclusive staging owner before admission.");
+            var count=new TakeoutMetadataJobRepository(_database).RecoverInterruptedMetadata();_recoveryAvailable=false;return count;
+        }
+    }
+
     internal async Task<TakeoutMetadataAttemptStage> OpenAttemptAsync(TakeoutMetadataWork work,CancellationToken token)
     {
         var name=Acquire(work);StorageReservation? reserved=null;FileStream? input=null;FileStream? source=null;
@@ -148,7 +162,7 @@ public sealed class TakeoutMetadataStageStorage : IDisposable
         if(!ReferenceEquals(work.Owner,_database))throw new InvalidOperationException("Metadata staging belongs to a different native state owner.");
         if(work.Sidecar.Bytes is <1 or >TakeoutMetadataDocument.MaximumSourceBytes || work.Sidecar.RelativePath!="input.bin")throw new InvalidDataException("Invalid captured metadata input.");
         var name=ItemName(work.Lease.JobId,work.Lease.ItemId);
-        lock(_gate){ObjectDisposedException.ThrowIf(_closed,this);if(!_users.Add(name))throw new InvalidOperationException("Join the current sidecar capture/worker before reusing its item.");}
+        lock(_gate){ObjectDisposedException.ThrowIf(_closed,this);_recoveryAvailable=false;if(!_users.Add(name))throw new InvalidOperationException("Join the current sidecar capture/worker before reusing its item.");}
         return name;
     }
     internal void Release(string name)

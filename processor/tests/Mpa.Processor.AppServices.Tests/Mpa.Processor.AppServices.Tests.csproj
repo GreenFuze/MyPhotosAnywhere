@@ -5,5 +5,7 @@
     <PackageReference Include="MSTest.TestFramework" Version="[4.5.1]" />
     <PackageReference Include="MSTest.TestAdapter" Version="[4.5.1]" />
     <ProjectReference Include="../../src/Mpa.Processor.AppServices/Mpa.Processor.AppServices.csproj" />
+    <ProjectReference Include="../../src/Mpa.Processor.WorkerHost/Mpa.Processor.WorkerHost.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
+  <Import Project="../../src/Mpa.Processor.Desktop/TakeoutWorkerBundle.targets" />
 </Project>

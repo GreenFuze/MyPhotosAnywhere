@@ -9,20 +9,33 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.Core.Tests;
 
 [TestClass]
-public sealed class TakeoutMetadataOperationTests
+public sealed partial class TakeoutMetadataOperationTests
 {
     private const string Valid="{\"title\":\"שלום.jpg\",\"description\":\"preserve human source\",\"photoTakenTime\":{\"timestamp\":\"-1\"},\"geoData\":{\"latitude\":31.7,\"longitude\":35.2},\"unknown\":{\"keep\":true}}";
     private static readonly string MediaHash=new('c',64);
 
     [TestMethod]
     public async Task TakeoutOwnedOperationCommitsVerifiedReceiptOnlyAfterActualChildAndIoJoin()
+        =>await RunVerifiedMetadataAsync(appHost:false).ConfigureAwait(false);
+
+    [TestMethod]
+    public async Task TakeoutAppHostRunsTheSameInstalledAnalysisWithoutPassingSdkHostArguments()
+        =>await RunVerifiedMetadataAsync(appHost:true).ConfigureAwait(false);
+
+    [TestMethod]
+    public async Task TakeoutInstalledDescriptorRunsThePinnedFirstPartyBundleAndJoinsItsActualChild()
+        =>await RunVerifiedMetadataAsync(appHost:true,installedDescriptor:true).ConfigureAwait(false);
+
+    private static async Task RunVerifiedMetadataAsync(bool appHost,bool installedDescriptor=false)
     {
         using var root=new WorkerProcessTests.WorkerTestDirectory();using var database=new ProcessorStateDatabase(root.Path);
         await using var state=new ProcessorStateCoordinator(database);using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var budget=new StorageBudgetManager(new MeasuredSpace(root.Path));using var storage=new TakeoutMetadataStageStorage(database,budget);
         var work=await AdmitAsync(state,Encoding.UTF8.GetBytes(Valid),deadline.Token).ConfigureAwait(false);
         using(var source=new MemoryStream(Encoding.UTF8.GetBytes(Valid),writable:false))await storage.CaptureAsync(work,source,deadline.Token).ConfigureAwait(false);
-        var operation=await TakeoutMetadataWorkerOperation.CreateAsync(state,work,storage,await InstallationAsync(deadline.Token).ConfigureAwait(false),deadline.Token).ConfigureAwait(false);
+        var installation=installedDescriptor?await TakeoutWorkerInstallation.OpenInstalledAsync(await CopyInstalledBundleAsync(root.Path,deadline.Token).ConfigureAwait(false),deadline.Token).ConfigureAwait(false):
+            appHost?await AppHostInstallationAsync(deadline.Token).ConfigureAwait(false):await InstallationAsync(deadline.Token).ConfigureAwait(false);
+        var operation=await TakeoutMetadataWorkerOperation.CreateAsync(state,work,storage,installation,deadline.Token).ConfigureAwait(false);
         await using var supervisor=new ProcessorWorkSupervisor();await supervisor.Start(operation,deadline.Token).ConfigureAwait(false);
         Assert.AreEqual(ProcessorWorkState.Ready,supervisor.State);Assert.IsNull(supervisor.Failure);Assert.AreEqual(0L,budget.Status().ReservedBytes);
         var receipt=await state.ExecuteAsync(db=>
@@ -41,6 +54,30 @@ public sealed class TakeoutMetadataOperationTests
         CollectionAssert.AreEqual(Encoding.UTF8.GetBytes(Valid),await File.ReadAllBytesAsync(SourcePath(root.Path,work),deadline.Token).ConfigureAwait(false));
         Assert.AreEqual(0L,new FileInfo(operation.Launch.NewDiagnosticPath).Length);
         using var released=File.Open(result,FileMode.Open,FileAccess.ReadWrite,FileShare.None);
+    }
+
+    [TestMethod]
+    [DataRow("host")]
+    [DataRow("assembly")]
+    [DataRow("foreign-name")]
+    [DataRow("missing-manifest")]
+    public async Task TakeoutInstalledBundleRejectsChangedOrMissingFilesWithoutSdkFallback(string change)
+    {
+        using var root=new WorkerProcessTests.WorkerTestDirectory();using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var bundle=await CopyInstalledBundleAsync(root.Path,deadline.Token).ConfigureAwait(false);var manifest=Path.Combine(bundle,"worker.json");
+        if(change=="missing-manifest")
+        {File.Delete(manifest);await Assert.ThrowsExactlyAsync<FileNotFoundException>(()=>TakeoutWorkerInstallation.OpenInstalledAsync(bundle,deadline.Token)).ConfigureAwait(false);return;}
+        if(change=="foreign-name")
+        {
+            var text=await File.ReadAllTextAsync(manifest,deadline.Token).ConfigureAwait(false);
+            await File.WriteAllTextAsync(manifest,text.Replace("Mpa.Processor.WorkerHost.dll","substituted.dll",StringComparison.Ordinal),deadline.Token).ConfigureAwait(false);
+        }
+        else
+        {
+            var path=Path.Combine(bundle,change=="host"?HostName():"Mpa.Processor.WorkerHost.dll");
+            await using var file=new FileStream(path,FileMode.Open,FileAccess.ReadWrite,FileShare.None);var value=file.ReadByte();file.Position=0;file.WriteByte((byte)(value^255));
+        }
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(()=>TakeoutWorkerInstallation.OpenInstalledAsync(bundle,deadline.Token)).ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -224,6 +261,22 @@ public sealed class TakeoutMetadataOperationTests
     private static async Task<string> DigestAsync(string path,CancellationToken token)
     {await using var file=File.OpenRead(path);return Convert.ToHexStringLower(await SHA256.HashDataAsync(file,token).ConfigureAwait(false));}
     private static async Task<TakeoutWorkerInstallation> InstallationAsync(CancellationToken token)=>new(RuntimePath(),await DigestAsync(RuntimePath(),token).ConfigureAwait(false),WorkerPath(),await DigestAsync(WorkerPath(),token).ConfigureAwait(false));
+    private static async Task<TakeoutWorkerInstallation> AppHostInstallationAsync(CancellationToken token)
+    {
+        var host=System.IO.Path.Combine(System.IO.Path.GetDirectoryName(WorkerPath())!,OperatingSystem.IsWindows()?"Mpa.Processor.WorkerHost.exe":"Mpa.Processor.WorkerHost");
+        return TakeoutWorkerInstallation.ForAppHost(host,await DigestAsync(host,token).ConfigureAwait(false),WorkerPath(),await DigestAsync(WorkerPath(),token).ConfigureAwait(false));
+    }
+    private static string HostName()=>OperatingSystem.IsWindows()?"Mpa.Processor.WorkerHost.exe":"Mpa.Processor.WorkerHost";
+    private static async Task<string> CopyInstalledBundleAsync(string root,CancellationToken token)
+    {
+        var bundle=Path.Combine(root,"installed-takeout-worker");Directory.CreateDirectory(bundle);
+        foreach(var source in Directory.EnumerateFiles(Path.GetDirectoryName(WorkerPath())!))
+            File.Copy(source,Path.Combine(bundle,Path.GetFileName(source)),overwrite:false);
+        await File.WriteAllBytesAsync(Path.Combine(bundle,"worker.json"),JsonSerializer.SerializeToUtf8Bytes(new
+        {format="mpa-installed-takeout-worker-1",host=HostName(),hostSha256=await DigestAsync(Path.Combine(bundle,HostName()),token).ConfigureAwait(false),
+            assembly="Mpa.Processor.WorkerHost.dll",assemblySha256=await DigestAsync(Path.Combine(bundle,"Mpa.Processor.WorkerHost.dll"),token).ConfigureAwait(false)}),token).ConfigureAwait(false);
+        return bundle;
+    }
     private sealed class MeasuredSpace(string root) : IStorageSpaceReader
     {
         internal long AvailableBytes { get; set; }=40*StorageBudgetManager.Gibibyte;

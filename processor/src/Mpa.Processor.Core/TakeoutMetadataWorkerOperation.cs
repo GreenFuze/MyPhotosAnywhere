@@ -7,18 +7,29 @@ namespace Mpa.Processor.Core;
 
 /// <summary>Trusted installation description, supplied by native composition,
 /// never a web command. Only the fixed installed Takeout analysis is selected.</summary>
-public sealed class TakeoutWorkerInstallation
+public sealed partial class TakeoutWorkerInstallation
 {
     private readonly string _runtime;
     private readonly string _runtimeHash;
     private readonly string _assembly;
     private readonly string _assemblyHash;
+    private readonly bool _appHost;
     public TakeoutWorkerInstallation(string runtimePath,string runtimeSha256,string assemblyPath,string assemblySha256)
     {
         if(!System.IO.Path.IsPathFullyQualified(runtimePath)||!System.IO.Path.IsPathFullyQualified(assemblyPath)||System.IO.Path.GetFileName(assemblyPath)!="Mpa.Processor.WorkerHost.dll"||!Hash(runtimeSha256)||!Hash(assemblySha256))
             throw new ArgumentException("The exact installed runtime and first-party worker hashes are required.");
         _runtime=System.IO.Path.GetFullPath(runtimePath);_runtimeHash=runtimeSha256;_assembly=System.IO.Path.GetFullPath(assemblyPath);_assemblyHash=assemblySha256;
     }
+    private TakeoutWorkerInstallation(string hostPath,string hostSha256,string assemblyPath,string assemblySha256,bool appHost)
+        :this(hostPath,hostSha256,assemblyPath,assemblySha256)
+    {
+        var expected=System.IO.Path.Combine(System.IO.Path.GetDirectoryName(_assembly)!,OperatingSystem.IsWindows()?"Mpa.Processor.WorkerHost.exe":"Mpa.Processor.WorkerHost");
+        if(!appHost||!string.Equals(_runtime,expected,OperatingSystem.IsWindows()?StringComparison.OrdinalIgnoreCase:StringComparison.Ordinal))
+            throw new ArgumentException("The installed first-party apphost must share its exact worker assembly directory.",nameof(hostPath));
+        _appHost=true;
+    }
+    public static TakeoutWorkerInstallation ForAppHost(string hostPath,string hostSha256,string assemblyPath,string assemblySha256)
+        =>new(hostPath,hostSha256,assemblyPath,assemblySha256,true);
     internal async Task<FileStream> OpenAssemblyAsync(CancellationToken token)
     {
         TakeoutMetadataStageStorage.Regular(System.IO.Path.GetDirectoryName(_assembly)!,true);
@@ -30,7 +41,8 @@ public sealed class TakeoutWorkerInstallation
         }
         catch {await file.DisposeAsync().ConfigureAwait(false);throw;}
     }
-    internal WorkerLaunchSpec Launch(Guid session,string staging)=>new(_runtime,_runtimeHash,[_assembly,"--session",session.ToString("D"),"--staging",staging],
+    internal WorkerLaunchSpec Launch(Guid session,string staging)=>new(_runtime,_runtimeHash,
+        _appHost?["--session",session.ToString("D"),"--staging",staging]:[_assembly,"--session",session.ToString("D"),"--staging",staging],
         System.IO.Path.GetDirectoryName(_assembly)!,System.IO.Path.Combine(staging,"diagnostics.log"));
     private static bool Hash(string? value)=>value is {Length:64}&&value.All(c=>c is >='0' and <='9' or >='a' and <='f');
 }

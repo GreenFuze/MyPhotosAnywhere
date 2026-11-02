@@ -91,11 +91,18 @@ public sealed partial class AccountServiceTests
         Assert.AreEqual(1,(await fixture.State.ExecuteAsync(db=>new DurableJobRepository(db).PendingReceiptCount(),deadline.Token).ConfigureAwait(false)));
     }
 
-    private static async Task<OriginalInput> PrepareOriginalJobAsync(Fixture fixture,CancellationToken token)
+    private static async Task<OriginalInput> PrepareOriginalJobAsync(Fixture fixture,CancellationToken token,bool metadata=false)
     {
         var account=await fixture.Service.ConnectAsync(null,new NoBrowser(),token).ConfigureAwait(false);
         var state=await fixture.State.ExecuteAsync(db=>db.StateDirectory,token).ConfigureAwait(false);var folder=Path.Combine(state,"original-fixture");Directory.CreateDirectory(folder);
         var path=Path.Combine(folder,"a.jpg");var payload=RandomNumberGenerator.GetBytes(1024*1024+19);await File.WriteAllBytesAsync(path,payload,token).ConfigureAwait(false);
+        if(metadata)
+        {
+            await File.WriteAllTextAsync(path+".json","{\"title\":\"a.jpg\",\"description\":\"Imported detail\",\"photoTakenTime\":{\"timestamp\":\"1\"}}",token).ConfigureAwait(false);
+            await File.WriteAllTextAsync(Path.Combine(folder,"broken.json"),"{",token).ConfigureAwait(false);
+            await File.WriteAllTextAsync(Path.Combine(folder,"other.json"),"{\"title\":\"unmatched.jpg\",\"photoTakenTime\":{\"timestamp\":\"1\"}}",token).ConfigureAwait(false);
+            await File.WriteAllBytesAsync(Path.Combine(folder,"oversized.json"),new byte[Mpa.Processor.Protocol.TakeoutMetadataDocument.MaximumSourceBytes+1],token).ConfigureAwait(false);
+        }
         var budget=new StorageBudgetManager(new OriginalSpace(state));var import=Guid.NewGuid();var part=Guid.NewGuid();
         using(var selected=TakeoutSelectedInput.OpenFolder(part,folder))await fixture.State.ExecuteAsync(db=>{new TakeoutImportInventoryRepository(db).Ensure(import,new(Guid.NewGuid(),account.PermissionId,account.Revision,"original-destination",1),[selected.Binding]);return true;},token).ConfigureAwait(false);
         await using var inventoryOwner=new TakeoutInventoryService(fixture.State,budget);var inventory=await inventoryOwner.RunAsync(import,token).ConfigureAwait(false);

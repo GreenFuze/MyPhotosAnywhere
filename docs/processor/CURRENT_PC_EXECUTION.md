@@ -24,9 +24,20 @@ gallery integration. Native folder selection, review/start/progress/retry, share
 current-Root original transfers and scoped interrupted-upload recovery are now wired.
 Completed copies request exactly one durable source scan; the actual scanner reads
 the first Drive ID and preserves the human filename in discovered photo facts.
-Evidence: current-takeout-import-ui-validation-v51.json in preflight-060. These are
-focused native/synthetic-provider checks; actual OS chooser/browser, live Drive and
-portable catalog activation remain unverified. See PC_IMPORT_VALIDATION_2026_11_02.md.
+Evidence: current-takeout-import-ui-validation-v51.json in preflight-060 and
+PC_IMPORT_VALIDATION_2026_11_02.md. The later isolated v54case proves native portable
+activation/query with synthetic Google; actual browser/OS/live acceptance remains.
+Committed5638738 PC CI is verified
+across60jobs/72reports; do not rerun those passed checks on unchanged source. The
+isolated v60worker apphost/bundle prerequisite passes native and actual Windows
+publish execution checks. The locally validated continuation now binds optional sidecars to
+verified canonical originals and runs the installed worker through a bounded native
+import runner. Native tests also cover immutable metadata restart recovery. Next
+compose that runner into the desktop import queue, expose processing/issues and
+project/publish results with human metadata precedence; it is not yet a usable
+metadata workflow. The Windows UI tool failed to initialize;
+keep visual acceptance unverified and continue independent work. Do not confuse
+framework-dependent worker publish evidence with self-contained installers.
 Canonical Drive asset identity stays library/account/file based. Inventory MediaId
 is a separate stable processing/provenance identity requiring an explicit metadata
 association; do not replace canonical IDs or infer a second asset defect. Preserve

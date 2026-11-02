@@ -11,6 +11,56 @@ See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists
 
 ## Current PC import increment (2026-11-02; not complete PC acceptance)
 
+The current metadata increment has61distinct focused Core cases across the receipt,
+association, installed operation and restart checks,12AppServices cases covering
+the actual original-to-installed-worker chain and original regressions, plus the
+strengthened import-to-portable-catalog case repeated successfully in26sec. Strict
+Desktop build has zero warnings/errors. All7tested installed-worker files match
+the desktop build and framework-dependent publish byte for byte. Evidence:
+current-takeout-metadata-validation-v73.json (741-file frozen source packet).
+Restore rewrote eight lockfiles' line endings; the original repository bytes were
+restored after proving all parsed dependency graphs identical. No package changed.
+The new increment is locally validated; fresh PC CI is required for its revision.
+
+Exact committed5638738ffea80bdd1276082ea9c4fb93734bd548 now has independently verified
+PC CI:60jobs/72reports,113Protocol/566Core/773ordinary Services/179Google/9LAN/49Web
+cases per platform across Windows, Linux, macOS ARM and macOS Intel. All previous
+identities and every added committed method/static DataRow are present exactly once.
+The original two Mac ARM jobs never obtained hosted runners; only those incomplete
+jobs were retried, preserving every pass and deadline. Complete official attempt
+archives and all report streams/logs passed diagnostic checks without new exceptions.
+All4 Desktop source/asset/lock/audit/14API reports match. Evidence:
+ci-5638738-pc-validation-v1.json and ci-5638738-desktop-validation-v1.json in preflight.
+These are contract/build checks, not UI, installer or complete-product acceptance.
+
+A stronger isolated test-only continuation also passes the actual native import ->
+source scan -> portable dependency/header publication -> signed Root transition ->
+canonical activation/query, retaining the imported Drive ID and human filename.
+It passed26.19sec under the unchanged40sec deadline; Google responses are synthetic.
+Evidence current-takeout-import-catalog-validation-v54.json. The stronger test is not
+yet part of the above committed CI revision. No additional production scheduler was
+needed; existing source/catalog notifications and the shared Root lane are reused.
+
+The next isolated prerequisite builds and publishes the fixed first-party metadata
+worker with an explicit apphost launch mode and exact host/assembly descriptor.
+Its14 native operation/bundle cases pass; a standalone probe executed the worker
+from the actual Windows publish output, verified raw metadata/result and physically
+joined its child. Evidence current-takeout-installed-worker-validation-v60.json.
+This is a framework-dependent development publish, not self-contained/installer
+acceptance, and it is not yet wired to import metadata scheduling or projection.
+A continuation now reads independently verified original receipts, binds
+conservative sidecar matches to the canonical Drive photo while retaining logical
+input provenance, and executes a bounded import metadata runner using that installed
+worker. Oversized, malformed and unmatched sidecars do not prevent original copying.
+Native checks cover first-binding retries and fresh exclusive staging recovery,
+including canceled policy and rejection after capture admission. The runner still
+needs desktop composition, visible processing/issues, metadata projection/publication
+and generated-cache retirement under the unchanged1024item stage bound. These
+component checks do not establish a complete import metadata workflow.
+No package version, warning gate, test assertion or prior deadline was weakened.
+Windows visual acceptance is presently blocked by a computer-use runtime startup
+failure; no picker/screen result is inferred. Independent implementation continues.
+
 The native folder picker and host-only Imports screen now connect review, explicit
 Start, progress and retry to the background engine. Explicit Start is durable before
 its reply; closing a browser does not cancel admitted copies. Native input/index

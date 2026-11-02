@@ -15,14 +15,15 @@ public sealed class TakeoutMetadataWork
     public Guid MediaId { get; }
     public string MediaInputSha256 { get; }
     public ArtifactDescriptor Sidecar { get; }
-    internal TakeoutMetadataWork(object owner,StageLease lease,Guid mediaId,string mediaInputSha256,ArtifactDescriptor sidecar)
-    {Owner=owner;Lease=lease;MediaId=mediaId;MediaInputSha256=mediaInputSha256;Sidecar=sidecar;}
+    public TakeoutImportedMetadata? Imported {get;}
+    internal TakeoutMetadataWork(object owner,StageLease lease,Guid mediaId,string mediaInputSha256,ArtifactDescriptor sidecar,TakeoutImportedMetadata? imported=null)
+    {Owner=owner;Lease=lease;MediaId=mediaId;MediaInputSha256=mediaInputSha256;Sidecar=sidecar;Imported=imported;}
 }
 
 /// <summary>One metadata job per captured sidecar/media binding. Independent media
 /// uploads are never dependencies of this optional analysis. All successful stage
 /// receipts still use the existing atomic durable outbox; raw bytes stay staged.</summary>
-public sealed class TakeoutMetadataJobRepository
+public sealed partial class TakeoutMetadataJobRepository
 {
     public const string JobKind="takeout-metadata";
     public const string Stage="metadata";
@@ -34,6 +35,8 @@ public sealed class TakeoutMetadataJobRepository
     {_database=database??throw new ArgumentNullException(nameof(database));_jobs=new(database);}
 
     public bool Ensure(Guid jobId,Guid itemId,Guid mediaId,string mediaInputSha256,ArtifactDescriptor sidecar)
+        =>EnsureCaptured(jobId,itemId,mediaId,mediaInputSha256,sidecar,JobContext);
+    private bool EnsureCaptured(Guid jobId,Guid itemId,Guid mediaId,string mediaInputSha256,ArtifactDescriptor sidecar,byte[] capturedJob)
     {
         ArgumentNullException.ThrowIfNull(sidecar);
         if(mediaId==Guid.Empty || !IsHash(mediaInputSha256) || sidecar.Bytes>TakeoutMetadataDocument.MaximumSourceBytes || sidecar.RelativePath!="input.bin")
@@ -43,13 +46,16 @@ public sealed class TakeoutMetadataJobRepository
             format="mpa-takeout-sidecar-input-1",mediaId=mediaId.ToString("D"),mediaInputSha256,bytes=sidecar.Bytes.ToString(CultureInfo.InvariantCulture),
             sha256=sidecar.Sha256,relativePath=sidecar.RelativePath,recipeSha256=TakeoutMetadataDocument.RecipeSha256
         }));
-        return _jobs.EnsureJobWithInitialItem(jobId,JobKind,JobContext,
+        return _jobs.EnsureJobWithInitialItem(jobId,JobKind,capturedJob,
             new(itemId,Hash(context),[new(Stage,TakeoutMetadataDocument.RecipeSha256,[])],Encoding.UTF8.GetString(context)));
     }
 
     public TakeoutMetadataWork? ClaimNext()
+        =>DecodeClaim(_jobs.ClaimNext(JobKind,Stage));
+    public TakeoutMetadataWork? Claim(Guid jobId)
+        =>DecodeClaim(_jobs.ClaimNext(JobKind,Stage,jobId));
+    private TakeoutMetadataWork? DecodeClaim(StageLease? lease)
     {
-        var lease=_jobs.ClaimNext(JobKind,Stage);
         if(lease is null)return null;
         var work=Decode(lease);AssertCurrent(work);return work;
     }
@@ -112,7 +118,7 @@ public sealed class TakeoutMetadataJobRepository
 
     private TakeoutMetadataWork Decode(StageLease lease)
     {
-        if(lease.Stage!=Stage || lease.CapturedContext!=Encoding.UTF8.GetString(JobContext) ||
+        if(lease.Stage!=Stage ||
             !_codec.Encode(Encoding.UTF8.GetBytes(lease.CapturedItemContext)).AsSpan().SequenceEqual(Encoding.UTF8.GetBytes(lease.CapturedItemContext)))
             throw new InvalidDataException("Metadata lease has an unknown or changed captured contract.");
         using var json=JsonDocument.Parse(lease.CapturedItemContext);var root=json.RootElement;
@@ -126,7 +132,8 @@ public sealed class TakeoutMetadataJobRepository
             throw new InvalidDataException("Metadata lease has invalid captured identities or byte bounds.");
         var descriptor=new ArtifactDescriptor(bytes,root.GetProperty("sha256").GetString()!,root.GetProperty("relativePath").GetString()!);
         if(descriptor.RelativePath!="input.bin")throw new InvalidDataException("Metadata work must use its assigned sidecar snapshot.");
-        return new(_database,lease,mediaId,mediaHash!,descriptor);
+        var imported=lease.CapturedContext==Encoding.UTF8.GetString(JobContext)?null:DecodeImported(lease,mediaId,mediaHash!,descriptor);
+        return new(_database,lease,mediaId,mediaHash!,descriptor,imported);
     }
     private static bool IsHash(string? value)=>value is {Length:64} && value.All(c=>c is >='0' and <='9' or >='a' and <='f');
     private static string Hash(ReadOnlySpan<byte> bytes)=>Convert.ToHexStringLower(SHA256.HashData(bytes));

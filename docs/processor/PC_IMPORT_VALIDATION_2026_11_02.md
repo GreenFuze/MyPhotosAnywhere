@@ -1,5 +1,21 @@
 # PC folder import increment
 
+Exact5638738 now has60verified PC CI jobs/72reports on Windows, Linux and both Mac
+architectures. All113Protocol/566Core/773ordinary Services/179Google/9LAN/49Web cases
+per platform preserve prior identities and add the committed new source methods
+and rows exactly once. Native diagnostics, scale/reference checks, unchanged job
+limits and4 Desktop frontend/lock/audit/14API reports are verified. Two unacquired
+Mac ARM hosted jobs alone were retried; original evidence and all passes are retained.
+Private aggregate: ci-5638738-pc-validation-v1.json. UI/install/live acceptance stays
+separate. No0.6 release or asset publication follows from this result.
+
+Later isolated evidence v54also passes a real native import through portable catalog
+publication, signed Root transition, activation and canonical query in26.19sec using
+synthetic Google. The unchanged production pipeline was reused. This strengthened
+test-only continuation was not part of5638738; it is now included and its actual
+native pipeline passed again in26sec (v72). Optional metadata,
+hierarchy, ZIP workflows and full PC acceptance remain unfinished.
+
 The approved PC import workflow now has native folder selection, saved review,
 explicit Import all, background original verification, progress and retry. Inputs
 remain read-only. The browser sends captured identities, not local paths or claimed
@@ -39,6 +55,23 @@ was weakened. Earlier worker, metadata, source, original transport and native ap
 component evidence remains recorded in IMPLEMENTATION_STATUS.md.
 
 ## Remaining acceptance
+
+The later native metadata increment verifies exact original receipts,
+sidecar association, separate canonical/logical identities, installed-worker
+execution and immutable pending recovery. The AppServices check runs an actual
+original upload/independent verification followed by the actual installed child;
+malformed, oversized and unmatched sidecars remain separate from original copying.
+It also repeats an unchanged admitted metadata job without another child or upload.
+Google transport is controlled test data. Desktop composition, per-item metadata
+presentation, human-precedence projection/publication and cache retirement remain
+unfinished, so this is not complete metadata workflow acceptance.
+Focused evidence current-takeout-metadata-validation-v73.json freezes741files:
+61distinct Core cases across v66/v70,12affected AppServices cases v71 and the
+catalog case v72. Strict Desktop build passed with zero warnings/errors; the seven
+actual installed-worker files used by the native runner equal the desktop build
+and framework-dependent publish bytes. The restored lockfile bytes have identical
+dependency graphs; no package version changed. Fresh exact-revision PC CI remains
+required. Earlier compile/test-fixture failures remain retained separately.
 
 The native picker compiles; this packet does not claim actual OS chooser or browser
 screen acceptance. Live Google, metadata/provenance association, portable catalog

@@ -80,12 +80,14 @@ public sealed partial class TakeoutOriginalJobRepository(ProcessorStateDatabase 
         if(accountId!=capture.Inventory.Target.AccountId||folderId!=capture.Inventory.Target.FolderId||fileId!=work.FileId||
             bytes!=capture.Entry.Bytes||version<1||independentlyVerifiedSha256!=capture.Sha256||work.AcknowledgedBytes!=bytes)
             throw new InvalidDataException("Verified original receipt differs from its captured source, destination or assigned identity.");
-        new DurableJobRepository(_database).Complete(work.Lease,_codec.Encode(JsonSerializer.SerializeToUtf8Bytes(new
+        new DurableJobRepository(_database).Complete(work.Lease,VerifiedReceipt(capture,work.ApprovalId,fileId,version));
+    }
+    private byte[] VerifiedReceipt(TakeoutOriginalCapture capture,Guid approval,string fileId,long version)=>_codec.Encode(JsonSerializer.SerializeToUtf8Bytes(new
         {
             format="mpa-takeout-original-result-1",importId=capture.Inventory.ImportId.ToString("D"),mediaId=capture.Entry.MediaId.ToString("D"),
-            approvalId=work.ApprovalId.ToString("D"),accountId,folderId,fileId,bytes=bytes.ToString(CultureInfo.InvariantCulture),version=version.ToString(CultureInfo.InvariantCulture),sha256=independentlyVerifiedSha256
-        })));
-    }
+            approvalId=approval.ToString("D"),accountId=capture.Inventory.Target.AccountId,folderId=capture.Inventory.Target.FolderId,fileId,
+            bytes=capture.Entry.Bytes.ToString(CultureInfo.InvariantCulture),version=version.ToString(CultureInfo.InvariantCulture),sha256=capture.Sha256
+        }));
 
     private void AssertLease(TakeoutOriginalWork work,bool retirementBookkeeping)
     {
@@ -109,19 +111,24 @@ public sealed partial class TakeoutOriginalJobRepository(ProcessorStateDatabase 
     }
     private TakeoutOriginalWork Decode(StageLease lease,Microsoft.Data.Sqlite.SqliteTransaction? transaction=null)
     {
-        using var document=JsonDocument.Parse(lease.CapturedContext);var root=document.RootElement;
+        var value=DecodeCapture(lease.CapturedContext,lease.Checkpoint,transaction);
+        return new(_database,lease,value.Capture,value.Approval,value.FileId,value.Acknowledged);
+    }
+    private (TakeoutOriginalCapture Capture,Guid Approval,string? FileId,long Acknowledged) DecodeCapture(string context,string? savedCheckpoint,Microsoft.Data.Sqlite.SqliteTransaction? transaction=null)
+    {
+        using var document=JsonDocument.Parse(context);var root=document.RootElement;
         var inventory=new TakeoutImportInventoryRepository(_database).ReadCompleted(root.GetProperty("importId").GetGuid(),transaction)??throw new InvalidDataException("Original upload lost its completed selected-input receipt.");
         var entry=new TakeoutCapturedEntry(root.GetProperty("partId").GetGuid(),root.GetProperty("entryKey").GetString()!,root.GetProperty("relativePath").GetString()!,
             Decimal(root,"bytes"),TakeoutEntryKind.Media,root.GetProperty("ordinal").GetInt32(),Decimal(root,"sourceStamp"),root.GetProperty("mediaId").GetGuid());
         var capture=new TakeoutOriginalCapture(inventory,entry,root.GetProperty("sha256").GetString()!);var approval=root.GetProperty("approvalId").GetGuid();
-        if(!Encode(capture,approval).AsSpan().SequenceEqual(Encoding.UTF8.GetBytes(lease.CapturedContext)))throw new InvalidDataException("Original upload context lost its exact captured schema.");
+        if(!Encode(capture,approval).AsSpan().SequenceEqual(Encoding.UTF8.GetBytes(context)))throw new InvalidDataException("Original upload context lost its exact captured schema.");
         string? fileId=null;long acknowledged=0;
-        if(lease.Checkpoint is {} checkpoint)
+        if(savedCheckpoint is {} checkpoint)
         {
             using var progress=JsonDocument.Parse(checkpoint);fileId=progress.RootElement.GetProperty("fileId").GetString();acknowledged=Decimal(progress.RootElement,"acknowledgedBytes");
             if(!Opaque(fileId)||fileId=="root"||acknowledged>entry.Bytes||Checkpoint(fileId!,acknowledged)!=checkpoint)throw new InvalidDataException("Original progress changed its assigned identity or bounds.");
         }
-        return new(_database,lease,capture,approval,fileId,acknowledged);
+        return(capture,approval,fileId,acknowledged);
     }
     private void AssertInventory(TakeoutCompletedInventory inventory)
     {

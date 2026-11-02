@@ -14,7 +14,7 @@ public sealed partial class AccountServiceTests
         using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(40));await using var fixture=await CurrentReaderFixture.CreateAsync(addSource:true).ConfigureAwait(false);
         var selection=await NativeTakeoutSelectionAsync(fixture,deadline.Token).ConfigureAwait(false);var state=fixture.Data.Setup.Accounts.State;
         var setup=await state.ExecuteAsync(db=>new{db.StateDirectory,db.InstallationId,Source=new LibrarySourceRepository(db).Snapshot().Sources.Single().Id},deadline.Token).ConfigureAwait(false);
-        var cloud=new OriginalCloud(selection.Payload);WireOriginal(fixture.Data.Setup.Accounts,cloud);
+        var originalAllocator=fixture.Data.Setup.Accounts.Readers.WorkspaceAllocate;var cloud=new OriginalCloud(selection.Payload);WireOriginal(fixture.Data.Setup.Accounts,cloud);
         await using var current=new CurrentLibraryCatalogRuntime(state,setup.StateDirectory,setup.InstallationId,fixture.Data.Setup.Accounts.Service,fixture.Data.Setup.Keys,fixture.Data.Budget);
         await using var inventory=new TakeoutInventoryService(state,fixture.Data.Budget);
         var scanQueued=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var scanNotifications=0;
@@ -34,7 +34,7 @@ public sealed partial class AccountServiceTests
             Assert.AreEqual(review.Target.AccountId,activity.Scope.AccountId);Assert.AreEqual(review.Target.FolderId,activity.Scope.RootFolderId);Assert.AreEqual(setup.Source,activity.Scope.SourceId);
             Assert.AreEqual(1,new DurableJobRepository(db).Summary(retained.JobId).Queued);return retained;
         },deadline.Token).ConfigureAwait(false);
-        var sourceReads=0;fixture.Data.Setup.Accounts.Readers.FolderRead=(folder,token)=>
+        var sourceReads=0;var originalFolderReader=fixture.Data.Setup.Accounts.Readers.FolderRead;fixture.Data.Setup.Accounts.Readers.FolderRead=(folder,token)=>
         {token.ThrowIfCancellationRequested();Assert.AreEqual(review.Target.FolderId,folder);return Task.FromResult(new DriveFolder(folder,"Imported photos",true,[],null));};
         fixture.Data.Setup.Accounts.Readers.SourceRead=(folder,_,cursor,token)=>
         {
@@ -50,6 +50,13 @@ public sealed partial class AccountServiceTests
         var discovered=await state.ExecuteAsync(db=>new DiscoveredCatalogRepository(db).ReadPage(),deadline.Token).ConfigureAwait(false);
         var imported=discovered.Assets.Single(value=>value.Facts.FileId=="first-original-id");Assert.AreEqual("Human renamed.jpg",imported.Facts.Name);
         Assert.AreEqual(new DriveAssetIdentity(review.Target.LibraryId).Derive(review.Target.AccountId,"first-original-id"),imported.Id);Assert.AreEqual(1,sourceReads);
+        fixture.Data.Setup.Accounts.Readers.WorkspaceAllocate=originalAllocator;
+        fixture.Data.Setup.Accounts.Readers.FolderRead=originalFolderReader;
+        ConfigureCurrentPublication(fixture.Data);InstallCurrentInventoryTransport(fixture);InstallImportedCatalogFixture(fixture);
+        var published=await current.RunUntilCurrentAsync(deadline.Token).ConfigureAwait(false);
+        var activated=current.Catalog.Selection;Assert.IsNotNull(activated);Assert.AreEqual(published.Commit,activated.Catalog);
+        var page=await current.Catalog.ReadPageAsync(activated.StageId,null,60,deadline.Token).ConfigureAwait(false);Assert.IsNotNull(page);
+        var portable=page.Page.Assets.Single(value=>value.Id==imported.Id);Assert.AreEqual("Human renamed.jpg",portable.Name);
         var replay=await imports.StartAsync(review.Id,deadline.Token).ConfigureAwait(false);Assert.AreEqual("originals-verified",replay.State);Assert.AreEqual(1,cloud.Allocations);
         await imports.ResumeAsync().ConfigureAwait(false);await imports.PauseAsync().ConfigureAwait(false);Assert.AreEqual(1,scanNotifications);
         var before=await state.ExecuteAsync(db=>new SourceDiscoveryRepository(db).ReadActivity().Jobs.Single(value=>value.JobId==scan.JobId).Scope,deadline.Token).ConfigureAwait(false);
