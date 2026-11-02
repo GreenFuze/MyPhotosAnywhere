@@ -92,13 +92,15 @@ public sealed partial class TakeoutMetadataJobRepository
         if(document.SourceSha256!=work.Sidecar.Sha256 || artifact.Bytes>TakeoutMetadataDocument.MaximumArtifactBytes ||
             artifact.RelativePath!="facts-"+work.Lease.LeaseId.ToString("N")+".json")
             throw new InvalidDataException("Metadata result substituted its captured source, output identity or budget.");
-        _jobs.Complete(work.Lease,_codec.Encode(JsonSerializer.SerializeToUtf8Bytes(new
-        {
-            format="mpa-takeout-metadata-result-1",mediaId=work.MediaId.ToString("D"),mediaInputSha256=work.MediaInputSha256,itemId=work.Lease.ItemId.ToString("D"),
-            sourceSha256=work.Sidecar.Sha256,recipeSha256=TakeoutMetadataDocument.RecipeSha256,
-            artifact=new {relativePath=artifact.RelativePath,bytes=artifact.Bytes.ToString(CultureInfo.InvariantCulture),sha256=artifact.Sha256}
-        })));
+        _jobs.Complete(work.Lease,ResultReceipt(work.MediaId,work.MediaInputSha256,work.Lease.ItemId,work.Sidecar,artifact));
     }
+    private byte[] ResultReceipt(Guid mediaId,string mediaHash,Guid itemId,ArtifactDescriptor sidecar,ArtifactDescriptor artifact)
+        =>_codec.Encode(JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            format="mpa-takeout-metadata-result-1",mediaId=mediaId.ToString("D"),mediaInputSha256=mediaHash,itemId=itemId.ToString("D"),
+            sourceSha256=sidecar.Sha256,recipeSha256=TakeoutMetadataDocument.RecipeSha256,
+            artifact=new {relativePath=artifact.RelativePath,bytes=artifact.Bytes.ToString(CultureInfo.InvariantCulture),sha256=artifact.Sha256}
+        }));
 
     internal void FailAfterJoinedWorker(TakeoutMetadataWork work,TakeoutMetadataWorkerOperation operation)
     {
@@ -118,10 +120,15 @@ public sealed partial class TakeoutMetadataJobRepository
 
     private TakeoutMetadataWork Decode(StageLease lease)
     {
-        if(lease.Stage!=Stage ||
-            !_codec.Encode(Encoding.UTF8.GetBytes(lease.CapturedItemContext)).AsSpan().SequenceEqual(Encoding.UTF8.GetBytes(lease.CapturedItemContext)))
+        if(lease.Stage!=Stage)throw new InvalidDataException("Metadata lease changed its fixed stage.");
+        var captured=DecodeCaptured(lease.JobId,lease.ItemId,lease.CapturedContext,lease.CapturedItemContext);
+        return new(_database,lease,captured.MediaId,captured.MediaHash,captured.Sidecar,captured.Imported);
+    }
+    private (Guid MediaId,string MediaHash,ArtifactDescriptor Sidecar,TakeoutImportedMetadata? Imported) DecodeCaptured(Guid jobId,Guid itemId,string jobContext,string itemContext)
+    {
+        if(!_codec.Encode(Encoding.UTF8.GetBytes(itemContext)).AsSpan().SequenceEqual(Encoding.UTF8.GetBytes(itemContext)))
             throw new InvalidDataException("Metadata lease has an unknown or changed captured contract.");
-        using var json=JsonDocument.Parse(lease.CapturedItemContext);var root=json.RootElement;
+        using var json=JsonDocument.Parse(itemContext);var root=json.RootElement;
         if(root.ValueKind!=JsonValueKind.Object || root.EnumerateObject().Count()!=7 || root.GetProperty("format").GetString()!="mpa-takeout-sidecar-input-1" ||
             root.GetProperty("recipeSha256").GetString()!=TakeoutMetadataDocument.RecipeSha256)
             throw new InvalidDataException("Metadata lease changed its fixed recipe or input schema.");
@@ -132,8 +139,8 @@ public sealed partial class TakeoutMetadataJobRepository
             throw new InvalidDataException("Metadata lease has invalid captured identities or byte bounds.");
         var descriptor=new ArtifactDescriptor(bytes,root.GetProperty("sha256").GetString()!,root.GetProperty("relativePath").GetString()!);
         if(descriptor.RelativePath!="input.bin")throw new InvalidDataException("Metadata work must use its assigned sidecar snapshot.");
-        var imported=lease.CapturedContext==Encoding.UTF8.GetString(JobContext)?null:DecodeImported(lease,mediaId,mediaHash!,descriptor);
-        return new(_database,lease,mediaId,mediaHash!,descriptor,imported);
+        var imported=jobContext==Encoding.UTF8.GetString(JobContext)?null:DecodeImported(jobId,itemId,jobContext,mediaId,mediaHash!,descriptor);
+        return(mediaId,mediaHash!,descriptor,imported);
     }
     private static bool IsHash(string? value)=>value is {Length:64} && value.All(c=>c is >='0' and <='9' or >='a' and <='f');
     private static string Hash(ReadOnlySpan<byte> bytes)=>Convert.ToHexStringLower(SHA256.HashData(bytes));

@@ -3,6 +3,8 @@ using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.Core;
 
+public sealed class TakeoutMetadataCapacityException(string message):IOException(message);
+
 /// <summary>Private, retained sidecar snapshots and generated worker attempts. This
 /// owner never accepts an original path and never deletes source or result bytes.
 /// A canceled capture resumes only after comparing its entire retained prefix.</summary>
@@ -103,6 +105,22 @@ public sealed class TakeoutMetadataStageStorage : IDisposable
         finally {Release(name);}
     }
 
+    public async Task<byte[]?> ReadCapturedSourceAsync(TakeoutMetadataWork work,CancellationToken token)
+    {
+        var name=Acquire(work);
+        try
+        {
+            token.ThrowIfCancellationRequested();var item=Path.Combine(_root,name);
+            if(!Directory.Exists(item)){if(File.Exists(item))throw new InvalidDataException("The retained metadata item directory was replaced.");return null;}
+            CheckItem(work,item);var path=Path.Combine(item,"source.bin");
+            if(!File.Exists(path)){if(Directory.Exists(path))throw new InvalidDataException("The retained sidecar file was replaced.");return null;}
+            using var reserved=_budget.Reserve(checked(work.Sidecar.Bytes+65536));reserved.RecheckBeforeWrite(reserved.Bytes);
+            await using var source=OpenRead(path);await new ArtifactVerifier(TakeoutMetadataDocument.MaximumSourceBytes).VerifyAsync(source,work.Sidecar,token).ConfigureAwait(false);
+            source.Position=0;var bytes=new byte[checked((int)work.Sidecar.Bytes)];await source.ReadExactlyAsync(bytes,token).ConfigureAwait(false);return bytes;
+        }
+        finally{Release(name);}
+    }
+
     /// <summary>Composition-root startup only, while this fresh owner holds the
     /// exclusive native stage area and before exposing any work admission. Raw
     /// snapshots, attempt evidence and immutable identities are all retained.</summary>
@@ -114,6 +132,35 @@ public sealed class TakeoutMetadataStageStorage : IDisposable
             if(!_recoveryAvailable||_users.Count!=0||_lease is null)throw new InvalidOperationException("Recover metadata only under a fresh exclusive staging owner before admission.");
             var count=new TakeoutMetadataJobRepository(_database).RecoverInterruptedMetadata();_recoveryAvailable=false;return count;
         }
+    }
+
+    public async Task<TakeoutMetadataDocument> ReadVerifiedAsync(TakeoutVerifiedMetadata completed,CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(completed);
+        if(!ReferenceEquals(completed.Owner,_database))throw new InvalidOperationException("Metadata result belongs to another native state owner.");
+        var name=ItemName(completed.JobId,completed.JobId);
+        lock(_gate)
+        {
+            ObjectDisposedException.ThrowIf(_closed,this);_recoveryAvailable=false;
+            if(!_users.Add(name))throw new InvalidOperationException("Join the current metadata owner before reading its retained result.");
+        }
+        try
+        {
+            token.ThrowIfCancellationRequested();using var reserved=_budget.Reserve(checked(completed.Source.Bytes+completed.Artifact.Bytes+65536));reserved.RecheckBeforeWrite(reserved.Bytes);
+            Regular(_root,true);AssertBytes(Path.Combine(_root,"owner.json"),OwnerBytes(_installation));
+            var item=Path.Combine(_root,name);Regular(item,true);AssertBytes(Path.Combine(item,"claim.json"),ItemBytes(completed.JobId,completed.JobId,completed.ItemContext,_installation));
+            var attempt=Path.Combine(item,"attempt-"+completed.LeaseId.ToString("N"));Regular(attempt,true);
+            AssertBytes(Path.Combine(attempt,"claim.json"),AttemptBytes(completed.JobId,completed.JobId,completed.ItemContext,_installation,completed.LeaseId,completed.Attempt));
+            await using var source=OpenRead(Path.Combine(item,"source.bin"));
+            await new ArtifactVerifier(TakeoutMetadataDocument.MaximumSourceBytes).VerifyAsync(source,completed.Source,token).ConfigureAwait(false);
+            await using var artifact=OpenRead(Path.Combine(attempt,completed.Artifact.RelativePath));
+            await new ArtifactVerifier(TakeoutMetadataDocument.MaximumArtifactBytes).VerifyAsync(artifact,completed.Artifact,token).ConfigureAwait(false);
+            artifact.Position=0;var bytes=new byte[checked((int)completed.Artifact.Bytes)];await artifact.ReadExactlyAsync(bytes,token).ConfigureAwait(false);
+            return TakeoutMetadataDocument.ReadVerifiedArtifact(bytes,completed.Source);
+        }
+        catch(Exception error)when(error is ProtocolFormatException or JsonException)
+        {throw new InvalidDataException("Retained metadata source, result or ownership evidence changed.",error);}
+        finally{Release(name);}
     }
 
     internal async Task<TakeoutMetadataAttemptStage> OpenAttemptAsync(TakeoutMetadataWork work,CancellationToken token)
@@ -134,7 +181,7 @@ public sealed class TakeoutMetadataStageStorage : IDisposable
             lock(AccountingGate)
             {
                 CheckItem(work,item);
-                if(Directory.EnumerateDirectories(item).Take(MaximumAttempts).Count()>=MaximumAttempts)throw new IOException("Retained metadata attempts reached their bounded capacity; preserve evidence before explicit cleanup.");
+                if(Directory.EnumerateDirectories(item).Take(MaximumAttempts).Count()>=MaximumAttempts)throw new TakeoutMetadataCapacityException("Retained metadata attempts reached their bounded capacity; preserve evidence before explicit cleanup.");
                 if(File.Exists(attempt)||Directory.Exists(attempt))throw new IOException("This metadata attempt already has retained bytes; do not reuse its worker directory.");
                 Directory.CreateDirectory(attempt);WriteNew(Path.Combine(attempt,"claim.json"),AttemptBytes(work,_installation));
             }
@@ -175,7 +222,7 @@ public sealed class TakeoutMetadataStageStorage : IDisposable
             Regular(_root,true);AssertBytes(Path.Combine(_root,"owner.json"),OwnerBytes(_installation));
             if(!Directory.Exists(path))
             {
-                if(Directory.EnumerateDirectories(_root).Take(MaximumItems).Count()>=MaximumItems)throw new IOException("Retained metadata inputs reached capacity; keep originals and pending evidence.");
+                if(Directory.EnumerateDirectories(_root).Take(MaximumItems).Count()>=MaximumItems)throw new TakeoutMetadataCapacityException("Retained metadata inputs reached capacity; keep originals and pending evidence.");
                 Directory.CreateDirectory(path);WriteNew(Path.Combine(path,"claim.json"),ItemBytes(work,_installation));
             }
             CheckItem(work,path);return path;

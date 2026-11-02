@@ -26,6 +26,7 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
     private ProcessorWorkGroup? _importWork;
     private ProcessorWorkGroup? _importChildrenWork;
     private TakeoutDesktopImportRuntime? _importQueue;
+    private TakeoutMetadataStageStorage? _importMetadata;
     private bool _importAdmissionClosed;
     private CatalogViewerSessions? _viewers;
     private CatalogPreparationService? _preparations;
@@ -79,13 +80,17 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
             owner._imports=await TakeoutInventoryService.CreatePausedAfterExclusiveRestartAsync(state,storage,cancellationToken).ConfigureAwait(false);
             owner._imports.Failed+=owner.OnFailure;
             await state.ExecuteAsync(database=>new TakeoutOriginalJobRepository(database).RecoverInterruptedAfterExclusiveRestart(),cancellationToken).ConfigureAwait(false);
+            owner._importMetadata=await state.ExecuteAsync(database=>new TakeoutMetadataStageStorage(database,storage),cancellationToken).ConfigureAwait(false);
+            await state.ExecuteAsync(_=>owner._importMetadata.RecoverInterruptedAfterExclusiveRestart(),cancellationToken).ConfigureAwait(false);
             owner._preparations = new(state, stateDirectory, installationId, storage);
             var setup = new LibraryWorkspaceSetup(state, owner._accounts, owner._signing, storage);
             owner._publication = new(state, owner._accounts, owner._signing, storage,
                 currentCatalog: new CurrentLibraryCatalogRuntime(state, stateDirectory, installationId, owner._accounts, owner._signing, storage));
             owner._publication.Failed += owner.OnFailure;
             await owner._publication.InitializeCurrentCatalogAsync(cancellationToken).ConfigureAwait(false);
-            owner._importQueue=new(state,storage,owner._imports,owner._publication.CurrentOperations,importFolderPicker,owner._sources.NotifySourcesChanged);
+            var importMetadata=new TakeoutImportMetadataRunner(state,storage,owner._importMetadata,work,
+                token=>TakeoutWorkerInstallation.OpenInstalledAsync(Path.Combine(AppContext.BaseDirectory,"workers","takeout-metadata"),token));
+            owner._importQueue=new(state,storage,owner._imports,owner._publication.CurrentOperations,importFolderPicker,owner._sources.NotifySourcesChanged,importMetadata);
             owner._importQueue.Failed+=owner.OnFailure;
             owner._importChildrenWork=new(owner._imports,owner._importQueue);
             owner._importWork=new(owner._sources.Work,owner._importChildrenWork);
@@ -183,6 +188,7 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
         if (!_hostClosed || !_importWorkClosed || _imports is { ExitConfirmed:false } || _importQueue is{ExitConfirmed:false} || _sources is { ExitConfirmed: false } || _viewers is { ExitConfirmed: false } || _preparations is { ExitConfirmed: false } ||
             _publication is { ExitConfirmed: false } || _native.State != ProcessorWorkState.Stopped)
             throw new InvalidOperationException("Desktop requests or processing resources have not joined; account/vault/state ownership is retained.", Failure);
+        _importMetadata?.Dispose();
         if (!_accountsClosed) { if (_accounts is not null) await _accounts.DisposeAsync().ConfigureAwait(false); _accountsClosed = true; }
         if (!_identityClosed) { if (_identity is not null) await _identity.DisposeAsync().ConfigureAwait(false); _identityClosed = true; }
         if (!_signingClosed) { if (_signing is not null) await _signing.DisposeAsync().ConfigureAwait(false); _signingClosed = true; }

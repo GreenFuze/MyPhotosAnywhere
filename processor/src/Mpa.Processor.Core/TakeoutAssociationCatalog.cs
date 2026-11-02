@@ -212,6 +212,14 @@ public sealed partial class TakeoutAssociationCatalog : IDisposable
         }
         finally {Exit();}
     }
+    public long Count(TakeoutEntryKind kind)
+    {
+        Enter();try
+        {
+            RequireSealed();if(!Enum.IsDefined(kind))throw new ArgumentException("Unknown Takeout entry kind.",nameof(kind));
+            using var query=Command("SELECT count(*) FROM entry WHERE kind=$kind",("$kind",(int)kind));return(long)query.ExecuteScalar()!;
+        }finally{Exit();}
+    }
     public TakeoutEntryPage ReadPage(TakeoutEntryKind kind,string? after=null,int limit=250,CancellationToken token=default)
     {
         Enter();try

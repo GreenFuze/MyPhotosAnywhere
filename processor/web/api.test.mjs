@@ -160,13 +160,21 @@ test('canonical preview URLs carry only captured identities and cancellation rem
   }); assert.equal(requests, 1);
 });
 const importIdentity = '22222222-2222-4222-8222-222222222222';
-const validImport = () => ({ id: importIdentity, inputName: 'Takeout photos', target: { libraryId: '33333333-3333-4333-8333-333333333333', accountId: 'account-one', accountRevision: '1', folderId: 'photos', configurationRevision: '2' }, state: 'copying', entries: '12', media: '10', verified: '3', requested: true, issue: null });
+const validImport = () => ({ id: importIdentity, inputName: 'Takeout photos', target: { libraryId: '33333333-3333-4333-8333-333333333333', accountId: 'account-one', accountRevision: '1', folderId: 'photos', configurationRevision: '2' }, state: 'copying', entries: '12', media: '10', verified: '3', requested: true, issue: null, metadata: null });
 test('import progress keeps exact decimal counts and never infers verified originals from an offset', async () => {
   await withBrowser(async () => json({ canChooseFolder: true, paused: false, imports: [validImport()] }), async api => {
     const actual = await api.imports(new AbortController().signal); assert.equal(actual.imports[0].verified, '3'); assert.equal(actual.imports[0].state, 'copying');
   });
   const bad = [ { ...validImport(), verified: '11' }, { ...validImport(), state: 'originals-verified' }, { ...validImport(), media: 10 }, { ...validImport(), verified: '03' }, { ...validImport(), id: 'not-an-identity' }, { ...validImport(), state: 'ready', issue: 'unknown' } ];
   for (const item of bad) await withBrowser(async () => json({ canChooseFolder: true, paused: false, imports: [item] }), async api => { await assert.rejects(api.imports(new AbortController().signal), /conflicting import progress/); });
+});
+test('metadata progress cannot claim unfinished sidecars complete or count them as verified originals', async () => {
+  const progress = { total: '2', ready: '1', issues: '1', waiting: '0', finished: true };
+  await withBrowser(async () => json({ canChooseFolder: true, paused: false, imports: [{ ...validImport(), metadata: progress }] }), async api => {
+    const item = (await api.imports(new AbortController().signal)).imports[0]; assert.equal(item.verified, '3'); assert.equal(item.state, 'copying'); assert.deepEqual(item.metadata, progress);
+  });
+  const bad = [{ ...progress, total: '3' }, { ...progress, ready: 1 }, { ...progress, ready: '01' }, { ...progress, waiting: '1' }, { ...progress, issues: '0' }, { ...progress, finished: 'true' }];
+  for (const metadata of bad) await withBrowser(async () => json({ canChooseFolder: true, paused: false, imports: [{ ...validImport(), metadata }] }), async api => { await assert.rejects(api.imports(new AbortController().signal), /conflicting import progress/); });
 });
 test('explicit import actions send captured identifiers and CSRF, never local paths or caller-made backup proofs', async () => {
   let calls = 0;

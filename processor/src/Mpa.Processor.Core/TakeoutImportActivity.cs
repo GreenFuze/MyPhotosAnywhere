@@ -8,7 +8,10 @@ namespace Mpa.Processor.Core;
 public sealed record TakeoutImportActivity(Guid Id,string InputName,TakeoutImportTarget Target,string State,
     [property:JsonNumberHandling(JsonNumberHandling.WriteAsString|JsonNumberHandling.AllowReadingFromString)]long? Entries,
     [property:JsonNumberHandling(JsonNumberHandling.WriteAsString|JsonNumberHandling.AllowReadingFromString)]long? Media,
-    [property:JsonNumberHandling(JsonNumberHandling.WriteAsString|JsonNumberHandling.AllowReadingFromString)]long Verified,bool Requested,string? Issue);
+    [property:JsonNumberHandling(JsonNumberHandling.WriteAsString|JsonNumberHandling.AllowReadingFromString)]long Verified,bool Requested,string? Issue)
+{
+    public TakeoutMetadataProgress? Metadata{get;init;}
+}
 
 public sealed partial class TakeoutImportInventoryRepository
 {
@@ -31,9 +34,9 @@ public sealed partial class TakeoutImportInventoryRepository
         var summary=new DurableJobRepository(_database).Summary(importId);var completed=ReadCompleted(importId);var requested=completed is not null&&RequestValue(importId) is not null;
         if(requested&&RequestValue(importId)!=RequestBody(completed!))throw new InvalidDataException("Original import request changed its exact reviewed selection.");
         var verified=new TakeoutOriginalJobRepository(_database).VerifiedCount(importId);var issue=ReadMeta(IssuePrefix+importId.ToString("D"));
-        if(issue is not null&&issue is not("input-unavailable" or "drive-unavailable" or "permission-changed"))throw new InvalidDataException("Unknown retained import issue.");
+        if(issue is not null&&issue is not("input-unavailable" or "drive-unavailable" or "permission-changed" or "metadata-capacity"))throw new InvalidDataException("Unknown retained import issue.");
         var state=summary.IsCanceled?"canceled":summary.Paused?"paused":issue is not null?"needs-attention":completed is null?"reviewing":!requested?"ready":verified==completed.Result.Media?"originals-verified":"copying";
-        return new(importId,parts.Length==1?Path.GetFileName(Path.TrimEndingDirectorySeparator(parts[0].Location)):parts.Length.ToString(CultureInfo.InvariantCulture)+" selected parts",target,state,completed?.Result.Entries,completed?.Result.Media,verified,requested,issue);
+        return new(importId,parts.Length==1?Path.GetFileName(Path.TrimEndingDirectorySeparator(parts[0].Location)):parts.Length.ToString(CultureInfo.InvariantCulture)+" selected parts",target,state,completed?.Result.Entries,completed?.Result.Media,verified,requested,issue){Metadata=completed is null?null:ReadMetadataProgress(completed)};
     }
     /// <summary>Authenticated explicit Start only. This local human request is durable
     /// before acknowledgement, but does not reserve a signature or grant provider IO.</summary>
@@ -47,7 +50,7 @@ public sealed partial class TakeoutImportInventoryRepository
     }
     public void RecordIssue(Guid importId,string issue)
     {
-        if(issue is not("input-unavailable" or "drive-unavailable" or "permission-changed"))throw new ArgumentException("Unknown operational import issue.",nameof(issue));
+        if(issue is not("input-unavailable" or "drive-unavailable" or "permission-changed" or "metadata-capacity"))throw new ArgumentException("Unknown operational import issue.",nameof(issue));
         _=Activity(importId);using var command=_database.Connection.CreateCommand();command.CommandText="INSERT INTO processor_meta(key,value) VALUES($key,$value) ON CONFLICT(key) DO UPDATE SET value=excluded.value";
         command.Parameters.AddWithValue("$key",IssuePrefix+importId.ToString("D"));command.Parameters.AddWithValue("$value",issue);command.ExecuteNonQuery();
     }

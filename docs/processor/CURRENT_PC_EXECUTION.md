@@ -32,10 +32,17 @@ across60jobs/72reports; do not rerun those passed checks on unchanged source. Th
 isolated v60worker apphost/bundle prerequisite passes native and actual Windows
 publish execution checks. The locally validated continuation now binds optional sidecars to
 verified canonical originals and runs the installed worker through a bounded native
-import runner. Native tests also cover immutable metadata restart recovery. Next
-compose that runner into the desktop import queue, expose processing/issues and
-project/publish results with human metadata precedence; it is not yet a usable
-metadata workflow. The Windows UI tool failed to initialize;
+import runner. The desktop queue now invokes it automatically after original
+verification, retains processing counts and resumes private captured sidecars after
+input removal. Grouped Pause/Exit joins the owners; metadata capacity is a per-import
+issue rather than an engine fault. The UI separates metadata processing from
+verified originals and pending catalog work. Native composition/integration,
+retained-result integrity, the unchanged1024item bound and frontend contracts pass
+local focused checks (current-takeout-metadata-desktop-validation-v89.json).
+Next finish per-item metadata issue detail/repair, imported-fact projection and
+publication with human precedence, and owned generated-cache retirement. The
+metadata workflow is not complete until those steps and actual UI/live acceptance
+pass. The Windows UI tool failed to initialize;
 keep visual acceptance unverified and continue independent work. Do not confuse
 framework-dependent worker publish evidence with self-contained installers.
 Canonical Drive asset identity stays library/account/file based. Inventory MediaId

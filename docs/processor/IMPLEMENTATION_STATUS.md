@@ -11,6 +11,31 @@ See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists
 
 ## Current PC import increment (2026-11-02; not complete PC acceptance)
 
+Desktop imports now run the installed metadata worker automatically after original
+verification and display durable processing/issue counts separately from original
+verification and pending catalog work. Completed and pending captured sidecars use
+their native retained snapshots, so removing the input sidecar does not cause a new
+upload or discard accepted work. Grouped pause waits for outstanding preparation;
+resume reuses the same captured job. Native completion reading verifies the exact
+atomic receipt, source, artifact and item/attempt ownership before reuse.
+
+The unchanged1024item metadata capacity now produces a retained per-import issue
+and leaves the engine usable. A native test fills the exact owned bound, rejects
+one further capture and preserves all retained snapshots; another verifies retry
+from private capture after capacity attention without another original upload.
+No generated cache is deleted and no bound is raised.
+
+Local evidence current-takeout-metadata-desktop-validation-v89.json freezes745files
+(741source files and4generated web assets). Focused checks pass34Core,8current
+AppServices integration/regression,1authenticated HTTP boundary and15frontend API
+cases. The native import-to-portable-catalog case remains within its original40sec
+deadline; its human filename and canonical identity assertions remain. Strict
+Desktop builds in both validation and main trees have zero warnings/errors. All
+four packaged web assets match the bundle, and the tested installed worker equals
+the validation Desktop bundle. Google responses are synthetic; actual UI/live,
+per-item issue repair, imported-fact projection/publication, cache retirement and
+complete PC/install acceptance remain unfinished.
+
 Exact4b07139 PC CI exposed three native apphost startup failures on macOS Intel
 (worker exit131); its protocol run failed and the matrix canceled19other jobs.
 The four Desktop builds passed, but the complete PC revision is not accepted.
@@ -24,7 +49,7 @@ new actual-child environment-boundary cases. Fresh Mac/PC CI must verify the fix
 no failure, warning or deadline was waived. Evidence:
 current-takeout-runtime-root-main-v81.trx and its strict build/test log in preflight.
 
-The current metadata increment has61distinct focused Core cases across the receipt,
+The preceding4b07139 metadata increment has61distinct focused Core cases across the receipt,
 association, installed operation and restart checks,12AppServices cases covering
 the actual original-to-installed-worker chain and original regressions, plus the
 strengthened import-to-portable-catalog case repeated successfully in26sec. Strict
@@ -60,15 +85,16 @@ Its14 native operation/bundle cases pass; a standalone probe executed the worker
 from the actual Windows publish output, verified raw metadata/result and physically
 joined its child. Evidence current-takeout-installed-worker-validation-v60.json.
 This is a framework-dependent development publish, not self-contained/installer
-acceptance, and it is not yet wired to import metadata scheduling or projection.
+acceptance. At that point it was not wired to desktop metadata scheduling or projection.
 A continuation now reads independently verified original receipts, binds
 conservative sidecar matches to the canonical Drive photo while retaining logical
 input provenance, and executes a bounded import metadata runner using that installed
 worker. Oversized, malformed and unmatched sidecars do not prevent original copying.
 Native checks cover first-binding retries and fresh exclusive staging recovery,
-including canceled policy and rejection after capture admission. The runner still
-needs desktop composition, visible processing/issues, metadata projection/publication
-and generated-cache retirement under the unchanged1024item stage bound. These
+including canceled policy and rejection after capture admission. Desktop composition
+and aggregate processing/issues are now wired as described above. Per-item issue
+repair, metadata projection/publication and generated-cache retirement under the
+unchanged1024item stage bound remain. These
 component checks do not establish a complete import metadata workflow.
 No package version, warning gate, test assertion or prior deadline was weakened.
 Windows visual acceptance is presently blocked by a computer-use runtime startup

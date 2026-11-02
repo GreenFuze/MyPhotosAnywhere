@@ -42,10 +42,15 @@ export function Imports({ api, back }: { api: DesktopApi; back: () => void }) {
       return <section className="setting-card" key={item.id}><h2>{item.inputName}</h2><p>{labels[item.state]}</p>
         <p>Destination: {target?.displayName ?? 'Captured Drive folder'}</p>
         {item.media !== null && <p>{BigInt(item.verified).toLocaleString()} of {BigInt(item.media).toLocaleString()} photo and video originals verified</p>}
+        {item.metadata && <div role="status"><p>{item.metadata.finished ? 'Metadata processing finished · catalog processing pending' : 'Processing imported metadata'}</p>
+          <p>{BigInt(item.metadata.ready).toLocaleString()} of {BigInt(item.metadata.total).toLocaleString()} sidecars processed</p>
+          {item.metadata.issues !== '0' && <p>{BigInt(item.metadata.issues).toLocaleString()} sidecars could not be applied or matched. Verified originals are retained.</p>}
+          {item.metadata.waiting !== '0' && <p>{BigInt(item.metadata.waiting).toLocaleString()} sidecars are waiting for their original photos to verify.</p>}
+        </div>}
         {item.state === 'ready' && <button disabled={busy || item.media === '0'} onClick={() => {
           if (window.confirm(`Import all ${item.media ?? ''} photo and video originals from ${item.inputName} into ${target?.displayName ?? 'the captured Drive folder'}? The source files will stay unchanged.`)) void act('start', item.id);
         }}>Import all originals</button>}
-        {item.state === 'needs-attention' && <><p>{item.issue === 'drive-unavailable' ? 'Google Drive is unavailable. Reconnect or wait for access to return.' : item.issue === 'input-unavailable' ? 'The selected input is unavailable. Restore access to the same folder.' : 'The captured destination or account permission changed. Review Sources and the account connection.'}</p><button disabled={busy} onClick={() => { void act('retry', item.id); }}>Retry unfinished work</button></>}
+        {item.state === 'needs-attention' && <><p>{item.issue === 'metadata-capacity' ? 'Metadata storage is full. Saved originals and unfinished metadata are retained.' : item.issue === 'drive-unavailable' ? 'Google Drive is unavailable. Reconnect or wait for access to return.' : item.issue === 'input-unavailable' ? 'The selected input is unavailable. Restore access to the same folder.' : 'The captured destination or account permission changed. Review Sources and the account connection.'}</p><button disabled={busy} onClick={() => { void act('retry', item.id); }}>Retry unfinished work</button></>}
       </section>;
     })}
   </section>;

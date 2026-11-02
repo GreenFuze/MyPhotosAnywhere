@@ -6,7 +6,7 @@ namespace Mpa.Processor.AppServices;
 /// own selection only; captured reviews/Start requests survive browser closure.
 /// Shares the existing current-library lane and borrowed inventory owner.</summary>
 public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,StorageBudgetManager budget,
-    TakeoutInventoryService inventory,CurrentLibraryCatalogRuntime current,Func<CancellationToken,Task<string?>>? picker,Action? discoveryReady=null)
+    TakeoutInventoryService inventory,CurrentLibraryCatalogRuntime current,Func<CancellationToken,Task<string?>>? picker,Action? discoveryReady=null,TakeoutImportMetadataRunner? metadata=null)
     : IProcessorWorkControl,IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state=state??throw new ArgumentNullException(nameof(state));
@@ -15,6 +15,7 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
     private readonly CurrentLibraryCatalogRuntime _current=current??throw new ArgumentNullException(nameof(current));
     private readonly Func<CancellationToken,Task<string?>>? _picker=picker;
     private readonly Action? _discoveryReady=discoveryReady;
+    private readonly TakeoutImportMetadataRunner? _metadata=metadata;
     private readonly object _gate=new();
     private readonly CancellationTokenSource _stop=new();
     private CancellationTokenSource? _runStop;
@@ -113,10 +114,19 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
                         }
                         var scheduled=await _state.ExecuteAsync(database=>new SourceDiscoveryRepository(database).EnsureImportedOriginalsScheduled(item.Id),token).ConfigureAwait(false);
                         if(scheduled.Created)_discoveryReady?.Invoke();
+                        if(_metadata is not null)
+                        {
+                            var completed=await _state.ExecuteAsync(database=>
+                            {
+                                var repository=new TakeoutImportInventoryRepository(database);
+                                return repository.Activity(item.Id).Metadata is{Finished:true}?null:repository.ReadCompleted(item.Id)??throw new InvalidDataException("The reviewed metadata input disappeared.");
+                            },token).ConfigureAwait(false);
+                            if(completed is not null)await _metadata.RunAsync(completed,token).ConfigureAwait(false);
+                        }
                     }
-                    catch(Exception error)when(error is HttpRequestException or StaleLibraryConfigurationException or StaleDriveConnectionException or UnauthorizedAccessException or FileNotFoundException or DirectoryNotFoundException)
+                    catch(Exception error)when(error is HttpRequestException or StaleLibraryConfigurationException or StaleDriveConnectionException or UnauthorizedAccessException or FileNotFoundException or DirectoryNotFoundException or TakeoutMetadataCapacityException)
                     {
-                        var issue=error is HttpRequestException?"drive-unavailable":error is FileNotFoundException or DirectoryNotFoundException?"input-unavailable":"permission-changed";
+                        var issue=error is TakeoutMetadataCapacityException?"metadata-capacity":error is HttpRequestException?"drive-unavailable":error is FileNotFoundException or DirectoryNotFoundException?"input-unavailable":"permission-changed";
                         await _state.ExecuteAsync(database=>{new TakeoutImportInventoryRepository(database).RecordIssue(item.Id,issue);return true;},CancellationToken.None).ConfigureAwait(false);
                     }
                 }

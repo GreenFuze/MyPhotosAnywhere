@@ -27,35 +27,66 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
         {
             using var catalog=await TakeoutAssociationCatalog.OpenCompletedAsync(completed,_budget,token).ConfigureAwait(false);
             long analyzed=0,retained=0,unsupported=0,unmatched=0,waiting=0;string? after=null;
+            var total=catalog.Count(TakeoutEntryKind.JsonSidecar);
+            await SaveAsync(false).ConfigureAwait(false);
             while(true)
             {
                 var page=catalog.ReadPage(TakeoutEntryKind.JsonSidecar,after,token:token);
                 foreach(var sidecar in page.Entries)
                 {
-                    token.ThrowIfCancellationRequested();
-                    if(sidecar.Bytes is <1 or >TakeoutMetadataDocument.MaximumSourceBytes){unsupported++;continue;}
-                    using var reservation=_budget.Reserve(checked(sidecar.Bytes*4+65536));reservation.RecheckBeforeWrite(reservation.Bytes);
-                    var raw=await ReadSidecarAsync(completed,catalog,sidecar,token).ConfigureAwait(false);
-                    TakeoutMetadataDocument document;
-                    try{document=TakeoutMetadataDocument.ParseSource(raw);}
-                    catch(TakeoutMetadataIssueException){unsupported++;continue;}
-                    var association=catalog.AssociateMetadata(sidecar.Key,document);
-                    if(association.Status!="matched"){unmatched++;continue;}
-                    var original=await _state.ExecuteAsync(db=>new TakeoutOriginalJobRepository(db).ReadVerified(completed.ImportId,association.Media!.Key),token).ConfigureAwait(false);
-                    if(original is null){waiting++;continue;}
-                    var descriptor=new ArtifactDescriptor(raw.Length,document.SourceSha256,"input.bin");
-                    var work=await _state.ExecuteAsync(db=>
+                    switch(await RunSidecarAsync(completed,catalog,sidecar,token).ConfigureAwait(false))
                     {
-                        var jobs=new TakeoutMetadataJobRepository(db);var id=jobs.EnsureImported(original,association,descriptor);return jobs.Claim(id);
-                    },token).ConfigureAwait(false);
-                    if(work is null){retained++;continue;}
-                    await AnalyzeAsync(work,raw,token).ConfigureAwait(false);analyzed++;
+                        case SidecarResult.Analyzed:analyzed++;break;
+                        case SidecarResult.Retained:retained++;break;
+                        case SidecarResult.Unsupported:unsupported++;break;
+                        case SidecarResult.Unmatched:unmatched++;break;
+                        case SidecarResult.Waiting:waiting++;break;
+                        default:throw new InvalidOperationException("Unknown native metadata result.");
+                    }
+                    await SaveAsync(false).ConfigureAwait(false);
                 }
                 if(!page.HasMore)break;after=page.Entries[^1].Key;
             }
-            return new(analyzed,retained,unsupported,unmatched,waiting);
+            await SaveAsync(waiting==0).ConfigureAwait(false);return new(analyzed,retained,unsupported,unmatched,waiting);
+            Task SaveAsync(bool finished)=>_state.ExecuteAsync(db=>
+            {new TakeoutImportInventoryRepository(db).RecordMetadataProgress(completed,new(total,analyzed+retained,unsupported+unmatched,waiting,finished));return true;},token);
         }
         finally{Volatile.Write(ref _running,0);}
+    }
+
+    private enum SidecarResult{Analyzed,Retained,Unsupported,Unmatched,Waiting}
+    private async Task<SidecarResult> RunSidecarAsync(TakeoutCompletedInventory completed,TakeoutAssociationCatalog catalog,TakeoutCapturedEntry sidecar,CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var previous=await _state.ExecuteAsync(db=>new TakeoutMetadataJobRepository(db).ReadCompletedImported(completed.ImportId,sidecar.Key),token).ConfigureAwait(false);
+        if(previous is not null){_=await _storage.ReadVerifiedAsync(previous,token).ConfigureAwait(false);return SidecarResult.Retained;}
+        var pending=await _state.ExecuteAsync(db=>new TakeoutMetadataJobRepository(db).ClaimImported(completed.ImportId,sidecar.Key),token).ConfigureAwait(false);
+        if(pending is not null)
+        {
+            var prepared=false;
+            try
+            {
+                if(pending.Imported!.Sidecar!=sidecar)throw new InvalidDataException("Pending metadata changed its captured sidecar entry.");
+                var captured=await _storage.ReadCapturedSourceAsync(pending,token).ConfigureAwait(false)??await ReadSidecarAsync(completed,catalog,sidecar,token).ConfigureAwait(false);
+                prepared=true;await AnalyzeAsync(pending,captured,token).ConfigureAwait(false);return SidecarResult.Analyzed;
+            }
+            finally
+            {
+                if(!prepared)await _state.ExecuteAsync(db=>{new DurableJobRepository(db).ReturnJoinedRead(pending.Lease);return true;},CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+        if(sidecar.Bytes is <1 or >TakeoutMetadataDocument.MaximumSourceBytes)return SidecarResult.Unsupported;
+        using var reservation=_budget.Reserve(checked(sidecar.Bytes*4+65536));reservation.RecheckBeforeWrite(reservation.Bytes);
+        var raw=await ReadSidecarAsync(completed,catalog,sidecar,token).ConfigureAwait(false);TakeoutMetadataDocument document;
+        try{document=TakeoutMetadataDocument.ParseSource(raw);}catch(TakeoutMetadataIssueException){return SidecarResult.Unsupported;}
+        var association=catalog.AssociateMetadata(sidecar.Key,document);if(association.Status!="matched")return SidecarResult.Unmatched;
+        var original=await _state.ExecuteAsync(db=>new TakeoutOriginalJobRepository(db).ReadVerified(completed.ImportId,association.Media!.Key),token).ConfigureAwait(false);
+        if(original is null)return SidecarResult.Waiting;
+        var descriptor=new ArtifactDescriptor(raw.Length,document.SourceSha256,"input.bin");
+        var work=await _state.ExecuteAsync(db=>
+        {var jobs=new TakeoutMetadataJobRepository(db);return jobs.Claim(jobs.EnsureImported(original,association,descriptor));},token).ConfigureAwait(false);
+        if(work is null)throw new ProcessorWorkStateConflictException();
+        await AnalyzeAsync(work,raw,token).ConfigureAwait(false);return SidecarResult.Analyzed;
     }
 
     private static async Task<byte[]> ReadSidecarAsync(TakeoutCompletedInventory completed,TakeoutAssociationCatalog catalog,TakeoutCapturedEntry entry,CancellationToken token)

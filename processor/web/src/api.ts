@@ -34,7 +34,8 @@ export interface SourceJob {
 export interface ActivityPage { jobs: SourceJob[]; nextCursor: string | null }
 
 export class AuthenticationRequired extends Error {}
-export interface PhotoImport { id: string; inputName: string; target: { libraryId: string; accountId: string; accountRevision: string; folderId: string; configurationRevision: string }; state: 'reviewing' | 'ready' | 'copying' | 'originals-verified' | 'needs-attention' | 'paused' | 'canceled'; entries: string | null; media: string | null; verified: string; requested: boolean; issue: string | null }
+export interface ImportMetadataProgress { total: string; ready: string; issues: string; waiting: string; finished: boolean }
+export interface PhotoImport { id: string; inputName: string; target: { libraryId: string; accountId: string; accountRevision: string; folderId: string; configurationRevision: string }; state: 'reviewing' | 'ready' | 'copying' | 'originals-verified' | 'needs-attention' | 'paused' | 'canceled'; entries: string | null; media: string | null; verified: string; requested: boolean; issue: string | null; metadata: ImportMetadataProgress | null }
 export interface PhotoImports { canChooseFolder: boolean; paused: boolean; imports: PhotoImport[] }
 export interface LibraryPublication {
   stage: 'NeedsApproval' | 'Running' | 'PoliciesPublished' | 'NeedsAttention' | 'Stopping' | 'Stopped';
@@ -232,12 +233,21 @@ export class DesktopApi {
       !('state' in value) || !['reviewing', 'ready', 'copying', 'originals-verified', 'needs-attention', 'paused', 'canceled'].includes(String(value.state)) ||
       !('target' in value) || typeof value.target !== 'object' || value.target === null || !('libraryId' in value.target) || !libraryIdentity(value.target.libraryId) ||
       !('accountId' in value.target) || !libraryAccount(value.target.accountId) || !('folderId' in value.target) || !libraryAccount(value.target.folderId) || value.target.folderId === 'root' ||
-      !('accountRevision' in value.target) || !('configurationRevision' in value.target) || !('entries' in value) || !('media' in value) || !('verified' in value) || !('requested' in value) || typeof value.requested !== 'boolean' || !('issue' in value) || value.issue !== null && !['input-unavailable', 'drive-unavailable', 'permission-changed'].includes(String(value.issue))) throw invalid();
+      !('accountRevision' in value.target) || !('configurationRevision' in value.target) || !('entries' in value) || !('media' in value) || !('verified' in value) || !('requested' in value) || typeof value.requested !== 'boolean' || !('issue' in value) || value.issue !== null && !['input-unavailable', 'drive-unavailable', 'permission-changed', 'metadata-capacity'].includes(String(value.issue))) throw invalid();
     const decimal = (x: unknown): x is string => typeof x === 'string' && /^(0|[1-9][0-9]{0,18})$/.test(x) && BigInt(x) <= 9223372036854775807n;
     if (!decimal(value.target.accountRevision) || value.target.accountRevision === '0' || !decimal(value.target.configurationRevision) || value.target.configurationRevision === '0' ||
       !decimal(value.verified) || value.entries !== null && !decimal(value.entries) || value.media !== null && !decimal(value.media) ||
       value.media !== null && BigInt(value.verified) > BigInt(value.media as string) || value.entries !== null && value.media !== null && BigInt(value.media as string) > BigInt(value.entries as string) ||
       value.state === 'originals-verified' && (!value.requested || value.media === null || value.verified !== value.media)) throw invalid();
+    if (!('metadata' in value)) throw invalid();
+    if (value.metadata !== null) {
+      const metadata = value.metadata;
+      if (typeof metadata !== 'object' || metadata === null || !('total' in metadata) || !decimal(metadata.total) || !('ready' in metadata) || !decimal(metadata.ready) ||
+        !('issues' in metadata) || !decimal(metadata.issues) || !('waiting' in metadata) || !decimal(metadata.waiting) || !('finished' in metadata) || typeof metadata.finished !== 'boolean' ||
+        value.entries === null || value.media === null || BigInt(metadata.total) > BigInt(value.entries as string) - BigInt(value.media as string) ||
+        BigInt(metadata.ready) + BigInt(metadata.issues) + BigInt(metadata.waiting) > BigInt(metadata.total) ||
+        metadata.finished && (metadata.waiting !== '0' || BigInt(metadata.ready) + BigInt(metadata.issues) !== BigInt(metadata.total))) throw invalid();
+    }
     return value as unknown as PhotoImport;
   }
   async addSource(accountId: string, folderId: string, includeDescendants: boolean, expectedRevision: number): Promise<Sources> {

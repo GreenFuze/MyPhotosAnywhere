@@ -153,12 +153,13 @@ public sealed partial class AccountServiceTests
     }
 
     private sealed record NativeTakeoutSelection(TakeoutCompletedInventory Completed,string Path,byte[] Payload);
-    private static async Task<NativeTakeoutSelection> NativeTakeoutSelectionAsync(CurrentReaderFixture fixture,CancellationToken token,bool? invalid=null)
+    private static async Task<NativeTakeoutSelection> NativeTakeoutSelectionAsync(CurrentReaderFixture fixture,CancellationToken token,bool? invalid=null,bool metadata=false)
     {
         var state=fixture.Data.Setup.Accounts.State;
         var selection=await state.ExecuteAsync(db=>new{db.StateDirectory,Pin=new LibraryAuthorityRepository(db).Controller()!,Sources=new LibrarySourceRepository(db).Snapshot(),Account=new DriveAccountRepository(db).Accounts().Single()},token).ConfigureAwait(false);
         var folder=Path.Combine(selection.StateDirectory,"takeout-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(folder);var path=Path.Combine(folder,"a.jpg");
         var payload=System.Security.Cryptography.RandomNumberGenerator.GetBytes(1024*1024+19);await File.WriteAllBytesAsync(path,payload,token).ConfigureAwait(false);
+        if(metadata)await File.WriteAllTextAsync(path+".json","{\"title\":\"a.jpg\",\"description\":\"Imported detail\",\"photoTakenTime\":{\"timestamp\":\"1\"}}",token).ConfigureAwait(false);
         var id=Guid.NewGuid();using(var source=TakeoutSelectedInput.OpenFolder(Guid.NewGuid(),folder))
         {
             var target=new TakeoutImportTarget(selection.Pin.LibraryId,selection.Account.PermissionId,selection.Account.Revision,invalid==false?"not-approved":"photos",invalid==true?selection.Sources.Revision-1:selection.Sources.Revision);

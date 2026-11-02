@@ -16,6 +16,14 @@ public sealed class TakeoutImportedMetadata
 
 public sealed partial class TakeoutMetadataJobRepository
 {
+    public TakeoutMetadataWork? ClaimImported(Guid importId,string sidecarKey)
+    {
+        if(importId==Guid.Empty||!IsHash(sidecarKey))throw new ArgumentException("An exact captured sidecar identity is required.");
+        var work=Claim(ImportedJobId(importId,sidecarKey));
+        if(work is not null&&(work.Imported is null||work.Imported.Original.Capture.Inventory.ImportId!=importId||work.Imported.Sidecar.Key!=sidecarKey))
+            throw new InvalidDataException("Claimed metadata changed its first imported provenance.");
+        return work;
+    }
     /// <summary>One optional analysis per exact indexed sidecar and verified copy.
     /// Canonical photo identity and logical input provenance remain separate.
     /// This local admission is not current provider/publication permission.</summary>
@@ -44,11 +52,11 @@ public sealed partial class TakeoutMetadataJobRepository
         sidecar=new{key=sidecar.Key,partId=sidecar.PartId.ToString("D"),relativePath=sidecar.RelativePath,bytes=sidecar.Bytes.ToString(CultureInfo.InvariantCulture),
             ordinal=sidecar.Ordinal,sourceStamp=sidecar.SourceStamp.ToString(CultureInfo.InvariantCulture),mediaId=sidecar.MediaId.ToString("D")}
     }));
-    private TakeoutImportedMetadata DecodeImported(StageLease lease,Guid mediaId,string mediaHash,ArtifactDescriptor descriptor)
+    private TakeoutImportedMetadata DecodeImported(Guid jobId,Guid itemId,string jobContext,Guid mediaId,string mediaHash,ArtifactDescriptor descriptor)
     {
         try
         {
-            using var document=JsonDocument.Parse(lease.CapturedContext);var root=document.RootElement;
+            using var document=JsonDocument.Parse(jobContext);var root=document.RootElement;
             if(root.GetProperty("format").GetString()!="mpa-takeout-import-metadata-job-1")throw new InvalidDataException("Unknown captured metadata job contract.");
             var import=root.GetProperty("importId").GetGuid();var entry=root.GetProperty("originalEntryKey").GetString()!;
             var original=new TakeoutOriginalJobRepository(_database).ReadVerified(import,entry)??throw new InvalidDataException("Imported metadata lost its verified copy receipt.");
@@ -56,8 +64,8 @@ public sealed partial class TakeoutMetadataJobRepository
                 ImportedDecimal(value,"bytes"),TakeoutEntryKind.JsonSidecar,value.GetProperty("ordinal").GetInt32(),ImportedDecimal(value,"sourceStamp"),value.GetProperty("mediaId").GetGuid());
             _=TakeoutSelectedInput.LogicalPath(sidecar.RelativePath);
             if(sidecar.Ordinal<0||sidecar.Bytes!=descriptor.Bytes||sidecar.Kind!=TakeoutEntryKind.JsonSidecar||original.Capture.Inventory.Parts.All(part=>part.PartId!=sidecar.PartId)||
-                lease.JobId!=ImportedJobId(import,sidecar.Key)||lease.ItemId!=lease.JobId||mediaId!=original.AssetId||mediaHash!=original.Capture.Sha256||
-                !ImportedContext(original,sidecar).AsSpan().SequenceEqual(Encoding.UTF8.GetBytes(lease.CapturedContext)))
+                jobId!=ImportedJobId(import,sidecar.Key)||itemId!=jobId||mediaId!=original.AssetId||mediaHash!=original.Capture.Sha256||
+                !ImportedContext(original,sidecar).AsSpan().SequenceEqual(Encoding.UTF8.GetBytes(jobContext)))
                 throw new InvalidDataException("Imported metadata changed its original, sidecar, provenance or canonical identity.");
             return new(original,sidecar);
         }

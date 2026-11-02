@@ -33,6 +33,47 @@ public sealed partial class TakeoutMetadataOperationTests
         await fixture.State.ExecuteAsync(db=>
         {var jobs=new DurableJobRepository(db);Assert.AreEqual(1,jobs.Summary(fixture.Original.JobId).Ready);Assert.AreEqual(0,jobs.Summary(fixture.Original.JobId).Queued);Assert.IsNull(new TakeoutMetadataJobRepository(db).Claim(job));return true;},fixture.Token).ConfigureAwait(false);
         Assert.AreEqual(0L,new FileInfo(operation.Launch.NewDiagnosticPath).Length);Assert.AreEqual(0L,fixture.Budget.Status().ReservedBytes);
+        var completed=await fixture.State.ExecuteAsync(db=>new TakeoutMetadataJobRepository(db).ReadCompletedImported(fixture.Completed.ImportId,fixture.Sidecar.Key),fixture.Token).ConfigureAwait(false);
+        Assert.IsNotNull(completed);Assert.AreEqual(fixture.Original.AssetId,completed.Imported.Original.AssetId);
+        File.Delete(Path.Combine(fixture.Completed.Parts.Single().Location,"a.jpg.json"));
+        CollectionAssert.AreEqual(fixture.Raw,(await fixture.Storage.ReadVerifiedAsync(completed,fixture.Token).ConfigureAwait(false)).CopyRawSource());
+        await fixture.State.ExecuteAsync(db=>{new DurableJobRepository(db).MarkReceiptPublished(receipt.Id);Assert.IsNotNull(new TakeoutMetadataJobRepository(db).ReadCompletedImported(fixture.Completed.ImportId,fixture.Sidecar.Key));return true;},fixture.Token).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [DataRow("artifact")]
+    [DataRow("source")]
+    [DataRow("marker")]
+    [DataRow("receipt")]
+    [DataRow("outbox")]
+    public async Task HistoricalMetadataReaderRejectsChangedRetainedEvidenceWithoutRequeueingOriginals(string change)
+    {
+        await using var fixture=await ImportedFixture.CreateAsync().ConfigureAwait(false);
+        var association=fixture.Catalog.AssociateMetadata(fixture.Sidecar.Key,fixture.Document);
+        var work=await fixture.State.ExecuteAsync(db=>{var jobs=new TakeoutMetadataJobRepository(db);var id=jobs.EnsureImported(fixture.Original,association,fixture.Descriptor);Assert.IsNull(jobs.ReadCompletedImported(fixture.Completed.ImportId,fixture.Sidecar.Key));return jobs.Claim(id)!;},fixture.Token).ConfigureAwait(false);
+        using(var source=new MemoryStream(fixture.Raw,false))await fixture.Storage.CaptureAsync(work,source,fixture.Token).ConfigureAwait(false);
+        var installed=await TakeoutWorkerInstallation.OpenInstalledAsync(await CopyInstalledBundleAsync(fixture.Root.Path,fixture.Token).ConfigureAwait(false),fixture.Token).ConfigureAwait(false);
+        await using var supervisor=new ProcessorWorkSupervisor();await supervisor.Start(await TakeoutMetadataWorkerOperation.CreateAsync(fixture.State,work,fixture.Storage,installed,fixture.Token).ConfigureAwait(false),fixture.Token).ConfigureAwait(false);
+        var completed=(await fixture.State.ExecuteAsync(db=>new TakeoutMetadataJobRepository(db).ReadCompletedImported(fixture.Completed.ImportId,fixture.Sidecar.Key),fixture.Token).ConfigureAwait(false))!;
+        if(change is "receipt" or "outbox")
+        {
+            await fixture.State.ExecuteAsync(db=>
+            {
+                using var command=db.Connection.CreateCommand();
+                command.CommandText=change=="outbox"?"DELETE FROM state_outbox WHERE job_id=$id":"UPDATE item_stage SET result_receipt=json_set(result_receipt,'$.sourceSha256',$hash) WHERE job_id=$id";
+                command.Parameters.AddWithValue("$id",work.Lease.JobId.ToString("D"));if(change=="receipt")command.Parameters.AddWithValue("$hash",new string('b',64));command.ExecuteNonQuery();
+                Assert.ThrowsExactly<InvalidDataException>(()=>new TakeoutMetadataJobRepository(db).ReadCompletedImported(fixture.Completed.ImportId,fixture.Sidecar.Key));return true;
+            },fixture.Token).ConfigureAwait(false);
+        }
+        else
+        {
+            var path=change=="artifact"?ResultPath(fixture.StateDirectory,work):change=="source"?SourcePath(fixture.StateDirectory,work):Path.Combine(Path.GetDirectoryName(ResultPath(fixture.StateDirectory,work))!,"claim.json");
+            var bytes=await File.ReadAllBytesAsync(path,fixture.Token).ConfigureAwait(false);var changed=bytes.ToArray();changed[0]^=1;await File.WriteAllBytesAsync(path,changed,fixture.Token).ConfigureAwait(false);
+            await Assert.ThrowsExactlyAsync<InvalidDataException>(()=>fixture.Storage.ReadVerifiedAsync(completed,fixture.Token)).ConfigureAwait(false);
+            await File.WriteAllBytesAsync(path,bytes,fixture.Token).ConfigureAwait(false);
+        }
+        await fixture.State.ExecuteAsync(db=>{Assert.AreEqual(1,new DurableJobRepository(db).Summary(fixture.Original.JobId).Ready);Assert.IsNull(new TakeoutMetadataJobRepository(db).Claim(work.Lease.JobId));return true;},fixture.Token).ConfigureAwait(false);
+        Assert.AreEqual(0L,fixture.Budget.Status().ReservedBytes);
     }
 
     [TestMethod]
@@ -93,6 +134,63 @@ public sealed partial class TakeoutMetadataOperationTests
         Assert.ThrowsExactly<InvalidOperationException>(()=>fixture.Storage.RecoverInterruptedAfterExclusiveRestart());
         await fixture.State.ExecuteAsync(db=>{var jobs=new TakeoutMetadataJobRepository(db);jobs.AssertCurrent(work);jobs.ReturnJoinedOperation(work);return true;},fixture.Token).ConfigureAwait(false);
         CollectionAssert.AreEqual(fixture.Raw,await File.ReadAllBytesAsync(SourcePath(fixture.StateDirectory,work),fixture.Token).ConfigureAwait(false));
+    }
+
+    [TestMethod]
+    public async Task MetadataDisplayProgressRejectsImpossibleCountsAndNeverCreatesWorkerOrPublicationReceipts()
+    {
+        await using var fixture=await ImportedFixture.CreateAsync().ConfigureAwait(false);
+        await fixture.State.ExecuteAsync(db=>
+        {
+            var repository=new TakeoutImportInventoryRepository(db);var originalReceipts=new DurableJobRepository(db).PendingReceiptCount();
+            Assert.ThrowsExactly<InvalidDataException>(()=>repository.RecordMetadataProgress(fixture.Completed,new(2,0,0,0,false)));
+            Assert.ThrowsExactly<InvalidDataException>(()=>repository.RecordMetadataProgress(fixture.Completed,new(1,1,1,0,false)));
+            Assert.ThrowsExactly<InvalidDataException>(()=>repository.RecordMetadataProgress(fixture.Completed,new(1,0,0,1,true)));
+            Assert.ThrowsExactly<InvalidDataException>(()=>repository.RecordMetadataProgress(fixture.Completed,new(1,0,0,0,true)));
+            Assert.IsNull(repository.Activity(fixture.Completed.ImportId).Metadata);
+            repository.RecordMetadataProgress(fixture.Completed,new(1,1,0,0,true));Assert.AreEqual(new TakeoutMetadataProgress(1,1,0,0,true),repository.Activity(fixture.Completed.ImportId).Metadata);
+            Assert.IsNull(new TakeoutMetadataJobRepository(db).ReadCompletedImported(fixture.Completed.ImportId,fixture.Sidecar.Key));
+            Assert.AreEqual(originalReceipts,new DurableJobRepository(db).PendingReceiptCount());return true;
+        },fixture.Token).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    public async Task MetadataDisplayProgressRetainsItsFirstInventoryBindingAndRejectsAlteredLocalPayload()
+    {
+        await using var fixture=await ImportedFixture.CreateAsync().ConfigureAwait(false);
+        await fixture.State.ExecuteAsync(db=>
+        {
+            var repository=new TakeoutImportInventoryRepository(db);repository.RecordMetadataProgress(fixture.Completed,new(1,0,0,1,false));
+            Assert.ThrowsExactly<InvalidDataException>(()=>repository.RecordMetadataProgress(fixture.Completed,new(0,0,0,0,true)));
+            using var update=db.Connection.CreateCommand();update.CommandText="UPDATE processor_meta SET value=json_set(value,'$.indexSha256',$hash) WHERE key=$key";
+            update.Parameters.AddWithValue("$key","takeout-metadata-progress-v1:"+fixture.Completed.ImportId.ToString("D"));update.Parameters.AddWithValue("$hash",new string('b',64));Assert.AreEqual(1,update.ExecuteNonQuery());
+            Assert.ThrowsExactly<InvalidDataException>(()=>repository.Activity(fixture.Completed.ImportId));Assert.AreEqual(1,new DurableJobRepository(db).Summary(fixture.Original.JobId).Ready);return true;
+        },fixture.Token).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    public async Task MetadataStagingKeepsItsExactItemBoundAndPreservesEveryRetainedSnapshotWhenFull()
+    {
+        await using var fixture=await ImportedFixture.CreateAsync().ConfigureAwait(false);
+        var association=fixture.Catalog.AssociateMetadata(fixture.Sidecar.Key,fixture.Document);
+        var first=await fixture.State.ExecuteAsync(db=>{var jobs=new TakeoutMetadataJobRepository(db);return jobs.Claim(jobs.EnsureImported(fixture.Original,association,fixture.Descriptor))!;},fixture.Token).ConfigureAwait(false);
+        using(var source=new MemoryStream(fixture.Raw,false))await fixture.Storage.CaptureAsync(first,source,fixture.Token).ConfigureAwait(false);
+        var item=Path.GetDirectoryName(SourcePath(fixture.StateDirectory,first))!;var area=Path.GetDirectoryName(item)!;
+        var marker=await File.ReadAllBytesAsync(Path.Combine(item,"claim.json"),fixture.Token).ConfigureAwait(false);
+        // Retained private-item fixtures use the exact native ownership format.
+        // These local markers are not worker receipts or original/provider grants.
+        for(var ordinal=1;ordinal<1024;ordinal++)
+        {
+            var id=Guid.NewGuid();var retained=Path.Combine(area,"item-"+id.ToString("N")+"-"+id.ToString("N"));Directory.CreateDirectory(retained);
+            var claim=System.Text.Json.Nodes.JsonNode.Parse(marker)!;claim["jobId"]=id.ToString("D");claim["itemId"]=id.ToString("D");
+            await File.WriteAllBytesAsync(Path.Combine(retained,"claim.json"),JsonSerializer.SerializeToUtf8Bytes(claim),fixture.Token).ConfigureAwait(false);
+            await File.WriteAllBytesAsync(Path.Combine(retained,"source.bin"),fixture.Raw,fixture.Token).ConfigureAwait(false);
+        }
+        var next=await fixture.State.ExecuteAsync(db=>{var jobs=new TakeoutMetadataJobRepository(db);var id=Guid.NewGuid();jobs.Ensure(id,id,fixture.Original.AssetId,fixture.Original.Capture.Sha256,fixture.Descriptor);return jobs.Claim(id)!;},fixture.Token).ConfigureAwait(false);
+        using(var source=new MemoryStream(fixture.Raw,false))await Assert.ThrowsExactlyAsync<TakeoutMetadataCapacityException>(()=>fixture.Storage.CaptureAsync(next,source,fixture.Token)).ConfigureAwait(false);
+        Assert.AreEqual(1024,Directory.GetDirectories(area).Length);CollectionAssert.AreEqual(fixture.Raw,await File.ReadAllBytesAsync(SourcePath(fixture.StateDirectory,first),fixture.Token).ConfigureAwait(false));
+        await fixture.State.ExecuteAsync(db=>{var jobs=new TakeoutMetadataJobRepository(db);jobs.ReturnJoinedOperation(first);jobs.ReturnJoinedOperation(next);Assert.AreEqual(1,new DurableJobRepository(db).Summary(fixture.Original.JobId).Ready);Assert.AreEqual(0,new DurableJobRepository(db).Summary(next.Lease.JobId).Ready);return true;},fixture.Token).ConfigureAwait(false);
+        Assert.AreEqual(0L,fixture.Budget.Status().ReservedBytes);
     }
 
     private sealed class ImportedFixture: IAsyncDisposable

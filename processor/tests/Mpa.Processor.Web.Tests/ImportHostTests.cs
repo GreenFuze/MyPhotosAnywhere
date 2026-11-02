@@ -12,6 +12,7 @@ public sealed partial class WebHostTests
     public async Task ImportRoutesRequireHostSessionCsrfAndExactCapturedIdentitiesBeforeNativeAdmission()
     {
         using var assets=new Assets();var engine=new Engine();
+        engine.Import=engine.Import with{Entries=2,Metadata=new(1,0,0,1,false)};
         await using var host=await DesktopWebHost.StartAsync(engine,assets.Path,null,CancellationToken.None).ConfigureAwait(false);
         using var http=Client(host.LocalEndpoint);var diagnostics=new List<Exception>();host.Diagnostic+=diagnostics.Add;
         using(var anonymous=await http.GetAsync("api/imports").ConfigureAwait(false))Assert.AreEqual(HttpStatusCode.Unauthorized,anonymous.StatusCode);
@@ -23,13 +24,15 @@ public sealed partial class WebHostTests
             Assert.IsTrue(body.GetProperty("canChooseFolder").GetBoolean());var item=body.GetProperty("imports")[0];
             Assert.AreEqual("0",item.GetProperty("verified").GetString());Assert.AreEqual("1",item.GetProperty("media").GetString());
             Assert.AreEqual("photos",item.GetProperty("inputName").GetString());Assert.IsFalse(item.GetProperty("requested").GetBoolean());
+            var metadata=item.GetProperty("metadata");Assert.AreEqual("1",metadata.GetProperty("total").GetString());Assert.AreEqual("0",metadata.GetProperty("ready").GetString());
+            Assert.AreEqual("1",metadata.GetProperty("waiting").GetString());Assert.IsFalse(metadata.GetProperty("finished").GetBoolean());
         }
         foreach(var route in new[]{"api/import-folders","api/import-start","api/import-retry"})
         {
             using var forged=await SourceMutationAsync(http,host.LocalEndpoint,HttpMethod.Post,new{id=engine.Import.Id},null,route).ConfigureAwait(false);
             Assert.AreEqual(HttpStatusCode.Unauthorized,forged.StatusCode);
         }
-        foreach(var body in new object[]{new{id=Guid.Empty},new{id=Guid.NewGuid()},new{id=engine.Import.Id,path=@"C:\untrusted"},new{id=engine.Import.Id,verified=true}})
+        foreach(var body in new object[]{new{id=Guid.Empty},new{id=Guid.NewGuid()},new{id=engine.Import.Id,path=@"C:\untrusted"},new{id=engine.Import.Id,verified=true},new{id=engine.Import.Id,metadata=new{ready="1",finished=true}}})
         {
             using var invalid=await SourceMutationAsync(http,host.LocalEndpoint,HttpMethod.Post,body,csrf,"api/import-start").ConfigureAwait(false);
             Assert.AreEqual(HttpStatusCode.BadRequest,invalid.StatusCode);
@@ -37,7 +40,7 @@ public sealed partial class WebHostTests
         Assert.AreEqual(0,engine.ImportCommands.Count);
         engine.Import=engine.Import with{State="reviewing",Entries=null,Media=null};
         using(var pending=await SourceMutationAsync(http,host.LocalEndpoint,HttpMethod.Post,new{id=engine.Import.Id},csrf,"api/import-start").ConfigureAwait(false))Assert.AreEqual(HttpStatusCode.Conflict,pending.StatusCode);
-        Assert.AreEqual(0,engine.ImportCommands.Count);engine.Import=engine.Import with{State="ready",Entries=1,Media=1};
+        Assert.AreEqual(0,engine.ImportCommands.Count);engine.Import=engine.Import with{State="ready",Entries=1,Media=1,Metadata=null};
         var destination=Guid.NewGuid();
         using(var picked=await SourceMutationAsync(http,host.LocalEndpoint,HttpMethod.Post,new{id=destination},csrf,"api/import-folders").ConfigureAwait(false))
         {picked.EnsureSuccessStatusCode();Assert.AreEqual(JsonValueKind.Null,(await picked.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("import").ValueKind);}

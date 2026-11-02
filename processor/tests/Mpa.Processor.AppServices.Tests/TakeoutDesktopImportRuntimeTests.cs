@@ -12,13 +12,17 @@ public sealed partial class AccountServiceTests
     public async Task DesktopFolderImportReviewsActualInputBeforeExplicitStartAndBrowserCancellationDoesNotOwnTheCopy()
     {
         using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(40));await using var fixture=await CurrentReaderFixture.CreateAsync(addSource:true).ConfigureAwait(false);
-        var selection=await NativeTakeoutSelectionAsync(fixture,deadline.Token).ConfigureAwait(false);var state=fixture.Data.Setup.Accounts.State;
+        var selection=await NativeTakeoutSelectionAsync(fixture,deadline.Token,metadata:true).ConfigureAwait(false);var state=fixture.Data.Setup.Accounts.State;
         var setup=await state.ExecuteAsync(db=>new{db.StateDirectory,db.InstallationId,Source=new LibrarySourceRepository(db).Snapshot().Sources.Single().Id},deadline.Token).ConfigureAwait(false);
         var originalAllocator=fixture.Data.Setup.Accounts.Readers.WorkspaceAllocate;var cloud=new OriginalCloud(selection.Payload);WireOriginal(fixture.Data.Setup.Accounts,cloud);
         await using var current=new CurrentLibraryCatalogRuntime(state,setup.StateDirectory,setup.InstallationId,fixture.Data.Setup.Accounts.Service,fixture.Data.Setup.Keys,fixture.Data.Budget);
         await using var inventory=new TakeoutInventoryService(state,fixture.Data.Budget);
+        using var metadataStorage=await state.ExecuteAsync(db=>new TakeoutMetadataStageStorage(db,fixture.Data.Budget),deadline.Token).ConfigureAwait(false);
+        await using var native=new ProcessorWorkSupervisor();var metadataLaunches=0;
+        var metadata=new TakeoutImportMetadataRunner(state,fixture.Data.Budget,metadataStorage,native,token=>
+        {metadataLaunches++;return TakeoutWorkerInstallation.OpenInstalledAsync(Path.Combine(AppContext.BaseDirectory,"workers","takeout-metadata"),token);});
         var scanQueued=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var scanNotifications=0;
-        await using var imports=new TakeoutDesktopImportRuntime(state,fixture.Data.Budget,inventory,current,_=>Task.FromResult<string?>(Path.GetDirectoryName(selection.Path)),()=>{Interlocked.Increment(ref scanNotifications);scanQueued.TrySetResult();});
+        await using var imports=new TakeoutDesktopImportRuntime(state,fixture.Data.Budget,inventory,current,_=>Task.FromResult<string?>(Path.GetDirectoryName(selection.Path)),()=>{Interlocked.Increment(ref scanNotifications);scanQueued.TrySetResult();},metadata);
         await imports.ResumeAsync().ConfigureAwait(false);var review=await imports.ChooseFolderAsync(setup.Source,deadline.Token).ConfigureAwait(false);Assert.IsNotNull(review);
         var ready=await WaitImportAsync(imports,review.Id,"ready",deadline.Token).ConfigureAwait(false);Assert.AreEqual(1L,ready.Media);Assert.IsFalse(ready.Requested);Assert.AreEqual(0,cloud.Allocations);
         Assert.IsFalse(ready.InputName.Contains(Path.DirectorySeparatorChar));
@@ -26,7 +30,9 @@ public sealed partial class AccountServiceTests
         using var browser=new CancellationTokenSource();var admitted=await imports.StartAsync(review.Id,browser.Token).ConfigureAwait(false);Assert.IsTrue(admitted.Requested);await browser.CancelAsync().ConfigureAwait(false);
         var verified=await WaitImportAsync(imports,review.Id,"originals-verified",deadline.Token).ConfigureAwait(false);Assert.AreEqual(1L,verified.Verified);Assert.AreEqual(1,cloud.Allocations);
         CollectionAssert.AreEqual(selection.Payload,cloud.Uploaded);CollectionAssert.AreEqual(selection.Payload,await File.ReadAllBytesAsync(selection.Path,deadline.Token).ConfigureAwait(false));
-        await scanQueued.Task.WaitAsync(deadline.Token).ConfigureAwait(false);await imports.PauseAsync().ConfigureAwait(false);
+        await scanQueued.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
+        var processed=await WaitImportMetadataAsync(imports,review.Id,deadline.Token).ConfigureAwait(false);Assert.AreEqual(new TakeoutMetadataProgress(1,1,0,0,true),processed.Metadata);Assert.AreEqual(1,metadataLaunches);
+        File.Delete(selection.Path+".json");await imports.PauseAsync().ConfigureAwait(false);
         var scan=await state.ExecuteAsync(db=>
         {
             var repository=new SourceDiscoveryRepository(db);var retained=repository.EnsureImportedOriginalsScheduled(review.Id);Assert.IsFalse(retained.Created);
@@ -58,7 +64,7 @@ public sealed partial class AccountServiceTests
         var page=await current.Catalog.ReadPageAsync(activated.StageId,null,60,deadline.Token).ConfigureAwait(false);Assert.IsNotNull(page);
         var portable=page.Page.Assets.Single(value=>value.Id==imported.Id);Assert.AreEqual("Human renamed.jpg",portable.Name);
         var replay=await imports.StartAsync(review.Id,deadline.Token).ConfigureAwait(false);Assert.AreEqual("originals-verified",replay.State);Assert.AreEqual(1,cloud.Allocations);
-        await imports.ResumeAsync().ConfigureAwait(false);await imports.PauseAsync().ConfigureAwait(false);Assert.AreEqual(1,scanNotifications);
+        await imports.ResumeAsync().ConfigureAwait(false);await imports.PauseAsync().ConfigureAwait(false);Assert.AreEqual(1,scanNotifications);Assert.AreEqual(1,metadataLaunches);
         var before=await state.ExecuteAsync(db=>new SourceDiscoveryRepository(db).ReadActivity().Jobs.Single(value=>value.JobId==scan.JobId).Scope,deadline.Token).ConfigureAwait(false);
         await state.ExecuteAsync(db=>
         {
@@ -145,6 +151,15 @@ public sealed partial class AccountServiceTests
         Assert.AreEqual(review.Id,verified.Id);Assert.AreEqual(review.Target,verified.Target);Assert.AreEqual(1,cloud.Allocations);Assert.IsNull(verified.Issue);
     }
 
+    private static async Task<TakeoutImportActivity> WaitImportMetadataAsync(TakeoutDesktopImportRuntime runtime,Guid id,CancellationToken token)
+    {
+        while(true)
+        {
+            token.ThrowIfCancellationRequested();if(runtime.Failure is{}failure)throw new InvalidOperationException("The actual import metadata owner failed.",failure);
+            var item=(await runtime.ListAsync(token).ConfigureAwait(false)).Single(value=>value.Id==id);if(item.Metadata is{Finished:true})return item;
+            await Task.Delay(20,token).ConfigureAwait(false);
+        }
+    }
     private static async Task<TakeoutImportActivity> WaitImportAsync(TakeoutDesktopImportRuntime runtime,Guid id,string expected,CancellationToken token)
     {
         var elapsed=Stopwatch.StartNew();
