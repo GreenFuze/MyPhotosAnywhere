@@ -43,7 +43,7 @@ public sealed partial class TakeoutWorkerInstallation
     }
     internal WorkerLaunchSpec Launch(Guid session,string staging)=>new(_runtime,_runtimeHash,
         _appHost?["--session",session.ToString("D"),"--staging",staging]:[_assembly,"--session",session.ToString("D"),"--staging",staging],
-        System.IO.Path.GetDirectoryName(_assembly)!,System.IO.Path.Combine(staging,"diagnostics.log"));
+        System.IO.Path.GetDirectoryName(_assembly)!,System.IO.Path.Combine(staging,"diagnostics.log")){UseCurrentFrameworkRuntime=_appHost};
     private static bool Hash(string? value)=>value is {Length:64}&&value.All(c=>c is >='0' and <='9' or >='a' and <='f');
 }
 

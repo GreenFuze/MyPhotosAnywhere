@@ -8,7 +8,7 @@ using Mpa.Processor.WorkerRuntime;
 using Mpa.Processor.TestSupport;
 
 // Synthetic child-process fixture only. Never included in the product installer/plugin registry.
-if (args.Length != 2 || args[0] is not ("echo" or "ignore-eof" or "partial-frame" or "malformed" or "exit-error" or "exit-clean" or "parent-launcher" or "startup-stall" or "native-exit-gate" or "takeout-inventory-crash"))
+if (args.Length != 2 || args[0] is not ("echo" or "framework-runtime" or "ignore-eof" or "partial-frame" or "malformed" or "exit-error" or "exit-clean" or "parent-launcher" or "startup-stall" or "native-exit-gate" or "takeout-inventory-crash"))
     throw new ArgumentException("Expected a known synthetic scenario and an owned test directory.");
 var root = Path.GetFullPath(args[1]);
 if (!Directory.Exists(root) || !Path.GetFileName(root).StartsWith("MPA-Worker-Test-", StringComparison.Ordinal))
@@ -78,6 +78,8 @@ using (var started = new FileStream(Path.Combine(root, "worker-started.marker"),
 { started.WriteByte(1); started.Flush(flushToDisk: true); }
 using var output = Console.OpenStandardOutput();
 using var writer = new WorkerFrameWriter(output);
+if(args[0]=="framework-runtime")
+    await File.WriteAllTextAsync(Path.Combine(root,"framework-runtime.txt"),Environment.GetEnvironmentVariable("DOTNET_ROOT_"+System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToUpperInvariant())??"not-set").ConfigureAwait(false);
 await writer.WriteAsync("{\"type\":\"hello\"}"u8.ToArray(), CancellationToken.None).ConfigureAwait(false);
 if (args[0] == "exit-error") return 7;
 if (args[0] == "exit-clean") return 0;

@@ -11,6 +11,19 @@ See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists
 
 ## Current PC import increment (2026-11-02; not complete PC acceptance)
 
+Exact4b07139 PC CI exposed three native apphost startup failures on macOS Intel
+(worker exit131); its protocol run failed and the matrix canceled19other jobs.
+The four Desktop builds passed, but the complete PC revision is not accepted.
+The worker's isolated environment omitted the executing shared runtime location.
+A focused fix captures that location from the already loaded native .NET runtime
+and passes only its architecture-specific root when explicitly requested by the
+installed apphost adapter. It never inherits DOTNET_ROOT, searches PATH or chooses
+an SDK. Self-contained installations retain app-local discovery. Exact focused
+main-source checks pass39native worker/lifecycle/metadata cases, including two
+new actual-child environment-boundary cases. Fresh Mac/PC CI must verify the fix;
+no failure, warning or deadline was waived. Evidence:
+current-takeout-runtime-root-main-v81.trx and its strict build/test log in preflight.
+
 The current metadata increment has61distinct focused Core cases across the receipt,
 association, installed operation and restart checks,12AppServices cases covering
 the actual original-to-installed-worker chain and original regressions, plus the

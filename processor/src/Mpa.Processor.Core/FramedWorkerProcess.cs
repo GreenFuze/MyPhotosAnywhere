@@ -11,7 +11,10 @@ namespace Mpa.Processor.Core;
 
 public sealed record WorkerLaunchSpec(string ExecutablePath, string ExecutableSha256,
     IReadOnlyList<string> Arguments, string InstalledWorkingDirectory, string NewDiagnosticPath,
-    WorkerResourcePolicy? ResourcePolicy = null);
+    WorkerResourcePolicy? ResourcePolicy = null)
+{
+    public bool UseCurrentFrameworkRuntime{get;init;}
+}
 public sealed class WorkerStartCleanupException(FramedWorkerProcess retainedWorker, Exception startup, Exception cleanup)
     : AggregateException("Worker startup failed and exit/cleanup could not be confirmed. Retain ownership and investigate.", startup, cleanup)
 {
@@ -152,6 +155,7 @@ public sealed class FramedWorkerProcess : IAsyncDisposable
             foreach (var name in new[] { "SystemRoot", "WINDIR", "TEMP", "TMP", "HOME", "USERPROFILE" })
                 if (Environment.GetEnvironmentVariable(name) is { } value) start.Environment[name] = value;
             start.Environment["PATH"] = OperatingSystem.IsWindows() ? Environment.SystemDirectory : "/usr/bin:/bin";
+            if(spec.UseCurrentFrameworkRuntime)CurrentFrameworkRuntime.Capture()?.ApplyTo(start);
             start.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
             start.Environment["OMP_THREAD_LIMIT"] = "2";
             start.Environment["MPA_PARENT_PORT"] = parent.Configuration.Port.ToString(CultureInfo.InvariantCulture);
