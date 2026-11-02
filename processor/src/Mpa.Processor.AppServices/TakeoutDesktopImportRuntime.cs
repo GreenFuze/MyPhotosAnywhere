@@ -133,6 +133,8 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
                 lock(_gate){if(_requests==version){_draining=false;if(_status==ProcessorWorkState.Running)_status=ProcessorWorkState.Ready;return;}}
             }
         }
+        catch(TakeoutMetadataAdmissionClosedException)
+        {lock(_gate){_draining=false;if(_status==ProcessorWorkState.Running)_status=ProcessorWorkState.Ready;}}
         catch(OperationCanceledException)when(token.IsCancellationRequested||_stopping||_status==ProcessorWorkState.Pausing){lock(_gate)_draining=false;}
         catch(Exception error)
         {

@@ -42,6 +42,40 @@ public sealed partial class AccountServiceTests
     }
 
     [TestMethod]
+    public async Task DesktopMetadataAdmissionClosingBeforeQueuePauseDefersAndResumesTheSameCapturedWork()
+    {
+        using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(40));await using var fixture=await CurrentReaderFixture.CreateAsync(addSource:true).ConfigureAwait(false);
+        var selection=await NativeTakeoutSelectionAsync(fixture,deadline.Token,metadata:true).ConfigureAwait(false);var state=fixture.Data.Setup.Accounts.State;
+        var setup=await state.ExecuteAsync(db=>new{db.StateDirectory,db.InstallationId,Source=new LibrarySourceRepository(db).Snapshot().Sources.Single().Id},deadline.Token).ConfigureAwait(false);
+        var cloud=new OriginalCloud(selection.Payload);WireOriginal(fixture.Data.Setup.Accounts,cloud);
+        await using var current=new CurrentLibraryCatalogRuntime(state,setup.StateDirectory,setup.InstallationId,fixture.Data.Setup.Accounts.Service,fixture.Data.Setup.Keys,fixture.Data.Budget);
+        await using var inventory=new TakeoutInventoryService(state,fixture.Data.Budget);
+        using var storage=await state.ExecuteAsync(db=>new TakeoutMetadataStageStorage(db,fixture.Data.Budget),deadline.Token).ConfigureAwait(false);
+        await using var native=new ProcessorWorkSupervisor();var closed=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var attempts=0;
+        var metadata=new TakeoutImportMetadataRunner(state,fixture.Data.Budget,storage,native,async token=>
+        {
+            if(++attempts==1){await native.PauseAsync().ConfigureAwait(false);closed.TrySetResult();}
+            return await TakeoutWorkerInstallation.OpenInstalledAsync(Path.Combine(AppContext.BaseDirectory,"workers","takeout-metadata"),token).ConfigureAwait(false);
+        });
+        await using var imports=new TakeoutDesktopImportRuntime(state,fixture.Data.Budget,inventory,current,_=>Task.FromResult<string?>(Path.GetDirectoryName(selection.Path)),metadata:metadata);
+        await imports.ResumeAsync().ConfigureAwait(false);await using var children=new ProcessorWorkGroup(inventory,imports);await using var controls=new ProcessorWorkGroup(native,children);
+        var review=(await imports.ChooseFolderAsync(setup.Source,deadline.Token).ConfigureAwait(false))!;await WaitImportAsync(imports,review.Id,"ready",deadline.Token).ConfigureAwait(false);await imports.StartAsync(review.Id,deadline.Token).ConfigureAwait(false);
+        await closed.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
+        while(imports.State!=ProcessorWorkState.Ready)
+        {
+            if(imports.Failure is{}failure)throw new InvalidOperationException("Normal shared pause became an import fault.",failure);
+            await Task.Delay(20,deadline.Token).ConfigureAwait(false);
+        }
+        Assert.IsNull(native.Failure);Assert.IsNull(imports.Failure);
+        // Complete the later half of the real grouped pause after native admission
+        // has already closed. No worker was accepted in the intervening window.
+        await children.PauseAsync().ConfigureAwait(false);Assert.AreEqual(ProcessorWorkState.Paused,controls.State);File.Delete(selection.Path+".json");
+        await controls.ResumeAsync().ConfigureAwait(false);var processed=await WaitImportMetadataAsync(imports,review.Id,deadline.Token).ConfigureAwait(false);
+        Assert.AreEqual(new TakeoutMetadataProgress(1,1,0,0,true),processed.Metadata);Assert.AreEqual(2,attempts);Assert.AreEqual(1,cloud.Allocations);
+        await controls.PauseAsync().ConfigureAwait(false);Assert.IsNull(controls.Failure);Assert.AreEqual(0L,fixture.Data.Budget.Status().ReservedBytes);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public async Task DesktopMetadataPauseOrCapacityRetainsCapturedWorkAndRetriesWithoutAnotherOriginalUpload(bool capacity)

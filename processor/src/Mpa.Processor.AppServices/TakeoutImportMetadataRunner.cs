@@ -4,6 +4,7 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.AppServices;
 
 public sealed record TakeoutImportMetadataResult(long Analyzed,long Retained,long Unsupported,long Unmatched,long WaitingForOriginal);
+internal sealed class TakeoutMetadataAdmissionClosedException(Exception inner):Exception("Metadata worker admission closed before ownership transfer; captured work is retained.",inner);
 
 /// <summary>One bounded optional sidecar at a time, after the independent original
 /// copy. Borrows the engine's single native supervisor and staging owner. The
@@ -108,7 +109,11 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
             using(var source=new MemoryStream(raw,false))await _storage.CaptureAsync(work,source,token).ConfigureAwait(false);
             var installed=await _installation(token).ConfigureAwait(false);
             operation=await TakeoutMetadataWorkerOperation.CreateAsync(_state,work,_storage,installed,token).ConfigureAwait(false);
-            var completion=_native.Start(operation,token);transferred=true;await completion.ConfigureAwait(false);
+            Task completion;
+            try{completion=_native.Start(operation,token);}
+            catch(InvalidOperationException error)when(_native.Failure is null&&_native.State is ProcessorWorkState.Pausing or ProcessorWorkState.Paused or ProcessorWorkState.Stopping or ProcessorWorkState.Stopped)
+            {throw new TakeoutMetadataAdmissionClosedException(error);}
+            transferred=true;await completion.ConfigureAwait(false);
         }
         finally
         {

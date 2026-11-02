@@ -25,6 +25,14 @@ one further capture and preserves all retained snapshots; another verifies retry
 from private capture after capacity attention without another original upload.
 No generated cache is deleted and no bound is raised.
 
+A shared Pause can close native worker admission just before the import queue
+receives cancellation. That window now returns the unaccepted operation and retains
+its exact pending capture without faulting the engine. A dedicated native integration
+case forces that ordering, then resumes from the private sidecar with no second
+original upload. It and both pause/capacity rows pass (3cases, unchanged40sec limits).
+Evidence current-takeout-pause-admission-validation-v95.json. Genuine busy/faulted
+worker ownership and cleanup failures still fail visibly.
+
 Local evidence current-takeout-metadata-desktop-validation-v89.json freezes745files
 (741source files and4generated web assets). Focused checks pass34Core,8current
 AppServices integration/regression,1authenticated HTTP boundary and15frontend API
