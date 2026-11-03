@@ -95,6 +95,15 @@ export class DesktopApi {
     if (!libraryIdentity(stage) || !libraryIdentity(asset) || account !== null && !libraryAccount(account)) throw new Error('Invalid captured shared photo identity.');
     const query = new URLSearchParams({ stage, asset }); if (account !== null) query.set('account', account); return '/api/library/preview?' + query;
   }
+  async libraryMetadataSource(stage: string, asset: string, account: string | null, signal: AbortSignal): Promise<Blob> {
+    if (!libraryIdentity(stage) || !libraryIdentity(asset) || account !== null && !libraryAccount(account)) throw new Error('Invalid captured shared photo identity.');
+    const query = new URLSearchParams({ stage, asset }); if (account !== null) query.set('account', account);
+    const response = await fetch('/api/library/metadata-source?' + query, { signal, credentials: 'same-origin', cache: 'no-store' }); await this.check(response);
+    const length = response.headers.get('Content-Length');
+    if (response.headers.get('Content-Type') !== 'application/octet-stream' || length === null || !/^[1-9][0-9]*$/.test(length) || Number(length) > 128 * 1024) throw new Error('MPA returned invalid export metadata. No file was saved.');
+    const blob = await response.blob(); if (blob.size !== Number(length)) throw new Error('Export metadata ended before its verified length. No file was saved.');
+    signal.throwIfAborted(); return blob;
+  }
   async openLibraryViewer(id: string, selectedId: string, accountId: string | null, stageId: string, signal: AbortSignal): Promise<LibraryViewerWindow> {
     if (!libraryIdentity(id) || !libraryIdentity(selectedId) || !libraryIdentity(stageId) || accountId !== null && !libraryAccount(accountId)) throw new Error('Invalid captured shared viewer context.');
     const response = await fetch('/api/viewers', { method: 'POST', credentials: 'same-origin', signal,

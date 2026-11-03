@@ -25,6 +25,7 @@ function CatalogViewer({ api, photos, selected, account, stage, close, report }:
   const [sequence, setSequence] = useState<LibraryViewerWindow | null>(null), [position, setPosition] = useState(0);
   const [details, setDetails] = useState(false), [failed, setFailed] = useState(false), [failure, setFailure] = useState<string | null>(null), [pending, setPending] = useState(false);
   const sessionId = useRef(crypto.randomUUID()), dialog = useRef<HTMLDialogElement>(null), navigation = useRef<AbortController | null>(null);
+  const metadataRead = useRef<AbortController | null>(null), [savingMetadata, setSavingMetadata] = useState(false);
   const reportCurrent = useRef(report); reportCurrent.current = report;
   const entry = sequence?.entries.find(item => item.position === position);
   const photo = sequence ? entry?.photo ?? null : initial;
@@ -35,7 +36,7 @@ function CatalogViewer({ api, photos, selected, account, stage, close, report }:
       if (sequence.id !== id || sequence.entries.find(item => item.position === sequence.position)?.assetId !== initial.id) throw new Error('MPA returned a different selected identity. Photo navigation stopped.');
       if (!controller.signal.aborted) { setSequence(sequence); setPosition(sequence.position); }
     }).catch(error => { if (!controller.signal.aborted) setFailure(failureMessage(error)); });
-    return () => { controller.abort(); navigation.current?.abort(); void api.closeViewer(id).catch(error => reportCurrent.current(error)); };
+    return () => { controller.abort(); navigation.current?.abort(); metadataRead.current?.abort(); void api.closeViewer(id).catch(error => reportCurrent.current(error)); };
   }, [api, initial.id, account, stage]);
   async function move(target: number) {
     if (!sequence || target < 0 || target >= sequence.count || navigation.current) return;
@@ -56,6 +57,17 @@ function CatalogViewer({ api, photos, selected, account, stage, close, report }:
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
   }, [sequence, position]);
   useEffect(() => setFailed(false), [photo?.id]);
+  async function saveMetadata() {
+    if (!photo || metadataRead.current) return;
+    const selected = photo, controller = new AbortController(); metadataRead.current = controller; setSavingMetadata(true); setFailure(null);
+    try {
+      const blob = await api.libraryMetadataSource(stage, selected.id, account, controller.signal); controller.signal.throwIfAborted();
+      const url = URL.createObjectURL(blob), link = document.createElement('a'); link.href = url;
+      link.download = selected.name.replace(/[\\/\u0000-\u001f\u007f]/g, '_').slice(0, 120) + '.metadata.json';
+      document.body.appendChild(link); try { link.click(); } finally { link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    } catch (error) { if (!controller.signal.aborted) setFailure(failureMessage(error)); }
+    finally { if (metadataRead.current === controller) { metadataRead.current = null; setSavingMetadata(false); } }
+  }
   return <dialog ref={dialog} className="viewer" aria-label="Photo viewer" onCancel={close}>
     <header><button className="icon" onClick={close} aria-label="Close photo"><ViewerIcon name="close" /></button><span dir="auto">{photo?.name ?? 'Photo unavailable'}</span><button disabled={!photo} onClick={() => setDetails(value => !value)} aria-expanded={details}>Details</button></header>
     {failure && <p className="viewer-message" role="alert">{failure}</p>}
@@ -70,6 +82,7 @@ function CatalogViewer({ api, photos, selected, account, stage, close, report }:
       {photo.rawCapture && photo.dateProvenance !== 'DriveCapture' && <><dt>Original capture text</dt><dd>{photo.rawCapture}</dd></>}
       {photo.importedMetadata?.attention && <><dt>Metadata from export</dt><dd>{photo.importedMetadata.attention === 'conflicting-metadata' ? 'More than one metadata file needs review. Imported values have not been applied.' : photo.importedMetadata.attention === 'original-version-changed' ? 'The original changed since these metadata were processed. The retained details need verification.' : 'These metadata details exceed the supported photo record size. The source metadata is retained.'}</dd></>}
       {photo.importedMetadata && photo.importedMetadata.attention === null && <>
+        <dt>Metadata file from export</dt><dd><button disabled={savingMetadata} onClick={() => { void saveMetadata(); }}>{savingMetadata ? 'Preparing metadata file…' : 'Save export metadata'}</button><p>Saves the original metadata file, including fields not shown here.</p></dd>
         {photo.importedMetadata.title !== photo.name && <><dt>Name in export</dt><dd dir="auto">{photo.importedMetadata.title}</dd></>}
         {photo.importedMetadata.description && <><dt>Description from export</dt><dd dir="auto">{photo.importedMetadata.description}</dd></>}
         {photo.importedMetadata.capturedUtc !== null && photo.dateProvenance !== 'ImportedCapture' && <><dt>Capture time in export</dt><dd>{new Date(photo.importedMetadata.capturedUtc).toLocaleString()}</dd></>}

@@ -34,6 +34,7 @@ public sealed class MetadataSourceBundle
     public const int MaximumSources=128;
     private const int MaximumHeaderBytes=32*1024;
     private static ReadOnlySpan<byte> Magic=>"MPA-RAW-METADATA-1\n"u8;
+    public static bool HasSignature(ReadOnlySpan<byte> bytes)=>bytes.StartsWith(Magic);
     private readonly byte[] _payload;
     private readonly ReadOnlyCollection<Slot> _slots;
     private sealed record Slot(ImportedMetadataFingerprint Source,int Offset);

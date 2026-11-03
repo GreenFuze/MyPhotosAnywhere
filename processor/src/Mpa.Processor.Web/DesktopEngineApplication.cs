@@ -7,7 +7,7 @@ namespace Mpa.Processor.Web;
 /// <summary>Browser adapter borrowing engine-lifetime accounts, read owners, state and work.</summary>
 public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoordinator state, ProcessorAccountService accounts,
     IProcessorWorkControl work, ProcessorSourceRuntime? sources = null, CatalogViewerSessions? viewers = null, LibraryWorkspaceSetup? setup = null,
-    InitialLibraryPublicationRuntime? publication = null,TakeoutDesktopImportRuntime? imports=null) : IDesktopWebApplication, IDesktopLibraryCatalogApplication, IDesktopLibraryPreviewApplication,IDesktopImportApplication
+    InitialLibraryPublicationRuntime? publication = null,TakeoutDesktopImportRuntime? imports=null) : IDesktopWebApplication, IDesktopLibraryCatalogApplication, IDesktopLibraryPreviewApplication,IDesktopImportApplication,IDesktopLibraryMetadataSourceApplication
 {
     private readonly Guid _libraryId = libraryId != Guid.Empty ? libraryId : throw new ArgumentException("Library identity is required.", nameof(libraryId));
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
@@ -68,6 +68,8 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
     }, cancellationToken);
     public Task<DesktopPreview?> LibraryPreviewAsync(Guid stageId,Guid assetId,string? accountId,CancellationToken cancellationToken)=>
         new DesktopLibraryPreviewReader(_publication?.CurrentCanonicalCatalog ?? throw new DesktopLibraryCatalogUnavailableException(),new DesktopLibraryPreviewTransport(_accounts)).ReadAsync(stageId,assetId,accountId,cancellationToken);
+    public Task<RecoveredMetadataSource?> LibraryMetadataSourceAsync(Guid stageId,Guid assetId,string? accountId,CancellationToken cancellationToken)=>
+        Publication.CurrentOperations.ReadImportedMetadataSourceAsync(stageId,assetId,accountId is null?null:new CurrentCatalogAccountFilter(accountId),cancellationToken);
     public Task<DesktopLibraryCatalogPage> LibraryCatalogAsync(string? accountId,string? position,bool newer,long? dateUtc,CancellationToken cancellationToken)
     {
         var current=_publication?.CurrentCanonicalCatalog ?? throw new DesktopLibraryCatalogUnavailableException();

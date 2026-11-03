@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Mpa.Processor.Core;
 using Mpa.Processor.GoogleDrive;
+using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.AppServices.Tests;
 
@@ -9,6 +10,21 @@ public sealed partial class CatalogGenerationCaptureServiceTests
 {
     private static readonly string[] BothScanPolicies = ["policy-A", "policy-B"];
     private static readonly string[] NewScanRevocation = ["revocation-B"];
+
+    [TestMethod]
+    public async Task FailedRawSourceHintPersistenceKeepsActualReadEvidenceButCannotCompleteTheScanOrReachItsVerifier()
+    {
+        await using var fixture=new Fixture();var context=ScanContext(fixture);var source=new ScanSource();var raw=MetadataSourceBytes.Capture("{\"title\":\"a.jpg\",\"unknown\":true}"u8);var bundle=MetadataSourceBundle.Capture([raw]);
+        source.Documents.Add("raw-source-A",new(context.AccountId,"raw-source-A",context.FolderId,1,bundle.CopyPayload()){MimeType=MetadataSourceBundle.MimeType});source.Encodings.Add("raw-source-A",MetadataSourceBundle.MimeType);
+        ObservationSql(fixture,"CREATE TRIGGER fail_source_hint BEFORE INSERT ON processor_meta WHEN NEW.key LIKE 'metadata-source-hint-v1:%' BEGIN SELECT RAISE(ABORT,'synthetic hint failure'); END");
+        await using var scanner=new WorkspaceObservationService(fixture.State,fixture.Budget,context,source);var callbacks=0;
+        await Assert.ThrowsExactlyAsync<SqliteException>(()=>scanner.ScanAsync((_,_)=>{callbacks++;return Task.CompletedTask;},CancellationToken.None)).ConfigureAwait(false);
+        var observed=new WorkspaceObservationRepository(fixture.Database,fixture.Budget);Assert.AreEqual(1,observed.Known(context).Count);Assert.IsNull(observed.LastCheckpoint());Assert.IsNull(observed.LastAttempt()!.Completed);Assert.AreEqual(0,callbacks);Assert.AreEqual(0,source.FinalChecks);
+        Assert.AreEqual(0,new MetadataSourceHintRepository(fixture.Database,fixture.Budget).Candidates(context,raw.Fingerprint).Count);
+        ObservationSql(fixture,"DROP TRIGGER fail_source_hint");var completed=await scanner.ScanAsync((_,_)=>{callbacks++;return Task.CompletedTask;},CancellationToken.None).ConfigureAwait(false);
+        observed.AssertCompletedScan(completed);Assert.AreEqual(1,callbacks);Assert.AreEqual(1,source.FinalChecks);Assert.AreEqual(2,source.Reads);Assert.IsNull(scanner.Failure);
+        Assert.AreEqual("raw-source-A",new MetadataSourceHintRepository(fixture.Database,fixture.Budget).Candidates(context,raw.Fingerprint).Single().Bundle.FileId);Assert.AreEqual(0L,fixture.Budget.Status().ReservedBytes);
+    }
 
     [TestMethod]
     public async Task UncertainAllocationCanBeAbsentButAnUnseenVerifiedReceiptRemainsRequired()

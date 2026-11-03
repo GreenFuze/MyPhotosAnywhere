@@ -17,7 +17,9 @@ public sealed partial class AccountServiceTests
     public Task DesktopExplicitMetadataSelectionSurvivesBrowserClosureAndPublishesOnlyTheChosenVerifiedOriginal()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false,manualAssociation:true);
     [TestMethod]
     public Task DesktopImportBacksUpExactRawSidecarThroughCurrentPublicationBeforeAnyPrivateRetirement()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false,rawBackup:true);
-    private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished,bool manualAssociation=false,bool rawBackup=false)
+    [TestMethod]
+    public Task DesktopRawMetadataRecoveryUsesSignedCatalogAndActualDriveWithoutPrivateInputsJobsOrLocators()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false,rawBackup:true,recover:true);
+    private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished,bool manualAssociation=false,bool rawBackup=false,bool recover=false)
     {
         var started=Stopwatch.GetTimestamp();
         using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(40));await using var fixture=await CurrentReaderFixture.CreateAsync(addSource:true).ConfigureAwait(false);
@@ -161,6 +163,38 @@ public sealed partial class AccountServiceTests
         }
         var replay=await imports.StartAsync(review.Id,deadline.Token).ConfigureAwait(false);Assert.AreEqual("originals-verified",replay.State);Assert.AreEqual(1,cloud.Allocations);
         await imports.ResumeAsync().ConfigureAwait(false);await imports.PauseAsync().ConfigureAwait(false);Assert.AreEqual(1,scanNotifications);Assert.AreEqual(1,metadataLaunches);Assert.AreEqual(legacyFinished?2:1,metadataNotifications);
+        if(recover)
+        {
+            await current.DisposeAsync().ConfigureAwait(false);Assert.IsTrue(current.ExitConfirmed);metadataStorage.Dispose();
+            // Simulate loss of this disposable fixture's private metadata area,
+            // jobs and locators. Product recovery performs no such deletion.
+            var lost=Path.Combine(setup.StateDirectory,"lost-metadata-test-inputs");
+            Assert.AreEqual(Path.TrimEndingDirectorySeparator(Path.GetFullPath(setup.StateDirectory)),Path.GetDirectoryName(Path.GetFullPath(metadataArea)));
+            Assert.AreEqual(Path.TrimEndingDirectorySeparator(Path.GetFullPath(setup.StateDirectory)),Path.GetDirectoryName(Path.GetFullPath(lost)));Directory.Move(metadataArea,lost);
+            await state.ExecuteAsync(db=>
+            {
+                using var connection=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.Combine(db.StateDirectory,"processor.db"),Mode=SqliteOpenMode.ReadWrite,Pooling=false,ForeignKeys=true,DefaultTimeout=5}.ToString());connection.Open();
+                using var transaction=connection.BeginTransaction();using var remove=connection.CreateCommand();remove.Transaction=transaction;
+                remove.CommandText="""
+                    DELETE FROM state_outbox WHERE job_id=$job;
+                    DELETE FROM stage_dependency WHERE job_id=$job;
+                    DELETE FROM item_stage WHERE job_id=$job;
+                    DELETE FROM job_item WHERE job_id=$job;
+                    DELETE FROM job WHERE id=$job;
+                    DELETE FROM processor_meta WHERE key LIKE 'metadata-source-backup-v1:%' OR key LIKE 'metadata-source-hint-v1:%' OR key LIKE 'takeout-photo-observation-v1:%';
+                    """;
+                remove.Parameters.AddWithValue("$job",portable.ImportedMetadata!.JobId.ToString("D"));remove.ExecuteNonQuery();transaction.Commit();
+                Assert.IsNull(new TakeoutMetadataJobRepository(db).ReadCompletedImported(review.Id,portable.ImportedMetadata.SidecarKey));return true;
+            },deadline.Token).ConfigureAwait(false);
+            var allocated=fixture.Data.Allocations;var created=fixture.Data.Creates;
+            await using var recovery=new CurrentLibraryCatalogRuntime(state,setup.StateDirectory,setup.InstallationId,fixture.Data.Setup.Accounts.Service,fixture.Data.Setup.Keys,fixture.Data.Budget);
+            Assert.AreEqual(activated,await recovery.InitializeHistoricalAsync(deadline.Token).ConfigureAwait(false));
+            var raw=await recovery.ReadImportedMetadataSourceAsync(activated.StageId,portable.Id,new(portable.AccountId),deadline.Token).ConfigureAwait(false);
+            Assert.IsNotNull(raw);Assert.AreEqual(portable.Id,raw.AssetId);Assert.AreEqual(expectedMetadata.SourceSha256,raw.Sha256);CollectionAssert.AreEqual(expectedMetadata.CopyRawSource(),raw.Bytes);
+            Assert.IsFalse(Directory.Exists(metadataArea));Assert.AreEqual(allocated,fixture.Data.Allocations);Assert.AreEqual(created,fixture.Data.Creates);Assert.AreEqual(1,cloud.Allocations);Assert.AreEqual(1,metadataLaunches);
+            CollectionAssert.AreEqual(selection.Payload,await File.ReadAllBytesAsync(selection.Path,deadline.Token).ConfigureAwait(false));
+            Measure("raw-source-recovered");
+        }
         var before=await state.ExecuteAsync(db=>new SourceDiscoveryRepository(db).ReadActivity().Jobs.Single(value=>value.JobId==scan.JobId).Scope,deadline.Token).ConfigureAwait(false);
         await state.ExecuteAsync(db=>
         {

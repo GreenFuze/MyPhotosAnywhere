@@ -124,3 +124,18 @@ source.bin/artifacts or claim a complete backup/recovery workflow. Continue that
 vertical before corrected-input/version repair and the remaining approved PC work.
 The preceding exact ec41bcb now has independently verified60PCjobs/72reports across
 all four native runners (ci-ec41bcb-pc-validation-v196.json); do not rerun that source.
+
+Portable raw-source recovery continuation (2026-11-03): photo Details now offers
+Save export metadata. The engine resolves the actual signed canonical photo,
+observes the current approved workspace and verifies exact raw source/artifact/
+observation fingerprints before returning a bounded inert download. The scanner
+builds bounded source-hash discovery hints from actual observed bundles; these are
+not receipts, authority, associations or deletion grants. Recovery is tested after
+simulated loss of the disposable fixture's private metadata area, jobs and local
+locators/hints, using the reopened canonical runtime and actual Drive reads.
+No extra upload/worker or original change occurs. The40sec deadline remains.
+Do not retire primary files from a public recovery DTO. Safe whole-item retirement,
+capacity recovery, unsupported/conflicting raw backup, corrected-input/version
+repair and remaining approved PC workflows/installers/acceptance still remain.
+The preceding7df9282 is independently verified60PCjobs/72reports in
+ci-7df9282-pc-validation-v209.json; do not rerun that unchanged revision.

@@ -177,3 +177,17 @@ Portable recovery and unsupported/conflicting inputs remain unfinished. Syntheti
 native Drive tests are component evidence, not live Drive or finished PC acceptance.
 Preceding ec41bcb CI is independently verified60jobs/72reports in
 ci-ec41bcb-pc-validation-v196.json; later code needs its own exact-head validation.
+
+Portable raw metadata recovery continuation (2026-11-03): source-discovery hints
+are rebuilt from real observed bundle bytes; they are neither receipts nor
+permission. Actual canonical signed metadata and fresh pinned workspace reads
+supply size/hash/minimum-version/source/artifact/observation verification. Native
+recovery succeeds after simulated loss of the test fixture's private metadata
+files, metadata jobs/outbox/local locators/projections/hints, with unchanged
+originals, upload identities and worker counts, under the original40sec deadline.
+The authenticated Details download returns an inert no-store attachment with exact
+raw bytes. HTTP/API checks cover identity, authentication, bounds, missing data and
+cancellation. Actual visual/live acceptance and clean-install enrollment remain
+unverified. Primary-file/generated-item retirement and capacity recovery remain
+unfinished; no public recovery DTO can authorize deletion. Prior exact7df9282 has
+independent60-job/72-report native PC evidence in ci-7df9282-pc-validation-v209.json.

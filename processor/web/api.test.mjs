@@ -104,6 +104,36 @@ test('canceling connection export never creates a client enrollment or setup req
 
 const sharedStage = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const sharedAsset = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+test('export metadata uses an abortable same-origin read and preserves exact opaque bytes in a bounded download', async () => {
+  const controller = new AbortController(), raw = new Uint8Array([239, 187, 191, 123, 34, 255, 0, 125, 13, 10]); let calls = 0;
+  await withBrowser(async (url, options) => {
+    calls++; const query = new URL(url, 'https://local.invalid'); assert.equal(query.pathname, '/api/library/metadata-source');
+    assert.equal(query.searchParams.get('stage'), sharedStage); assert.equal(query.searchParams.get('asset'), sharedAsset); assert.equal(query.searchParams.get('account'), 'account-A');
+    assert.equal(options.credentials, 'same-origin'); assert.equal(options.cache, 'no-store'); assert.equal(options.signal, controller.signal);
+    return new Response(raw, { headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': String(raw.length) } });
+  }, async api => {
+    const blob = await api.libraryMetadataSource(sharedStage, sharedAsset, 'account-A', controller.signal); assert.equal(blob.type, 'application/octet-stream');
+    assert.deepEqual(new Uint8Array(await blob.arrayBuffer()), raw);
+    await assert.rejects(api.libraryMetadataSource('', sharedAsset, null, controller.signal), /Invalid captured shared/);
+    await assert.rejects(api.libraryMetadataSource(sharedStage, sharedAsset, 'someone@example.com', controller.signal), /Invalid captured shared/);
+  }); assert.equal(calls, 1);
+});
+test('invalid export metadata lengths and types cannot become a downloadable file', async () => {
+  for (const [type, length, raw] of [['text/html', '4', 'test'], ['application/octet-stream', null, 'test'], ['application/octet-stream', '0', ''],
+    ['application/octet-stream', '04', 'test'], ['application/octet-stream', '131073', 'test'], ['application/octet-stream', '3', 'test']]) {
+    await withBrowser(async () => {
+      const headers = { 'Content-Type': type }; if (length !== null) headers['Content-Length'] = length; return new Response(raw, { headers });
+    }, async api => { await assert.rejects(api.libraryMetadataSource(sharedStage, sharedAsset, null, new AbortController().signal), /metadata|verified length/i); });
+  }
+});
+test('missing or canceled export metadata reads cannot report a saved file', async () => {
+  await withBrowser(async () => new Response(JSON.stringify({ message: 'No saved export metadata is available for this photo.' }), { status: 404, headers: { 'Content-Type': 'application/json' } }),
+    async api => { await assert.rejects(api.libraryMetadataSource(sharedStage, sharedAsset, null, new AbortController().signal), /No saved export metadata/); });
+  const controller = new AbortController();
+  await withBrowser(async () => {
+    controller.abort(); return new Response('test', { headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': '4' } });
+  }, async api => { await assert.rejects(api.libraryMetadataSource(sharedStage, sharedAsset, null, controller.signal), { name: 'AbortError' }); });
+});
 const sharedOther = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const sharedViewer = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const sharedPhoto = { id: sharedAsset, accountId: 'account-A', name: 'Literal <tag> שלום.jpg', mimeType: 'image/jpeg', width: 40, height: 30, effectiveUtc: 100, dateProvenance: 'DriveCapture', rawCapture: null };

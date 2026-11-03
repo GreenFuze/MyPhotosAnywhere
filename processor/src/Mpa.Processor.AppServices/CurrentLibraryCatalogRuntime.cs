@@ -6,7 +6,7 @@ namespace Mpa.Processor.AppServices;
 /// pool, actual canonical readers and the outgoing generation drain. Accounts,
 /// native signing keys, serialized state and the global budget are borrowed.
 /// Stop joins every real child before their borrowed owners may retire.</summary>
-public sealed class CurrentLibraryCatalogRuntime : IAsyncDisposable
+public sealed partial class CurrentLibraryCatalogRuntime : IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state;
     private readonly ProcessorAccountService _accounts;

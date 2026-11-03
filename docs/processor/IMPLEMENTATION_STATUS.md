@@ -9,6 +9,45 @@ app. Earlier joint-release gate statements below are historical and superseded
 for this PC release; PC safety, signing, preservation and validation stay required.
 See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists.
 
+## Recover export metadata from the signed library (2026-11-03)
+
+Photo Details now offers Save export metadata for supported imported observations.
+The authenticated request supplies only a captured canonical stage/photo/account.
+The engine resolves its actual accepted signed metadata, observes the approved
+workspace, reads a matching raw bundle with exact size/hash/minimum-version checks,
+reconstructs all source/artifact/observation fields and rechecks the inventory and
+canonical selection before returning exact source bytes. The response is a bounded
+inert attachment with no-store; unknown raw fields and encoding remain unchanged.
+No original image read, provider write, new worker or browser-made receipt is used.
+
+The existing workspace scanner rebuilds bounded source-discovery hints from actual
+observed bundle bytes. They are derived hints, never backup receipts, associations,
+authority or deletion permission. A failed hint write preserves the actual read
+and incomplete scan, but cannot reach its verifier or advance completion. Retry
+reuses observed history and rebuilds the hint. Native reopen, corruption, changed
+access, failed writes and canceled empty searches are covered.
+
+Native recovery is tested after closing the old current/staging owners, moving
+only the disposable fixture's private metadata area aside, and removing its
+metadata jobs/outbox/local locators/projections/hints. The reopened actual canonical
+runtime recovers identical source bytes from Drive with no original mutation,
+extra upload or worker. The original40sec integration deadline remains. This is
+simulated private-data loss in a test, not product cleanup or clean-install
+enrollment acceptance. HTTP/API tests cover strict identity, authentication,
+inert bytes, bounds, missing data and cancellation; visual/live acceptance remains.
+
+Safe primary-source/generated-item retirement,1024slot capacity recovery and raw
+backup for unsupported/conflicting inputs remain unfinished. Returned recovery
+DTOs and discovery hints must never become private-file deletion grants. No schema,
+old pending signing body, signing/upgrade identity, dependency or limit changed.
+
+The preceding exact7df9282 is independently verified60PCjobs/72native reports:
+142Protocol/623Core/785ordinaryServices/179Google/9LAN/53Web on all four existing
+native runners, all first attempt with old identities/new additions, complete
+official logs, unchanged limits, scale/reference and four22-case Desktop reports.
+Evidence ci-7df9282-pc-validation-v209.json; it does not accept later recovery code
+or the full PC/UI/live/install/release workflow.
+
 ## Current-generation raw metadata backup (2026-11-03; recovery unfinished)
 
 The installed desktop now borrows its existing metadata staging owner during

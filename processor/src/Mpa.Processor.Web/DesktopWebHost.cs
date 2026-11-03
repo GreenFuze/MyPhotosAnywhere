@@ -241,6 +241,22 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 var previewAccount=OptionalQuery(context,"account",256);
                 if(previewAccount is not null && !Identity(previewAccount)) throw new BadHttpRequestException("Invalid preview account.");
                 await WritePreviewAsync(context,await libraryPreview.LibraryPreviewAsync(previewStage,previewAsset,previewAccount,token).ConfigureAwait(false),token).ConfigureAwait(false);break;
+            case ("GET", "/api/library/metadata-source"):
+                if(_application is not IDesktopLibraryMetadataSourceApplication metadataApplication){context.Response.StatusCode=404;break;}
+                if(context.Request.Query.Keys.Any(key=>key is not("stage" or "asset" or "account")))throw new BadHttpRequestException("Unexpected metadata source fields.");
+                var metadataStageText=RequiredQuery(context,"stage");var metadataAssetText=RequiredQuery(context,"asset");
+                if(!Guid.TryParseExact(metadataStageText,"D",out var metadataStage)||metadataStage==Guid.Empty||metadataStage.ToString("D")!=metadataStageText||
+                    !Guid.TryParseExact(metadataAssetText,"D",out var metadataAsset)||metadataAsset==Guid.Empty||metadataAsset.ToString("D")!=metadataAssetText)
+                    throw new BadHttpRequestException("Invalid captured metadata source identity.");
+                var metadataAccount=OptionalQuery(context,"account",256);if(metadataAccount is not null&&!Identity(metadataAccount))throw new BadHttpRequestException("Invalid metadata source account.");
+                var metadata=await metadataApplication.LibraryMetadataSourceAsync(metadataStage,metadataAsset,metadataAccount,token).ConfigureAwait(false);
+                if(metadata is null){context.Response.StatusCode=404;await context.Response.WriteAsJsonAsync(new{message="No saved export metadata is available for this photo."},token).ConfigureAwait(false);break;}
+                if(metadata.StageId!=metadataStage||metadata.AssetId!=metadataAsset||metadata.Bytes is not{Length:>=1 and <=Mpa.Processor.Protocol.TakeoutMetadataDocument.MaximumSourceBytes}||
+                    Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(metadata.Bytes))!=metadata.Sha256)
+                    throw new InvalidDataException("Recovered export metadata changed its captured identity, bytes or bound.");
+                context.Response.ContentType="application/octet-stream";context.Response.ContentLength=metadata.Bytes.Length;
+                context.Response.Headers.ContentDisposition="attachment; filename=\"metadata-"+metadataAsset.ToString("N")+".json\"";
+                await context.Response.Body.WriteAsync(metadata.Bytes,token).ConfigureAwait(false);break;
             case ("GET", "/api/library/catalog"):
                 if (_application is not IDesktopLibraryCatalogApplication libraryCatalog)
                 { context.Response.StatusCode = 404; break; }

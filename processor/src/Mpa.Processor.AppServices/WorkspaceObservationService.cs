@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Mpa.Processor.Core;
 using Mpa.Processor.GoogleDrive;
+using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.AppServices;
 
@@ -136,6 +137,11 @@ public sealed class WorkspaceObservationService(ProcessorStateCoordinator state,
                     if (expectedFiles.TryGetValue(observation.FileId, out var expected) && (expected.Bytes != observation.Bytes || expected.Sha256 != observation.Sha256 ||
                         expected.MimeType != candidate.MimeType || expected.VerifiedVersion is { } version && observation.Version < version))
                         throw new WorkspaceObservationConflictException();
+                    if(document is not null&&candidate.MimeType==MetadataSourceBundle.MimeType&&MetadataSourceBundle.HasSignature(document.Bytes.Span))
+                    {
+                        var bundle=MetadataSourceBundle.Read(document.Bytes.Span);
+                        await _state.ExecuteAsync(database=>{new MetadataSourceHintRepository(database,_budget).Remember(_context,observation,bundle);return true;},token).ConfigureAwait(false);
+                    }
                     // If persistence fails, the verifier never receives this document.
                     // Its policy writes also must succeed before this scan can complete.
                     if(document is not null) await verifyAndPersist(document,observation,token).ConfigureAwait(false);
