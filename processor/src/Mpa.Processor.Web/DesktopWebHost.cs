@@ -324,13 +324,14 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 if(issueImport.Entries is null)throw new ProcessorWorkStateConflictException();
                 await context.Response.WriteAsJsonAsync(await issueApplication.ImportMetadataIssuesAsync(issueImportId,issueAfter,token).ConfigureAwait(false),token).ConfigureAwait(false);break;
             case("POST","/api/import-folders"):
+            case("POST","/api/import-archives"):
             case("POST","/api/import-start"):
             case("POST","/api/import-retry"):
                 if(!session.HostOwner){context.Response.StatusCode=403;break;}
                 if(_application is not IDesktopImportApplication importApplication){context.Response.StatusCode=404;break;}
                 var importRequest=await context.Request.ReadFromJsonAsync<ImportRequest>(token).ConfigureAwait(false)??throw new BadHttpRequestException("Choose an import action.");
                 if(importRequest.Id==Guid.Empty)throw new BadHttpRequestException("A captured import or destination is required.");
-                if(context.Request.Path.Value!="/api/import-folders")
+                if(context.Request.Path.Value is not("/api/import-folders" or "/api/import-archives"))
                 {
                     var existing=(await importApplication.ImportsAsync(token).ConfigureAwait(false)).Imports.SingleOrDefault(value=>value.Id==importRequest.Id)
                         ??throw new BadHttpRequestException("That saved import is unavailable. Refresh Imports.");
@@ -339,6 +340,7 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 var importResult=context.Request.Path.Value switch
                 {
                     "/api/import-folders"=>await importApplication.ChooseImportFolderAsync(importRequest.Id,token).ConfigureAwait(false),
+                    "/api/import-archives"=>await importApplication.ChooseImportArchivesAsync(importRequest.Id,token).ConfigureAwait(false),
                     "/api/import-start"=>await importApplication.StartImportAsync(importRequest.Id,token).ConfigureAwait(false),
                     _=>await importApplication.RetryImportAsync(importRequest.Id,token).ConfigureAwait(false)
                 };

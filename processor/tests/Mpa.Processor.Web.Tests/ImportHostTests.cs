@@ -87,11 +87,13 @@ public sealed partial class WebHostTests
         {token.ThrowIfCancellationRequested();Assert.AreEqual(Import.Id,importId);OriginalChoiceReads++;return Task.FromResult(new TakeoutOriginalChoices([new(new string('b',64),"Folder/a.jpg","verified-file")],null));}
         public Task SelectImportMetadataOriginalAsync(Guid importId,string sidecarKey,string originalKey,CancellationToken token)
         {token.ThrowIfCancellationRequested();if(RejectMetadataSelection)throw new TakeoutMetadataSelectionException("The first selection was retained.");MetadataSelections.Add((importId,sidecarKey,originalKey));return Task.CompletedTask;}
-        public Task<DesktopImports> ImportsAsync(CancellationToken token){token.ThrowIfCancellationRequested();return Task.FromResult(new DesktopImports(true,[Import],ImportsPaused));}
+        public Task<DesktopImports> ImportsAsync(CancellationToken token){token.ThrowIfCancellationRequested();return Task.FromResult(new DesktopImports(true,[Import],ImportsPaused,true));}
         public Task<TakeoutMetadataIssuePage> ImportMetadataIssuesAsync(Guid importId,string? after,CancellationToken token)
         {token.ThrowIfCancellationRequested();Assert.AreEqual(Import.Id,importId);MetadataIssueReads++;MetadataIssueAfter=after;return Task.FromResult(new TakeoutMetadataIssuePage([new(new string('a',64),"a.jpg.json","input-unavailable",true)],null));}
         public Task<TakeoutImportActivity?> ChooseImportFolderAsync(Guid sourceId,CancellationToken token)
         {token.ThrowIfCancellationRequested();ImportCommands.Add(("choose",sourceId));return Task.FromResult<TakeoutImportActivity?>(null);}
+        public Task<TakeoutImportActivity?> ChooseImportArchivesAsync(Guid sourceId,CancellationToken token)
+        {token.ThrowIfCancellationRequested();ImportCommands.Add(("archives",sourceId));return Task.FromResult<TakeoutImportActivity?>(null);}
         public Task<TakeoutImportActivity> StartImportAsync(Guid importId,CancellationToken token)
         {token.ThrowIfCancellationRequested();ImportCommands.Add(("start",importId));return Task.FromResult(Import with{Requested=true,State="copying"});}
         public Task<TakeoutImportActivity> RetryImportAsync(Guid importId,CancellationToken token)

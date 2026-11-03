@@ -42,7 +42,7 @@ export interface ImportMetadataIssues { issues: ImportMetadataIssue[]; next: str
 export interface ImportOriginalChoice { key: string; name: string; fileId: string }
 export interface ImportOriginalChoices { originals: ImportOriginalChoice[]; next: string | null }
 export interface PhotoImport { id: string; inputName: string; target: { libraryId: string; accountId: string; accountRevision: string; folderId: string; configurationRevision: string }; state: 'reviewing' | 'ready' | 'copying' | 'originals-verified' | 'needs-attention' | 'paused' | 'canceled'; entries: string | null; media: string | null; verified: string; requested: boolean; issue: string | null; metadata: ImportMetadataProgress | null }
-export interface PhotoImports { canChooseFolder: boolean; paused: boolean; imports: PhotoImport[] }
+export interface PhotoImports { canChooseFolder: boolean; canChooseArchives: boolean; paused: boolean; imports: PhotoImport[] }
 export interface LibraryPublication {
   stage: 'NeedsApproval' | 'Running' | 'PoliciesPublished' | 'NeedsAttention' | 'Stopping' | 'Stopped';
   detail: string | null; canRetry: boolean;
@@ -251,9 +251,10 @@ export class DesktopApi {
   async imports(signal: AbortSignal): Promise<PhotoImports> {
     const value = await this.get<unknown>('/api/imports', signal);
     if (typeof value !== 'object' || value === null || !('canChooseFolder' in value) || typeof value.canChooseFolder !== 'boolean' || !('paused' in value) || typeof value.paused !== 'boolean' || !('imports' in value) || !Array.isArray(value.imports) || value.imports.length > 64) throw new Error('MPA returned invalid import progress. Saved work was retained.');
-    return { canChooseFolder: value.canChooseFolder, paused: value.paused, imports: value.imports.map(item => this.importItem(item)) };
+    if ('canChooseArchives' in value && typeof value.canChooseArchives !== 'boolean') throw new Error('MPA returned invalid import progress. Saved work was retained.');
+    return { canChooseFolder: value.canChooseFolder, canChooseArchives: 'canChooseArchives' in value && value.canChooseArchives === true, paused: value.paused, imports: value.imports.map(item => this.importItem(item)) };
   }
-  async importAction(action: 'folders' | 'start' | 'retry', id: string): Promise<PhotoImport | null> {
+  async importAction(action: 'folders' | 'archives' | 'start' | 'retry', id: string): Promise<PhotoImport | null> {
     if (!libraryIdentity(id)) throw new Error('Choose a captured import or destination.');
     const value = await this.sourceCommand('/api/import-' + action, { id });
     if (typeof value !== 'object' || value === null || !('import' in value)) throw new Error('The import reply was lost. Refresh Imports before retrying.');

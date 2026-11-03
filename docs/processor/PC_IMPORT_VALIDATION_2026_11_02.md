@@ -239,3 +239,22 @@ validation; observed non-workspace CPU workloads were left untouched. Prior exac
 d63bc17 is independently verified60PCjobs/72reports in
 ci-d63bc17-pc-validation-v226.json, including complete original/retry logs and proof
 that only a never-started queued macOS job executed anew.
+
+Local ZIP/multipart desktop workflow (2026-11-03): exact native selection now
+feeds existing review/Start and the original transfer/metadata/publication owners.
+Actual tests put original and sidecar into one compressed ZIP or two distinct ZIP
+parts with preserved hierarchy, verify raw backup and signed canonical fields,
+retain human filename precedence, reuse the first original upload on replay and
+confirm archive hashes are unchanged. No extraction, ZIP-backed remote originals
+or fabricated completion. Both flows pass the existing40sec bound (27.7/19.7sec
+in v277). Fifty Core,15distinct affected Services,60Web and27frontend cases pass;
+strict Desktop0warnings/errors. Source proof v281 retains300old test blobs,
+40changed-file old cases and202exact assertions. Stronger rejected-later-part and
+all10prior desktop import cases pass v279; earlier five new v277cases remain.
+Final frozen proof current-archive-import-validation-v282.json; fresh committed
+main/native CI, real UI and live Drive acceptance are not yet claimed.
+
+The preceding cleanup59a8215 has independent first-attempt60-job/72-report native
+PC CI in ci-59a8215-pc-validation-v271.json. Earlier failed attempts remain intact.
+Local ZIP acceptance does not close Drive ZIP, unsupported/conflicting raw backup,
+corrected inputs/versions, remaining product workflows or installer/release gates.

@@ -58,7 +58,8 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
         =>await StartAsync(state,installationId,stateDirectory,work,oauthConfigurationPath,assetsDirectory,enableLan,null,cancellationToken).ConfigureAwait(false);
     public static async Task<DesktopWebRuntime> StartAsync(ProcessorStateCoordinator state, Guid installationId, string stateDirectory,
         ProcessorWorkSupervisor work, string oauthConfigurationPath, string assetsDirectory, bool enableLan,
-        Func<CancellationToken,Task<string?>>? importFolderPicker,CancellationToken cancellationToken)
+        Func<CancellationToken,Task<string?>>? importFolderPicker,CancellationToken cancellationToken,
+        Func<CancellationToken,Task<IReadOnlyList<string>?>>? importArchivePicker=null)
     {
         ArgumentNullException.ThrowIfNull(work);
         var owner = new DesktopWebRuntime(work);
@@ -90,7 +91,7 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
             await owner._publication.InitializeCurrentCatalogAsync(cancellationToken).ConfigureAwait(false);
             var importMetadata=new TakeoutImportMetadataRunner(state,storage,owner._importMetadata,work,
                 token=>TakeoutWorkerInstallation.OpenInstalledAsync(Path.Combine(AppContext.BaseDirectory,"workers","takeout-metadata"),token));
-            owner._importQueue=new(state,storage,owner._imports,owner._publication.CurrentOperations,importFolderPicker,owner._sources.NotifySourcesChanged,importMetadata,owner._publication.NotifyLocalCatalogChanged);
+            owner._importQueue=new(state,storage,owner._imports,owner._publication.CurrentOperations,importFolderPicker,owner._sources.NotifySourcesChanged,importMetadata,owner._publication.NotifyLocalCatalogChanged,importArchivePicker);
             owner._importQueue.Failed+=owner.OnFailure;
             owner._importChildrenWork=new(owner._imports,owner._importQueue);
             owner._importWork=new(owner._sources.Work,owner._importChildrenWork);

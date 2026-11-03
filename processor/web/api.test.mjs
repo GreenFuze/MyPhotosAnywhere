@@ -334,3 +334,21 @@ test('explicit metadata cleanup sends only the saved import with CSRF and valida
   for (const value of [null, {}, { retired: 1, kept: '0' }, { retired: '01', kept: '0' }, { retired: '-1', kept: '0' }, { retired: '1', kept: '6400000' }, { retired: '0', kept: '900000000' }])
     await withBrowser(async () => json(value), async api => { await assert.rejects(api.cleanupImportMetadata(importIdentity), /cleanup reply/); });
 });
+
+test('archive selection uses the native dialog command and validates the declared capability without accepting browser paths', async () => {
+  const signal = new AbortController().signal;
+  for (const enabled of [true, false]) await withBrowser(async () => json({ canChooseFolder: true, canChooseArchives: enabled, paused: false, imports: [] }), async api => {
+    assert.equal((await api.imports(signal)).canChooseArchives, enabled);
+  });
+  await withBrowser(async () => json({ canChooseFolder: true, paused: false, imports: [] }), async api => { assert.equal((await api.imports(signal)).canChooseArchives, false); });
+  for (const invalid of [null, 'true', 1, {}]) await withBrowser(async () => json({ canChooseFolder: true, canChooseArchives: invalid, paused: false, imports: [] }), async api => {
+    await assert.rejects(api.imports(signal), /invalid import progress/);
+  });
+  let calls = 0;
+  await withBrowser(async (url, options) => {
+    if (url === '/api/session') return json({ csrf: 'c'.repeat(64), hostOwner: true });
+    calls++; assert.equal(url, '/api/import-archives'); assert.equal(options.method, 'POST'); assert.equal(options.credentials, 'same-origin');
+    assert.equal(options.headers['X-MPA-CSRF'], 'c'.repeat(64)); assert.deepEqual(JSON.parse(options.body), { id: importIdentity }); return json({ import: null });
+  }, async api => { await api.connect(); assert.equal(await api.importAction('archives', importIdentity), null); await assert.rejects(api.importAction('archives', 'C:/photos.zip'), /captured import/); });
+  assert.equal(calls, 1);
+});

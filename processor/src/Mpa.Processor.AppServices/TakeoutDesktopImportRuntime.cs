@@ -6,7 +6,8 @@ namespace Mpa.Processor.AppServices;
 /// own selection only; captured reviews/Start requests survive browser closure.
 /// Shares the existing current-library lane and borrowed inventory owner.</summary>
 public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,StorageBudgetManager budget,
-    TakeoutInventoryService inventory,CurrentLibraryCatalogRuntime current,Func<CancellationToken,Task<string?>>? picker,Action? discoveryReady=null,TakeoutImportMetadataRunner? metadata=null,Action? metadataReady=null)
+    TakeoutInventoryService inventory,CurrentLibraryCatalogRuntime current,Func<CancellationToken,Task<string?>>? picker,Action? discoveryReady=null,TakeoutImportMetadataRunner? metadata=null,Action? metadataReady=null,
+    Func<CancellationToken,Task<IReadOnlyList<string>?>>? archivePicker=null)
     : IProcessorWorkControl,IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state=state??throw new ArgumentNullException(nameof(state));
@@ -14,6 +15,7 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
     private readonly TakeoutInventoryService _inventory=inventory??throw new ArgumentNullException(nameof(inventory));
     private readonly CurrentLibraryCatalogRuntime _current=current??throw new ArgumentNullException(nameof(current));
     private readonly Func<CancellationToken,Task<string?>>? _picker=picker;
+    private readonly Func<CancellationToken,Task<IReadOnlyList<string>?>>? _archivePicker=archivePicker;
     private readonly Action? _discoveryReady=discoveryReady;
     private readonly TakeoutImportMetadataRunner? _metadata=metadata;
     private readonly Action? _metadataReady=metadataReady;
@@ -28,6 +30,7 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
     private long _requests;
     private Exception? _failure;
     public bool CanChooseFolder=>_picker is not null;
+    public bool CanChooseArchives=>_archivePicker is not null;
     public ProcessorWorkState State {get{lock(_gate)return _status;}}
     public bool ExitConfirmed {get{lock(_gate)return _exitConfirmed;}}
     public Exception? Failure {get{lock(_gate)return _failure;}}
@@ -44,17 +47,21 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
         lock(_gate){Check(caller,caller);if(_metadata is null)throw new InvalidOperationException("Metadata processing is unavailable.");new TakeoutMetadataIssueRepository(database).SelectOriginal(importId,sidecarKey,originalKey);Wake();return true;}
     },caller);
     public Task<TakeoutImportActivity?> ChooseFolderAsync(Guid sourceId,CancellationToken caller)
+        =>ChooseAsync(sourceId,false,caller);
+    public Task<TakeoutImportActivity?> ChooseArchivesAsync(Guid sourceId,CancellationToken caller)
+        =>ChooseAsync(sourceId,true,caller);
+    private Task<TakeoutImportActivity?> ChooseAsync(Guid sourceId,bool archives,CancellationToken caller)
     {
         if(sourceId==Guid.Empty)throw new ArgumentException("Choose an existing Drive source.",nameof(sourceId));
         lock(_gate)
         {
             ObjectDisposedException.ThrowIf(_stopping,this);
-            if(_picker is null)throw new InvalidOperationException("Choose the input on the desktop computer.");
+            if(archives?_archivePicker is null:_picker is null)throw new InvalidOperationException("Choose the input on the desktop computer.");
             if(_pick is{IsCompleted:false})throw new ProcessorWorkStateConflictException();
-            caller.ThrowIfCancellationRequested();var operation=Task.Run(()=>ChooseOwnedAsync(sourceId,caller),CancellationToken.None);_pick=operation;return operation;
+            caller.ThrowIfCancellationRequested();var operation=Task.Run(()=>ChooseOwnedAsync(sourceId,archives,caller),CancellationToken.None);_pick=operation;return operation;
         }
     }
-    private async Task<TakeoutImportActivity?> ChooseOwnedAsync(Guid sourceId,CancellationToken caller)
+    private async Task<TakeoutImportActivity?> ChooseOwnedAsync(Guid sourceId,bool archives,CancellationToken caller)
     {
         using var linked=CancellationTokenSource.CreateLinkedTokenSource(caller,_stop.Token);
         var target=await _state.ExecuteAsync(database=>
@@ -65,8 +72,22 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
             var library=new LibraryAuthorityRepository(database,_budget).Controller()??throw new InvalidOperationException("Finish library setup before importing photos.");
             return new TakeoutImportTarget(library.LibraryId,source.AccountId,account.Revision,source.FolderId,snapshot.Revision);
         },linked.Token).ConfigureAwait(false);
-        var path=await _picker!(linked.Token).ConfigureAwait(false);Check(caller,linked.Token);if(path is null)return null;
-        using var selected=TakeoutSelectedInput.OpenFolder(Guid.NewGuid(),path);var binding=selected.Binding;var importId=Guid.NewGuid();
+        IReadOnlyList<string>? paths;
+        if(archives)paths=await _archivePicker!(linked.Token).ConfigureAwait(false);
+        else{var path=await _picker!(linked.Token).ConfigureAwait(false);paths=path is null?null:new[]{path};}
+        Check(caller,linked.Token);if(paths is null||paths.Count==0)return null;
+        if(paths.Count>(archives?64:1)||paths.Any(string.IsNullOrWhiteSpace))throw new ArgumentException("Choose at most 64 local ZIP parts or one local folder.");
+        var full=paths.Select(Path.GetFullPath).ToArray();
+        if(full.Distinct(OperatingSystem.IsWindows()?StringComparer.OrdinalIgnoreCase:StringComparer.Ordinal).Count()!=full.Length)throw new ArgumentException("Choose each local input only once.");
+        var selected=new List<TakeoutSelectedInput>(full.Length);
+        try
+        {
+        foreach(var path in full)
+        {
+            Check(caller,linked.Token);
+            selected.Add(archives?await TakeoutSelectedInput.OpenZipAsync(Guid.NewGuid(),path,linked.Token).ConfigureAwait(false):TakeoutSelectedInput.OpenFolder(Guid.NewGuid(),path));
+        }
+        var bindings=selected.Select(value=>value.Binding).ToArray();var importId=Guid.NewGuid();
         var result=await _state.ExecuteAsync(database=>
         {
             lock(_gate)
@@ -75,12 +96,14 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
                 if(snapshot.Revision!=target.ConfigurationRevision||!snapshot.Sources.Any(value=>value.Id==sourceId&&value.AccountId==target.AccountId&&value.FolderId==target.FolderId&&value.Enabled&&value.AccountConnected)||
                     !new DriveAccountRepository(database).Accounts().Any(value=>value.PermissionId==target.AccountId&&value.Revision==target.AccountRevision&&value.Connected))throw new StaleLibraryConfigurationException();
                 var repository=new TakeoutImportInventoryRepository(database);if(repository.Identities().Count==64)throw new InvalidOperationException("Retained import capacity reached; review the existing imports first.");
-                repository.Ensure(importId,target,[binding]);Wake();return repository.Activity(importId);
+                repository.Ensure(importId,target,bindings);Wake();return repository.Activity(importId);
             }
         },linked.Token).ConfigureAwait(false);
         // Admission above is durable. Caller/browser cancellation after that point
         // must not abandon the engine's review, even if this reply is lost.
         return result;
+        }
+        finally{foreach(var input in selected)input.Dispose();}
     }
     public async Task<TakeoutImportActivity> StartAsync(Guid importId,CancellationToken caller)
     {

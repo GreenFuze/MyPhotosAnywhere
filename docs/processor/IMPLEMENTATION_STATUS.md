@@ -6243,3 +6243,31 @@ JSON/gzip inventory, partial-page history, general failed-observation reconcilia
 predecessor verification, renewed-access admission and complete catalog publication remain
 unfinished. A stored completed attempt cannot authorize a new process or skip startup
 reconciliation. No live Drive write or new device/UI acceptance is claimed here.
+
+## 2026-11-03 — Native local ZIP selection reaches actual PC publication
+
+The desktop Imports screen can select local ZIP/multipart Takeout without first
+extracting it. The native input owner derives exact bounded SHA/length, uses its
+existing verified ZIP reader and retains originals read-only. Selection captures
+one existing destination; user review and explicit Start remain required. Stale
+account/source configuration, duplicate/excess parts, cancellation and rejected
+later-part handles fail before durable admission; Exit joins the actual dialog.
+
+Final isolated scope passes50Core input/association,15distinct Services,60Web and
+27frontend cases with a strict zero-warning/error Desktop build. Actual single ZIP
+and original/sidecar split across two archives complete original verification,
+installed worker, exact raw backup, signed activation/query and immutable retry
+assertions under existing40sec deadlines; archive hashes remain identical. Current
+source proof preserves300unchanged test files/40old cases/202exact assertions.
+Evidence current-archive-import-source-v281.json and
+current-archive-import-validation-v282.json. Initial compile failures and a CRLF
+versus Git-LF evidence comparison failure are retained with their corrections;
+no test, warning, deadline, runtime exception or capacity bound was weakened.
+Exact committed-main validation and fresh PC CI remain required for this slice.
+
+Previous exact59a8215 PC CI independently passes60jobs/72native reports, first
+attempt, in ci-59a8215-pc-validation-v271.json. This does not establish UI/live
+acceptance or a finished 0.6 product. Drive ZIP, raw evidence for unsupported and
+conflicting sidecars, repaired input/version workflows, remaining approved plugins
+and human photo workflows, six installers and actual platform/signing/final exact
+publication remain unfinished. Android stays deferred and is not a PC gate.

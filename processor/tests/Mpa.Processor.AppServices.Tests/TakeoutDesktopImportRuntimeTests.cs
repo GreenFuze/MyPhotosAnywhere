@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using Microsoft.Data.Sqlite;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Mpa.Processor.Core;
@@ -21,7 +22,12 @@ public sealed partial class AccountServiceTests
     public Task DesktopRawMetadataRecoveryUsesSignedCatalogAndActualDriveWithoutPrivateInputsJobsOrLocators()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false,rawBackup:true,recover:true);
     [TestMethod]
     public Task DesktopExplicitMetadataCleanupUsesActualRawBackupAndRetainsRetryWithoutAnotherOriginalUploadOrWorker()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false,rawBackup:true,cleanup:true);
-    private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished,bool manualAssociation=false,bool rawBackup=false,bool recover=false,bool cleanup=false)
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public Task DesktopZipImportReviewsCompressedPartsAndPublishesVerifiedOriginalAndBackedUpMetadataWithoutExtraction(bool multipart)
+        =>VerifyImportedPhotoPublicationAsync(legacyFinished:false,rawBackup:true,zipParts:multipart?2:1);
+    private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished,bool manualAssociation=false,bool rawBackup=false,bool recover=false,bool cleanup=false,int zipParts=0)
     {
         var started=Stopwatch.GetTimestamp();
         using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(40));await using var fixture=await CurrentReaderFixture.CreateAsync(addSource:true).ConfigureAwait(false);
@@ -33,6 +39,20 @@ public sealed partial class AccountServiceTests
             var raw=System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllBytesAsync(selection.Path+".json",deadline.Token).ConfigureAwait(false))!;raw["title"]="Different export title.jpg";
             await File.WriteAllBytesAsync(selection.Path+".json",System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(raw),deadline.Token).ConfigureAwait(false);
         }
+        var archives=new List<string>();var archiveHashes=new List<byte[]>();
+        if(zipParts>0)
+        {
+            for(var part=0;part<zipParts;part++)
+            {
+                var path=Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(selection.Path))!,"takeout-part-"+part+".zip");
+                using(var archive=ZipFile.Open(path,ZipArchiveMode.Create))
+                {
+                    if(part==0)archive.CreateEntryFromFile(selection.Path,"Takeout/Google Photos/Album/"+Path.GetFileName(selection.Path),CompressionLevel.Fastest);
+                    if(part==zipParts-1)archive.CreateEntryFromFile(selection.Path+".json","Takeout/Google Photos/Album/"+Path.GetFileName(selection.Path)+".json",CompressionLevel.Fastest);
+                }
+                archives.Add(path);archiveHashes.Add(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(path,deadline.Token).ConfigureAwait(false)));
+            }
+        }
         var setup=await state.ExecuteAsync(db=>new{db.StateDirectory,db.InstallationId,Source=new LibrarySourceRepository(db).Snapshot().Sources.Single().Id},deadline.Token).ConfigureAwait(false);
         var originalAllocator=fixture.Data.Setup.Accounts.Readers.WorkspaceAllocate;var cloud=new OriginalCloud(selection.Payload);WireOriginal(fixture.Data.Setup.Accounts,cloud);
         using var metadataStorage=await state.ExecuteAsync(db=>new TakeoutMetadataStageStorage(db,fixture.Data.Budget),deadline.Token).ConfigureAwait(false);
@@ -42,8 +62,8 @@ public sealed partial class AccountServiceTests
         var metadata=new TakeoutImportMetadataRunner(state,fixture.Data.Budget,metadataStorage,native,token=>
         {metadataLaunches++;return TakeoutWorkerInstallation.OpenInstalledAsync(Path.Combine(AppContext.BaseDirectory,"workers","takeout-metadata"),token);});
         var scanQueued=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var scanNotifications=0;var metadataNotifications=0;
-        await using var imports=new TakeoutDesktopImportRuntime(state,fixture.Data.Budget,inventory,current,_=>Task.FromResult<string?>(Path.GetDirectoryName(selection.Path)),()=>{Interlocked.Increment(ref scanNotifications);scanQueued.TrySetResult();},metadata,()=>Interlocked.Increment(ref metadataNotifications));
-        await imports.ResumeAsync().ConfigureAwait(false);var review=await imports.ChooseFolderAsync(setup.Source,deadline.Token).ConfigureAwait(false);Assert.IsNotNull(review);
+        await using var imports=new TakeoutDesktopImportRuntime(state,fixture.Data.Budget,inventory,current,_=>Task.FromResult<string?>(Path.GetDirectoryName(selection.Path)),()=>{Interlocked.Increment(ref scanNotifications);scanQueued.TrySetResult();},metadata,()=>Interlocked.Increment(ref metadataNotifications),zipParts>0?_=>Task.FromResult<IReadOnlyList<string>?>(archives):null);
+        await imports.ResumeAsync().ConfigureAwait(false);var review=zipParts>0?await imports.ChooseArchivesAsync(setup.Source,deadline.Token).ConfigureAwait(false):await imports.ChooseFolderAsync(setup.Source,deadline.Token).ConfigureAwait(false);Assert.IsNotNull(review);
         var ready=await WaitImportAsync(imports,review.Id,"ready",deadline.Token).ConfigureAwait(false);Assert.AreEqual(1L,ready.Media);Assert.IsFalse(ready.Requested);Assert.AreEqual(0,cloud.Allocations);
         Measure("input-reviewed");
         Assert.IsFalse(ready.InputName.Contains(Path.DirectorySeparatorChar));
@@ -217,6 +237,7 @@ public sealed partial class AccountServiceTests
             Assert.AreEqual(before,new SourceDiscoveryRepository(db).ReadActivity().Jobs.Single(value=>value.JobId==scan.JobId).Scope);return true;
         },deadline.Token).ConfigureAwait(false);
         Measure("assertions-complete");
+        for(var part=0;part<archives.Count;part++)CollectionAssert.AreEqual(archiveHashes[part],System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(archives[part],deadline.Token).ConfigureAwait(false)),"Selected ZIP archives must remain byte-identical.");
     }
 
     [TestMethod]

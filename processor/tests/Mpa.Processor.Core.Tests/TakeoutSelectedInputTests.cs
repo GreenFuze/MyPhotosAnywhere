@@ -15,6 +15,39 @@ public sealed class TakeoutSelectedInputTests
     private const string Sidecar="{\"title\":\"שלום.jpg\",\"photoTakenTime\":{\"timestamp\":\"-1\"},\"description\":\"keep original\"}";
 
     [TestMethod]
+    public async Task LocalZipCaptureDerivesActualBindingAndKeepsOriginalBytesAndImmutableReopenFence()
+    {
+        using var root=new WorkerProcessTests.WorkerTestDirectory();using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var path=await ZipAsync(root.Path,[("album/photo.jpg","original"u8.ToArray())],deadline.Token).ConfigureAwait(false);
+        var before=await File.ReadAllBytesAsync(path,deadline.Token).ConfigureAwait(false);var id=Guid.NewGuid();TakeoutInputBinding binding;
+        using(var input=await TakeoutSelectedInput.OpenZipAsync(id,path,deadline.Token).ConfigureAwait(false))
+        {
+            binding=input.Binding;Assert.AreEqual(id,binding.PartId);Assert.AreEqual("zip",binding.Kind);Assert.AreEqual(path,binding.Location);
+            Assert.AreEqual((long)before.Length,binding.Bytes);Assert.AreEqual(Convert.ToHexStringLower(SHA256.HashData(before)),binding.Sha256);
+            var entry=input.Enumerate(deadline.Token).Single();Assert.AreEqual("album/photo.jpg",entry.RelativePath);
+            await using var read=input.OpenRead(entry,1024);CollectionAssert.AreEqual("original"u8.ToArray(),await ReadAllAsync(read,deadline.Token).ConfigureAwait(false));
+        }
+        CollectionAssert.AreEqual(before,await File.ReadAllBytesAsync(path,deadline.Token).ConfigureAwait(false));
+        var changed=before.ToArray();changed[0]^=1;await File.WriteAllBytesAsync(path,changed,deadline.Token).ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(()=>TakeoutSelectedInput.OpenZipAsync(id,path,binding.Bytes!.Value,binding.Sha256!,deadline.Token)).ConfigureAwait(false);
+        using var exclusive=new FileStream(path,FileMode.Open,FileAccess.ReadWrite,FileShare.None);Assert.AreEqual(before.Length,exclusive.Length);
+    }
+
+    [TestMethod]
+    public async Task LocalZipCaptureRejectsCanceledTruncatedAndMalformedArchivesAndClosesEveryRejectedHandle()
+    {
+        using var root=new WorkerProcessTests.WorkerTestDirectory();using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var path=Path.Combine(root.Path,"invalid.zip");using var canceled=new CancellationTokenSource();await canceled.CancelAsync().ConfigureAwait(false);
+        await Assert.ThrowsAsync<OperationCanceledException>(()=>TakeoutSelectedInput.OpenZipAsync(Guid.NewGuid(),path,canceled.Token)).ConfigureAwait(false);
+        foreach(var bytes in new[]{new byte[21],new byte[22],new byte[4096]})
+        {
+            await File.WriteAllBytesAsync(path,bytes,deadline.Token).ConfigureAwait(false);
+            await Assert.ThrowsExactlyAsync<InvalidDataException>(()=>TakeoutSelectedInput.OpenZipAsync(Guid.NewGuid(),path,deadline.Token)).ConfigureAwait(false);
+            using var exclusive=new FileStream(path,FileMode.Open,FileAccess.ReadWrite,FileShare.None);Assert.AreEqual((long)bytes.Length,exclusive.Length);
+        }
+    }
+
+    [TestMethod]
     public async Task TakeoutSelectedFolderReadsOnlyItsOwnOriginalEntriesAndRetainsNativeLeases()
     {
         using var root=new WorkerProcessTests.WorkerTestDirectory();using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(30));

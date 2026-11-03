@@ -169,3 +169,33 @@ fresh native CI for cleanup remain required. The parentd0a8ded is independently
 verified60PCjobs/72reports, first attempt (ci-d0a8ded-pc-validation-v241.json).
 Do not claim complete import/storage acceptance, unsupported/conflicting raw backup,
 version/input repair, a complete PC client, native installers or a final release.
+
+Local compressed Takeout continuation (2026-11-03): Imports now offers native ZIP
+selection alongside folders, including up to64parts from one export. The existing
+input owner captures actual bounded length/SHA and holds read-only verified ZIPs;
+no extraction or original writes. The browser sends only a destination identity,
+then existing review and explicit Start govern copying. Folder/archive dialogs share
+one tracked admission; a changed destination/account rejects the selection and Exit
+waits for actual dialog/input retirement. A later rejected part releases earlier
+handles. Existing1024item/32attempt and ZIP/metadata limits remain unchanged.
+
+Isolated final-code evidence:50Core ZIP/input/association cases,15distinct affected
+Services cases (including both real single/multipart originals plus sidecar worker,
+raw backup and signed publication),60Web and27frontend cases pass; strict Desktop
+build has zero warnings/errors. Multipart puts original and matching sidecar in
+separate archives under the same hierarchy. Both selected archives remain exactly
+byte-identical. All existing40sec publication assertions, human filename precedence,
+replay/original-upload identity and browser-cancellation checks remain. Initial two
+compile errors and the workflow-line-ending proof correction are retained. Source
+proof preserves300whole test files,40old changed-file cases and202exact assertions;
+new cases2Core/5Services/1Web/1frontend. See current-archive-import-source-v281.json
+and current-archive-import-validation-v282.json in preflight-060. Exact committed
+main and fresh native CI are still required. Native picker visuals/live Drive are
+unverified; this is one local ZIP vertical, not complete import/product acceptance.
+
+The preceding exact59a8215 cleanup is independently verified60PCjobs/72reports,
+first attempt on all four existing native runners; ci-59a8215-pc-validation-v271.json.
+Unsupported/conflicting raw preservation, corrected-input/version repair, Drive ZIP
+input and full hierarchy, remaining approved processing/photo-client workflows,
+six installers and actual UI/live/platform/performance/signing/final tested PC
+publication remain unfinished. No Android work or acceptance gate was added.

@@ -115,7 +115,7 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
             _controlMonitor = ObserveControlAsync(_control);
             RefreshReadyStatus();
             _webStartup = Task.Run(() => DesktopWebRuntime.StartAsync(_stateCoordinator, _installationId, Program.StateDirectory, _work,
-                Path.Combine(AppContext.BaseDirectory, "MPA.Processor.oauth.json"), Path.Combine(AppContext.BaseDirectory, "wwwroot"), enableLan: false, importFolderPicker:ChooseImportFolderAsync,cancellationToken:_stop.Token));
+                Path.Combine(AppContext.BaseDirectory, "MPA.Processor.oauth.json"), Path.Combine(AppContext.BaseDirectory, "wwwroot"), enableLan: false, importFolderPicker:ChooseImportFolderAsync,cancellationToken:_stop.Token,importArchivePicker:ChooseImportArchivesAsync));
             _web = await _webStartup;
             _web.Failed += error => Dispatcher.UIThread.Post(() => ShowFailure("Desktop engine needs attention", error));
             if (_shutdown is not null) return;
@@ -196,6 +196,33 @@ public sealed class ProcessorApp : Application, IAsyncDisposable
             finally {foreach(var folder in selected)folder.Dispose();}
         }
         finally {picker.Close();}
+    }
+    private async Task<IReadOnlyList<string>?> ChooseImportArchivesAsync(CancellationToken token)
+    {
+        var operation=await Dispatcher.UIThread.InvokeAsync<Task<IReadOnlyList<string>?>>(()=>ChooseImportArchivesOnUiAsync(token));
+        return await operation.ConfigureAwait(false);
+    }
+    private async Task<IReadOnlyList<string>?> ChooseImportArchivesOnUiAsync(CancellationToken token)
+    {
+        using var linked=CancellationTokenSource.CreateLinkedTokenSource(token,_stop.Token);linked.Token.ThrowIfCancellationRequested();
+        var picker=new Window{Title="Choose Takeout ZIP archives",Width=380,Height=130,ShowInTaskbar=false,
+            Content=new TextBlock{Text="Choose all ZIP parts belonging to one photo export.",Margin=new Thickness(20),TextWrapping=TextWrapping.Wrap}};
+        picker.Show();using var cancel=linked.Token.Register(()=>Dispatcher.UIThread.Post(()=>picker.Close()));
+        try
+        {
+            if(!picker.StorageProvider.CanOpen)throw new InvalidOperationException("File selection is unavailable on this desktop.");
+            var selected=await picker.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions{Title="Choose Takeout ZIP archives",AllowMultiple=true,
+                FileTypeFilter=[new FilePickerFileType("ZIP archives"){Patterns=["*.zip"]}]});
+            try
+            {
+                linked.Token.ThrowIfCancellationRequested();
+                if(selected.Count==0)return null;
+                if(selected.Count>64||selected.Any(file=>!file.Path.IsFile))throw new InvalidOperationException("Choose at most 64 local ZIP parts on this computer.");
+                return selected.Select(file=>file.Path.LocalPath).ToArray();
+            }
+            finally{foreach(var file in selected)file.Dispose();}
+        }
+        finally{picker.Close();}
     }
     private async Task RequestExitAsync()
     {

@@ -92,8 +92,8 @@ export function Imports({ api, back }: { api: DesktopApi; back: () => void }) {
     }
     void refresh(); return () => { stop.abort(); if (timer !== undefined) clearTimeout(timer); };
   }, [api]);
-  async function act(action: 'folders' | 'start' | 'retry', id: string) {
-    setBusy(true); setNotice(action === 'folders' ? 'Choose a folder in the dialog on this computer.' : null);
+  async function act(action: 'folders' | 'archives' | 'start' | 'retry', id: string) {
+    setBusy(true); setNotice(action === 'folders' ? 'Choose a folder in the dialog on this computer.' : action === 'archives' ? 'Choose the ZIP parts in the dialog on this computer.' : null);
     try { await api.importAction(action, id); setData(await api.imports(new AbortController().signal)); setNotice(null); }
     catch (error) { setNotice(error instanceof Error ? error.message : 'Import could not continue. Saved progress was retained.'); }
     finally { setBusy(false); }
@@ -110,13 +110,14 @@ export function Imports({ api, back }: { api: DesktopApi; back: () => void }) {
   const labels = { reviewing: 'Reviewing selected files', ready: 'Ready to import', copying: 'Copying and verifying originals', 'originals-verified': 'Originals verified', 'needs-attention': 'Needs attention', paused: 'Paused', canceled: 'Canceled' };
   const enabled = sources.filter(source => source.enabled && source.accountConnected);
   return <section className="settings"><button className="back" onClick={back}>‹ Back to Photos</button><h1>Import photos</h1>
-    <p>Copy photos from a local photo folder or an extracted Takeout folder to Google Drive. Your selected files stay unchanged.</p>
+    <p>Copy photos from a local folder or Takeout ZIP archives to Google Drive. Your selected files stay unchanged.</p>
     {notice && <p role="alert">{notice}</p>}
     {data?.paused && <p role="status">Processing is paused. Saved imports will continue when you resume processing in Settings.</p>}
     <section className="setting-card"><h2>Choose a destination</h2><label>Drive folder <select value={destination} onChange={event => setDestination(event.target.value)} disabled={busy}>
       <option value="">Choose an enabled Source…</option>{enabled.map(source => <option key={source.id} value={source.id}>{source.displayName}</option>)}</select></label>
       {!enabled.length && <p>Add and enable a Drive folder in Sources first.</p>}
       {data?.canChooseFolder ? <button disabled={busy || !enabled.some(source => source.id === destination)} onClick={() => { void act('folders', destination); }}>Choose folder on this computer</button> : data && <p>Open the desktop application on this computer to choose a local folder.</p>}
+      {data?.canChooseArchives && <><button disabled={busy || !enabled.some(source => source.id === destination)} onClick={() => { void act('archives', destination); }}>Choose ZIP archives on this computer</button><p>Select all ZIP parts from one export together. You can leave them compressed.</p></>}
       <p>You can review the photo count before starting the copy.</p>
     </section>
     {!data && <p role="status">Loading saved imports…</p>}
@@ -134,7 +135,7 @@ export function Imports({ api, back }: { api: DesktopApi; back: () => void }) {
         {item.state === 'ready' && <button disabled={busy || item.media === '0'} onClick={() => {
           if (window.confirm(`Import all ${item.media ?? ''} photo and video originals from ${item.inputName} into ${target?.displayName ?? 'the captured Drive folder'}? The source files will stay unchanged.`)) void act('start', item.id);
         }}>Import all originals</button>}
-        {item.state === 'needs-attention' && <><p>{item.issue === 'metadata-capacity' ? 'Metadata storage is full. Saved originals and unfinished metadata are retained.' : item.issue === 'drive-unavailable' ? 'Google Drive is unavailable. Reconnect or wait for access to return.' : item.issue === 'input-unavailable' ? 'The selected input is unavailable. Restore access to the same folder.' : 'The captured destination or account permission changed. Review Sources and the account connection.'}</p><button disabled={busy} onClick={() => { void act('retry', item.id); }}>Retry unfinished work</button></>}
+        {item.state === 'needs-attention' && <><p>{item.issue === 'metadata-capacity' ? 'Metadata storage is full. Saved originals and unfinished metadata are retained.' : item.issue === 'drive-unavailable' ? 'Google Drive is unavailable. Reconnect or wait for access to return.' : item.issue === 'input-unavailable' ? 'The selected input is unavailable. Restore access to the same folder or ZIP archives.' : 'The captured destination or account permission changed. Review Sources and the account connection.'}</p><button disabled={busy} onClick={() => { void act('retry', item.id); }}>Retry unfinished work</button></>}
         {item.metadata && item.metadata.ready !== '0' && <div><p>Free extra local metadata processing space after backup. Pause processing in Settings first, then resume it after cleanup.</p>
           <button disabled={busy || !data.paused} onClick={() => { void cleanup(item.id); }}>Free local metadata space</button></div>}
       </section>;

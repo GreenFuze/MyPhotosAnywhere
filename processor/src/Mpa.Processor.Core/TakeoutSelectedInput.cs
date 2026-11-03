@@ -95,6 +95,18 @@ public abstract class TakeoutSelectedInput : IDisposable
     {lock(_gate){if(_closed)return;if(_reading||_enumerating)throw new InvalidOperationException("Join all selected Takeout entry readers/enumerators before releasing the source.");DisposeOwned();_closed=true;}GC.SuppressFinalize(this);}
 
     public static TakeoutSelectedInput OpenFolder(Guid partId,string selectedAbsoluteDirectory)=>new FolderInput(partId,selectedAbsoluteDirectory);
+    /// <summary>Capture an explicitly chosen local archive, then open the same exact
+    /// read-only snapshot through the normal bounded ZIP owner. No extraction.</summary>
+    public static async Task<TakeoutSelectedInput> OpenZipAsync(Guid partId,string selectedAbsolutePath,CancellationToken token)
+    {
+        if(partId==Guid.Empty||!Path.IsPathFullyQualified(selectedAbsolutePath))throw new ArgumentException("Choose a local ZIP with a selected-part identity.");
+        token.ThrowIfCancellationRequested();Regular(selectedAbsolutePath,false);
+        await using var input=new FileStream(selectedAbsolutePath,FileMode.Open,FileAccess.Read,FileShare.Read,65536,FileOptions.Asynchronous|FileOptions.SequentialScan);
+        var bytes=input.Length;
+        if(bytes is <22 or >TakeoutZipDirectoryBounds.MaximumArchiveBytes)throw new InvalidDataException("Selected ZIP exceeds the supported archive bounds.");
+        var hash=Convert.ToHexStringLower(await SHA256.HashDataAsync(input,token).ConfigureAwait(false));
+        return await OpenZipAsync(partId,selectedAbsolutePath,bytes,hash,token).ConfigureAwait(false);
+    }
     public static async Task<TakeoutSelectedInput> OpenZipAsync(Guid partId,string stagedAbsolutePath,long expectedBytes,string expectedSha256,CancellationToken token)
     {
         if(partId==Guid.Empty||!Path.IsPathFullyQualified(stagedAbsolutePath)||expectedBytes is <22 or >TakeoutZipDirectoryBounds.MaximumArchiveBytes||expectedSha256 is not {Length:64}||expectedSha256.Any(c=>c is not(>='0' and <='9') and not(>='a' and <='f')))
