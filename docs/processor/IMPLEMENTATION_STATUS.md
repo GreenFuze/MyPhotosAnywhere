@@ -9,6 +9,45 @@ app. Earlier joint-release gate statements below are historical and superseded
 for this PC release; PC safety, signing, preservation and validation stay required.
 See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists.
 
+## Joined duplicate replay-input retirement (2026-11-03; raw cloud backup unfinished)
+
+The desktop metadata runner now retires the generated per-attempt input.bin only
+after the exact child/IO have joined and the actual native ready/outbox still match.
+The storage owner independently checks its retained source and worker artifact,
+verifies the duplicate's complete bytes, rechecks the ready receipt through the
+same serial state owner and holds its native item admission through unlink. The
+retained source/result handles and their original markers remain held/intact. No
+provider operation or original path is exposed by this local cleanup.
+
+Changed payload/marker, pending capture, unknown file, unresolved diagnostic,
+missing atomic receipt, canceled request or foreign state owner cannot authorize
+deletion. Reopening native storage accepts a previously retired duplicate and
+reads the exact retained raw/result without another worker or upload. Original
+bytes, result receipts, raw source, artifact, diagnostics, markers and item/attempt
+directories stay protected. The1024item and32attempt limits are unchanged. This
+reclaims one redundant input copy; full raw metadata cloud preservation/recovery
+and generated-item retirement remain unfinished and are not inferred from hashes.
+
+The preceding exact06e61ce has independently verified60PCjobs/72native reports on
+Windows/Linux/macOS ARM/Intel:127Protocol/611Core/781ordinaryServices/179Google/
+9LAN/53Web each. Every prior identity and source-derived addition, unchanged job
+limit, official diagnostic stream, scale/reference fixture and four22-case Desktop
+frontend/audit/asset reports pass. Evidence ci-06e61ce-pc-validation-v179.json.
+This does not accept later code or the complete PC/UI/live/install/release workflow.
+
+Current focused replay-cleanup evidence is current-replay-retirement-validation-v185.json:
+53related Core cases (11new),10Services cases and strict Desktop diagnostics. The
+native fresh/legacy/manual publication cases additionally assert automatic replay
+retirement and exact retained raw bytes. Existing40sec integration deadlines and
+all old assertions remain. One initial negative fixture asked budget accounting
+to inspect its deliberately corrupt inventory after already proving no deletion;
+the fixture now restores only that synthetic damage before checking reservations.
+The failed report is retained. One fresh publication run reached its unchanged
+40sec deadline; phase instrumentation was added without changing production or
+limits. The single profiled case passed in28.27sec, and the complete10-case rerun
+passed. Exact phase/read-count measurements and the earlier failed report remain
+in evidence; no timeout exception or warning suppression was introduced.
+
 ## Explicit unmatched-sidecar selection (2026-11-03; PC acceptance unfinished)
 
 Imports now lets the local host review supported unmatched metadata, page through

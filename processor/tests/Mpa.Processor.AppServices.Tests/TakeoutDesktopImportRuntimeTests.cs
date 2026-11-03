@@ -17,7 +17,10 @@ public sealed partial class AccountServiceTests
     public Task DesktopExplicitMetadataSelectionSurvivesBrowserClosureAndPublishesOnlyTheChosenVerifiedOriginal()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false,manualAssociation:true);
     private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished,bool manualAssociation=false)
     {
+        var started=Stopwatch.GetTimestamp();
         using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(40));await using var fixture=await CurrentReaderFixture.CreateAsync(addSource:true).ConfigureAwait(false);
+        void Measure(string phase)=>Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new{importPublicationPhase=phase,elapsedMilliseconds=Stopwatch.GetElapsedTime(started).TotalMilliseconds,conditionalMetadataReads=fixture.Http.MetadataReads}));
+        Measure("fixture-ready");
         var selection=await NativeTakeoutSelectionAsync(fixture,deadline.Token,metadata:true).ConfigureAwait(false);var state=fixture.Data.Setup.Accounts.State;
         if(manualAssociation)
         {
@@ -36,10 +39,12 @@ public sealed partial class AccountServiceTests
         await using var imports=new TakeoutDesktopImportRuntime(state,fixture.Data.Budget,inventory,current,_=>Task.FromResult<string?>(Path.GetDirectoryName(selection.Path)),()=>{Interlocked.Increment(ref scanNotifications);scanQueued.TrySetResult();},metadata,()=>Interlocked.Increment(ref metadataNotifications));
         await imports.ResumeAsync().ConfigureAwait(false);var review=await imports.ChooseFolderAsync(setup.Source,deadline.Token).ConfigureAwait(false);Assert.IsNotNull(review);
         var ready=await WaitImportAsync(imports,review.Id,"ready",deadline.Token).ConfigureAwait(false);Assert.AreEqual(1L,ready.Media);Assert.IsFalse(ready.Requested);Assert.AreEqual(0,cloud.Allocations);
+        Measure("input-reviewed");
         Assert.IsFalse(ready.InputName.Contains(Path.DirectorySeparatorChar));
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(()=>state.ExecuteAsync(db=>new SourceDiscoveryRepository(db).EnsureImportedOriginalsScheduled(review.Id),deadline.Token)).ConfigureAwait(false);
         using var browser=new CancellationTokenSource();var admitted=await imports.StartAsync(review.Id,browser.Token).ConfigureAwait(false);Assert.IsTrue(admitted.Requested);await browser.CancelAsync().ConfigureAwait(false);
         var verified=await WaitImportAsync(imports,review.Id,"originals-verified",deadline.Token).ConfigureAwait(false);Assert.AreEqual(1L,verified.Verified);Assert.AreEqual(1,cloud.Allocations);
+        Measure("original-verified");
         CollectionAssert.AreEqual(selection.Payload,cloud.Uploaded);CollectionAssert.AreEqual(selection.Payload,await File.ReadAllBytesAsync(selection.Path,deadline.Token).ConfigureAwait(false));
         await scanQueued.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
         var processed=await WaitImportMetadataAsync(imports,review.Id,deadline.Token).ConfigureAwait(false);
@@ -60,7 +65,12 @@ public sealed partial class AccountServiceTests
             await imports.SelectMetadataOriginalAsync(review.Id,issue.Key,chosen.Key,deadline.Token).ConfigureAwait(false);
         }
         Assert.AreEqual(new TakeoutMetadataProgress(1,1,0,0,true),processed.Metadata);Assert.AreEqual(1,metadataLaunches);
+        Measure("metadata-ready");
         var expectedMetadata=TakeoutMetadataDocument.ParseSource(await File.ReadAllBytesAsync(selection.Path+".json",deadline.Token).ConfigureAwait(false));
+        var metadataArea=Path.Combine(setup.StateDirectory,"takeout-metadata-stages");
+        Assert.AreEqual(0,Directory.EnumerateFiles(metadataArea,"input.bin",SearchOption.AllDirectories).Count(),"Only joined duplicate worker inputs should retire automatically.");
+        var retainedRaw=Directory.EnumerateFiles(metadataArea,"source.bin",SearchOption.AllDirectories).Single();
+        CollectionAssert.AreEqual(expectedMetadata.CopyRawSource(),await File.ReadAllBytesAsync(retainedRaw,deadline.Token).ConfigureAwait(false));
         File.Delete(selection.Path+".json");await imports.PauseAsync().ConfigureAwait(false);
         if(legacyFinished)
         {
@@ -104,7 +114,9 @@ public sealed partial class AccountServiceTests
         fixture.Data.Setup.Accounts.Readers.WorkspaceAllocate=originalAllocator;
         fixture.Data.Setup.Accounts.Readers.FolderRead=originalFolderReader;
         ConfigureCurrentPublication(fixture.Data);InstallCurrentInventoryTransport(fixture);InstallImportedCatalogFixture(fixture);
+        Measure("catalog-publication-start");
         var published=await current.RunUntilCurrentAsync(deadline.Token).ConfigureAwait(false);
+        Measure("catalog-published");
         var activated=current.Catalog.Selection;Assert.IsNotNull(activated);Assert.AreEqual(published.Commit,activated.Catalog);
         var page=await current.Catalog.ReadPageAsync(activated.StageId,null,60,deadline.Token).ConfigureAwait(false);Assert.IsNotNull(page);
         var portable=page.Page.Assets.Single(value=>value.Id==imported.Id);Assert.AreEqual("Human renamed.jpg",portable.Name);
@@ -122,6 +134,7 @@ public sealed partial class AccountServiceTests
             var retained=new SourceDiscoveryRepository(db).EnsureImportedOriginalsScheduled(review.Id);Assert.AreEqual(scan.JobId,retained.JobId);Assert.IsFalse(retained.Created);
             Assert.AreEqual(before,new SourceDiscoveryRepository(db).ReadActivity().Jobs.Single(value=>value.JobId==scan.JobId).Scope);return true;
         },deadline.Token).ConfigureAwait(false);
+        Measure("assertions-complete");
     }
 
     [TestMethod]

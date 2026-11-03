@@ -69,6 +69,17 @@ human metadata. Complete hierarchy and ZIP/Drive ZIP input paths as approved.
 Do not restart passed inventory/worker/signing foundations or use the overly broad
 AccountServiceTests class filter.
 
+The installed metadata runner now retires only the byte-identical per-attempt
+worker input after actual native join, current local ready/outbox validation and
+independent retained raw/result verification. Source.bin, the ready artifact,
+markers, diagnostics and item/attempt directories remain intact. Unknown, changed
+or unresolved evidence closes cleanup before any deletion. This saves one redundant
+copy; it does not free the1024item/32attempt bounds, provide cloud backup, or accept
+general raw/result eviction. Raw cloud preservation with verified recovery remains
+the next import-storage workflow. The exact preceding06e61ce is independently
+verified across60PCjobs/72reports on all four existing native runners; see
+ci-06e61ce-pc-validation-v179.json. Do not rerun that unchanged revision.
+
 The product remains substantially unfinished. A passing component build is not
 a usable, validated 0.6 release. Complete these five milestones in order where
 dependent, and perform independent desktop work while checks run:

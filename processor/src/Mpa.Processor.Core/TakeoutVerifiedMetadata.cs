@@ -33,6 +33,19 @@ public sealed class TakeoutVerifiedMetadata
             Imported.Original.Capture.Sha256,Imported.Original.Version,Imported.Sidecar.Key,Source,Artifact,document);
     }
     private static bool SameDescriptor(ArtifactDescriptor left,ArtifactDescriptor right)=>left.Bytes==right.Bytes&&left.Sha256==right.Sha256&&left.RelativePath==right.RelativePath;
+
+    // Serial state owner only. A stale DTO or missing atomic outbox cannot
+    // authorize even duplicate replay-input retirement.
+    internal void AssertReadyForReplayRetirement(ProcessorStateDatabase database)
+    {
+        if(!ReferenceEquals(database,Owner))throw new InvalidOperationException("Metadata retirement must borrow its actual native state owner.");
+        var actual=new TakeoutMetadataJobRepository(database).ReadCompletedImported(Imported.Original.Capture.Inventory.ImportId,Imported.Sidecar.Key)
+            ??throw new InvalidDataException("Metadata retirement lost its actual ready receipt.");
+        if(actual.JobId!=JobId||actual.LeaseId!=LeaseId||actual.Attempt!=Attempt||actual.ItemContext!=ItemContext||actual.Imported.Sidecar!=Imported.Sidecar||
+            !SameDescriptor(actual.Source,Source)||!SameDescriptor(actual.Artifact,Artifact)||actual.Imported.Original.AssetId!=Imported.Original.AssetId||
+            actual.Imported.Original.FileId!=Imported.Original.FileId||actual.Imported.Original.Version!=Imported.Original.Version||actual.Imported.Original.Capture.Sha256!=Imported.Original.Capture.Sha256)
+            throw new InvalidDataException("Metadata retirement changed its first source, ready attempt or verified original.");
+    }
 }
 
 public sealed partial class TakeoutMetadataJobRepository

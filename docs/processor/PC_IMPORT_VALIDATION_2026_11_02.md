@@ -1,5 +1,28 @@
 # PC folder import increment
 
+Joined replay-input cleanup continuation (2026-11-03): only the verified duplicate
+worker input may retire, under the storage owner's held item admission and actual
+ready/outbox checks through its exact serial state owner. Primary raw source,
+ready artifact, markers, diagnostics, item/attempt directories and original uploads
+remain intact. Reopen is idempotent; unknown, modified, canceled, foreign-owner or
+unresolved evidence preserves every file. This reclaims duplicate bytes, not item
+capacity or cloud-backed raw/result eviction. Full raw cloud backup/recovery and
+safe generated-item retirement remain required before the import storage workflow
+is accepted.
+Local replay evidence current-replay-retirement-validation-v185.json covers53Core
+and10Services cases plus strict Desktop build/package checks. Native publication
+asserts the duplicate is gone and retained raw bytes are exact. Corrupt/unknown
+files, missing outbox, cancellation, foreign ownership and actual storage reopen
+are covered. Earlier fixture/accounting and40sec publication failures remain in
+the packet; the corrected fixture, profiled28.27sec case and full10-case rerun pass
+without removing assertions or increasing the deadline.
+
+Exact06e61ce PC CI is independently verified in ci-06e61ce-pc-validation-v179.json:
+60jobs/72reports,127Protocol/611Core/781Services/179Google/9LAN/53Web cases per
+native runner, preserving all prior identities and exact source additions. Every
+official log/limit, scale/reference fixture and four22-case Desktop/audit/asset
+reports pass. No final PC acceptance or release follows from that component result.
+
 Latest explicit association continuation (2026-11-03): the local host can choose
 a verified original from the same saved import for a supported unmatched sidecar.
 Bounded original pages and strict host/CSRF commands feed immutable native intent;

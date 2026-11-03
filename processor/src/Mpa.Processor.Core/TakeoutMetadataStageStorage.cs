@@ -6,9 +6,10 @@ namespace Mpa.Processor.Core;
 public sealed class TakeoutMetadataCapacityException(string message):IOException(message);
 
 /// <summary>Private, retained sidecar snapshots and generated worker attempts. This
-/// owner never accepts an original path and never deletes source or result bytes.
+/// owner never accepts an original path and never deletes the retained source or
+/// result bytes. A verified duplicate worker replay input may retire after join.
 /// A canceled capture resumes only after comparing its entire retained prefix.</summary>
-public sealed class TakeoutMetadataStageStorage : IDisposable
+public sealed partial class TakeoutMetadataStageStorage : IDisposable
 {
     private const string Name="takeout-metadata-stages";
     private const int MaximumItems=1024;
@@ -134,7 +135,16 @@ public sealed class TakeoutMetadataStageStorage : IDisposable
         }
     }
 
-    public async Task<TakeoutMetadataDocument> ReadVerifiedAsync(TakeoutVerifiedMetadata completed,CancellationToken token)
+    public Task<TakeoutMetadataDocument> ReadVerifiedAsync(TakeoutVerifiedMetadata completed,CancellationToken token)
+        =>ReadVerifiedOwnedAsync(completed,null,token);
+    /// <summary>After actual worker retirement, verify the retained source/result
+    /// and remove only their byte-identical per-attempt replay copy. Original raw
+    /// source, result, markers, diagnostics and item/attempt bounds stay intact.</summary>
+    public Task<TakeoutMetadataDocument> ReadVerifiedAndRetireReplayAsync(TakeoutVerifiedMetadata completed,ProcessorStateCoordinator state,CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(state);return ReadVerifiedOwnedAsync(completed,state,token);
+    }
+    private async Task<TakeoutMetadataDocument> ReadVerifiedOwnedAsync(TakeoutVerifiedMetadata completed,ProcessorStateCoordinator? retirementState,CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(completed);
         if(!ReferenceEquals(completed.Owner,_database))throw new InvalidOperationException("Metadata result belongs to another native state owner.");
@@ -146,6 +156,7 @@ public sealed class TakeoutMetadataStageStorage : IDisposable
         }
         try
         {
+            if(retirementState is not null)await AssertReadyAsync(completed,retirementState,token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();using var reserved=_budget.Reserve(checked(completed.Source.Bytes+completed.Artifact.Bytes+65536));reserved.RecheckBeforeWrite(reserved.Bytes);
             Regular(_root,true);AssertBytes(Path.Combine(_root,"owner.json"),OwnerBytes(_installation));
             var item=Path.Combine(_root,name);Regular(item,true);AssertBytes(Path.Combine(item,"claim.json"),ItemBytes(completed.JobId,completed.JobId,completed.ItemContext,_installation));
@@ -156,7 +167,9 @@ public sealed class TakeoutMetadataStageStorage : IDisposable
             await using var artifact=OpenRead(Path.Combine(attempt,completed.Artifact.RelativePath));
             await new ArtifactVerifier(TakeoutMetadataDocument.MaximumArtifactBytes).VerifyAsync(artifact,completed.Artifact,token).ConfigureAwait(false);
             artifact.Position=0;var bytes=new byte[checked((int)completed.Artifact.Bytes)];await artifact.ReadExactlyAsync(bytes,token).ConfigureAwait(false);
-            return TakeoutMetadataDocument.ReadVerifiedArtifact(bytes,completed.Source);
+            var document=TakeoutMetadataDocument.ReadVerifiedArtifact(bytes,completed.Source);
+            if(retirementState is not null)await RetireReplayAsync(completed,item,attempt,retirementState,token).ConfigureAwait(false);
+            return document;
         }
         catch(Exception error)when(error is ProtocolFormatException or JsonException)
         {throw new InvalidDataException("Retained metadata source, result or ownership evidence changed.",error);}

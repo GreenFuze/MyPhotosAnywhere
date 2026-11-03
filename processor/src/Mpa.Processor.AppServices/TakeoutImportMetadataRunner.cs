@@ -127,7 +127,7 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
     }
     private async Task<Observation> VerifyAndResolveAsync(TakeoutVerifiedMetadata result,CancellationToken token)
     {
-        var verified=await _storage.ReadVerifiedAsync(result,token).ConfigureAwait(false);
+        var verified=await _storage.ReadVerifiedAndRetireReplayAsync(result,_state,token).ConfigureAwait(false);
         try{return await _state.ExecuteAsync(db=>{var changed=new TakeoutImportedPhotoFactsRepository(db).Retain(result,verified);new TakeoutMetadataIssueRepository(db).Resolve(result);return changed?Observation.New:Observation.Retained;},token).ConfigureAwait(false);}
         catch(CatalogChunkCapacityException)
         {await _state.ExecuteAsync(db=>{new TakeoutMetadataIssueRepository(db).ObserveProjectionCapacity(result,verified);return true;},token).ConfigureAwait(false);return Observation.Unsupported;}
