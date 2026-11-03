@@ -31,6 +31,30 @@ public sealed class CurrentCatalogGenerationObjectSink(Guid generationId,Process
         var owned=CatalogDependencyPayload.Capture(role,mimeType,payload.Span);
         return StoreOwnedAsync(owned,cancellationToken);
     }
+    /// <summary>Fresh bounded read of an inert source bundle through the actual
+    /// pinned workspace/account owner. A historical locator alone admits no read
+    /// result, upload, original action or private-source retirement.</summary>
+    public async Task<MetadataSourceBundle> ReadMetadataSourceBundleAsync(CatalogObjectReference reference,long minimumVersion,CancellationToken caller)
+    {
+        ArgumentNullException.ThrowIfNull(reference);ArgumentOutOfRangeException.ThrowIfLessThan(minimumVersion,1);CancellationTokenSource linked;
+        lock(_gate){ObjectDisposedException.ThrowIf(_stopping,this);linked=CancellationTokenSource.CreateLinkedTokenSource(caller,_stop.Token);}
+        using(linked)
+        {
+            await _serial.WaitAsync(linked.Token).ConfigureAwait(false);
+            try
+            {
+                Check(caller,linked.Token);var capture=await _reader.CaptureAsync(linked.Token).ConfigureAwait(false);
+                var workspace=new CatalogWorkspace(capture.Pin.AccountId,capture.Pin.FolderId);
+                if(reference.AccountId!=workspace.AccountId||reference.WorkspaceId!=workspace.FolderId||reference.Bytes is <1 or >MetadataSourceBundle.MaximumBytes)
+                    throw new WorkspacePublicationConflictException();
+                var bytes=await new CatalogWorkspaceObjectSource(state,accounts,workspace,capture.Attempt.AccountRevision).ReadAtLeastVersionAsync(reference,minimumVersion,linked.Token).ConfigureAwait(false);
+                var result=MetadataSourceBundle.Read(bytes.Span);
+                lock(_gate){Check(caller,linked.Token);_failure=null;return result;}
+            }
+            catch(Exception error){lock(_gate)_failure=error;throw;}
+            finally{_serial.Release();}
+        }
+    }
     private async Task<CatalogObjectReference> StoreOwnedAsync(CatalogDependencyPayload input,CancellationToken caller)
     {
         CancellationTokenSource linked;

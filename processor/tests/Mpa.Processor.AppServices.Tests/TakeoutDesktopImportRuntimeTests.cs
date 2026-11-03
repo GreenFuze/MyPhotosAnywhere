@@ -15,7 +15,9 @@ public sealed partial class AccountServiceTests
     public Task DesktopImportUpgradesOldFinishedMetadataFromPrivateEvidenceWithoutAnotherUploadOrWorker()=>VerifyImportedPhotoPublicationAsync(legacyFinished:true);
     [TestMethod]
     public Task DesktopExplicitMetadataSelectionSurvivesBrowserClosureAndPublishesOnlyTheChosenVerifiedOriginal()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false,manualAssociation:true);
-    private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished,bool manualAssociation=false)
+    [TestMethod]
+    public Task DesktopImportBacksUpExactRawSidecarThroughCurrentPublicationBeforeAnyPrivateRetirement()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false,rawBackup:true);
+    private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished,bool manualAssociation=false,bool rawBackup=false)
     {
         var started=Stopwatch.GetTimestamp();
         using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(40));await using var fixture=await CurrentReaderFixture.CreateAsync(addSource:true).ConfigureAwait(false);
@@ -29,9 +31,9 @@ public sealed partial class AccountServiceTests
         }
         var setup=await state.ExecuteAsync(db=>new{db.StateDirectory,db.InstallationId,Source=new LibrarySourceRepository(db).Snapshot().Sources.Single().Id},deadline.Token).ConfigureAwait(false);
         var originalAllocator=fixture.Data.Setup.Accounts.Readers.WorkspaceAllocate;var cloud=new OriginalCloud(selection.Payload);WireOriginal(fixture.Data.Setup.Accounts,cloud);
-        await using var current=new CurrentLibraryCatalogRuntime(state,setup.StateDirectory,setup.InstallationId,fixture.Data.Setup.Accounts.Service,fixture.Data.Setup.Keys,fixture.Data.Budget);
-        await using var inventory=new TakeoutInventoryService(state,fixture.Data.Budget);
         using var metadataStorage=await state.ExecuteAsync(db=>new TakeoutMetadataStageStorage(db,fixture.Data.Budget),deadline.Token).ConfigureAwait(false);
+        await using var current=new CurrentLibraryCatalogRuntime(state,setup.StateDirectory,setup.InstallationId,fixture.Data.Setup.Accounts.Service,fixture.Data.Setup.Keys,fixture.Data.Budget,rawBackup?metadataStorage:null);
+        await using var inventory=new TakeoutInventoryService(state,fixture.Data.Budget);
         await using var native=new ProcessorWorkSupervisor();var metadataLaunches=0;
         var metadata=new TakeoutImportMetadataRunner(state,fixture.Data.Budget,metadataStorage,native,token=>
         {metadataLaunches++;return TakeoutWorkerInstallation.OpenInstalledAsync(Path.Combine(AppContext.BaseDirectory,"workers","takeout-metadata"),token);});
@@ -125,6 +127,38 @@ public sealed partial class AccountServiceTests
         Assert.AreEqual(imported.Facts.CapturedUtc,portable.CapturedUtc);
         Assert.AreEqual(imported.Facts.CapturedUtc??expectedMetadata.CapturedUtc??imported.Facts.ModifiedUtc,portable.EffectiveUtc,"The imported capture is used only when Drive capture is absent.");
         CollectionAssert.AreEqual(expectedMetadata.ImportedNames.ToArray(),portable.ImportedMetadata.ImportedNames.ToArray());
+        if(rawBackup)
+        {
+            var backup=await state.ExecuteAsync(db=>
+            {
+                var actual=new TakeoutMetadataJobRepository(db).ReadCompletedImported(review.Id,portable.ImportedMetadata.SidecarKey)!;
+                var uploads=new WorkspacePublicationRepository(db,fixture.Data.Budget);
+                var raw=uploads.Identities().Select(id=>uploads.Read(id)!).Single(row=>row.Role==MetadataSourceBundle.Role);
+                var workspace=new CatalogWorkspace(raw.Scope.AccountId,raw.Scope.FolderId);var repository=new MetadataSourceBackupRepository(db,fixture.Data.Budget);
+                var saved=repository.Read(actual,workspace);Assert.IsNotNull(saved);
+                Assert.AreEqual(saved,repository.RecordBundle(raw.Id,[actual]).Single());
+                Assert.ThrowsExactly<InvalidDataException>(()=>repository.RecordBundle(Guid.NewGuid(),[actual]));
+                Assert.ThrowsExactly<ArgumentException>(()=>repository.RecordBundle(raw.Id,[actual,actual]));
+                // Corruption and a failed native journal write cannot fabricate a
+                // backup receipt. These edits affect this disposable fixture only.
+                using var connection=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.Combine(db.StateDirectory,"processor.db"),Mode=SqliteOpenMode.ReadWrite,Pooling=false,DefaultTimeout=5}.ToString());connection.Open();
+                using var row=connection.CreateCommand();row.CommandText="SELECT key,value FROM processor_meta WHERE key LIKE 'metadata-source-backup-v1:%'";
+                string key,body;using(var record=row.ExecuteReader()){Assert.IsTrue(record.Read());key=record.GetString(0);body=record.GetString(1);Assert.IsFalse(record.Read());}
+                using var edit=connection.CreateCommand();edit.CommandText="UPDATE processor_meta SET value=json_set(value,'$.sourceSha256',$hash) WHERE key=$key";edit.Parameters.AddWithValue("$key",key);edit.Parameters.AddWithValue("$hash",new string('b',64));Assert.AreEqual(1,edit.ExecuteNonQuery());
+                Assert.ThrowsExactly<InvalidDataException>(()=>repository.Read(actual,workspace));Assert.ThrowsExactly<InvalidDataException>(()=>repository.RecordBundle(raw.Id,[actual]));
+                edit.CommandText="DELETE FROM processor_meta WHERE key=$key";Assert.AreEqual(1,edit.ExecuteNonQuery());
+                edit.CommandText="CREATE TRIGGER fail_raw_backup BEFORE INSERT ON processor_meta WHEN NEW.key LIKE 'metadata-source-backup-v1:%' BEGIN SELECT RAISE(ABORT,'synthetic backup write failure'); END";edit.ExecuteNonQuery();
+                Assert.ThrowsExactly<SqliteException>(()=>repository.RecordBundle(raw.Id,[actual]));Assert.IsNull(repository.Read(actual,workspace));
+                edit.CommandText="DROP TRIGGER fail_raw_backup";edit.ExecuteNonQuery();Assert.AreEqual(saved,repository.RecordBundle(raw.Id,[actual]).Single());
+                row.CommandText="SELECT value FROM processor_meta WHERE key=$key";row.Parameters.AddWithValue("$key",key);Assert.AreEqual(body,(string)row.ExecuteScalar()!);
+                return saved;
+            },deadline.Token).ConfigureAwait(false);
+            Assert.IsNotNull(backup);Assert.AreEqual(portable.ImportedMetadata.JobId,backup.JobId);Assert.AreEqual(7L,backup.VerifiedVersion);
+            var remote=fixture.Data.Cloud[backup.Bundle.FileId];Assert.AreEqual(MetadataSourceBundle.MimeType,remote.MimeType);
+            CollectionAssert.AreEqual(expectedMetadata.CopyRawSource(),MetadataSourceBundle.Read(remote.Bytes.Span).ReadSource(backup.Source.Sha256));
+            CollectionAssert.AreEqual(expectedMetadata.CopyRawSource(),await File.ReadAllBytesAsync(retainedRaw,deadline.Token).ConfigureAwait(false));
+            Assert.AreEqual(1,fixture.Data.MetadataMimeTypes.Values.Count(mime=>mime==MetadataSourceBundle.MimeType));
+        }
         var replay=await imports.StartAsync(review.Id,deadline.Token).ConfigureAwait(false);Assert.AreEqual("originals-verified",replay.State);Assert.AreEqual(1,cloud.Allocations);
         await imports.ResumeAsync().ConfigureAwait(false);await imports.PauseAsync().ConfigureAwait(false);Assert.AreEqual(1,scanNotifications);Assert.AreEqual(1,metadataLaunches);Assert.AreEqual(legacyFinished?2:1,metadataNotifications);
         var before=await state.ExecuteAsync(db=>new SourceDiscoveryRepository(db).ReadActivity().Jobs.Single(value=>value.JobId==scan.JobId).Scope,deadline.Token).ConfigureAwait(false);

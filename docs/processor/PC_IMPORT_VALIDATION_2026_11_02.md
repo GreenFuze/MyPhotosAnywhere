@@ -166,3 +166,14 @@ screen acceptance. Live Google, imported-metadata projection/publication, final
 gallery acceptance, supported hierarchy, ZIP/Drive ZIP UI and complete PC photo workflows
 remain. Native installers, platform/architecture tests and exact release publication
 are also unfinished. Android is deferred and has no PC release gate.
+
+Raw-source cloud preservation continuation (2026-11-03): supported imported facts
+now cause the installed current-generation owner to preserve their actual native
+raw bytes in bounded128-source/4MiB bundles. Upload/readback and an immutable local
+ready/outbox locator precede any success record. Unknown source fields/encoding are
+retained exactly. Lost replies reuse the first allocated ID; generic historical
+upload authority is rejected. No primary raw/result/item retirement is implemented.
+Portable recovery and unsupported/conflicting inputs remain unfinished. Synthetic
+native Drive tests are component evidence, not live Drive or finished PC acceptance.
+Preceding ec41bcb CI is independently verified60jobs/72reports in
+ci-ec41bcb-pc-validation-v196.json; later code needs its own exact-head validation.

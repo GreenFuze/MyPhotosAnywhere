@@ -32,7 +32,7 @@ public sealed class CurrentCatalogPublicationService : IAsyncDisposable
 
     public CurrentCatalogPublicationService(ProcessorStateCoordinator state,string directory,Guid installationId,
         ProcessorAccountService accounts,StorageBudgetManager budget,LocalCurrentControlReader reader,
-        CurrentCanonicalReadRuntime canonical,LocalCurrentStagePool pool)
+        CurrentCanonicalReadRuntime canonical,LocalCurrentStagePool pool,TakeoutMetadataStageStorage? metadataStorage=null)
     {
         ArgumentNullException.ThrowIfNull(state);ArgumentNullException.ThrowIfNull(accounts);ArgumentNullException.ThrowIfNull(budget);
         ArgumentNullException.ThrowIfNull(reader);ArgumentNullException.ThrowIfNull(canonical);ArgumentNullException.ThrowIfNull(pool);
@@ -40,7 +40,7 @@ public sealed class CurrentCatalogPublicationService : IAsyncDisposable
             !canonical.BorrowsPublicationOwners(state,budget,reader,pool))
             throw new InvalidOperationException("Current publication must borrow the exact reader, state, account, budget and canonical pool owners.");
         _state=state;_budget=budget;_reader=reader;_canonical=canonical;
-        _header=new(state,directory,installationId,accounts,budget,reader);
+        _header=new(state,directory,installationId,accounts,budget,reader,metadataStorage);
         _allocation=new(state,accounts,budget,reader);_upload=new(accounts,reader);_completion=new(state,budget);
     }
 

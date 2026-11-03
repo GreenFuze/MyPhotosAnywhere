@@ -48,7 +48,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         foreach(var work in publications.Objects.Where(value=>value.Scope==inputs.Capture.Scope))
         {
             token.ThrowIfCancellationRequested();
-            if(work.Role is not("facts-chunk" or "facts-index" or "coverage-page" or "coverage-root") || work.FileId is null ||
+            if(!CatalogDependencyPayload.IsSupportedRoleAndMime(work.Role,work.MimeType) || work.FileId is null ||
                 work.VerifiedVersion is null || !known.TryGetValue(work.FileId,out var actual) || actual.Version<work.VerifiedVersion ||
                 actual.Bytes!=work.Bytes || actual.Sha256!=work.Sha256 || (actual.MimeType??"application/json")!=work.MimeType)
                 throw new WorkspacePublicationConflictException();

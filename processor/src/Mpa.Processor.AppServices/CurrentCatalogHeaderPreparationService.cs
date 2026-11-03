@@ -22,12 +22,12 @@ public sealed class CurrentCatalogHeaderPreparationService : IAsyncDisposable
     public Exception? Failure {get {lock(_gate) return _failure??_dependencies.Failure;}}
 
     public CurrentCatalogHeaderPreparationService(ProcessorStateCoordinator state,string directory,Guid installationId,
-        ProcessorAccountService accounts,StorageBudgetManager budget,LocalCurrentControlReader reader)
+        ProcessorAccountService accounts,StorageBudgetManager budget,LocalCurrentControlReader reader,TakeoutMetadataStageStorage? metadataStorage=null)
     {
         ArgumentNullException.ThrowIfNull(state);ArgumentNullException.ThrowIfNull(accounts);ArgumentNullException.ThrowIfNull(budget);ArgumentNullException.ThrowIfNull(reader);
         if(!reader.BorrowsDependencyAllocationOwners(state,accounts,budget))
             throw new InvalidOperationException("Current header preparation must borrow the reader's exact owners.");
-        _state=state;_budget=budget;_reader=reader;_dependencies=new(state,directory,installationId,accounts,budget,reader);
+        _state=state;_budget=budget;_reader=reader;_dependencies=new(state,directory,installationId,accounts,budget,reader,metadataStorage);
     }
 
     public async Task<WorkspacePublicationRecord> PrepareAsync(CancellationToken caller)

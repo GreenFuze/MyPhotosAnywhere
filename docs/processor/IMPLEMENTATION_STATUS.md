@@ -9,6 +9,37 @@ app. Earlier joint-release gate statements below are historical and superseded
 for this PC release; PC safety, signing, preservation and validation stay required.
 See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists.
 
+## Current-generation raw metadata backup (2026-11-03; recovery unfinished)
+
+The installed desktop now borrows its existing metadata staging owner during
+current-generation preparation. Supported imported observations in the exact frozen
+catalog must match their actual native ready result, source, generated artifact and
+verified original. Exact raw sidecar bytes, including unknown fields and encoding,
+are grouped into closed content-indexed bundles bounded by128sources and4MiB.
+Actual current-only allocation/upload/readback precedes a local immutable locator
+bound to the original job/context and verified outbox. A lost upload reply retains
+the first allocated ID. Historical/generic upload authority rejects this role.
+
+Later preparation can verify an existing locator through an actual pinned account
+read, exact size/hash, a non-regressed Drive version and reconstructed worker result.
+Only one freshly read bundle is retained for reuse by its members in that awaited
+pass. It supplies no cleanup or original-mutation permission. Queued retained-file
+reads share the staging owner; cancellation cannot close an active reader, and Exit
+joins an actual late provider read before releasing borrowed owners.
+
+This does not yet provide portable discovery/restoration, raw backups for every
+unsupported/conflicting sidecar, or safe primary-source/generated-item retirement.
+Primary raw/result/markers/diagnostics and1024item/32attempt limits remain intact.
+No complete import-storage, live Drive, UI, installer or release acceptance follows.
+Frozen facts, old pending signing bodies, schema, dependencies and deadlines are
+unchanged. The change maps to the approved import metadata-preservation workflow.
+
+The preceding exact ec41bcb PC checks are independently verified in
+ci-ec41bcb-pc-validation-v196.json:60jobs/72native reports,127Protocol/622Core/
+781ordinaryServices/179Google/9LAN/53Web per platform, all first attempt with old
+identities, new source cases, full logs, limits, scale/reference and Desktop assets.
+This evidence does not validate the later raw-backup code or a finished PC product.
+
 ## Joined duplicate replay-input retirement (2026-11-03; raw cloud backup unfinished)
 
 The desktop metadata runner now retires the generated per-attempt input.bin only

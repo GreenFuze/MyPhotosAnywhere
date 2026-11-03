@@ -17,6 +17,8 @@ public sealed partial class TakeoutMetadataStageStorage : IDisposable
     private static readonly object AccountingGate=new();
     private readonly object _gate=new();
     private readonly HashSet<string> _users=new(StringComparer.Ordinal);
+    private readonly SemaphoreSlim _retainedReads=new(1,1);
+    private int _retainedReaders;
     private readonly string _root;
     private readonly ProcessorStateDatabase _database;
     private readonly Guid _installation;
@@ -24,6 +26,8 @@ public sealed partial class TakeoutMetadataStageStorage : IDisposable
     private FileStream? _lease;
     private bool _closed;
     private bool _recoveryAvailable=true;
+
+    public bool Borrows(ProcessorStateDatabase database,StorageBudgetManager budget)=>ReferenceEquals(database,_database)&&ReferenceEquals(budget,_budget);
 
     public TakeoutMetadataStageStorage(ProcessorStateDatabase database,StorageBudgetManager budget)
     {
@@ -148,6 +152,7 @@ public sealed partial class TakeoutMetadataStageStorage : IDisposable
     {
         ArgumentNullException.ThrowIfNull(completed);
         if(!ReferenceEquals(completed.Owner,_database))throw new InvalidOperationException("Metadata result belongs to another native state owner.");
+        using var read=await AcquireRetainedReadAsync(token).ConfigureAwait(false);
         var name=ItemName(completed.JobId,completed.JobId);
         lock(_gate)
         {
@@ -227,6 +232,21 @@ public sealed partial class TakeoutMetadataStageStorage : IDisposable
     }
     internal void Release(string name)
     {lock(_gate)if(!_users.Remove(name))throw new InvalidOperationException("Metadata staging ownership was released twice.");}
+    private async Task<RetainedRead> AcquireRetainedReadAsync(CancellationToken token)
+    {
+        lock(_gate){ObjectDisposedException.ThrowIf(_closed,this);_recoveryAvailable=false;_retainedReaders=checked(_retainedReaders+1);}
+        try{await _retainedReads.WaitAsync(token).ConfigureAwait(false);return new(this);}
+        catch{lock(_gate)_retainedReaders--;throw;}
+    }
+    private sealed class RetainedRead(TakeoutMetadataStageStorage owner):IDisposable
+    {
+        private int _released;
+        public void Dispose()
+        {
+            if(Interlocked.Exchange(ref _released,1)!=0)return;
+            lock(owner._gate){owner._retainedReads.Release();owner._retainedReaders--;}
+        }
+    }
     private string EnsureItem(TakeoutMetadataWork work)
     {
         var path=Path.Combine(_root,ItemName(work.Lease.JobId,work.Lease.ItemId));
@@ -313,7 +333,7 @@ public sealed partial class TakeoutMetadataStageStorage : IDisposable
     private static void WriteNew(string path,byte[] bytes)
     {using var file=new FileStream(path,FileMode.CreateNew,FileAccess.Write,FileShare.None);file.Write(bytes);file.Flush(true);}
     public void Dispose()
-    {lock(_gate){if(_closed)return;if(_users.Count!=0)throw new InvalidOperationException("Join metadata capture and actual worker owners before closing staging.");_lease?.Dispose();_lease=null;_closed=true;}}
+    {lock(_gate){if(_closed)return;if(_users.Count!=0||_retainedReaders!=0)throw new InvalidOperationException("Join metadata capture, queued reads and actual worker owners before closing staging.");_lease?.Dispose();_lease=null;_retainedReads.Dispose();_closed=true;}}
 }
 
 /// <summary>Transferred to one supervised worker. Input, output reservation and

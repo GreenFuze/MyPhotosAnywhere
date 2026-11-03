@@ -25,9 +25,12 @@ public sealed class CatalogWorkspaceObjectSource : ICatalogObjectSource
         _accountRevision = accountRevision;
     }
 
-    public async Task<ReadOnlyMemory<byte>> ReadAsync(CatalogObjectReference reference, CancellationToken cancellationToken)
+    public Task<ReadOnlyMemory<byte>> ReadAsync(CatalogObjectReference reference,CancellationToken cancellationToken)=>ReadAtLeastVersionAsync(reference,1,cancellationToken);
+
+    internal async Task<ReadOnlyMemory<byte>> ReadAtLeastVersionAsync(CatalogObjectReference reference,long minimumVersion,CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(reference);
+        ArgumentOutOfRangeException.ThrowIfLessThan(minimumVersion,1);
         cancellationToken.ThrowIfCancellationRequested();
         if (reference.AccountId != _workspace.AccountId || reference.WorkspaceId != _workspace.FolderId ||
             reference.FileId is null || reference.FileId.Length is < 1 or > 256 ||
@@ -46,6 +49,7 @@ public sealed class CatalogWorkspaceObjectSource : ICatalogObjectSource
             token.ThrowIfCancellationRequested(); cancellationToken.ThrowIfCancellationRequested();
             if (result.AccountId != _workspace.AccountId || result.FolderId != _workspace.FolderId || result.FileId != reference.FileId)
                 throw new InvalidDataException("The owned Drive reader returned a different metadata object identity.");
+            if(result.DriveVersion<minimumVersion)throw new DriveWorkspaceObjectChangedException();
             await _state.ExecuteAsync(database =>
             {
                 if (!new DriveAccountRepository(database).Accounts().Any(account => account.PermissionId == _workspace.AccountId &&

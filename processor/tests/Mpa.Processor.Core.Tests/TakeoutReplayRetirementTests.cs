@@ -6,6 +6,34 @@ namespace Mpa.Processor.Core.Tests;
 public sealed partial class TakeoutMetadataOperationTests
 {
     [TestMethod]
+    public async Task RetainedMetadataReadsQueueUnderTheSameOwnerAndCanceledWaitersCannotCloseOrStealIt()
+    {
+        await using var fixture=await ImportedFixture.CreateAsync().ConfigureAwait(false);
+        var ready=await CompleteImportedObservationAsync(fixture,fixture.Sidecar,await CopyInstalledBundleAsync(fixture.Root.Path,fixture.Token).ConfigureAwait(false)).ConfigureAwait(false);
+        using var release=new ManualResetEventSlim();var entered=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var held=fixture.State.ExecuteAsync(_=>{entered.TrySetResult();release.Wait(fixture.Token);return true;},fixture.Token);
+        Task<Mpa.Processor.Protocol.TakeoutMetadataDocument>? first=null;
+        try
+        {
+            await entered.Task.WaitAsync(fixture.Token).ConfigureAwait(false);
+            first=fixture.Storage.ReadVerifiedAndRetireReplayAsync(ready.Result,fixture.State,fixture.Token);
+            using var canceled=CancellationTokenSource.CreateLinkedTokenSource(fixture.Token);
+            var second=fixture.Storage.ReadVerifiedAsync(ready.Result,canceled.Token);
+            Assert.IsFalse(first.IsCompleted);Assert.IsFalse(second.IsCompleted);
+            Assert.ThrowsExactly<InvalidOperationException>(()=>fixture.Storage.Dispose());
+            await canceled.CancelAsync().ConfigureAwait(false);
+            await Assert.ThrowsAsync<OperationCanceledException>(()=>second).ConfigureAwait(false);
+            Assert.ThrowsExactly<InvalidOperationException>(()=>fixture.Storage.Dispose());
+        }
+        finally
+        {
+            release.Set();await held.ConfigureAwait(false);
+            if(first is not null)CollectionAssert.AreEqual(fixture.Raw,(await first.ConfigureAwait(false)).CopyRawSource());
+        }
+        CollectionAssert.AreEqual(fixture.Raw,(await fixture.Storage.ReadVerifiedAsync(ready.Result,fixture.Token).ConfigureAwait(false)).CopyRawSource());
+        Assert.AreEqual(0L,fixture.Budget.Status().ReservedBytes);
+    }
+    [TestMethod]
     public async Task JoinedReplayRetirementRemovesOnlyItsVerifiedDuplicateAndRetainedMetadataSurvivesReopen()
     {
         await using var fixture=await ImportedFixture.CreateAsync().ConfigureAwait(false);

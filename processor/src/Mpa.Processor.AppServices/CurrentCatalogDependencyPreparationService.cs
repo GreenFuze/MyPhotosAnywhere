@@ -13,6 +13,7 @@ public sealed class CurrentCatalogDependencyPreparationService : IAsyncDisposabl
     private readonly StorageBudgetManager _budget;
     private readonly LocalCurrentControlReader _reader;
     private readonly CurrentCatalogBasisPreparationService _basis;
+    private readonly TakeoutMetadataStageStorage? _metadataStorage;
     private readonly SemaphoreSlim _serial=new(1,1);
     private readonly object _gate=new();
     private readonly CancellationTokenSource _stop=new();
@@ -26,11 +27,11 @@ public sealed class CurrentCatalogDependencyPreparationService : IAsyncDisposabl
     public Exception? Failure {get {lock(_gate) return _failure??_basis.Failure??_sink?.Failure;}}
 
     public CurrentCatalogDependencyPreparationService(ProcessorStateCoordinator state,string directory,Guid installationId,
-        ProcessorAccountService accounts,StorageBudgetManager budget,LocalCurrentControlReader reader)
+        ProcessorAccountService accounts,StorageBudgetManager budget,LocalCurrentControlReader reader,TakeoutMetadataStageStorage? metadataStorage=null)
     {
         ArgumentNullException.ThrowIfNull(state);ArgumentNullException.ThrowIfNull(accounts);ArgumentNullException.ThrowIfNull(budget);ArgumentNullException.ThrowIfNull(reader);
         if(!reader.BorrowsDependencyAllocationOwners(state,accounts,budget)) throw new InvalidOperationException("Current producer must borrow the reader's exact owners.");
-        _state=state;_accounts=accounts;_budget=budget;_reader=reader;
+        _state=state;_accounts=accounts;_budget=budget;_reader=reader;_metadataStorage=metadataStorage;
         _basis=new(state,directory,installationId,budget,reader);
     }
 
@@ -63,6 +64,8 @@ public sealed class CurrentCatalogDependencyPreparationService : IAsyncDisposabl
                 {
                     if(prepared is null || prepared.Publication!=publication) throw new CatalogGenerationCaptureConflictException();
                     _sink=new(publication.Capture.Scope.GenerationId,_state,_accounts,_budget,_reader);
+                    if(_metadataStorage is not null)
+                        await new CurrentMetadataSourceBackupService(_state,_budget,_metadataStorage,_sink).PreserveAsync(_frozen,publication.Capture.Scope,token).ConfigureAwait(false);
                     var graph=await new CatalogGenerationDependencyBuilder(new(publication.Capture.Scope.AccountId,publication.Capture.Scope.FolderId),
                         _sink,WorkspaceObservationRepository.MaximumDocuments).BuildAsync(_frozen,prepared.Sources,publication.Basis.Parent,token).ConfigureAwait(false);
                     if(graph.Assets!=_frozen.Count || graph.SourcePolicySha256!=publication.Basis.SourcePolicySha256)

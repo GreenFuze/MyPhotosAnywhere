@@ -22,6 +22,7 @@ public sealed class CatalogDependencyPayload
             mime=="application/json" && bytes.Length>ProtocolDocumentReader.MaximumDocumentBytes)
             throw new ArgumentException("Catalog dependency payload exceeds its exact role bound.",nameof(bytes));
         var owned=bytes.ToArray();
+        if(role==MetadataSourceBundle.Role)_=MetadataSourceBundle.Read(owned);
         if(mime=="application/json" && !new CanonicalJson(ProtocolDocumentReader.MaximumDocumentBytes).Encode(owned).AsSpan().SequenceEqual(owned))
             throw new ProtocolFormatException("Catalog dependency JSON must be canonical before preparation.");
         return new(role,mime,owned);
@@ -42,9 +43,19 @@ public sealed class CatalogDependencyPayload
         var digest=SHA256.HashData(context);digest[6]=(byte)((digest[6]&15)|128);digest[8]=(byte)((digest[8]&63)|128);
         return new(digest.AsSpan(0,16),bigEndian:true);
     }
+    /// <summary>Closed data-role classification only, never current provider or
+    /// source-retirement authority. Legacy sinks keep their narrower contracts.</summary>
+    public static bool IsSupportedRole(string? role)=>role is "facts-chunk" or "facts-index" or "coverage-page" or "coverage-root" or MetadataSourceBundle.Role;
+    public static bool IsSupportedRoleAndMime(string? role,string? mime)=>role switch
+    {
+        "facts-chunk"=>mime=="application/gzip",
+        MetadataSourceBundle.Role=>mime==MetadataSourceBundle.MimeType,
+        "facts-index" or "coverage-page" or "coverage-root"=>mime=="application/json",
+        _=>false
+    };
     private static void ValidateRole(string role,string mime)
     {
-        if(role=="facts-chunk" ? mime!="application/gzip" : role is not("facts-index" or "coverage-page" or "coverage-root") || mime!="application/json")
+        if(!IsSupportedRoleAndMime(role,mime))
             throw new ArgumentException("Only exact catalog dependency roles and MIME types may be prepared.");
     }
 }

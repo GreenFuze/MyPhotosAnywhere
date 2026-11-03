@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Mpa.Processor.Core;
+using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.AppServices.Tests;
 
@@ -13,7 +14,7 @@ public sealed partial class AccountServiceTests
         var create=fixture.Data.Setup.Accounts.Readers.WorkspaceCreate!;
         fixture.Data.Setup.Accounts.Readers.WorkspaceCreate=async(folder,file,mime,payload,hash,token)=>
         {
-            if(mime!="application/gzip")return await create(folder,file,mime,payload,hash,token).ConfigureAwait(false);
+            if(mime!="application/gzip"&&mime!=MetadataSourceBundle.MimeType)return await create(folder,file,mime,payload,hash,token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             var captured=await fixture.Data.Setup.Accounts.State.ExecuteAsync(database=>
             {
@@ -21,7 +22,9 @@ public sealed partial class AccountServiceTests
                 return repository.Identities().Select(id=>repository.Read(id)??throw new InvalidDataException("The captured metadata publication disappeared."))
                     .Single(value=>value.FileId==file);
             },token).ConfigureAwait(false);
-            Assert.AreEqual("facts-chunk",captured.Role);Assert.AreEqual(folder,captured.Scope.FolderId);Assert.AreEqual(mime,captured.MimeType);
+            if(mime==MetadataSourceBundle.MimeType){Assert.AreEqual(MetadataSourceBundle.Role,captured.Role);_=MetadataSourceBundle.Read(payload.Span);}
+            else Assert.AreEqual("facts-chunk",captured.Role);
+            Assert.AreEqual(folder,captured.Scope.FolderId);Assert.AreEqual(mime,captured.MimeType);
             Assert.AreEqual(hash,captured.Sha256);Assert.AreEqual(hash,Convert.ToHexStringLower(SHA256.HashData(payload.Span)));
             CollectionAssert.AreEqual(captured.Payload.ToArray(),payload.ToArray());fixture.Data.Creates++;
             if(!fixture.Data.Cloud.TryGetValue(file,out var stored))

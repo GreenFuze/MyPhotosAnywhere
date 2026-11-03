@@ -47,7 +47,7 @@ public sealed partial class CatalogGenerationCaptureRepository
             token.ThrowIfCancellationRequested();
             if(work.Scope==scope)
             {
-                if(work.Role is("facts-chunk" or "facts-index" or "coverage-page" or "coverage-root"))
+                if(CatalogDependencyPayload.IsSupportedRoleAndMime(work.Role,work.MimeType))
                 {if(work.FileId is null || work.VerifiedVersion is null) throw new WorkspacePublicationConflictException();}
                 else if(work.Role!="catalog-commit" || work.Id!=capture.CommitIntentId) throw new WorkspacePublicationConflictException();
             }

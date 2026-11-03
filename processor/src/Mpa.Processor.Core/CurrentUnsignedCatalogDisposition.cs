@@ -159,7 +159,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         {
             token.ThrowIfCancellationRequested();var row=outbox.Read(id,transaction) ?? throw new WorkspacePublicationConflictException();
             if(row.Scope.GenerationId!=scope.GenerationId) continue;
-            if(row.Scope!=scope || row.Role is not ("facts-index" or "facts-chunk" or "coverage-root" or "coverage-page")) throw new CatalogGenerationCaptureConflictException();
+            if(row.Scope!=scope || !CatalogDependencyPayload.IsSupportedRoleAndMime(row.Role,row.MimeType)) throw new CatalogGenerationCaptureConflictException();
             Append(new WorkspacePublicationExpectation(row.Id,row.Scope,row.Role,row.MimeType,row.Payload.Length,row.Sha256,row.FileId,row.VerifiedVersion));count=checked(count+1);
         }
         foreach(var reference in new CatalogDependencyReferenceRepository(_database,_budget).ForScope(scope,transaction).OrderBy(v=>v.Id.ToString("D"),StringComparer.Ordinal))

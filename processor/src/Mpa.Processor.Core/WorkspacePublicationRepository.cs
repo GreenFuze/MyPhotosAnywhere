@@ -43,6 +43,7 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
         if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Outbox preparation requires its owning transaction.");
         CheckId(id);ValidateScope(scope);ValidateContent(role,mimeType);
         if(owned.Length is <1 or >MaximumPayloadBytes) throw new ArgumentException("A bounded metadata payload is required.",nameof(owned));
+        if(role==MetadataSourceBundle.Role)_=MetadataSourceBundle.Read(owned);
         var hash=Hash(owned);var scopeJson=EncodeScope(scope);
         using(var selected=Command(transaction,"SELECT 1 FROM processor_meta WHERE key=$key",("$key","catalog_dependency_reference_v1:"+id.ToString("D"))))
             if(selected.ExecuteScalar() is not null) throw new WorkspacePublicationConflictException();
@@ -216,6 +217,8 @@ public sealed partial class WorkspacePublicationRepository(ProcessorStateDatabas
     }
     private static void ValidateContent(string role, string mime)
     {
+        if (role==MetadataSourceBundle.Role)
+        {if(mime!=MetadataSourceBundle.MimeType)throw new ArgumentException("Raw metadata bundles require their exact inert binary type.");return;}
         if (role is not ("facts-chunk" or "facts-index" or "coverage-page" or "coverage-root" or "publisher-authorization" or "source-configuration" or "catalog-commit") ||
             mime is not ("application/json" or "application/gzip" or "application/octet-stream")) throw new ArgumentException("A supported metadata publication role/type is required.");
     }

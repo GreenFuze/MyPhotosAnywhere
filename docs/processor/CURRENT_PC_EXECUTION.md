@@ -110,3 +110,17 @@ unresolved concern. Do not increase a failing test's deadline, discard assertion
 accept unexplained resource warnings, or replace native evidence with compilation.
 The implementation ledger and raw evidence remain authoritative for completed
 components; this list records work still required, not completed features.
+
+Current-generation raw-source backup continuation (2026-11-03): the installed PC
+composition now supplies its existing staging owner to current publication.
+Supported frozen metadata is matched to the actual native ready result before exact
+raw bytes are bundled, uploaded and read back under the current-only owner. Local
+immutable locators bind the original context and verified outbox; generic historical
+upload authority cannot upload this new role. Fresh reads check hash/size/account
+and minimum Drive version. Primary files and capacity limits remain unchanged.
+Portable discovery/restoration, unsupported/conflicting raw preservation, safe whole
+item retirement and large-import capacity recovery remain unfinished. Do not delete
+source.bin/artifacts or claim a complete backup/recovery workflow. Continue that
+vertical before corrected-input/version repair and the remaining approved PC work.
+The preceding exact ec41bcb now has independently verified60PCjobs/72reports across
+all four native runners (ci-ec41bcb-pc-validation-v196.json); do not rerun that source.

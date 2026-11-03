@@ -41,7 +41,7 @@ public sealed class CurrentLibraryCatalogRuntime : IAsyncDisposable
         ReferenceEquals(state,_state) && ReferenceEquals(accounts,_accounts) && ReferenceEquals(keys,_keys) && ReferenceEquals(budget,_budget);
 
     public CurrentLibraryCatalogRuntime(ProcessorStateCoordinator state,string directory,Guid installationId,
-        ProcessorAccountService accounts,LibrarySigningIdentityOwner keys,StorageBudgetManager budget)
+        ProcessorAccountService accounts,LibrarySigningIdentityOwner keys,StorageBudgetManager budget,TakeoutMetadataStageStorage? metadataStorage=null)
     {
         ArgumentNullException.ThrowIfNull(state);ArgumentNullException.ThrowIfNull(accounts);ArgumentNullException.ThrowIfNull(keys);ArgumentNullException.ThrowIfNull(budget);
         // Validate structural arguments before constructing any semantic child.
@@ -50,7 +50,7 @@ public sealed class CurrentLibraryCatalogRuntime : IAsyncDisposable
         _state=state;_accounts=accounts;_keys=keys;_budget=budget;
         _bootstrap=new(state,accounts,keys,budget);
         _reader=new(state,accounts,keys,budget);_pool=new(state,budget);_canonical=new(state,budget,_reader,_pool);
-        _generations=new(state,directory,installationId,accounts,budget,_reader,_canonical,_pool);
+        _generations=new(state,directory,installationId,accounts,budget,_reader,_canonical,_pool,metadataStorage);
     }
     public Task<CurrentCatalogActivation?> InitializeHistoricalAsync(CancellationToken caller)=>OperationAsync(
         token=>_canonical.InitializeHistoricalAsync(token),caller);

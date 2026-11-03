@@ -30,7 +30,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         SqliteTransaction transaction,CancellationToken token)
     {
         Id(publicationId);var row=new WorkspacePublicationRepository(_database,_budget).Read(publicationId,transaction) ?? throw new WorkspacePublicationConflictException();
-        if(row.Role is not("facts-chunk" or "facts-index" or "coverage-page" or "coverage-root")) throw new WorkspacePublicationConflictException();
+        if(!CatalogDependencyPayload.IsSupportedRole(row.Role)) throw new WorkspacePublicationConflictException();
         var payload=CatalogDependencyPayload.Capture(row.Role,row.MimeType,row.Payload.Span);
         if(payload.IdFor(row.Scope)!=row.Id) throw new WorkspacePublicationConflictException();
         var inputs=RequireCurrentBasisInputsIn(row.Scope.GenerationId,inventory,signing,fenced,publications,transaction,token);

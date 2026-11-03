@@ -85,7 +85,7 @@ public sealed class DesktopWebRuntime : IAsyncDisposable
             owner._preparations = new(state, stateDirectory, installationId, storage);
             var setup = new LibraryWorkspaceSetup(state, owner._accounts, owner._signing, storage);
             owner._publication = new(state, owner._accounts, owner._signing, storage,
-                currentCatalog: new CurrentLibraryCatalogRuntime(state, stateDirectory, installationId, owner._accounts, owner._signing, storage));
+                currentCatalog: new CurrentLibraryCatalogRuntime(state, stateDirectory, installationId, owner._accounts, owner._signing, storage,owner._importMetadata));
             owner._publication.Failed += owner.OnFailure;
             await owner._publication.InitializeCurrentCatalogAsync(cancellationToken).ConfigureAwait(false);
             var importMetadata=new TakeoutImportMetadataRunner(state,storage,owner._importMetadata,work,

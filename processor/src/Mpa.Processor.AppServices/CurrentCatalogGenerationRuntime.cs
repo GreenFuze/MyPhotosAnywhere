@@ -24,12 +24,12 @@ public sealed class CurrentCatalogGenerationRuntime : IAsyncDisposable
 
     public CurrentCatalogGenerationRuntime(ProcessorStateCoordinator state,string directory,Guid installationId,
         ProcessorAccountService accounts,StorageBudgetManager budget,LocalCurrentControlReader reader,
-        CurrentCanonicalReadRuntime canonical,LocalCurrentStagePool pool)
+        CurrentCanonicalReadRuntime canonical,LocalCurrentStagePool pool,TakeoutMetadataStageStorage? metadataStorage=null)
     {
         ArgumentNullException.ThrowIfNull(state);ArgumentNullException.ThrowIfNull(budget);ArgumentNullException.ThrowIfNull(canonical);
         // The concrete publication child checks every borrowed owner before any
         // native/account IO; no accepted caller-supplied readiness implementation.
-        _publication=new(state,directory,installationId,accounts,budget,reader,canonical,pool);
+        _publication=new(state,directory,installationId,accounts,budget,reader,canonical,pool,metadataStorage);
         _state=state;_budget=budget;_canonical=canonical;
     }
 

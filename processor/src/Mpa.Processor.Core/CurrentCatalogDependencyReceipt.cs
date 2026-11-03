@@ -53,7 +53,7 @@ public sealed partial class WorkspacePublicationRepository
     {
         if(!ReferenceEquals(transaction.Connection,_database.Connection)) throw new InvalidOperationException("Dependency receipt belongs to another transaction.");
         if(InventoryDigest(before.Context,before.Maximum,before.Objects)!=before.Sha256) throw new WorkspacePublicationConflictException();
-        if(before.Objects.Count(value=>value.Id==id && value.Role is("facts-chunk" or "facts-index" or "coverage-page" or "coverage-root") &&
+        if(before.Objects.Count(value=>value.Id==id && CatalogDependencyPayload.IsSupportedRoleAndMime(value.Role,value.MimeType) &&
             value.FileId is not null && value.VerifiedVersion is null)!=1) throw new WorkspacePublicationConflictException();
         var expected=before.Objects.Select(value=>value.Id==id?value with{VerifiedVersion=version}:value).ToArray();
         if(Inventory(before.Context,before.Maximum,transaction).Sha256!=InventoryDigest(before.Context,before.Maximum,expected))

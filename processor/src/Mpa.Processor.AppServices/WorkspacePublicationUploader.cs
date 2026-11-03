@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Mpa.Processor.Core;
 using Mpa.Processor.GoogleDrive;
+using Mpa.Processor.Protocol;
 
 namespace Mpa.Processor.AppServices;
 
@@ -30,6 +31,7 @@ public sealed class WorkspacePublicationUploader(ProcessorStateCoordinator state
     {
         var captured = await _state.ExecuteAsync(database => new WorkspacePublicationRepository(database, _budget).Read(id)
             ?? throw new InvalidOperationException("The captured publication is missing."), cancellationToken).ConfigureAwait(false);
+        if(captured.Role==MetadataSourceBundle.Role)throw new InvalidOperationException("Raw metadata backup requires the native current-generation upload owner.");
         await ValidateAsync(captured, cancellationToken).ConfigureAwait(false);
         // A retained receipt reports this earlier verified upload only. It is not proof
         // of current remote availability or authority to activate a catalog generation.

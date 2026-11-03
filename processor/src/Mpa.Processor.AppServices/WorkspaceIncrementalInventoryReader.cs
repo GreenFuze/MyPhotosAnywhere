@@ -43,8 +43,7 @@ public sealed class WorkspaceIncrementalInventoryReader
             expected.FileId is not { } file || !Identity(file) || file is "root" || file == baseline.FolderId || expected.VerifiedVersion is not >= 1 ||
             expected.Bytes < 1 || expected.Bytes > WorkspaceDocumentInventoryReader.CandidateByteLimit(expected.MimeType, includeBinaryMetadata: true) ||
             expected.Sha256 is not { Length: 64 } || expected.Sha256.Any(c => c is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')) ||
-            (expected.Role == "facts-chunk" ? expected.MimeType != "application/gzip" :
-                expected.Role is not ("facts-index" or "coverage-page" or "coverage-root") || expected.MimeType != "application/json")))
+            !CatalogDependencyPayload.IsSupportedRoleAndMime(expected.Role,expected.MimeType)))
             throw new ArgumentException("Only one exact previously read-back generation dependency may extend an incremental inventory.", nameof(expected));
         _expected = expected;
     }
