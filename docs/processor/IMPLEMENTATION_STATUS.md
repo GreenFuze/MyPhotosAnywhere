@@ -9,6 +9,40 @@ app. Earlier joint-release gate statements below are historical and superseded
 for this PC release; PC safety, signing, preservation and validation stay required.
 See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists.
 
+## Explicit unmatched-sidecar selection (2026-11-03; PC acceptance unfinished)
+
+Imports now lets the local host review supported unmatched metadata, page through
+independently verified originals from that same import, open the selected original
+in Drive and explicitly save its association. Browser commands contain only native
+import/sidecar/original keys; paths, hashes and caller-made receipts are rejected.
+The durable selection binds the sealed input/index, first raw hash and actual first
+original-copy receipt. Retry cannot change it, unsupported/unavailable metadata
+cannot acquire a selection, and original bytes/names/receipts remain unchanged.
+Selection and its local scheduling wake-up commit together. A metadata pass that
+overlaps a new selection cannot conceal it behind its earlier completion marker.
+
+The installed worker consumes the saved native selection and normal portable
+publication carries its supported observations into the selected canonical asset.
+Browser closure does not cancel admitted processing. Native database reopening
+retains the exact decision. Actual over-capacity results retain their private raw
+and ready evidence and become attention; callers cannot manufacture that status
+for a fitting result. Bounded pages expose only complete same-import copy receipts.
+Current focused evidence is current-manual-association-validation-v171.json; visual
+and live Google acceptance remain unperformed. This is the approved Takeout recovery
+path in REDESIGN_PLAN.md sections on imports/metadata, not a new photo feature.
+Corrected replacement input, changed-original revalidation, raw cloud preservation/
+cache retirement, remaining PC workflows, installers and final release stay open.
+
+The preceding exact829b807 now passes independently verified60PCjobs/72reports:
+127Protocol/600Core/779ordinaryServices/179Google/9LAN/52Web cases per platform,
+with every prior identity and source-derived addition checked, unchanged limits,
+full official diagnostics, scale/reference evidence and four Desktop/audit reports.
+See ci-829b807-pc-validation-v168.json. Its earlier local generated JavaScript was
+stale relative to its recorded sources: the old local asset-equivalence proof is
+superseded, not waived. A fresh locked build from the exact committed sources
+reproduces all four CI assets on every platform; all20frontend cases pass. Raw old
+evidence and the failed comparison remain retained. This was never a final release.
+
 ## Imported metadata reaches the portable gallery (2026-11-03; PC acceptance unfinished)
 
 Supported Takeout observations now pass from the actual installed worker and ready

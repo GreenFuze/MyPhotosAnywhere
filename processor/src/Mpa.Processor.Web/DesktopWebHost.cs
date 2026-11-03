@@ -177,6 +177,8 @@ public sealed class DesktopWebHost : IAsyncDisposable
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "The original source approval was retained. Review later changes in Sources." }, context.RequestAborted).ConfigureAwait(false); }
             catch (ProcessorWorkStateConflictException)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = "Processing state changed. Refresh Activity before trying again." }, context.RequestAborted).ConfigureAwait(false); }
+            catch (TakeoutMetadataSelectionException error)
+            { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
             catch (CurrentCanonicalPositionChangedException error)
             { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { message = error.Message }, context.RequestAborted).ConfigureAwait(false); }
             catch (CurrentCatalogAccountPagingUnavailableException error)
@@ -325,6 +327,22 @@ public sealed class DesktopWebHost : IAsyncDisposable
                     _=>await importApplication.RetryImportAsync(importRequest.Id,token).ConfigureAwait(false)
                 };
                 await context.Response.WriteAsJsonAsync(new{import=importResult},token).ConfigureAwait(false);break;
+            case("GET","/api/import-original-choices"):
+                if(!session.HostOwner){context.Response.StatusCode=403;break;}
+                if(_application is not IDesktopImportApplication choiceApplication){context.Response.StatusCode=404;break;}
+                var choiceIdText=RequiredQuery(context,"id");var choiceAfter=OptionalQuery(context,"after",36);
+                if(!Guid.TryParseExact(choiceIdText,"D",out var choiceImportId)||choiceImportId==Guid.Empty||choiceImportId.ToString("D")!=choiceIdText||
+                    choiceAfter is not null&&(!Guid.TryParseExact(choiceAfter,"D",out var choiceCursor)||choiceCursor==Guid.Empty||choiceCursor.ToString("D")!=choiceAfter))throw new BadHttpRequestException("Choose a captured import and original page.");
+                if(!(await choiceApplication.ImportsAsync(token).ConfigureAwait(false)).Imports.Any(value=>value.Id==choiceImportId&&value.Entries is not null))throw new BadHttpRequestException("That reviewed import is unavailable.");
+                await context.Response.WriteAsJsonAsync(await choiceApplication.ImportOriginalChoicesAsync(choiceImportId,choiceAfter,token).ConfigureAwait(false),token).ConfigureAwait(false);break;
+            case("POST","/api/import-metadata-original"):
+                if(!session.HostOwner){context.Response.StatusCode=403;break;}
+                if(_application is not IDesktopImportApplication associationApplication){context.Response.StatusCode=404;break;}
+                var associationRequest=await context.Request.ReadFromJsonAsync<ImportMetadataOriginalRequest>(token).ConfigureAwait(false)??throw new BadHttpRequestException("Choose the metadata file and its original.");
+                if(associationRequest.Id==Guid.Empty||!ImportKey(associationRequest.SidecarKey)||!ImportKey(associationRequest.OriginalKey))throw new BadHttpRequestException("Choose captured metadata and original identities.");
+                if(!(await associationApplication.ImportsAsync(token).ConfigureAwait(false)).Imports.Any(value=>value.Id==associationRequest.Id&&value.Entries is not null))throw new BadHttpRequestException("That reviewed import is unavailable.");
+                await associationApplication.SelectImportMetadataOriginalAsync(associationRequest.Id,associationRequest.SidecarKey,associationRequest.OriginalKey,token).ConfigureAwait(false);
+                context.Response.StatusCode=204;break;
             case ("GET", "/api/library"):
                 if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
                 await context.Response.WriteAsJsonAsync(new { controller = await _application.LibraryAsync(token).ConfigureAwait(false) }, token).ConfigureAwait(false); break;
@@ -459,5 +477,8 @@ public sealed class DesktopWebHost : IAsyncDisposable
     private sealed record SessionRequest(string Secret);
     [System.Text.Json.Serialization.JsonUnmappedMemberHandling(System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow)]
     private sealed record ImportRequest(Guid Id);
+    [System.Text.Json.Serialization.JsonUnmappedMemberHandling(System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow)]
+    private sealed record ImportMetadataOriginalRequest(Guid Id,string SidecarKey,string OriginalKey);
+    private static bool ImportKey(string? value)=>value is{Length:64}&&value.All(c=>c is >='0' and <='9' or >='a' and <='f');
     private sealed record AccountRequest(string Operation, string? AccountId, Guid? PendingId, long? ExpectedRevision);
 }

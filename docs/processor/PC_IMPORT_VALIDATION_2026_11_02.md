@@ -1,5 +1,27 @@
 # PC folder import increment
 
+Latest explicit association continuation (2026-11-03): the local host can choose
+a verified original from the same saved import for a supported unmatched sidecar.
+Bounded original pages and strict host/CSRF commands feed immutable native intent;
+the browser cannot provide source paths, hashes or success claims. Atomic intent/
+wake-up recovery, actual database reopen, concurrent-pass fencing and installed
+worker through portable publication are covered by the current manual-association
+validation packet. Original content, first copy identity and human filename remain
+protected. Actual unsupported or unavailable inputs cannot be reassigned. A fitting
+ready result cannot be mislabeled as oversized to bypass the normal processing path.
+Actual UI/live, replacement-input/version repair, raw cloud preservation/retirement,
+remaining PC photo workflows, six installers and final publication remain open.
+
+The preceding829b807 PC CI is independently verified in
+ci-829b807-pc-validation-v168.json:60jobs/72reports on all four native runners,
+127Protocol/600Core/779Services/179Google/9LAN/52Web cases each. Every previous
+identity, exact source-derived addition, warning/limit, scale/reference check and
+four Desktop/audit reports is retained. Its old local generated app.js was stale
+relative to the recorded source; that old asset-equivalence assertion is superseded.
+A fresh locked build from the exact committed source reproduces all four CI assets
+on all four platforms and passes20frontend cases. The failed comparison and old
+evidence are preserved. No final PC release has been published.
+
 Latest supported imported-photo path (2026-11-03):
 current-imported-photo-validation-v156.json freezes751files. Actual native fresh and
 legacy imports carry retained metadata through frozen dependency/header publication,

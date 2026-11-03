@@ -31,6 +31,7 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
             using var catalog=await TakeoutAssociationCatalog.OpenCompletedAsync(completed,_budget,token).ConfigureAwait(false);
             long analyzed=0,retained=0,unsupported=0,unmatched=0,waiting=0,unavailable=0;var observationsChanged=false;string? after=null;
             var total=catalog.Count(TakeoutEntryKind.JsonSidecar);
+            var selections=await _state.ExecuteAsync(db=>new TakeoutMetadataIssueRepository(db).AssociationCount(completed.ImportId),token).ConfigureAwait(false);
             await SaveAsync(false).ConfigureAwait(false);
             while(true)
             {
@@ -59,7 +60,7 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
             }
             await SaveAsync(waiting==0&&unavailable==0).ConfigureAwait(false);return new(analyzed,retained,unsupported,unmatched,waiting){Unavailable=unavailable,ObservationsChanged=observationsChanged};
             Task SaveAsync(bool finished)=>_state.ExecuteAsync(db=>
-            {new TakeoutImportInventoryRepository(db).RecordMetadataProgress(completed,new(total,analyzed+retained,unsupported+unmatched+unavailable,waiting,finished));if(finished)new TakeoutImportedPhotoFactsRepository(db).CompleteObservationPass(completed.ImportId);return true;},token);
+            {finished=finished&&new TakeoutMetadataIssueRepository(db).AssociationCount(completed.ImportId)==selections;new TakeoutImportInventoryRepository(db).RecordMetadataProgress(completed,new(total,analyzed+retained,unsupported+unmatched+unavailable,waiting,finished));if(finished)new TakeoutImportedPhotoFactsRepository(db).CompleteObservationPass(completed.ImportId);return true;},token);
         }
         finally{Volatile.Write(ref _running,0);}
     }
@@ -69,15 +70,17 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
     private async Task<SidecarResult> RunSidecarAsync(TakeoutCompletedInventory completed,TakeoutAssociationCatalog catalog,TakeoutCapturedEntry sidecar,CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        var selection=await _state.ExecuteAsync(db=>new TakeoutMetadataIssueRepository(db).ReadAssociation(completed,sidecar.Key),token).ConfigureAwait(false);
         var previous=await _state.ExecuteAsync(db=>new TakeoutMetadataJobRepository(db).ReadCompletedImported(completed.ImportId,sidecar.Key),token).ConfigureAwait(false);
         if(previous is not null)
         {
+            if(selection is not null&&(previous.Imported.Original.Capture.Entry!=selection.Original.Capture.Entry||previous.Source.Sha256!=selection.SourceSha256))throw new InvalidDataException("Ready metadata differs from its first explicit original selection.");
             var observation=await VerifyAndResolveAsync(previous,token).ConfigureAwait(false);
             if(observation!=Observation.Unsupported)return observation==Observation.New?SidecarResult.RetainedAndObserved:SidecarResult.Retained;
             await RecordIssueAsync(completed,catalog,sidecar,"metadata-too-large",previous.Source.Sha256,token).ConfigureAwait(false);return SidecarResult.Unsupported;
         }
         var issue=await _state.ExecuteAsync(db=>new TakeoutMetadataIssueRepository(db).Find(completed,sidecar.Key),token).ConfigureAwait(false);
-        if(issue is{Retryable:false})return issue.Code is "name-mismatch" or "missing-media" or "ambiguous-media"?SidecarResult.Unmatched:SidecarResult.Unsupported;
+        if(selection is null&&issue is{Retryable:false})return issue.Code is "name-mismatch" or "missing-media" or "ambiguous-media"?SidecarResult.Unmatched:SidecarResult.Unsupported;
         var pending=await _state.ExecuteAsync(db=>new TakeoutMetadataJobRepository(db).ClaimImported(completed.ImportId,sidecar.Key),token).ConfigureAwait(false);
         if(pending is not null)
         {
@@ -99,7 +102,7 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
         var raw=await ReadSidecarAsync(completed,catalog,sidecar,token).ConfigureAwait(false);TakeoutMetadataDocument document;
         try{document=TakeoutMetadataDocument.ParseSource(raw);}catch(TakeoutMetadataIssueException error)
         {await RecordIssueAsync(completed,catalog,sidecar,error.Code,Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(raw)),token).ConfigureAwait(false);return SidecarResult.Unsupported;}
-        var association=catalog.AssociateMetadata(sidecar.Key,document);if(association.Status!="matched")
+        var association=selection is null?catalog.AssociateMetadata(sidecar.Key,document):catalog.AssociateMetadata(completed,selection,document);if(association.Status!="matched")
         {await RecordIssueAsync(completed,catalog,sidecar,association.Status,document.SourceSha256,token).ConfigureAwait(false);return SidecarResult.Unmatched;}
         var original=await _state.ExecuteAsync(db=>new TakeoutOriginalJobRepository(db).ReadVerified(completed.ImportId,association.Media!.Key),token).ConfigureAwait(false);
         if(original is null)return SidecarResult.Waiting;
@@ -126,7 +129,8 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
     {
         var verified=await _storage.ReadVerifiedAsync(result,token).ConfigureAwait(false);
         try{return await _state.ExecuteAsync(db=>{var changed=new TakeoutImportedPhotoFactsRepository(db).Retain(result,verified);new TakeoutMetadataIssueRepository(db).Resolve(result);return changed?Observation.New:Observation.Retained;},token).ConfigureAwait(false);}
-        catch(CatalogChunkCapacityException){return Observation.Unsupported;}
+        catch(CatalogChunkCapacityException)
+        {await _state.ExecuteAsync(db=>{new TakeoutMetadataIssueRepository(db).ObserveProjectionCapacity(result,verified);return true;},token).ConfigureAwait(false);return Observation.Unsupported;}
     }
 
     private static async Task<byte[]> ReadSidecarAsync(TakeoutCompletedInventory completed,TakeoutAssociationCatalog catalog,TakeoutCapturedEntry entry,CancellationToken token)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { DesktopApi, PhotoImports, Source, ImportMetadataIssue, ImportMetadataIssueCode } from './api';
+import type { DesktopApi, PhotoImports, Source, ImportMetadataIssue, ImportMetadataIssueCode, ImportOriginalChoice } from './api';
 
 const issueMessages: Record<ImportMetadataIssueCode, string> = {
   'invalid-metadata': 'This metadata file could not be read.',
@@ -10,6 +10,44 @@ const issueMessages: Record<ImportMetadataIssueCode, string> = {
   'ambiguous-media': 'More than one reviewed photo matches this file.',
   'input-unavailable': 'Restore access to the captured file to retry.'
 };
+
+function MetadataOriginalPicker({ api, id, issue, disabled }: { api: DesktopApi; id: string; issue: ImportMetadataIssue; disabled: boolean }) {
+  const [open, setOpen] = useState(false); const [cursor, setCursor] = useState<string | null>(null);
+  const [originals, setOriginals] = useState<ImportOriginalChoice[]>([]); const [next, setNext] = useState<string | null>(null);
+  const [choice, setChoice] = useState(''); const [loading, setLoading] = useState(false); const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false); const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open || saved) return;
+    const stop = new AbortController(); setLoading(true); setChoice(''); setOriginals([]); setNext(null); setNotice(null);
+    void api.importOriginalChoices(id, cursor, stop.signal).then(page => {
+      if (!stop.signal.aborted) { setOriginals(page.originals); setNext(page.next); }
+    }).catch(error => { if (!stop.signal.aborted) setNotice(error instanceof Error ? error.message : 'Original choices could not load.'); })
+      .finally(() => { if (!stop.signal.aborted) setLoading(false); });
+    return () => { stop.abort(); };
+  }, [api, id, cursor, open, saved]);
+  async function save() {
+    const selected = originals.find(item => item.key === choice); if (!selected || saving || loading || disabled) return;
+    if (!window.confirm(`Use metadata from ${issue.name} for ${selected.name}? This choice will be saved for processing. The original photo will stay unchanged.`)) return;
+    setSaving(true); setNotice(null);
+    try { await api.selectImportMetadataOriginal(id, issue.key, selected.key); setSaved(true); }
+    catch (error) { setNotice(error instanceof Error ? error.message : 'The reply was lost. Refresh issues before retrying.'); }
+    finally { setSaving(false); }
+  }
+  if (saved) return <p role="status">Original selection saved. Processing will continue in the background. Refresh issues to see the result.</p>;
+  if (!open) return <button disabled={disabled} onClick={() => setOpen(true)}>Choose the matching original</button>;
+  const selected = originals.find(item => item.key === choice);
+  return <section aria-label={`Choose original for ${issue.name}`}><p>Choose a verified photo or video from this import. Check the original before saving your selection.</p>
+    {notice && <p role="alert">{notice}</p>}{loading && <p role="status">Loading originals…</p>}
+    {!loading && !notice && originals.length === 0 && <p>No verified originals are available on this page.</p>}
+    {originals.length > 0 && <label>Matching original <select disabled={loading || saving || disabled} value={choice} onChange={event => setChoice(event.target.value)}>
+      <option value="">Choose an original…</option>{originals.map(item => <option key={item.key} value={item.key}>{item.name}</option>)}
+    </select></label>}
+    {selected && <a href={`https://drive.google.com/file/d/${encodeURIComponent(selected.fileId)}/view`} target="_blank" rel="noopener noreferrer">View selected original in Drive</a>}
+    <button disabled={!selected || loading || saving || disabled} onClick={() => { void save(); }}>{saving ? 'Saving selection…' : 'Use metadata for this original'}</button>
+    {next !== null && <button disabled={loading || saving} onClick={() => setCursor(next)}>More originals</button>}
+    <button disabled={loading || saving} onClick={() => { setCursor(null); setOpen(false); }}>Cancel selection</button>
+  </section>;
+}
 
 function MetadataIssues({ api, id, disabled, retry }: { api: DesktopApi; id: string; disabled: boolean; retry: () => void }) {
   const [open, setOpen] = useState(false); const [cursor, setCursor] = useState<string | null>(null); const [reload, setReload] = useState(0);
@@ -27,7 +65,9 @@ function MetadataIssues({ api, id, disabled, retry }: { api: DesktopApi; id: str
   if (!open) return <button onClick={() => setOpen(true)}>Review metadata issues</button>;
   return <section aria-label="Metadata issues"><h3>Metadata files needing attention</h3>
     {notice && <p role="alert">{notice}</p>}{busy && <p role="status">Loading issue details…</p>}
-    {issues.map(issue => <div key={issue.key}><strong>{issue.name}</strong><p>{issueMessages[issue.code]}</p></div>)}
+    {issues.map(issue => <div key={issue.key}><strong>{issue.name}</strong><p>{issueMessages[issue.code]}</p>
+      {['name-mismatch', 'missing-media', 'ambiguous-media'].includes(issue.code) && <MetadataOriginalPicker api={api} id={id} issue={issue} disabled={disabled || busy} />}
+    </div>)}
     {!busy && !notice && issues.length === 0 && next === null && <p>No unresolved metadata issues.</p>}
     {next !== null && <button disabled={busy} onClick={() => setCursor(next)}>More issues</button>}
     <button disabled={busy} onClick={() => { setCursor(null); setReload(value => value + 1); }}>Refresh issues</button>

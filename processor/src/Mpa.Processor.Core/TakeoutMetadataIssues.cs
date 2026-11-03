@@ -43,7 +43,7 @@ public sealed partial class TakeoutAssociationCatalog
 /// <summary>Durable per-file observations, separate from work/backup receipts.
 /// Captured input and first observed raw hash cannot change on retry. No paths,
 /// status claims or source hashes are accepted from browser commands.</summary>
-public sealed class TakeoutMetadataIssueRepository(ProcessorStateDatabase database)
+public sealed partial class TakeoutMetadataIssueRepository(ProcessorStateDatabase database)
 {
     private readonly ProcessorStateDatabase _database=database??throw new ArgumentNullException(nameof(database));
     private readonly CanonicalJson _codec=new(16384);

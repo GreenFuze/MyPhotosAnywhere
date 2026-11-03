@@ -48,7 +48,15 @@ canonical gallery/viewer reads with separate provenance, observed filename/captu
 precedence, conflict/size/version attention and old-finished-import recovery. Evidence
 current-imported-photo-validation-v156.json includes real native fresh/legacy flows,
 127Protocol/49distinct Core/52Web/7Services/20frontend checks and unchanged100k staging.
-Next finish explicit corrected-input/manual association/version repair, cloud raw
+Explicit original selection for supported unmatched sidecars is now wired through
+bounded verified-original pages, host-only browser commands, immutable native
+selection recovery and the installed worker into portable publication. Unsupported
+or unavailable inputs cannot be reassigned. Selection and its scheduling wake-up
+commit atomically; a concurrent selection cannot be hidden by an older pass marker.
+Native browser-closure/publication, database reopen, rollback, capacity and API
+checks are recorded in the current manual-association validation evidence.
+Actual visual/live acceptance remains unverified. Next finish corrected-input and
+version repair, cloud raw
 metadata preservation and owned generated-cache retirement; complete the remaining
 PC workflows and actual UI/live/install acceptance. The metadata workflow is not
 fully accepted until those steps pass. The Windows UI tool failed to initialize;

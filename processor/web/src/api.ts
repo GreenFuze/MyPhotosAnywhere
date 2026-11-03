@@ -39,6 +39,8 @@ export interface ImportMetadataProgress { total: string; ready: string; issues: 
 export type ImportMetadataIssueCode = 'invalid-metadata' | 'unsupported-metadata' | 'metadata-too-large' | 'name-mismatch' | 'missing-media' | 'ambiguous-media' | 'input-unavailable';
 export interface ImportMetadataIssue { key: string; name: string; code: ImportMetadataIssueCode; retryable: boolean }
 export interface ImportMetadataIssues { issues: ImportMetadataIssue[]; next: string | null }
+export interface ImportOriginalChoice { key: string; name: string; fileId: string }
+export interface ImportOriginalChoices { originals: ImportOriginalChoice[]; next: string | null }
 export interface PhotoImport { id: string; inputName: string; target: { libraryId: string; accountId: string; accountRevision: string; folderId: string; configurationRevision: string }; state: 'reviewing' | 'ready' | 'copying' | 'originals-verified' | 'needs-attention' | 'paused' | 'canceled'; entries: string | null; media: string | null; verified: string; requested: boolean; issue: string | null; metadata: ImportMetadataProgress | null }
 export interface PhotoImports { canChooseFolder: boolean; paused: boolean; imports: PhotoImport[] }
 export interface LibraryPublication {
@@ -266,6 +268,27 @@ export class DesktopApi {
     }
     if (value.next !== null && previous !== null && value.next < previous) throw invalid();
     return value as unknown as ImportMetadataIssues;
+  }
+  async importOriginalChoices(id: string, after: string | null, signal: AbortSignal): Promise<ImportOriginalChoices> {
+    if (!libraryIdentity(id) || after !== null && !libraryIdentity(after)) throw new Error('Choose a saved import original page.');
+    const query = new URLSearchParams({ id }); if (after !== null) query.set('after', after);
+    const value = await this.get<unknown>('/api/import-original-choices?' + query, signal);
+    const invalid = () => new Error('MPA returned invalid original choices. Saved work was retained.');
+    if (typeof value !== 'object' || value === null || !('originals' in value) || !Array.isArray(value.originals) || value.originals.length > 60 ||
+      !('next' in value) || value.next !== null && (!libraryIdentity(value.next) || after !== null && value.next <= after || value.originals.length !== 60)) throw invalid();
+    const keys = new Set<string>();
+    for (const item of value.originals as unknown[]) {
+      if (typeof item !== 'object' || item === null || !('key' in item) || typeof item.key !== 'string' || !/^[a-f0-9]{64}$/.test(item.key) || keys.has(item.key) ||
+        !('name' in item) || typeof item.name !== 'string' || item.name.length < 1 || item.name.length > 4096 || item.name.startsWith('/') || /^[a-z]:/i.test(item.name) || /[\\\u0000-\u001f]/.test(item.name) || item.name.split('/').some(part => part === '' || part === '.' || part === '..') ||
+        !('fileId' in item) || !libraryAccount(item.fileId) || item.fileId === 'root') throw invalid();
+      keys.add(item.key);
+    }
+    return value as unknown as ImportOriginalChoices;
+  }
+  async selectImportMetadataOriginal(id: string, sidecarKey: string, originalKey: string): Promise<void> {
+    if (!libraryIdentity(id) || !/^[a-f0-9]{64}$/.test(sidecarKey) || !/^[a-f0-9]{64}$/.test(originalKey)) throw new Error('Choose a captured metadata file and original.');
+    await this.check(await fetch('/api/import-metadata-original', { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-MPA-CSRF': this.csrf }, body: JSON.stringify({ id, sidecarKey, originalKey }) }));
   }
   private importItem(value: unknown): PhotoImport {
     const invalid = () => new Error('MPA returned conflicting import progress. Saved work was retained.');

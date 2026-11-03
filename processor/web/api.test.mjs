@@ -257,3 +257,37 @@ test('canceled native folder chooser has no import and malformed import pages fa
   await withBrowser(async () => json({ import: null }), async api => { assert.equal(await api.importAction('folders', importIdentity), null); });
   for (const page of [{ canChooseFolder: true, imports: [] }, { canChooseFolder: true, paused: false, imports: Array(65).fill(validImport()) }]) await withBrowser(async () => json(page), async api => { await assert.rejects(api.imports(new AbortController().signal), /invalid import progress/); });
 });
+
+test('manual metadata selection lists bounded verified originals and sends only native identifiers with CSRF', async () => {
+  const signal = new AbortController().signal; const sidecarKey = 'a'.repeat(64); const originalKey = 'b'.repeat(64);
+  const page = { originals: [{ key: originalKey, name: 'Photos/שלום <photo>.jpg', fileId: 'verified-original' }], next: null }; let selections = 0;
+  await withBrowser(async (url, options) => {
+    if (url === '/api/session') return json({ csrf: 'c'.repeat(64), hostOwner: true });
+    if (options.method === 'POST') {
+      assert.equal(url, '/api/import-metadata-original'); assert.equal(options.headers['X-MPA-CSRF'], 'c'.repeat(64));
+      assert.equal(options.credentials, 'same-origin'); assert.deepEqual(JSON.parse(options.body), { id: importIdentity, sidecarKey, originalKey });
+      selections++; return new Response(null, { status: 204 });
+    }
+    const parsed = new URL(url, 'https://local.invalid'); assert.equal(parsed.pathname, '/api/import-original-choices'); assert.equal(parsed.searchParams.get('id'), importIdentity);
+    assert.equal(options.signal, signal); assert.equal(options.credentials, 'same-origin'); return json(page);
+  }, async api => {
+    await api.connect(); assert.deepEqual(await api.importOriginalChoices(importIdentity, null, signal), page);
+    await api.selectImportMetadataOriginal(importIdentity, sidecarKey, originalKey);
+    await assert.rejects(api.selectImportMetadataOriginal(importIdentity, '../file.json', originalKey), /captured metadata file/);
+    await assert.rejects(api.selectImportMetadataOriginal(importIdentity, sidecarKey, 'provider-id'), /captured metadata file/);
+  }); assert.equal(selections, 1);
+});
+
+test('original choice pages reject invalid paths, receipts, oversized pages and cursors before selection', async () => {
+  const original = { key: 'b'.repeat(64), name: 'photo.jpg', fileId: 'verified-original' }; const page = { originals: [original], next: null };
+  for (const value of [null, {}, { ...page, originals: Array(61).fill(original) }, { ...page, originals: [original, original] },
+    { ...page, next: importIdentity }, ...[{ name: '../photo.jpg' }, { name: 'C:/photo.jpg' }, { name: 'x\\photo.jpg' }, { name: '' }, { name: 'x'.repeat(4097) },
+      { fileId: 'root' }, { fileId: '../provider' }, { key: 'A'.repeat(64) }].map(change => ({ ...page, originals: [{ ...original, ...change }] }))]) {
+    await withBrowser(async () => json(value), async api => { await assert.rejects(api.importOriginalChoices(importIdentity, null, new AbortController().signal), /invalid original choices/); });
+  }
+  let calls = 0;
+  await withBrowser(async () => { calls++; return json(page); }, async api => {
+    await assert.rejects(api.importOriginalChoices(importIdentity, '../page', new AbortController().signal), /saved import original page/);
+    await assert.rejects(api.importOriginalChoices('00000000-0000-0000-0000-000000000000', null, new AbortController().signal), /saved import original page/);
+  }); assert.equal(calls, 0);
+});

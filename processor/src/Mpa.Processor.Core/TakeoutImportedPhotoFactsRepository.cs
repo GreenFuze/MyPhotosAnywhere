@@ -35,6 +35,11 @@ public sealed class TakeoutImportedPhotoFactsRepository(ProcessorStateDatabase d
         {format="mpa-local-imported-observation-pass",major=1,importId=importId.ToString("D"),indexSha256=completed.Result.Sha256,selectionSha256=Hash(Encoding.UTF8.GetBytes(completed.CapturedContext))})));
     }
     private static string ImportMarkerKey(Guid importId)=>"takeout-photo-import-observed-v1:"+importId.ToString("D");
+    internal void InvalidateObservationPass(Guid importId,SqliteTransaction transaction)
+    {
+        using var delete=_database.Connection.CreateCommand();delete.Transaction=transaction;delete.CommandText="DELETE FROM processor_meta WHERE key=$key";
+        delete.Parameters.AddWithValue("$key",ImportMarkerKey(importId));delete.ExecuteNonQuery();
+    }
     public bool Retain(TakeoutVerifiedMetadata result,TakeoutMetadataDocument verified)
     {
         ArgumentNullException.ThrowIfNull(result);ArgumentNullException.ThrowIfNull(verified);

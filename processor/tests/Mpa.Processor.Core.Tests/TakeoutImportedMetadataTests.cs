@@ -218,15 +218,16 @@ public sealed partial class TakeoutMetadataOperationTests
         internal ArtifactDescriptor Descriptor=>new(Raw.Length,Convert.ToHexStringLower(SHA256.HashData(Raw)),"input.bin");
         internal CancellationToken Token=>_deadline.Token;
         internal string StateDirectory=>_database.StateDirectory;
-        internal static async Task<ImportedFixture> CreateAsync(int additionalSidecars=0,bool conflictingSidecar=false,int descriptionLength=0)
+        internal static async Task<ImportedFixture> CreateAsync(int additionalSidecars=0,bool conflictingSidecar=false,int descriptionLength=0,int additionalOriginals=0)
         {
-            var fixture=new ImportedFixture();try{await fixture.InitializeAsync(additionalSidecars,conflictingSidecar,descriptionLength).ConfigureAwait(false);return fixture;}catch{await fixture.DisposeAsync().ConfigureAwait(false);throw;}
+            var fixture=new ImportedFixture();try{await fixture.InitializeAsync(additionalSidecars,conflictingSidecar,descriptionLength,additionalOriginals).ConfigureAwait(false);return fixture;}catch{await fixture.DisposeAsync().ConfigureAwait(false);throw;}
         }
-        private async Task InitializeAsync(int additionalSidecars,bool conflictingSidecar,int descriptionLength)
+        private async Task InitializeAsync(int additionalSidecars,bool conflictingSidecar,int descriptionLength,int additionalOriginals)
         {
             if(descriptionLength>0)Raw=Encoding.UTF8.GetBytes("{\"title\":\"a.jpg\",\"description\":\""+new string('x',descriptionLength)+"\",\"photoTakenTime\":{\"timestamp\":\"1\"}}");
             var input=Path.Combine(Root.Path,"input");Directory.CreateDirectory(input);await File.WriteAllBytesAsync(Path.Combine(input,"a.jpg"),new byte[]{1,2,3},Token).ConfigureAwait(false);
             await File.WriteAllBytesAsync(Path.Combine(input,"a.jpg.json"),Raw,Token).ConfigureAwait(false);
+            for(var ordinal=0;ordinal<additionalOriginals;ordinal++)await File.WriteAllBytesAsync(Path.Combine(input,"extra-"+ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)+".jpg"),new byte[]{1,2,3},Token).ConfigureAwait(false);
             for(var ordinal=0;ordinal<additionalSidecars;ordinal++)await File.WriteAllBytesAsync(Path.Combine(input,"extra-"+ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)+".json"),Raw,Token).ConfigureAwait(false);
             if(conflictingSidecar)await File.WriteAllBytesAsync(Path.Combine(input,"a.jpg.supplemental-metadata.json"),Encoding.UTF8.GetBytes("{\"title\":\"a.jpg\",\"description\":\"Conflicting imported description\",\"photoTakenTime\":{\"timestamp\":\"2\"}}"),Token).ConfigureAwait(false);
             _database=new(Path.Combine(Root.Path,"state"));Budget=new(new MeasuredSpace(_database.StateDirectory));
@@ -236,10 +237,11 @@ public sealed partial class TakeoutMetadataOperationTests
                 var work=imports.Claim(id)!;using var catalog=TakeoutAssociationCatalog.Open(_database,work,Budget,Token);catalog.AddPart(selected,Token);await catalog.SealAsync(Token).ConfigureAwait(false);imports.Complete(work,catalog);Completed=imports.ReadCompleted(id)!;
             }
             Catalog=await TakeoutAssociationCatalog.OpenCompletedAsync(Completed,Budget,Token).ConfigureAwait(false);Sidecar=Catalog.ReadPage(TakeoutEntryKind.JsonSidecar).Entries.Single(entry=>entry.RelativePath=="a.jpg.json");
-            await using(var source=await TakeoutOriginalReader.CaptureAsync(Completed,Catalog,Catalog.ReadPage(TakeoutEntryKind.Media).Entries.Single(),Token).ConfigureAwait(false))
+            foreach(var entry in Catalog.ReadPage(TakeoutEntryKind.Media).Entries)
             {
-                var originals=new TakeoutOriginalJobRepository(_database);var id=originals.Ensure(source.Capture,Guid.NewGuid());var work=originals.ObserveAcknowledgedBytes(originals.RetainAllocatedFileId(originals.Claim(id)!,"first-verified-file"),3);
-                originals.ConfirmVerified(work,"account-one","destination-one","first-verified-file",3,7,source.Capture.Sha256);Original=originals.ReadVerified(Completed.ImportId,source.Capture.Entry.Key)!;
+                await using var source=await TakeoutOriginalReader.CaptureAsync(Completed,Catalog,entry,Token).ConfigureAwait(false);
+                var originals=new TakeoutOriginalJobRepository(_database);var id=originals.Ensure(source.Capture,Guid.NewGuid());var fileId=entry.RelativePath=="a.jpg"?"first-verified-file":"verified-"+entry.MediaId.ToString("N");var work=originals.ObserveAcknowledgedBytes(originals.RetainAllocatedFileId(originals.Claim(id)!,fileId),3);
+                originals.ConfirmVerified(work,"account-one","destination-one",fileId,3,7,source.Capture.Sha256);if(entry.RelativePath=="a.jpg")Original=originals.ReadVerified(Completed.ImportId,source.Capture.Entry.Key)!;
             }
             Storage=new(_database,Budget);State=new(_database);
         }

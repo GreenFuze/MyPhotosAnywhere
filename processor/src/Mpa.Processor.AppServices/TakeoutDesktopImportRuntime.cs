@@ -37,6 +37,12 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
     {var repository=new TakeoutImportInventoryRepository(database);return(IReadOnlyList<TakeoutImportActivity>)repository.Identities().Select(repository.Activity).ToArray();},token);
     public Task<TakeoutMetadataIssuePage> MetadataIssuesAsync(Guid importId,string? after,CancellationToken token)
         =>_state.ExecuteAsync(database=>new TakeoutMetadataIssueRepository(database).ReadPage(importId,after),token);
+    public Task<TakeoutOriginalChoices> OriginalChoicesAsync(Guid importId,string? after,CancellationToken token)
+        =>_state.ExecuteAsync(database=>new TakeoutOriginalJobRepository(database).ReadChoices(importId,after),token);
+    public Task SelectMetadataOriginalAsync(Guid importId,string sidecarKey,string originalKey,CancellationToken caller)=>_state.ExecuteAsync(database=>
+    {
+        lock(_gate){Check(caller,caller);if(_metadata is null)throw new InvalidOperationException("Metadata processing is unavailable.");new TakeoutMetadataIssueRepository(database).SelectOriginal(importId,sidecarKey,originalKey);Wake();return true;}
+    },caller);
     public Task<TakeoutImportActivity?> ChooseFolderAsync(Guid sourceId,CancellationToken caller)
     {
         if(sourceId==Guid.Empty)throw new ArgumentException("Choose an existing Drive source.",nameof(sourceId));
