@@ -58,7 +58,7 @@ export function Imports({ api, back }: { api: DesktopApi; back: () => void }) {
     catch (error) { setNotice(error instanceof Error ? error.message : 'Import could not continue. Saved progress was retained.'); }
     finally { setBusy(false); }
   }
-  const labels = { reviewing: 'Reviewing selected files', ready: 'Ready to import', copying: 'Copying and verifying originals', 'originals-verified': 'Originals verified · catalog processing pending', 'needs-attention': 'Needs attention', paused: 'Paused', canceled: 'Canceled' };
+  const labels = { reviewing: 'Reviewing selected files', ready: 'Ready to import', copying: 'Copying and verifying originals', 'originals-verified': 'Originals verified', 'needs-attention': 'Needs attention', paused: 'Paused', canceled: 'Canceled' };
   const enabled = sources.filter(source => source.enabled && source.accountConnected);
   return <section className="settings"><button className="back" onClick={back}>‹ Back to Photos</button><h1>Import photos</h1>
     <p>Copy photos from a local photo folder or an extracted Takeout folder to Google Drive. Your selected files stay unchanged.</p>
@@ -76,7 +76,7 @@ export function Imports({ api, back }: { api: DesktopApi; back: () => void }) {
       return <section className="setting-card" key={item.id}><h2>{item.inputName}</h2><p>{labels[item.state]}</p>
         <p>Destination: {target?.displayName ?? 'Captured Drive folder'}</p>
         {item.media !== null && <p>{BigInt(item.verified).toLocaleString()} of {BigInt(item.media).toLocaleString()} photo and video originals verified</p>}
-        {item.metadata && <div role="status"><p>{item.metadata.finished ? 'Metadata processing finished · catalog processing pending' : 'Processing imported metadata'}</p>
+        {item.metadata && <div role="status"><p>{item.metadata.finished ? 'Imported metadata processed' : 'Processing imported metadata'}</p>
           <p>{BigInt(item.metadata.ready).toLocaleString()} of {BigInt(item.metadata.total).toLocaleString()} sidecars processed</p>
           {item.metadata.issues !== '0' && <p>{BigInt(item.metadata.issues).toLocaleString()} sidecars could not be applied or matched. Verified originals are retained.</p>}
           {item.metadata.issues !== '0' && <MetadataIssues api={api} id={item.id} disabled={busy || data.paused} retry={() => { void act('retry', item.id); }} />}

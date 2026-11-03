@@ -19,6 +19,20 @@ public sealed class TakeoutVerifiedMetadata
     internal int Attempt{get;}
     internal TakeoutVerifiedMetadata(ProcessorStateDatabase owner,Guid job,TakeoutImportedMetadata imported,ArtifactDescriptor source,ArtifactDescriptor artifact,string context,Guid lease,int attempt)
     {Owner=owner;JobId=job;Imported=imported;Source=source;Artifact=artifact;ItemContext=context;LeaseId=lease;Attempt=attempt;}
+
+    /// <summary>After the staging owner verifies the actual retained files, bind
+    /// portable imported observations to this still-valid native ready receipt.
+    /// This method neither edits Drive facts nor grants publication authority.</summary>
+    public ImportedPhotoMetadata DescribeImportedFacts(TakeoutMetadataDocument document)
+    {
+        var actual=new TakeoutMetadataJobRepository(Owner).ReadCompletedImported(Imported.Original.Capture.Inventory.ImportId,Imported.Sidecar.Key)
+            ??throw new InvalidDataException("Imported photo observations lost their actual ready receipt.");
+        if(actual.JobId!=JobId||!SameDescriptor(actual.Source,Source)||!SameDescriptor(actual.Artifact,Artifact)||actual.ItemContext!=ItemContext||actual.Imported.Original.AssetId!=Imported.Original.AssetId||actual.Imported.Original.Version!=Imported.Original.Version)
+            throw new InvalidDataException("Imported photo observations changed their native source or original identity.");
+        return ImportedPhotoMetadata.FromTakeout(Imported.Original.AssetId,Imported.Original.Capture.Inventory.ImportId,JobId,
+            Imported.Original.Capture.Sha256,Imported.Original.Version,Imported.Sidecar.Key,Source,Artifact,document);
+    }
+    private static bool SameDescriptor(ArtifactDescriptor left,ArtifactDescriptor right)=>left.Bytes==right.Bytes&&left.Sha256==right.Sha256&&left.RelativePath==right.RelativePath;
 }
 
 public sealed partial class TakeoutMetadataJobRepository

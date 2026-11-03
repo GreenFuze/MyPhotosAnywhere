@@ -5,7 +5,9 @@ namespace Mpa.Processor.Web;
 
 public sealed class InvalidDesktopCatalogQueryException() : Exception("The gallery position is invalid for this account filter. Return to Photos or choose the date again.");
 public sealed record DesktopCatalogPhoto(Guid Id, string AccountId, string Name, string MimeType, int? Width, int? Height,
-    long? EffectiveUtc, string DateProvenance, string? RawCapture);
+    long? EffectiveUtc, string DateProvenance, string? RawCapture)
+{public DesktopImportedPhotoDetails? ImportedMetadata{get;init;}}
+public sealed record DesktopImportedPhotoDetails(string? Title,string? Description,long? CapturedUtc,double? Latitude,double? Longitude,IReadOnlyList<string> NameHints,string? Attention);
 public sealed record DesktopCatalogPage(long DiscoveryRevision, long ConfigurationRevision, IReadOnlyList<DesktopCatalogPhoto> Photos,
     string? OlderCursor, string? NewerCursor);
 

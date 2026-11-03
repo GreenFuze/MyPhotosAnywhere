@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Data.Sqlite;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Mpa.Processor.Core;
 using Mpa.Processor.GoogleDrive;
@@ -9,7 +10,10 @@ namespace Mpa.Processor.AppServices.Tests;
 public sealed partial class AccountServiceTests
 {
     [TestMethod]
-    public async Task DesktopFolderImportReviewsActualInputBeforeExplicitStartAndBrowserCancellationDoesNotOwnTheCopy()
+    public Task DesktopFolderImportReviewsActualInputBeforeExplicitStartAndBrowserCancellationDoesNotOwnTheCopy()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false);
+    [TestMethod]
+    public Task DesktopImportUpgradesOldFinishedMetadataFromPrivateEvidenceWithoutAnotherUploadOrWorker()=>VerifyImportedPhotoPublicationAsync(legacyFinished:true);
+    private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished)
     {
         using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(40));await using var fixture=await CurrentReaderFixture.CreateAsync(addSource:true).ConfigureAwait(false);
         var selection=await NativeTakeoutSelectionAsync(fixture,deadline.Token,metadata:true).ConfigureAwait(false);var state=fixture.Data.Setup.Accounts.State;
@@ -21,8 +25,8 @@ public sealed partial class AccountServiceTests
         await using var native=new ProcessorWorkSupervisor();var metadataLaunches=0;
         var metadata=new TakeoutImportMetadataRunner(state,fixture.Data.Budget,metadataStorage,native,token=>
         {metadataLaunches++;return TakeoutWorkerInstallation.OpenInstalledAsync(Path.Combine(AppContext.BaseDirectory,"workers","takeout-metadata"),token);});
-        var scanQueued=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var scanNotifications=0;
-        await using var imports=new TakeoutDesktopImportRuntime(state,fixture.Data.Budget,inventory,current,_=>Task.FromResult<string?>(Path.GetDirectoryName(selection.Path)),()=>{Interlocked.Increment(ref scanNotifications);scanQueued.TrySetResult();},metadata);
+        var scanQueued=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var scanNotifications=0;var metadataNotifications=0;
+        await using var imports=new TakeoutDesktopImportRuntime(state,fixture.Data.Budget,inventory,current,_=>Task.FromResult<string?>(Path.GetDirectoryName(selection.Path)),()=>{Interlocked.Increment(ref scanNotifications);scanQueued.TrySetResult();},metadata,()=>Interlocked.Increment(ref metadataNotifications));
         await imports.ResumeAsync().ConfigureAwait(false);var review=await imports.ChooseFolderAsync(setup.Source,deadline.Token).ConfigureAwait(false);Assert.IsNotNull(review);
         var ready=await WaitImportAsync(imports,review.Id,"ready",deadline.Token).ConfigureAwait(false);Assert.AreEqual(1L,ready.Media);Assert.IsFalse(ready.Requested);Assert.AreEqual(0,cloud.Allocations);
         Assert.IsFalse(ready.InputName.Contains(Path.DirectorySeparatorChar));
@@ -32,7 +36,24 @@ public sealed partial class AccountServiceTests
         CollectionAssert.AreEqual(selection.Payload,cloud.Uploaded);CollectionAssert.AreEqual(selection.Payload,await File.ReadAllBytesAsync(selection.Path,deadline.Token).ConfigureAwait(false));
         await scanQueued.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
         var processed=await WaitImportMetadataAsync(imports,review.Id,deadline.Token).ConfigureAwait(false);Assert.AreEqual(new TakeoutMetadataProgress(1,1,0,0,true),processed.Metadata);Assert.AreEqual(1,metadataLaunches);
+        var expectedMetadata=TakeoutMetadataDocument.ParseSource(await File.ReadAllBytesAsync(selection.Path+".json",deadline.Token).ConfigureAwait(false));
         File.Delete(selection.Path+".json");await imports.PauseAsync().ConfigureAwait(false);
+        if(legacyFinished)
+        {
+            Assert.AreEqual(1,metadataNotifications);
+            await state.ExecuteAsync(db=>
+            {
+                // Reproduce pre-profile local state: finished processing and real
+                // ready/raw evidence, with no new projection rows or version hint.
+                using var connection=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.Combine(db.StateDirectory,"processor.db"),Mode=SqliteOpenMode.ReadWrite,Pooling=false,DefaultTimeout=5}.ToString());connection.Open();
+                using var remove=connection.CreateCommand();remove.CommandText="DELETE FROM processor_meta WHERE key LIKE 'takeout-photo-observation-v1:%' OR key=$marker";remove.Parameters.AddWithValue("$marker","takeout-photo-import-observed-v1:"+review.Id.ToString("D"));Assert.AreEqual(2,remove.ExecuteNonQuery());
+                Assert.IsTrue(new TakeoutImportInventoryRepository(db).Activity(review.Id).Metadata!.Finished);return true;
+            },deadline.Token).ConfigureAwait(false);
+            await imports.ResumeAsync().ConfigureAwait(false);
+            while(Volatile.Read(ref metadataNotifications)<2)
+            {if(imports.Failure is {}failure)throw new InvalidOperationException("Legacy metadata upgrade faulted.",failure);await Task.Delay(10,deadline.Token).ConfigureAwait(false);}
+            await imports.PauseAsync().ConfigureAwait(false);Assert.AreEqual(1,cloud.Allocations);Assert.AreEqual(1,metadataLaunches);
+        }
         var scan=await state.ExecuteAsync(db=>
         {
             var repository=new SourceDiscoveryRepository(db);var retained=repository.EnsureImportedOriginalsScheduled(review.Id);Assert.IsFalse(retained.Created);
@@ -63,8 +84,13 @@ public sealed partial class AccountServiceTests
         var activated=current.Catalog.Selection;Assert.IsNotNull(activated);Assert.AreEqual(published.Commit,activated.Catalog);
         var page=await current.Catalog.ReadPageAsync(activated.StageId,null,60,deadline.Token).ConfigureAwait(false);Assert.IsNotNull(page);
         var portable=page.Page.Assets.Single(value=>value.Id==imported.Id);Assert.AreEqual("Human renamed.jpg",portable.Name);
+        Assert.IsNotNull(portable.ImportedMetadata);Assert.AreEqual(expectedMetadata.SourceSha256,portable.ImportedMetadata.Source.Sha256);Assert.AreEqual(expectedMetadata.Description,portable.ImportedMetadata.Description);
+        Assert.AreEqual(expectedMetadata.Title,portable.ImportedMetadata.Title);Assert.AreEqual(expectedMetadata.CapturedUtc,portable.ImportedMetadata.CapturedUtc);
+        Assert.AreEqual(imported.Facts.CapturedUtc,portable.CapturedUtc);
+        Assert.AreEqual(imported.Facts.CapturedUtc??expectedMetadata.CapturedUtc??imported.Facts.ModifiedUtc,portable.EffectiveUtc,"The imported capture is used only when Drive capture is absent.");
+        CollectionAssert.AreEqual(expectedMetadata.ImportedNames.ToArray(),portable.ImportedMetadata.ImportedNames.ToArray());
         var replay=await imports.StartAsync(review.Id,deadline.Token).ConfigureAwait(false);Assert.AreEqual("originals-verified",replay.State);Assert.AreEqual(1,cloud.Allocations);
-        await imports.ResumeAsync().ConfigureAwait(false);await imports.PauseAsync().ConfigureAwait(false);Assert.AreEqual(1,scanNotifications);Assert.AreEqual(1,metadataLaunches);
+        await imports.ResumeAsync().ConfigureAwait(false);await imports.PauseAsync().ConfigureAwait(false);Assert.AreEqual(1,scanNotifications);Assert.AreEqual(1,metadataLaunches);Assert.AreEqual(legacyFinished?2:1,metadataNotifications);
         var before=await state.ExecuteAsync(db=>new SourceDiscoveryRepository(db).ReadActivity().Jobs.Single(value=>value.JobId==scan.JobId).Scope,deadline.Token).ConfigureAwait(false);
         await state.ExecuteAsync(db=>
         {

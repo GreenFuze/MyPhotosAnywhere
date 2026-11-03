@@ -6,15 +6,20 @@ using System.Text.Json;
 namespace Mpa.Processor.Protocol;
 
 public sealed record DriveCatalogSource(Guid Id, long Revision, int Depth);
+public sealed record ImportedMetadataAttention(long Candidates,string Sha256,string Code);
 public sealed record DriveCatalogAsset(Guid Id, string AccountId, string FileId, long DriveVersion, string Name, string MimeType,
     int? Width, int? Height, long? CapturedUtc, string? RawCapture, long? ModifiedUtc, ReadOnlyCollection<DriveCatalogSource> Sources)
 {
-    public long? EffectiveUtc => CapturedUtc ?? ModifiedUtc;
+    public ImportedPhotoMetadata? ImportedMetadata{get;init;}
+    public ImportedMetadataAttention? ImportedAttention{get;init;}
+    public long? EffectiveUtc => CapturedUtc ?? ImportedMetadata?.CapturedUtc ?? ModifiedUtc;
 }
-public sealed record DriveCatalogChunk(string Prefix, ReadOnlyCollection<DriveCatalogAsset> Assets);
+public sealed record DriveCatalogChunk(string Prefix, ReadOnlyCollection<DriveCatalogAsset> Assets)
+{public bool RequiresImportedMetadata=>Assets.Any(asset=>asset.ImportedMetadata is not null||asset.ImportedAttention is not null);}
 public sealed class CatalogChunkCapacityException() : InvalidOperationException("This identity partition exceeds a catalog chunk bound. Split it before publication; never truncate its records.");
 
-/// <summary>Observed Drive facts only, never proof of downloaded/verified original bytes.
+/// <summary>Observed Drive facts and separately identified imported observations,
+/// never proof of downloaded/verified original bytes.
 /// A consumer must additionally validate signed authority, source coverage/revisions,
 /// workspace membership and complete generation dependencies before activating these rows.</summary>
 public sealed class DriveCatalogFacts
@@ -34,7 +39,8 @@ public sealed class DriveCatalogFacts
         var canonical = new CanonicalJson().Encode(canonicalBytes);
         if (!canonicalBytes.SequenceEqual(canonical)) throw new ProtocolFormatException("Drive facts must already be canonical JSON.");
         using var document = JsonDocument.Parse(canonical); var root = document.RootElement;
-        if (Text(root, "format") != "mpa-drive-facts" || Integer(root, "major") != 1)
+        var photoProfile=Text(root,"format")=="mpa-photo-facts"&&Integer(root,"major")==2;
+        if (!photoProfile&&(Text(root, "format") != "mpa-drive-facts" || Integer(root, "major") != 1))
             throw new ProtocolCompatibilityException("These Drive facts require a compatible MPA update.");
         if (Uuid(root, "libraryId") != _library || Text(root, "prefix") != expectedPrefix)
             throw new ProtocolFormatException("Drive facts do not match their captured library/identity partition.");
@@ -58,12 +64,26 @@ public sealed class DriveCatalogFacts
             }
             var asset = new DriveCatalogAsset(id, Text(row, "accountId"), Text(row, "fileId"), Positive(row, "driveVersion"), Text(row, "name"), Text(row, "mimeType"),
                 OptionalInteger(row, "width"), OptionalInteger(row, "height"), Timestamp(row, "capturedUtc"), OptionalText(row, "rawCapture"), Timestamp(row, "modifiedUtc"), memberships.AsReadOnly());
+            if(photoProfile)
+            {
+                var imported=Property(row,"importedMetadata");
+                if(imported.ValueKind!=JsonValueKind.Null)asset=asset with{ImportedMetadata=ImportedPhotoMetadata.Read(Encoding.UTF8.GetBytes(imported.GetRawText()))};
+                var conflict=Property(row,"importedAttention");
+                if(conflict.ValueKind!=JsonValueKind.Null)
+                {
+                    if(conflict.ValueKind!=JsonValueKind.Object||conflict.EnumerateObject().Count()!=3)throw new ProtocolFormatException("Invalid imported metadata attention.");
+                    asset=asset with{ImportedAttention=new(Positive(conflict,"candidates"),Text(conflict,"sha256"),Text(conflict,"code"))};
+                }
+            }
+            else if(row.TryGetProperty("importedMetadata",out var unadvertised)&&unadvertised.ValueKind!=JsonValueKind.Null||!photoProfile&&row.TryGetProperty("importedAttention",out var unadvertisedConflict)&&unadvertisedConflict.ValueKind!=JsonValueKind.Null)
+                throw new ProtocolFormatException("Imported observations require their explicit photo facts profile.");
             Validate(asset, expectedPrefix);
             var key = id.ToString("D");
             if (previous is not null && StringComparer.Ordinal.Compare(previous, key) >= 0)
                 throw new ProtocolFormatException("Partition asset identities must be unique and ordinally sorted.");
             previous = key; assets.Add(asset);
         }
+        if(photoProfile&&assets.All(asset=>asset.ImportedMetadata is null&&asset.ImportedAttention is null))throw new ProtocolFormatException("The photo facts profile requires imported observations.");
         return new(expectedPrefix, assets.AsReadOnly());
     }
 
@@ -73,7 +93,8 @@ public sealed class DriveCatalogFacts
         var assets = source.Take(MaximumAssets + 1).OrderBy(asset => asset.Id.ToString("D"), StringComparer.Ordinal).ToArray();
         if (assets.Length > MaximumAssets) throw new CatalogChunkCapacityException();
         if (assets.Length == 0) throw new ProtocolFormatException("An empty generation uses an empty root index, not an empty facts chunk.");
-        var tail = Encoding.UTF8.GetBytes("],\"format\":\"mpa-drive-facts\",\"libraryId\":\"" + _library.ToString("D") + "\",\"major\":1,\"prefix\":\"" + prefix + "\"}");
+        var photoProfile=assets.Any(asset=>asset.ImportedMetadata is not null||asset.ImportedAttention is not null);
+        var tail = Encoding.UTF8.GetBytes("],\"format\":\""+(photoProfile?"mpa-photo-facts":"mpa-drive-facts")+"\",\"libraryId\":\"" + _library.ToString("D") + "\",\"major\":"+(photoProfile?"2":"1")+",\"prefix\":\"" + prefix + "\"}");
         using var output = new MemoryStream(4096); output.Write("{\"assets\":["u8); Guid? previous = null; var comma = false;
         foreach (var asset in assets)
         {
@@ -84,14 +105,20 @@ public sealed class DriveCatalogFacts
             if (sources.Select(item => item.Id).Distinct().Count() != sources.Length) throw new ProtocolFormatException("A record cannot duplicate its source membership.");
             // At most one bounded record is serialized before checking remaining chunk
             // space. No full-library JSON or over-limit chunk buffer is materialized.
-            var bytes = new CanonicalJson(64 * 1024).Encode(JsonSerializer.SerializeToUtf8Bytes(new
+            var row=new Dictionary<string,object?>
             {
-                id = asset.Id.ToString("D"), accountId = asset.AccountId, fileId = asset.FileId,
-                driveVersion = asset.DriveVersion.ToString(CultureInfo.InvariantCulture), name = asset.Name, mimeType = asset.MimeType,
-                width = asset.Width, height = asset.Height, capturedUtc = asset.CapturedUtc?.ToString(CultureInfo.InvariantCulture),
-                rawCapture = asset.RawCapture, modifiedUtc = asset.ModifiedUtc?.ToString(CultureInfo.InvariantCulture),
-                sources = sources.Select(item => new { id = item.Id.ToString("D"), revision = item.Revision.ToString(CultureInfo.InvariantCulture), depth = item.Depth })
-            }));
+                ["id"]=asset.Id.ToString("D"),["accountId"]=asset.AccountId,["fileId"]=asset.FileId,["driveVersion"]=asset.DriveVersion.ToString(CultureInfo.InvariantCulture),
+                ["name"]=asset.Name,["mimeType"]=asset.MimeType,["width"]=asset.Width,["height"]=asset.Height,["capturedUtc"]=asset.CapturedUtc?.ToString(CultureInfo.InvariantCulture),
+                ["rawCapture"]=asset.RawCapture,["modifiedUtc"]=asset.ModifiedUtc?.ToString(CultureInfo.InvariantCulture),
+                ["sources"]=sources.Select(item=>new{id=item.Id.ToString("D"),revision=item.Revision.ToString(CultureInfo.InvariantCulture),depth=item.Depth})
+            };
+            if(photoProfile)
+            {
+                row["importedMetadata"]=asset.ImportedMetadata is null?null:JsonSerializer.Deserialize<JsonElement>(asset.ImportedMetadata.Encode());
+                row["importedAttention"]=asset.ImportedAttention is null?null:new{candidates=asset.ImportedAttention.Candidates.ToString(CultureInfo.InvariantCulture),sha256=asset.ImportedAttention.Sha256,code=asset.ImportedAttention.Code};
+            }
+            var serialized=JsonSerializer.SerializeToUtf8Bytes(row);if(serialized.Length>64*1024)throw new CatalogChunkCapacityException();
+            var bytes = new CanonicalJson(64 * 1024).Encode(serialized);
             var required = output.Length + (comma ? 1 : 0) + bytes.Length + tail.Length;
             if (required > CatalogChunkDecoder.MaximumExpandedBytes) throw new CatalogChunkCapacityException();
             if (required > output.Capacity) output.Capacity = (int)Math.Min(CatalogChunkDecoder.MaximumExpandedBytes, Math.Max(required, output.Capacity * 2L));
@@ -109,7 +136,9 @@ public sealed class DriveCatalogFacts
             asset.MimeType is null || asset.MimeType.Length > 256 || asset.MimeType.Any(char.IsControl) ||
             !(asset.MimeType.StartsWith("image/", StringComparison.Ordinal) || asset.MimeType.StartsWith("video/", StringComparison.Ordinal)) ||
             asset.Width is <= 0 or > 1000000 || asset.Height is <= 0 or > 1000000 || !Time(asset.CapturedUtc) || !Time(asset.ModifiedUtc) || asset.RawCapture is { Length: > 128 } ||
-            asset.Sources is null || asset.Sources.Count is < 1 or > MaximumSources || asset.Sources.Any(item => item.Id == Guid.Empty || item.Revision < 1 || item.Depth is < 0 or > 256))
+            asset.Sources is null || asset.Sources.Count is < 1 or > MaximumSources || asset.Sources.Any(item => item.Id == Guid.Empty || item.Revision < 1 || item.Depth is < 0 or > 256)||
+            asset.ImportedMetadata is {} imported&&(imported.AssetId!=asset.Id||imported.OriginalVersion!=asset.DriveVersion)||asset.ImportedAttention is {} conflict&&
+            (asset.ImportedMetadata is not null||conflict.Code is not("conflicting-metadata" or "metadata-too-large" or "original-version-changed")||(conflict.Code=="conflicting-metadata"?conflict.Candidates<2:conflict.Candidates!=1)||conflict.Sha256 is null||conflict.Sha256.Length!=64||conflict.Sha256.Any(c=>c is not(>='0' and <='9') and not(>='a' and <='f'))))
             throw new ProtocolFormatException("Invalid observed Drive facts or captured source membership.");
         try
         {

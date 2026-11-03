@@ -6,7 +6,7 @@ namespace Mpa.Processor.AppServices;
 /// own selection only; captured reviews/Start requests survive browser closure.
 /// Shares the existing current-library lane and borrowed inventory owner.</summary>
 public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,StorageBudgetManager budget,
-    TakeoutInventoryService inventory,CurrentLibraryCatalogRuntime current,Func<CancellationToken,Task<string?>>? picker,Action? discoveryReady=null,TakeoutImportMetadataRunner? metadata=null)
+    TakeoutInventoryService inventory,CurrentLibraryCatalogRuntime current,Func<CancellationToken,Task<string?>>? picker,Action? discoveryReady=null,TakeoutImportMetadataRunner? metadata=null,Action? metadataReady=null)
     : IProcessorWorkControl,IAsyncDisposable
 {
     private readonly ProcessorStateCoordinator _state=state??throw new ArgumentNullException(nameof(state));
@@ -16,6 +16,7 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
     private readonly Func<CancellationToken,Task<string?>>? _picker=picker;
     private readonly Action? _discoveryReady=discoveryReady;
     private readonly TakeoutImportMetadataRunner? _metadata=metadata;
+    private readonly Action? _metadataReady=metadataReady;
     private readonly object _gate=new();
     private readonly CancellationTokenSource _stop=new();
     private CancellationTokenSource? _runStop;
@@ -121,9 +122,9 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
                             var completed=await _state.ExecuteAsync(database=>
                             {
                                 var repository=new TakeoutImportInventoryRepository(database);
-                                return repository.Activity(item.Id).Metadata is{Finished:true}?null:repository.ReadCompleted(item.Id)??throw new InvalidDataException("The reviewed metadata input disappeared.");
+                                return repository.Activity(item.Id).Metadata is{Finished:true}&&new TakeoutImportedPhotoFactsRepository(database).HasObservedImport(item.Id)?null:repository.ReadCompleted(item.Id)??throw new InvalidDataException("The reviewed metadata input disappeared.");
                             },token).ConfigureAwait(false);
-                            if(completed is not null)await _metadata.RunAsync(completed,token).ConfigureAwait(false);
+                            if(completed is not null){var result=await _metadata.RunAsync(completed,token).ConfigureAwait(false);if(result.ObservationsChanged)_metadataReady?.Invoke();}
                         }
                     }
                     catch(Exception error)when(error is HttpRequestException or StaleLibraryConfigurationException or StaleDriveConnectionException or UnauthorizedAccessException or FileNotFoundException or DirectoryNotFoundException or TakeoutMetadataCapacityException)

@@ -67,7 +67,7 @@ public sealed class CurrentCatalogDependencyPreparationService : IAsyncDisposabl
                         _sink,WorkspaceObservationRepository.MaximumDocuments).BuildAsync(_frozen,prepared.Sources,publication.Basis.Parent,token).ConfigureAwait(false);
                     if(graph.Assets!=_frozen.Count || graph.SourcePolicySha256!=publication.Basis.SourcePolicySha256)
                         throw new CatalogGenerationCaptureConflictException();
-                    plan=new(publication.Basis,graph.RootIndex,graph.SourceCoverage);
+                    plan=new(publication.Basis,graph.RootIndex,graph.SourceCoverage,ImportedMetadataProfile:true);
                 }
                 result=await _reader.SealPreparedDependencyGraphAsync(publication.Capture.Scope.GenerationId,plan,_frozen,token).ConfigureAwait(false);
             }

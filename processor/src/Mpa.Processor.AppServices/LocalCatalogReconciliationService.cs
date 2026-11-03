@@ -23,7 +23,7 @@ public sealed partial class LocalCatalogReconciliationService(ProcessorStateCoor
     LibrarySigningIdentityOwner keys, StorageBudgetManager budget) : IAsyncDisposable
 {
     private static readonly string[] Capabilities = [CatalogPublisherAuthorization.Capability, CatalogSourceConfiguration.Capability,
-        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability];
+        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability, ImportedPhotoMetadata.Capability];
     private readonly ProcessorStateCoordinator _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly ProcessorAccountService _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
     private readonly LibrarySigningIdentityOwner _keys = keys ?? throw new ArgumentNullException(nameof(keys));

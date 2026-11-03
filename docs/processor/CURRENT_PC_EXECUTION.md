@@ -43,10 +43,15 @@ Per-item metadata details now retain the captured filename and cause in bounded
 60-row pages. Restoring access retries only unavailable metadata while reusing
 verified originals and permanent classifications. Local native/HTTP/API evidence
 is current-takeout-issue-validation-v117.json; actual UI/live acceptance remains.
-Next finish explicit corrected-input/manual association repair, imported-fact
-projection and publication with human precedence, and owned generated-cache retirement. The
-metadata workflow is not complete until those steps and actual UI/live acceptance
-pass. The Windows UI tool failed to initialize;
+Supported imported facts now reach actual portable publication/Root activation and
+canonical gallery/viewer reads with separate provenance, observed filename/capture
+precedence, conflict/size/version attention and old-finished-import recovery. Evidence
+current-imported-photo-validation-v156.json includes real native fresh/legacy flows,
+127Protocol/49distinct Core/52Web/7Services/20frontend checks and unchanged100k staging.
+Next finish explicit corrected-input/manual association/version repair, cloud raw
+metadata preservation and owned generated-cache retirement; complete the remaining
+PC workflows and actual UI/live/install acceptance. The metadata workflow is not
+fully accepted until those steps pass. The Windows UI tool failed to initialize;
 keep visual acceptance unverified and continue independent work. Do not confuse
 framework-dependent worker publish evidence with self-contained installers.
 Canonical Drive asset identity stays library/account/file based. Inventory MediaId

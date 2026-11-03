@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 using Mpa.Processor.Protocol;
 
@@ -10,7 +11,8 @@ namespace Mpa.Processor.Core;
 /// source-policy fields are captured evidence, never remote availability or permission.</summary>
 public sealed record CapturedCatalogBasis(CatalogSnapshotDescriptor Snapshot, CatalogObjectReference? Parent,
     long ParentSequence, string SourcePolicySha256, long SettingsRevision, long MinimumHistoryGeneration);
-public sealed record CapturedCatalogCommitPlan(CapturedCatalogBasis Basis, CatalogObjectReference RootIndex, CatalogObjectReference SourceCoverage)
+public sealed record CapturedCatalogCommitPlan(CapturedCatalogBasis Basis, CatalogObjectReference RootIndex, CatalogObjectReference SourceCoverage,
+    [property:JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingDefault)] bool ImportedMetadataProfile=false)
 {
     /// <summary>Only this saved plan determines the outgoing body. No current discovery
     /// or caller-supplied dependency can be substituted under an existing signing ID.</summary>
@@ -25,7 +27,9 @@ public sealed record CapturedCatalogCommitPlan(CapturedCatalogBasis Basis, Catal
         {
             format = "mpa", major = 1, minor = 0, libraryId = scope.LibraryId.ToString("D"), actorId = scope.ActorId.ToString("D"),
             epoch = scope.ActorEpoch.ToString(CultureInfo.InvariantCulture), sequence = sequence.ToString(CultureInfo.InvariantCulture),
-            kind = "catalog-commit", requiredCapabilities = new[] { DriveCatalogFacts.Capability, CatalogPublicationReader.Capability },
+            kind = "catalog-commit", requiredCapabilities = ImportedMetadataProfile
+                ?new[] { DriveCatalogFacts.Capability, CatalogPublicationReader.Capability,ImportedPhotoMetadata.Capability }
+                :new[] { DriveCatalogFacts.Capability, CatalogPublicationReader.Capability },
             payload = document.RootElement
         }));
     }

@@ -4,7 +4,7 @@ using Mpa.Processor.Protocol;
 namespace Mpa.Processor.AppServices;
 
 public sealed record TakeoutImportMetadataResult(long Analyzed,long Retained,long Unsupported,long Unmatched,long WaitingForOriginal)
-{public long Unavailable{get;init;}}
+{public long Unavailable{get;init;}public bool ObservationsChanged{get;init;}}
 internal sealed class TakeoutMetadataAdmissionClosedException(Exception inner):Exception("Metadata worker admission closed before ownership transfer; captured work is retained.",inner);
 internal sealed class TakeoutMetadataInputUnavailableException(Exception inner):Exception("The captured metadata input is unavailable; its original binding is retained.",inner);
 
@@ -29,7 +29,7 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
         try
         {
             using var catalog=await TakeoutAssociationCatalog.OpenCompletedAsync(completed,_budget,token).ConfigureAwait(false);
-            long analyzed=0,retained=0,unsupported=0,unmatched=0,waiting=0,unavailable=0;string? after=null;
+            long analyzed=0,retained=0,unsupported=0,unmatched=0,waiting=0,unavailable=0;var observationsChanged=false;string? after=null;
             var total=catalog.Count(TakeoutEntryKind.JsonSidecar);
             await SaveAsync(false).ConfigureAwait(false);
             while(true)
@@ -44,7 +44,9 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
                     switch(result)
                     {
                         case SidecarResult.Analyzed:analyzed++;break;
+                        case SidecarResult.AnalyzedAndObserved:analyzed++;observationsChanged=true;break;
                         case SidecarResult.Retained:retained++;break;
+                        case SidecarResult.RetainedAndObserved:retained++;observationsChanged=true;break;
                         case SidecarResult.Unsupported:unsupported++;break;
                         case SidecarResult.Unmatched:unmatched++;break;
                         case SidecarResult.Waiting:waiting++;break;
@@ -55,19 +57,25 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
                 }
                 if(!page.HasMore)break;after=page.Entries[^1].Key;
             }
-            await SaveAsync(waiting==0&&unavailable==0).ConfigureAwait(false);return new(analyzed,retained,unsupported,unmatched,waiting){Unavailable=unavailable};
+            await SaveAsync(waiting==0&&unavailable==0).ConfigureAwait(false);return new(analyzed,retained,unsupported,unmatched,waiting){Unavailable=unavailable,ObservationsChanged=observationsChanged};
             Task SaveAsync(bool finished)=>_state.ExecuteAsync(db=>
-            {new TakeoutImportInventoryRepository(db).RecordMetadataProgress(completed,new(total,analyzed+retained,unsupported+unmatched+unavailable,waiting,finished));return true;},token);
+            {new TakeoutImportInventoryRepository(db).RecordMetadataProgress(completed,new(total,analyzed+retained,unsupported+unmatched+unavailable,waiting,finished));if(finished)new TakeoutImportedPhotoFactsRepository(db).CompleteObservationPass(completed.ImportId);return true;},token);
         }
         finally{Volatile.Write(ref _running,0);}
     }
 
-    private enum SidecarResult{Analyzed,Retained,Unsupported,Unmatched,Waiting,Unavailable}
+    private enum SidecarResult{Analyzed,AnalyzedAndObserved,Retained,RetainedAndObserved,Unsupported,Unmatched,Waiting,Unavailable}
+    private enum Observation{Unsupported,Retained,New}
     private async Task<SidecarResult> RunSidecarAsync(TakeoutCompletedInventory completed,TakeoutAssociationCatalog catalog,TakeoutCapturedEntry sidecar,CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         var previous=await _state.ExecuteAsync(db=>new TakeoutMetadataJobRepository(db).ReadCompletedImported(completed.ImportId,sidecar.Key),token).ConfigureAwait(false);
-        if(previous is not null){await VerifyAndResolveAsync(previous,token).ConfigureAwait(false);return SidecarResult.Retained;}
+        if(previous is not null)
+        {
+            var observation=await VerifyAndResolveAsync(previous,token).ConfigureAwait(false);
+            if(observation!=Observation.Unsupported)return observation==Observation.New?SidecarResult.RetainedAndObserved:SidecarResult.Retained;
+            await RecordIssueAsync(completed,catalog,sidecar,"metadata-too-large",previous.Source.Sha256,token).ConfigureAwait(false);return SidecarResult.Unsupported;
+        }
         var issue=await _state.ExecuteAsync(db=>new TakeoutMetadataIssueRepository(db).Find(completed,sidecar.Key),token).ConfigureAwait(false);
         if(issue is{Retryable:false})return issue.Code is "name-mismatch" or "missing-media" or "ambiguous-media"?SidecarResult.Unmatched:SidecarResult.Unsupported;
         var pending=await _state.ExecuteAsync(db=>new TakeoutMetadataJobRepository(db).ClaimImported(completed.ImportId,sidecar.Key),token).ConfigureAwait(false);
@@ -78,7 +86,7 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
             {
                 if(pending.Imported!.Sidecar!=sidecar)throw new InvalidDataException("Pending metadata changed its captured sidecar entry.");
                 var captured=await _storage.ReadCapturedSourceAsync(pending,token).ConfigureAwait(false)??await ReadSidecarAsync(completed,catalog,sidecar,token).ConfigureAwait(false);
-                prepared=true;await AnalyzeAsync(pending,captured,token).ConfigureAwait(false);await ResolveAfterAnalysisAsync(completed,sidecar,token).ConfigureAwait(false);return SidecarResult.Analyzed;
+                prepared=true;await AnalyzeAsync(pending,captured,token).ConfigureAwait(false);return await ResolveAfterAnalysisAsync(completed,catalog,sidecar,token).ConfigureAwait(false);
             }
             finally
             {
@@ -99,7 +107,7 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
         var work=await _state.ExecuteAsync(db=>
         {var jobs=new TakeoutMetadataJobRepository(db);return jobs.Claim(jobs.EnsureImported(original,association,descriptor));},token).ConfigureAwait(false);
         if(work is null)throw new ProcessorWorkStateConflictException();
-        await AnalyzeAsync(work,raw,token).ConfigureAwait(false);await ResolveAfterAnalysisAsync(completed,sidecar,token).ConfigureAwait(false);return SidecarResult.Analyzed;
+        await AnalyzeAsync(work,raw,token).ConfigureAwait(false);return await ResolveAfterAnalysisAsync(completed,catalog,sidecar,token).ConfigureAwait(false);
     }
 
     private Task<bool> RecordIssueAsync(TakeoutCompletedInventory completed,TakeoutAssociationCatalog catalog,TakeoutCapturedEntry sidecar,string code,string? hash,CancellationToken token)
@@ -107,15 +115,18 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
         var input=catalog.CaptureMetadataIssueInput(completed,sidecar);
         return _state.ExecuteAsync(db=>{new TakeoutMetadataIssueRepository(db).Record(input,code,hash);return true;},token);
     }
-    private async Task ResolveAfterAnalysisAsync(TakeoutCompletedInventory completed,TakeoutCapturedEntry sidecar,CancellationToken token)
+    private async Task<SidecarResult> ResolveAfterAnalysisAsync(TakeoutCompletedInventory completed,TakeoutAssociationCatalog catalog,TakeoutCapturedEntry sidecar,CancellationToken token)
     {
         var result=await _state.ExecuteAsync(db=>new TakeoutMetadataJobRepository(db).ReadCompletedImported(completed.ImportId,sidecar.Key)??throw new InvalidDataException("Metadata analysis returned without its native ready receipt."),token).ConfigureAwait(false);
-        await VerifyAndResolveAsync(result,token).ConfigureAwait(false);
+        var observation=await VerifyAndResolveAsync(result,token).ConfigureAwait(false);
+        if(observation!=Observation.Unsupported)return observation==Observation.New?SidecarResult.AnalyzedAndObserved:SidecarResult.Analyzed;
+        await RecordIssueAsync(completed,catalog,sidecar,"metadata-too-large",result.Source.Sha256,token).ConfigureAwait(false);return SidecarResult.Unsupported;
     }
-    private async Task VerifyAndResolveAsync(TakeoutVerifiedMetadata result,CancellationToken token)
+    private async Task<Observation> VerifyAndResolveAsync(TakeoutVerifiedMetadata result,CancellationToken token)
     {
-        _=await _storage.ReadVerifiedAsync(result,token).ConfigureAwait(false);
-        await _state.ExecuteAsync(db=>{new TakeoutMetadataIssueRepository(db).Resolve(result);return true;},token).ConfigureAwait(false);
+        var verified=await _storage.ReadVerifiedAsync(result,token).ConfigureAwait(false);
+        try{return await _state.ExecuteAsync(db=>{var changed=new TakeoutImportedPhotoFactsRepository(db).Retain(result,verified);new TakeoutMetadataIssueRepository(db).Resolve(result);return changed?Observation.New:Observation.Retained;},token).ConfigureAwait(false);}
+        catch(CatalogChunkCapacityException){return Observation.Unsupported;}
     }
 
     private static async Task<byte[]> ReadSidecarAsync(TakeoutCompletedInventory completed,TakeoutAssociationCatalog catalog,TakeoutCapturedEntry entry,CancellationToken token)

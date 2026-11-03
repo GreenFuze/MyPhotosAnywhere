@@ -33,7 +33,7 @@ public sealed partial class LocalCurrentControlReader
                         !coverage.Sources.SequenceEqual(frozen.Coverage.OrderBy(value=>value.Id.ToString("D"),StringComparer.Ordinal)))
                         throw new CatalogGenerationCaptureConflictException();
                     return Task.CompletedTask;
-                },token).ConfigureAwait(false))
+                },plan.ImportedMetadataProfile,token).ConfigureAwait(false))
             {
                 Check(caller,token);
                 await Task.Run(()=>comparison.Add(leaf,token),CancellationToken.None).ConfigureAwait(false);

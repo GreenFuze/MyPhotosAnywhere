@@ -1,5 +1,24 @@
 # PC folder import increment
 
+Latest supported imported-photo path (2026-11-03):
+current-imported-photo-validation-v156.json freezes751files. Actual native fresh and
+legacy imports carry retained metadata through frozen dependency/header publication,
+signed Root transition and activation/query while preserving first upload, one source
+scan, human filename and observed Drive capture. Imported date fallback and literal
+viewer details keep their provenance. Conflict, portable size and changed original
+version states apply no imported values. Old pending signing bodies remain exact.
+Focused evidence:127Protocol,49distinct Core,52Web,7Services,20frontend cases, including
+the unchanged10000/100000-photo fixtures. Strict Desktop build has0warnings/errors;
+all4web assets and7tested isolated-worker files match the package. This uses controlled
+Google. Actual UI/live, explicit repair, raw metadata cloud preservation/cache retirement,
+remaining PC workflows, installers and final publication remain unfinished.
+
+The preceding exactef71a8b has independently verified60PCjobs/72native reports on all
+four existing native runners, with113Protocol/597Core/778ordinaryServices/179Google/
+9LAN/50Web cases per platform. Source additions and prior identities are complete,
+native diagnostics and unchanged limits pass, and4Desktop frontend/audit/asset reports
+match. Evidence ci-ef71a8b-pc-validation-v154.json. Fresh CI is required for later code.
+
 Latest per-file attention evidence (2026-11-03):
 current-takeout-issue-validation-v117.json and input-v117.json freeze747files.
 The native issue observations retain exact input/index/first-source bindings and

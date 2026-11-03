@@ -52,10 +52,13 @@ public sealed class CatalogFactsTraversal
     /// source policy and finish the actual read/change fences after full enumeration.</summary>
     public IAsyncEnumerable<CatalogFactsLeaf> ReadPreparedLeavesAsync(CatalogCommit candidate, long sequence,
         Func<CatalogSourceCoverageSet, CancellationToken, Task> validateConfiguration, CancellationToken cancellationToken = default)
+        =>ReadPreparedLeavesAsync(candidate,sequence,validateConfiguration,importedMetadataAllowed:false,cancellationToken);
+    public IAsyncEnumerable<CatalogFactsLeaf> ReadPreparedLeavesAsync(CatalogCommit candidate,long sequence,
+        Func<CatalogSourceCoverageSet,CancellationToken,Task> validateConfiguration,bool importedMetadataAllowed,CancellationToken cancellationToken=default)
     {
         ArgumentNullException.ThrowIfNull(validateConfiguration);
         _ = new CatalogPublicationWriter(_workspace).EncodeCommit(candidate, sequence);
-        return ReadGraphAsync(candidate, validateConfiguration, cancellationToken);
+        return ReadGraphAsync(candidate, validateConfiguration, importedMetadataAllowed,cancellationToken);
     }
     private IAsyncEnumerable<CatalogFactsLeaf> ReadAsync(VerifiedProtocolDocument verified,
         Func<CatalogSourceCoverageSet, CancellationToken, Task>? validateConfiguration, CancellationToken cancellationToken)
@@ -64,10 +67,10 @@ public sealed class CatalogFactsTraversal
         if (verified.LibraryId != _library || !verified.RequiredCapabilities.Contains(DriveCatalogFacts.Capability, StringComparer.Ordinal))
             throw new ProtocolFormatException("The approved catalog must name this library and the observed Drive facts capability.");
         var commit = _schema.ReadCommit(verified);
-        return ReadGraphAsync(commit, validateConfiguration, cancellationToken);
+        return ReadGraphAsync(commit, validateConfiguration, verified.RequiredCapabilities.Contains(ImportedPhotoMetadata.Capability,StringComparer.Ordinal),cancellationToken);
     }
     private async IAsyncEnumerable<CatalogFactsLeaf> ReadGraphAsync(CatalogCommit commit,
-        Func<CatalogSourceCoverageSet, CancellationToken, Task>? validateConfiguration, [EnumeratorCancellation] CancellationToken cancellationToken)
+        Func<CatalogSourceCoverageSet, CancellationToken, Task>? validateConfiguration,bool importedMetadataAllowed,[EnumeratorCancellation] CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -101,6 +104,7 @@ public sealed class CatalogFactsTraversal
             if (entry.Chunk is not null)
             {
                 var facts = await ReadChunkAsync(entry.Chunk, entry.Prefix, cancellationToken).ConfigureAwait(false);
+                if(facts.RequiresImportedMetadata&&!importedMetadataAllowed)throw new ProtocolFormatException("Imported photo observations require their advertised catalog capability.");
                 if (coverage is not null) foreach (var asset in facts.Assets) coverage.ValidateAsset(asset);
                 cancellationToken.ThrowIfCancellationRequested(); yield return new(entry.Prefix, entry.Chunk, facts);
             }

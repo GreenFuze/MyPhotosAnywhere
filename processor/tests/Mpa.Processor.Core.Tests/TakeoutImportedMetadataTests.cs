@@ -35,6 +35,13 @@ public sealed partial class TakeoutMetadataOperationTests
         Assert.AreEqual(0L,new FileInfo(operation.Launch.NewDiagnosticPath).Length);Assert.AreEqual(0L,fixture.Budget.Status().ReservedBytes);
         var completed=await fixture.State.ExecuteAsync(db=>new TakeoutMetadataJobRepository(db).ReadCompletedImported(fixture.Completed.ImportId,fixture.Sidecar.Key),fixture.Token).ConfigureAwait(false);
         Assert.IsNotNull(completed);Assert.AreEqual(fixture.Original.AssetId,completed.Imported.Original.AssetId);
+        var retained=await fixture.Storage.ReadVerifiedAsync(completed,fixture.Token).ConfigureAwait(false);
+        var imported=await fixture.State.ExecuteAsync(db=>
+        {
+            var before=new DurableJobRepository(db).PendingReceiptCount();var described=completed.DescribeImportedFacts(retained);Assert.AreEqual(before,new DurableJobRepository(db).PendingReceiptCount());
+            Assert.AreEqual(fixture.Original.Capture.Sha256,described.OriginalSha256);Assert.AreEqual(fixture.Descriptor.Sha256,described.Source.Sha256);Assert.AreEqual(work.MediaId,described.AssetId);return described;
+        },fixture.Token).ConfigureAwait(false);
+        Assert.AreEqual("Imported detail",ImportedPhotoMetadata.Read(imported.Encode()).Description);Assert.AreEqual("Imported hint",imported.ImportedNames.Single());
         File.Delete(Path.Combine(fixture.Completed.Parts.Single().Location,"a.jpg.json"));
         CollectionAssert.AreEqual(fixture.Raw,(await fixture.Storage.ReadVerifiedAsync(completed,fixture.Token).ConfigureAwait(false)).CopyRawSource());
         await fixture.State.ExecuteAsync(db=>{new DurableJobRepository(db).MarkReceiptPublished(receipt.Id);Assert.IsNotNull(new TakeoutMetadataJobRepository(db).ReadCompletedImported(fixture.Completed.ImportId,fixture.Sidecar.Key));return true;},fixture.Token).ConfigureAwait(false);
@@ -206,20 +213,22 @@ public sealed partial class TakeoutMetadataOperationTests
         internal TakeoutAssociationCatalog Catalog{get;private set;}=null!;
         internal TakeoutVerifiedOriginal Original{get;private set;}=null!;
         internal TakeoutCapturedEntry Sidecar{get;private set;}=null!;
-        internal byte[] Raw{get;}=Encoding.UTF8.GetBytes("{\"title\":\"a.jpg\",\"description\":\"Imported detail\",\"photoTakenTime\":{\"timestamp\":\"1\"},\"people\":[{\"name\":\"Imported hint\"}]}");
+        internal byte[] Raw{get;private set;}=Encoding.UTF8.GetBytes("{\"title\":\"a.jpg\",\"description\":\"Imported detail\",\"photoTakenTime\":{\"timestamp\":\"1\"},\"people\":[{\"name\":\"Imported hint\"}]}");
         internal TakeoutMetadataDocument Document=>TakeoutMetadataDocument.ParseSource(Raw);
         internal ArtifactDescriptor Descriptor=>new(Raw.Length,Convert.ToHexStringLower(SHA256.HashData(Raw)),"input.bin");
         internal CancellationToken Token=>_deadline.Token;
         internal string StateDirectory=>_database.StateDirectory;
-        internal static async Task<ImportedFixture> CreateAsync(int additionalSidecars=0)
+        internal static async Task<ImportedFixture> CreateAsync(int additionalSidecars=0,bool conflictingSidecar=false,int descriptionLength=0)
         {
-            var fixture=new ImportedFixture();try{await fixture.InitializeAsync(additionalSidecars).ConfigureAwait(false);return fixture;}catch{await fixture.DisposeAsync().ConfigureAwait(false);throw;}
+            var fixture=new ImportedFixture();try{await fixture.InitializeAsync(additionalSidecars,conflictingSidecar,descriptionLength).ConfigureAwait(false);return fixture;}catch{await fixture.DisposeAsync().ConfigureAwait(false);throw;}
         }
-        private async Task InitializeAsync(int additionalSidecars)
+        private async Task InitializeAsync(int additionalSidecars,bool conflictingSidecar,int descriptionLength)
         {
+            if(descriptionLength>0)Raw=Encoding.UTF8.GetBytes("{\"title\":\"a.jpg\",\"description\":\""+new string('x',descriptionLength)+"\",\"photoTakenTime\":{\"timestamp\":\"1\"}}");
             var input=Path.Combine(Root.Path,"input");Directory.CreateDirectory(input);await File.WriteAllBytesAsync(Path.Combine(input,"a.jpg"),new byte[]{1,2,3},Token).ConfigureAwait(false);
             await File.WriteAllBytesAsync(Path.Combine(input,"a.jpg.json"),Raw,Token).ConfigureAwait(false);
             for(var ordinal=0;ordinal<additionalSidecars;ordinal++)await File.WriteAllBytesAsync(Path.Combine(input,"extra-"+ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)+".json"),Raw,Token).ConfigureAwait(false);
+            if(conflictingSidecar)await File.WriteAllBytesAsync(Path.Combine(input,"a.jpg.supplemental-metadata.json"),Encoding.UTF8.GetBytes("{\"title\":\"a.jpg\",\"description\":\"Conflicting imported description\",\"photoTakenTime\":{\"timestamp\":\"2\"}}"),Token).ConfigureAwait(false);
             _database=new(Path.Combine(Root.Path,"state"));Budget=new(new MeasuredSpace(_database.StateDirectory));
             using(var selected=TakeoutSelectedInput.OpenFolder(Guid.NewGuid(),input))
             {

@@ -14,7 +14,7 @@ public sealed class JournaledProtocolSigner(ProcessorStateCoordinator state, Lib
     private readonly LibrarySigningIdentityOwner _keys = keys ?? throw new ArgumentNullException(nameof(keys));
     private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
     private static readonly string[] Capabilities = [CatalogPublisherAuthorization.Capability, CatalogSourceConfiguration.Capability,
-        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability,LibraryCurrentControl.Capability];
+        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability, ImportedPhotoMetadata.Capability,LibraryCurrentControl.Capability];
 
     /// <summary>Seal the fixed initial no-catalog snapshot from its exact retained
     /// policy receipts. The slot's immutable ID is also its signing intent ID. Actual

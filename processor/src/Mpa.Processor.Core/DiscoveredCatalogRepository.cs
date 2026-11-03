@@ -7,7 +7,7 @@ namespace Mpa.Processor.Core;
 
 public sealed record DiscoveredDriveAsset(string FileId, long DriveVersion, string Name, string MimeType, int? Width, int? Height,
     long? CapturedUtc, string? RawCapture, long? ModifiedUtc, int Depth);
-public enum CatalogDateProvenance { Unknown, DriveCapture, DriveModification }
+public enum CatalogDateProvenance { Unknown, DriveCapture, DriveModification, ImportedCapture }
 public sealed record CatalogAsset(Guid Id, string AccountId, DiscoveredDriveAsset Facts)
 {
     public long? EffectiveUtc => Facts.CapturedUtc ?? Facts.ModifiedUtc;

@@ -139,7 +139,7 @@ public sealed partial class LocalCatalogReconciliationService
                     if (coverage.Root.ConfigurationRevision != plan.Basis.Snapshot.ConfigurationRevision || coverage.Root.DiscoveryRevision != plan.Basis.Snapshot.DiscoveryRevision)
                         throw new CatalogGenerationCaptureConflictException();
                     return Task.CompletedTask;
-                }, token).ConfigureAwait(false)) assets = checked(assets + leaf.Facts.Assets.Count);
+                },plan.ImportedMetadataProfile, token).ConfigureAwait(false)) assets = checked(assets + leaf.Facts.Assets.Count);
             if (assets != plan.Basis.Snapshot.Assets) throw new CatalogGenerationCaptureConflictException();
         }
 

@@ -43,7 +43,7 @@ public sealed class DesktopLibraryCatalogReader(ICurrentCanonicalCatalogQueries 
         var earlier=account is null?await _catalog.ReadPreviousPageAsync(selected.StageId,Key(first),1,caller).ConfigureAwait(false):
             await _catalog.ReadAccountPreviousPageAsync(selected.StageId,account,Key(first),1,caller).ConfigureAwait(false);
         ValidateProbe(earlier,selected,account);caller.ThrowIfCancellationRequested();
-        return new(true,selected.StageId,selected.RootSequence,page.Page.Assets.Select(Photo).ToArray(),
+        return new(true,selected.StageId,selected.RootSequence,page.Page.Assets.Select(asset=>Photo(asset)).ToArray(),
             older is {Page.Assets.Count:>0}?Encode(selected.StageId,accountId,Key(last)):null,
             earlier is {Page.Assets.Count:>0}?Encode(selected.StageId,accountId,Key(first)):null);
     }
@@ -82,8 +82,10 @@ public sealed class DesktopLibraryCatalogReader(ICurrentCanonicalCatalogQueries 
     }
     private sealed record Position(Guid Stage,CatalogCursor Key);
     private static CatalogCursor Key(DriveCatalogAsset asset)=>new(asset.EffectiveUtc,asset.Id);
-    internal static DesktopCatalogPhoto Photo(DriveCatalogAsset asset)=>new(asset.Id,asset.AccountId,asset.Name,asset.MimeType,asset.Width,asset.Height,asset.EffectiveUtc,
-        (asset.CapturedUtc is not null?CatalogDateProvenance.DriveCapture:asset.ModifiedUtc is not null?CatalogDateProvenance.DriveModification:CatalogDateProvenance.Unknown).ToString(),asset.RawCapture);
+    internal static DesktopCatalogPhoto Photo(DriveCatalogAsset asset,bool details=false)=>new(asset.Id,asset.AccountId,asset.Name,asset.MimeType,asset.Width,asset.Height,asset.EffectiveUtc,
+        (asset.CapturedUtc is not null?CatalogDateProvenance.DriveCapture:asset.ImportedMetadata?.CapturedUtc is not null?CatalogDateProvenance.ImportedCapture:asset.ModifiedUtc is not null?CatalogDateProvenance.DriveModification:CatalogDateProvenance.Unknown).ToString(),asset.RawCapture)
+        {ImportedMetadata=!details?null:asset.ImportedMetadata is {} imported?new(imported.Title,imported.Description,imported.CapturedUtc,imported.Latitude,imported.Longitude,imported.ImportedNames,null):
+            asset.ImportedAttention is {} attention?new(null,null,null,null,null,[],attention.Code):null};
     private static string Encode(Guid stage,string? account,CatalogCursor key)=>string.Join('|',"c1",stage.ToString("D"),account ?? "*",
         key.EffectiveUtc?.ToString(CultureInfo.InvariantCulture) ?? "unknown",key.Id.ToString("D"));
     private static Position Decode(string value,string? account)

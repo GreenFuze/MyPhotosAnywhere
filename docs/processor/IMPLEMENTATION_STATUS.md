@@ -9,7 +9,52 @@ app. Earlier joint-release gate statements below are historical and superseded
 for this PC release; PC safety, signing, preservation and validation stay required.
 See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists.
 
-## Per-file import metadata attention (2026-11-03; PC acceptance unfinished)
+## Imported metadata reaches the portable gallery (2026-11-03; PC acceptance unfinished)
+
+Supported Takeout observations now pass from the actual installed worker and ready
+receipt into immutable local observations, a frozen catalog, verified dependency/
+header publication, signed Root transition and canonical activation/query. The PC
+viewer exposes literal imported title/description/date/location/name hints separately
+from observed Drive facts. Observed Drive filename and capture remain first; imported
+capture supplies the effective date only when Drive capture is absent. Name hints
+are explicitly unverified and create no person/face identities. Ordinary gallery
+pages omit the larger viewer-only text and retain the existing paging bounds.
+
+An observation binds the canonical asset, first verified original version/hash,
+indexed sidecar, processing job, recipe and exact source/artifact fingerprints.
+Multiple candidates produce explicit attention with no arbitrary winner. A changed
+Drive version or unchanged portable record limit similarly leaves imported values
+unapplied and preserves their evidence. Insertion and the local catalog observation
+revision advance atomically under the existing native owner. The frozen reader uses
+the same WAL snapshot and includes imported bodies in storage accounting; ordinary
+catalogs without imports retain the fast path. No Drive version is fabricated.
+
+The new photo-facts profile requires catalog.imported-metadata.v1 on both outgoing
+and incoming graph validation. New plans capture that selection; old pending plans
+omit the new default field and keep their exact signing bodies. Already-finished
+older imports replay private ready evidence once to create the new observations,
+without a second original upload, worker execution or source scan. A versioned local
+pass hint controls admission only and grants no publication or backup authority.
+
+Evidence current-imported-photo-validation-v156.json freezes751files (747sources
+plus4assets). Final focused checks pass127Protocol,49distinct affected Core,
+52Web,7Services and20frontend cases, including actual fresh/legacy import through
+portable publication and the unchanged10000/100000-photo staging fixtures. Existing
+40sec integration deadlines, assertions, warnings and resource limits remain. Strict
+Desktop build has0warnings/errors; all4web assets and7tested isolated-worker files
+match its package. Google responses are controlled; actual UI/live acceptance is
+unperformed because the Windows UI backend still cannot initialize. This is not a
+complete PC release. Raw metadata cloud retention/cache retirement, explicit input/
+association/version repair, remaining processors/human operations/hierarchy/ZIP,
+six self-contained installers and final PC acceptance/publication remain required.
+
+The preceding exactef71a8b now has independently verified60PCjobs/72reports across
+Windows/Linux/macOS ARM/Intel:113Protocol/597Core/778ordinaryServices/179Google/9LAN/
+50Web cases per platform, with prior identities, source additions, native diagnostics,
+scale/reference checks, original limits and4Desktop web/audit reports checked. See
+ci-ef71a8b-pc-validation-v154.json. It does not accept this later imported-photo change.
+
+## Previous per-file import metadata attention (2026-11-03)
 
 Imports now has a bounded per-file metadata issue reader and review controls with
 the captured relative filename, exact cause and access-restoration retry. The

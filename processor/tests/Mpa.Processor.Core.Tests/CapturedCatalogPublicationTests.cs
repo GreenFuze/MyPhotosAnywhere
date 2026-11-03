@@ -7,6 +7,19 @@ namespace Mpa.Processor.Core.Tests;
 public sealed partial class LibraryAuthorityTests
 {
     [TestMethod]
+    public void ImportedProfileSelectionCannotRewriteAnOldCapturedPlanOrItsSigningBody()
+    {
+        using var fixture=new Fixture();fixture.PrepareLocalPublication(registerSigning:true);var prepared=PreparedPublication(fixture);var old=prepared.Plan!;
+        Assert.IsFalse(old.ImportedMetadataProfile);var retained=System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(old);
+        using(var json=System.Text.Json.JsonDocument.Parse(retained))Assert.IsFalse(json.RootElement.TryGetProperty("ImportedMetadataProfile",out _));
+        var restored=System.Text.Json.JsonSerializer.Deserialize<CapturedCatalogCommitPlan>(retained)!;
+        CollectionAssert.AreEqual(old.EncodeBody(prepared.Capture.Scope,1),restored.EncodeBody(prepared.Capture.Scope,1));
+        var next=old with{ImportedMetadataProfile=true};using var before=System.Text.Json.JsonDocument.Parse(old.EncodeBody(prepared.Capture.Scope,1));using var after=System.Text.Json.JsonDocument.Parse(next.EncodeBody(prepared.Capture.Scope,1));
+        Assert.AreEqual(2,before.RootElement.GetProperty("requiredCapabilities").GetArrayLength());Assert.AreEqual(3,after.RootElement.GetProperty("requiredCapabilities").GetArrayLength());
+        Assert.ThrowsExactly<CatalogGenerationCaptureConflictException>(()=>new CatalogGenerationCaptureRepository(fixture.Database,fixture.Budget).SealDependencies(prepared.Capture.Scope.GenerationId,next));
+        Assert.AreEqual(old,new CatalogGenerationCaptureRepository(fixture.Database,fixture.Budget).Publication(prepared.Capture.Scope.GenerationId)!.Plan);
+    }
+    [TestMethod]
     public void BasisPrecedesWritesAndRetriesCannotReplaceParentSnapshotOrHumanSettings()
     {
         using var fixture = new Fixture(); fixture.PrepareLocalPublication(registerSigning: true);

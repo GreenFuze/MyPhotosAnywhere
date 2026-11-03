@@ -51,7 +51,7 @@ public sealed class CatalogGenerationPreparationService : IAsyncDisposable
                         .BuildAsync(frozen, captured.Sources, basis.Parent, ownedToken).ConfigureAwait(false);
                     if (prepared.Assets != basis.Snapshot.Assets || prepared.SourcePolicySha256 != basis.SourcePolicySha256)
                         throw new CatalogGenerationCaptureConflictException();
-                    return await _current.SealCurrentDependenciesAsync(claim.Scope.GenerationId, new(basis, prepared.RootIndex, prepared.SourceCoverage), ownedToken).ConfigureAwait(false);
+                    return await _current.SealCurrentDependenciesAsync(claim.Scope.GenerationId, new(basis, prepared.RootIndex, prepared.SourceCoverage,ImportedMetadataProfile:true), ownedToken).ConfigureAwait(false);
                 }, token).ConfigureAwait(false);
                 Check(token); return result;
             }

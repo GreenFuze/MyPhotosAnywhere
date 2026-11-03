@@ -532,3 +532,71 @@ Lost replies, late cancellation, revoked authority, corruption and disposal leav
 operation available for explicit recovery. Two concurrent callers re-read the journal
 under the same account lease so completed work is not uploaded twice. No live scheduling
 or enrollment is inferred from these transport/journal primitives.
+
+## PC imported photo observations
+
+`catalog.imported-metadata.v1` adds the `mpa-photo-facts` leaf profile, major `2`.
+The signed enclosing catalog must require this capability as well as
+`catalog.drive-facts.v1` and `catalog.generations.v1`. An unadvertised imported
+profile is rejected before yielding its leaf. Outgoing graph validation receives
+the profile selected by the immutable captured plan; a current setting cannot
+change an earlier pending signing body's capabilities. Existing plans default to
+the old profile, omit the new local boolean when serialized and retain their exact
+body bytes. New producer plans explicitly capture the imported profile. No Android
+implementation or compatibility acceptance is included in this PC increment.
+
+All observed Drive asset fields, identity and source memberships retain their
+existing meaning. A v2 row adds nullable `importedMetadata` and `importedAttention`.
+At most one is non-null. A v2 leaf must contain at least one imported observation
+or attention record; otherwise the original `mpa-drive-facts`, major `1`, profile
+remains byte-identical. Mixed leaves can contain ordinary rows with both additions
+null. Imported values never replace the observed Drive name, version or capture.
+Effective date uses observed Drive capture, then supported imported capture, then
+Drive modification, then unknown. Imported descriptions, title, locations and name
+hints remain explicitly separate observations. Name hints are not person or face
+identities. Human operations and original-byte modification still need their own
+durable approved intents and precedence rules.
+
+`importedMetadata` is a closed canonical `mpa-imported-photo-metadata`, major `1`,
+object. It binds the canonical asset ID, import and processing-job IDs, original
+SHA-256 and first verified Drive version, indexed sidecar key, exact raw source length/SHA-256, exact analysis artifact
+length/SHA-256 and the supported Takeout recipe SHA-256. The filtered fields are
+title, description, optional capture time, optional paired geographic coordinates
+and at most 100 literal imported name hints of at most 200 characters each. Large
+integers and epoch milliseconds are canonical decimal strings. Geographic values
+are finite, range-checked round-trip decimal strings, preserving the protocol's
+integer-only JSON numeric subset. Unknown or aliased properties, changed recipe,
+foreign asset attachment, noncanonical values and malformed UTF-8 are rejected.
+
+The native producer verifies the actual ready receipt and retained source/artifact
+before retaining an observation. Its indexed asset/job/body-hash key is immutable.
+Body insertion and the local catalog observation counter advance atomically; the
+counter is not a Drive file version or cloud grant. The frozen catalog reads the
+same WAL observation as facts, source membership, coverage and size accounting.
+A later result cannot change a captured generation or an opened viewer's stage.
+An old finished import without the versioned observation-pass hint replays its
+retained ready evidence, without re-uploading the original or rerunning completed
+worker analysis. That local hint is not a receipt or publication authority.
+
+If multiple retained sidecars target one canonical photo, neither is silently
+selected. `importedAttention` carries `code: "conflicting-metadata"`, the canonical
+decimal candidate count and a SHA-256 of ordinal immutable candidate keys. A
+single retained observation that cannot fit the existing photo-record bound uses
+`code: "metadata-too-large"`, count `"1"` and its candidate-key digest. No imported
+field is applied in either case; observed Drive fields remain available. Source
+and analysis evidence remain retained for explicit repair. A portable-size failure
+does not truncate metadata or stop the original's independent copy.
+If the observed Drive version differs from the first independently verified
+original version, use `code: "original-version-changed"` with count `"1"` until
+the bytes can be reverified. A later human rename can also advance Drive's version;
+that conservative attention state preserves the human filename and all retained
+imported evidence without assuming the old analysis describes the current bytes.
+
+The 64 KiB individual record, chunk, source, artifact, staging-item and attempt
+bounds are unchanged. Size reservations include retained imported bodies. Empty
+import-observation state keeps the ordinary large-catalog path without per-photo
+projection queries. Ordinary web gallery pages carry only lightweight metadata and
+date provenance; imported text/name hints are included in captured viewer details.
+Signature, current actor/source authority, complete dependency verification, Root
+transition and activation gates are unchanged. An imported observation is never
+proof of backed-up raw metadata or verified original bytes.

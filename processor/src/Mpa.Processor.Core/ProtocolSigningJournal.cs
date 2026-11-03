@@ -23,7 +23,7 @@ public sealed partial class ProtocolSigningJournal(ProcessorStateDatabase databa
     private readonly ProcessorStateDatabase _database = database ?? throw new ArgumentNullException(nameof(database));
     private readonly StorageBudgetManager _budget = budget ?? throw new ArgumentNullException(nameof(budget));
     private static readonly string[] Capabilities = [CatalogPublisherAuthorization.Capability, CatalogSourceConfiguration.Capability,
-        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability, LibraryCurrentControl.Capability];
+        CatalogPublicationReader.Capability, DriveCatalogFacts.Capability, ImportedPhotoMetadata.Capability, LibraryCurrentControl.Capability];
 
     internal void InitializeBootstrapActors(SqliteTransaction transaction, LibraryControllerPin controller, PublisherSigningRegistration publisher)
     {

@@ -11,6 +11,16 @@ public sealed class DesktopLibraryCatalogReaderTests
 {
     private static readonly JsonSerializerOptions WebJsonOptions=new(JsonSerializerDefaults.Web);
     [TestMethod]
+    public async Task OrdinaryGalleryPagesKeepImportedDateProvenanceWithoutCarryingLargeViewerOnlyText()
+    {
+        var selected=Selection();var photo=Asset("account-A",null);var raw=JsonSerializer.SerializeToUtf8Bytes(new{title="Export.jpg",description=new string('x',60000),photoTakenTime=new{timestamp="1"}});
+        var document=TakeoutMetadataDocument.ParseSource(raw);var artifact=document.EncodeArtifact();photo=photo with{ImportedMetadata=ImportedPhotoMetadata.FromTakeout(photo.Id,Guid.NewGuid(),Guid.NewGuid(),new string('a',64),photo.DriveVersion,new string('b',64),
+            new(raw.Length,document.SourceSha256,"input.bin"),new(artifact.Length,Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(artifact)),"output.bin"),document)};
+        var query=new Queries();EnqueuePage(query,selected,[photo],[],[]);var page=await new DesktopLibraryCatalogReader(query).ReadAsync("account-A",null,false,null,CancellationToken.None).ConfigureAwait(false);
+        var summary=page.Photos.Single();Assert.AreEqual(1000L,summary.EffectiveUtc);Assert.AreEqual("ImportedCapture",summary.DateProvenance);Assert.AreEqual(photo.Name,summary.Name);Assert.IsNull(summary.ImportedMetadata);
+        Assert.IsTrue(JsonSerializer.SerializeToUtf8Bytes(page,WebJsonOptions).Length<4096,"A gallery page must not copy the imported description into every summary.");
+    }
+    [TestMethod]
     public async Task LibraryCatalogPagesBindActualStageAndAccountAndKeepDiscoveryRevisionsOutOfTheContract()
     {
         var selection=Selection();var first=Asset("account-A",100);var last=Asset("account-A",50);var query=new Queries();

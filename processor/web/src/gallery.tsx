@@ -66,8 +66,16 @@ function CatalogViewer({ api, photos, selected, account, stage, close, report }:
       <button className="icon next" disabled={!sequence || position === sequence.count - 1 || pending} onClick={() => { void move(position + 1); }} aria-label="Next photo"><ViewerIcon name="next" /></button></div>
     {details && photo && <aside className="details"><h2>Details</h2><dl><dt>File</dt><dd dir="auto">{photo.name}</dd><dt>Preview</dt><dd>Google Drive thumbnail · original has not been downloaded</dd>
       {photo.width && photo.height && <><dt>Dimensions</dt><dd>{photo.width} × {photo.height}</dd></>}
-      <dt>{photo.dateProvenance === 'DriveCapture' ? 'Capture time reported by Drive' : photo.dateProvenance === 'DriveModification' ? 'Drive modification time' : 'Date'}</dt><dd>{photo.effectiveUtc === null ? 'Unknown date' : new Date(photo.effectiveUtc).toLocaleString()}</dd>
+      <dt>{photo.dateProvenance === 'DriveCapture' ? 'Capture time reported by Drive' : photo.dateProvenance === 'ImportedCapture' ? 'Capture time in export' : photo.dateProvenance === 'DriveModification' ? 'Drive modification time' : 'Date'}</dt><dd>{photo.effectiveUtc === null ? 'Unknown date' : new Date(photo.effectiveUtc).toLocaleString()}</dd>
       {photo.rawCapture && photo.dateProvenance !== 'DriveCapture' && <><dt>Original capture text</dt><dd>{photo.rawCapture}</dd></>}
+      {photo.importedMetadata?.attention && <><dt>Metadata from export</dt><dd>{photo.importedMetadata.attention === 'conflicting-metadata' ? 'More than one metadata file needs review. Imported values have not been applied.' : photo.importedMetadata.attention === 'original-version-changed' ? 'The original changed since these metadata were processed. The retained details need verification.' : 'These metadata details exceed the supported photo record size. The source metadata is retained.'}</dd></>}
+      {photo.importedMetadata && photo.importedMetadata.attention === null && <>
+        {photo.importedMetadata.title !== photo.name && <><dt>Name in export</dt><dd dir="auto">{photo.importedMetadata.title}</dd></>}
+        {photo.importedMetadata.description && <><dt>Description from export</dt><dd dir="auto">{photo.importedMetadata.description}</dd></>}
+        {photo.importedMetadata.capturedUtc !== null && photo.dateProvenance !== 'ImportedCapture' && <><dt>Capture time in export</dt><dd>{new Date(photo.importedMetadata.capturedUtc).toLocaleString()}</dd></>}
+        {photo.importedMetadata.latitude !== null && <><dt>Location in export</dt><dd>{photo.importedMetadata.latitude}, {photo.importedMetadata.longitude}</dd></>}
+        {photo.importedMetadata.nameHints.length > 0 && <><dt>Names mentioned in export</dt><dd dir="auto">{photo.importedMetadata.nameHints.join(', ')}<p>These names have not been matched to people.</p></dd></>}
+      </>}
     </dl></aside>}
   </dialog>;
 }

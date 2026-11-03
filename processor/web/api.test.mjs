@@ -108,6 +108,34 @@ const sharedOther = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const sharedViewer = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const sharedPhoto = { id: sharedAsset, accountId: 'account-A', name: 'Literal <tag> שלום.jpg', mimeType: 'image/jpeg', width: 40, height: 30, effectiveUtc: 100, dateProvenance: 'DriveCapture', rawCapture: null };
 const sharedPage = { available: true, stageId: sharedStage, rootSequence: 7, photos: [sharedPhoto], olderCursor: null, newerCursor: null };
+const importedDetails = () => ({ title: 'Export name.jpg', description: 'Literal <tag> שלום', capturedUtc: 1000, latitude: 31.777, longitude: -35.123, nameHints: ['Unmatched name'], attention: null });
+
+test('captured viewer reads preserve imported detail provenance and the human filename without downloading or editing an original', async () => {
+  const signal = new AbortController().signal; const photo = { ...sharedPhoto, effectiveUtc: 1000, dateProvenance: 'ImportedCapture', importedMetadata: importedDetails() };
+  const frame = { id: sharedViewer, count: 1, position: 0, stageId: sharedStage, accountId: 'account-A', entries: [{ position: 0, assetId: sharedAsset, photo }] };
+  await withBrowser(async (url, options) => {
+    assert.equal(new URL(url, 'https://local.invalid').pathname, '/api/viewers'); assert.equal(options.method, undefined); assert.equal(options.signal, signal); assert.equal(options.credentials, 'same-origin'); return json(frame);
+  }, async api => {
+    const read = await api.libraryViewer(sharedViewer, 0, sharedStage, 'account-A', signal);
+    assert.equal(read.entries[0].photo.name, sharedPhoto.name); assert.deepEqual(read.entries[0].photo.importedMetadata, importedDetails()); assert.equal(read.entries[0].photo.dateProvenance, 'ImportedCapture');
+  });
+  const attention = { title: null, description: null, capturedUtc: null, latitude: null, longitude: null, nameHints: [], attention: 'conflicting-metadata' };
+  await withBrowser(async () => json({ ...frame, entries: [{ ...frame.entries[0], photo: { ...sharedPhoto, importedMetadata: attention } }] }), async api => {
+    assert.deepEqual((await api.libraryViewer(sharedViewer, 0, sharedStage, 'account-A', signal)).entries[0].photo.importedMetadata, attention);
+  });
+});
+
+test('malformed imported details cannot replace a captured viewer with false hints, dates, coordinates or completion claims', async () => {
+  const frame = { id: sharedViewer, count: 1, position: 0, stageId: sharedStage, accountId: 'account-A', entries: [] };
+  const invalid = [null, {}, { ...importedDetails(), capturedUtc: 1.5 }, { ...importedDetails(), capturedUtc: 253402300800000 },
+    { ...importedDetails(), latitude: 91 }, { ...importedDetails(), longitude: null }, { ...importedDetails(), latitude: '31.777' },
+    { ...importedDetails(), description: '界'.repeat(21900) }, { ...importedDetails(), nameHints: Array(101).fill('name') },
+    { ...importedDetails(), nameHints: [{ personId: sharedAsset }] }, { ...importedDetails(), nameHints: ['x'.repeat(201)] },
+    { ...importedDetails(), attention: 'unknown' }, { ...importedDetails(), attention: 'conflicting-metadata' }, { ...importedDetails(), backupVerified: true }];
+  for (const details of invalid.filter(value => value !== null)) await withBrowser(async () => json({ ...frame, entries: [{ position: 0, assetId: sharedAsset, photo: { ...sharedPhoto, importedMetadata: details } }] }), async api => {
+    await assert.rejects(api.libraryViewer(sharedViewer, 0, sharedStage, 'account-A', new AbortController().signal), /invalid imported photo details/);
+  });
+});
 
 test('canonical photo reads use the shared route with a captured stage/account cursor and preserve literal metadata', async () => {
   const signal = new AbortController().signal; const cursor = `c1|${sharedStage}|account-A|100|${sharedAsset}`;

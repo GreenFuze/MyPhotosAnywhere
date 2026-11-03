@@ -1,7 +1,8 @@
 export interface Account { id: string; name: string; connected: boolean; revision: number }
 export interface StorageBudget { reserveBytes: number; cacheLimitBytes: number; reservedBytes: number; reservableBytes: number }
 export interface Snapshot { libraryId: string; state: string; accounts: Account[]; pending: { id: string; expectedAccountId: string | null }[]; credentialCleanupCount: number; storageAttention: StorageBudget | null }
-export interface CatalogPhoto { id: string; accountId: string; name: string; mimeType: string; width: number | null; height: number | null; effectiveUtc: number | null; dateProvenance: 'Unknown' | 'DriveCapture' | 'DriveModification'; rawCapture: string | null }
+export interface ImportedPhotoDetails { title: string | null; description: string | null; capturedUtc: number | null; latitude: number | null; longitude: number | null; nameHints: string[]; attention: 'conflicting-metadata' | 'metadata-too-large' | 'original-version-changed' | null }
+export interface CatalogPhoto { id: string; accountId: string; name: string; mimeType: string; width: number | null; height: number | null; effectiveUtc: number | null; dateProvenance: 'Unknown' | 'DriveCapture' | 'DriveModification' | 'ImportedCapture'; rawCapture: string | null; importedMetadata?: ImportedPhotoDetails | null }
 export interface CatalogPage { discoveryRevision: number; configurationRevision: number; photos: CatalogPhoto[]; olderCursor: string | null; newerCursor: string | null }
 export type LibraryCatalogPage = { available: false; stageId: null; photos: []; olderCursor: null; newerCursor: null } | { available: true; stageId: string; photos: CatalogPhoto[]; olderCursor: string | null; newerCursor: string | null };
 export interface LibraryViewerWindow extends ViewerWindow { stageId: string; accountId: string | null }
@@ -121,11 +122,28 @@ export class DesktopApi {
     if (typeof value !== 'object' || value === null || !('id' in value) || !libraryIdentity(value.id) || !('accountId' in value) || !libraryAccount(value.accountId) || account !== null && value.accountId !== account ||
       !('name' in value) || typeof value.name !== 'string' || value.name.length > 4096 || !('mimeType' in value) || typeof value.mimeType !== 'string' || value.mimeType.length > 256 || !/^(image|video)\//.test(value.mimeType) ||
       !('effectiveUtc' in value) || value.effectiveUtc !== null && (typeof value.effectiveUtc !== 'number' || !Number.isSafeInteger(value.effectiveUtc) || value.effectiveUtc < -62135596800000 || value.effectiveUtc > 253402300799999) ||
-      !('dateProvenance' in value) || !['Unknown', 'DriveCapture', 'DriveModification'].includes(value.dateProvenance as string) ||
+      !('dateProvenance' in value) || !['Unknown', 'DriveCapture', 'DriveModification', 'ImportedCapture'].includes(value.dateProvenance as string) ||
       !('rawCapture' in value) || value.rawCapture !== null && (typeof value.rawCapture !== 'string' || value.rawCapture.length > 128)) throw invalid();
     if (!('width' in value) || !('height' in value)) throw invalid();
     for (const dimension of [value.width, value.height]) if (dimension !== null && (typeof dimension !== 'number' || !Number.isInteger(dimension) || dimension < 1 || dimension > 1000000)) throw invalid();
+    if ('importedMetadata' in value && value.importedMetadata !== null) this.importedDetails(value.importedMetadata);
     return value as CatalogPhoto;
+  }
+  private importedDetails(value: unknown): void {
+    const invalid = () => new Error('MPA returned invalid imported photo details. The visible photo was retained.');
+    if (typeof value !== 'object' || value === null || Object.keys(value).length !== 7 || !('title' in value) || !('description' in value) ||
+      !('capturedUtc' in value) || !('latitude' in value) || !('longitude' in value) || !('nameHints' in value) || !Array.isArray(value.nameHints) || value.nameHints.length > 100 ||
+      !('attention' in value) || value.attention !== null && value.attention !== 'conflicting-metadata' && value.attention !== 'metadata-too-large' && value.attention !== 'original-version-changed') throw invalid();
+    const names: unknown[] = value.nameHints;
+    if (names.some(name => typeof name !== 'string' || name.length > 200)) throw invalid();
+    if (value.attention !== null) {
+      if (value.title !== null || value.description !== null || value.capturedUtc !== null || value.latitude !== null || value.longitude !== null || names.length !== 0) throw invalid();
+      return;
+    }
+    if (typeof value.title !== 'string' || value.title.length < 1 || value.title.length > 1024 || typeof value.description !== 'string' || new TextEncoder().encode(value.description).length > 65536 ||
+      value.capturedUtc !== null && (typeof value.capturedUtc !== 'number' || !Number.isSafeInteger(value.capturedUtc) || value.capturedUtc < -62135596800000 || value.capturedUtc > 253402300799999) ||
+      (value.latitude === null) !== (value.longitude === null) || value.latitude !== null && (typeof value.latitude !== 'number' || !Number.isFinite(value.latitude) || value.latitude < -90 || value.latitude > 90) ||
+      value.longitude !== null && (typeof value.longitude !== 'number' || !Number.isFinite(value.longitude) || value.longitude < -180 || value.longitude > 180)) throw invalid();
   }
   async catalog(account: string | null, cursor: string | null, newer: boolean, date: number | null, signal: AbortSignal): Promise<CatalogPage> {
     const query = new URLSearchParams(); if (account) query.set('account', account); if (cursor) query.set('cursor', cursor);

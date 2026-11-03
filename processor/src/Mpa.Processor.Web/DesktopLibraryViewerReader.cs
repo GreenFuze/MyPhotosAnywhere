@@ -28,7 +28,7 @@ public sealed class DesktopLibraryViewerReader(ICurrentCanonicalCatalogQueries c
             var exact=await _catalog.ResolveAsync(stage,entry.AssetId,window.AccountId,caller).ConfigureAwait(false);
             if(selection is not null && selection!=exact.Selection) throw new CurrentCanonicalPositionChangedException();
             selection=exact.Selection;
-            entries.Add(new(entry.Position,entry.AssetId,exact.Asset is {} asset?DesktopLibraryCatalogReader.Photo(asset):null));
+            entries.Add(new(entry.Position,entry.AssetId,exact.Asset is {} asset?DesktopLibraryCatalogReader.Photo(asset,details:true):null));
         }
         caller.ThrowIfCancellationRequested();return new(window.Id,window.Count,window.Position,entries.ToArray(),stage,window.AccountId);
     }

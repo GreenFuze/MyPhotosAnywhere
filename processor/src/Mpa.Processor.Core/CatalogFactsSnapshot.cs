@@ -14,6 +14,7 @@ public sealed partial class CatalogFactsSnapshot : IDisposable
 {
     private readonly ProcessorStateReadSnapshot _snapshot;
     private readonly ManagedWorkspaceBoundary _workspace;
+    private readonly bool _hasImportedObservations;
     private bool _closed;
     public Guid LibraryId { get; }
     public long DiscoveryRevision { get; }
@@ -31,6 +32,9 @@ public sealed partial class CatalogFactsSnapshot : IDisposable
             throw new InvalidDataException("A catalog publication requires an established library and captured revisions.");
         LibraryId = library; DiscoveryRevision = reader.GetInt64(1); ConfigurationRevision = reader.GetInt64(2);
         reader.Close(); _workspace = ManagedWorkspaceBoundary.Capture(snapshot, LibraryId);
+        using var imported=Command("SELECT EXISTS(SELECT 1 FROM processor_meta WHERE key>=$start AND key<$end)");
+        imported.Parameters.AddWithValue("$start",TakeoutImportedPhotoFactsRepository.Prefix+"0");imported.Parameters.AddWithValue("$end",TakeoutImportedPhotoFactsRepository.Prefix+"g");
+        _hasImportedObservations=(long)imported.ExecuteScalar()! !=0;
     }
 
     public static CatalogFactsSnapshot Open(ProcessorStateDatabase database)
@@ -77,7 +81,7 @@ public sealed partial class CatalogFactsSnapshot : IDisposable
                 var id = Guid.ParseExact(reader.GetString(0), "D");
                 if (current?.Id != id)
                 {
-                    if (current is not null) assets.Add(current.Build());
+                    if (current is not null) assets.Add(Imported(current.Build(),cancellationToken));
                     if (assets.Count == limit) { more = true; break; }
                     current = new(reader, id);
                 }
@@ -85,7 +89,7 @@ public sealed partial class CatalogFactsSnapshot : IDisposable
                 current.Add(new(Guid.ParseExact(reader.GetString(11), "D"), reader.GetInt64(12), reader.GetInt32(13)));
             }
         }
-        if (!more && current is not null) assets.Add(current.Build());
+        if (!more && current is not null) assets.Add(Imported(current.Build(),cancellationToken));
         cancellationToken.ThrowIfCancellationRequested(); return new(assets.AsReadOnly(), more);
     }
 
@@ -99,6 +103,7 @@ public sealed partial class CatalogFactsSnapshot : IDisposable
         var command = _snapshot.Connection.CreateCommand(); command.Transaction = _snapshot.Transaction;
         command.CommandText = sql; return command;
     }
+    private DriveCatalogAsset Imported(DriveCatalogAsset asset,CancellationToken token)=>!_hasImportedObservations?asset:TakeoutImportedPhotoFactsRepository.Apply(_snapshot.Connection,_snapshot.Transaction,LibraryId,asset,token);
     private sealed class AssetBuilder
     {
         private readonly DriveCatalogAsset _asset;

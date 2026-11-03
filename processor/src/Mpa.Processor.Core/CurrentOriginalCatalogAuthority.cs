@@ -75,7 +75,7 @@ public sealed partial class CatalogGenerationCaptureRepository
                 throw new InvalidDataException("Original publication basis differs from its witnessed source policy.");
             if(intent?.Envelope is {} envelope)
             {
-                var document=new SignedProtocolDocuments([CatalogPublicationReader.Capability,DriveCatalogFacts.Capability]).VerifyAndRead(envelope.Span,actor);
+                var document=new SignedProtocolDocuments([CatalogPublicationReader.Capability,DriveCatalogFacts.Capability, ImportedPhotoMetadata.Capability]).VerifyAndRead(envelope.Span,actor);
                 _=new CatalogPublicationReader(pin.Workspace).ReadCommit(document);
             }
             if(intent is not null && !actual.Signing.Actors.Any(value=>value.ActorId==scope.ActorId && value.Epoch==scope.ActorEpoch && value.KeyId==key))

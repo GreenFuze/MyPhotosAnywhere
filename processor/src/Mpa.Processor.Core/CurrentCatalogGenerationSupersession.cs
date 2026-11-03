@@ -145,7 +145,7 @@ public sealed partial class CatalogGenerationCaptureRepository
             var publishers=root.ReadPublishers(journal.RetainedControllerReference(basis.Pin,root.Publishers,"library-publisher-authorization",transaction).Span,basis.Pin);
             if(publishers.Publisher is not {} actor || actor.ActorId!=scope.ActorId || actor.Epoch!=scope.ActorEpoch)
                 throw new InvalidDataException("Supersession substituted its original publisher.");
-            var verified=new SignedProtocolDocuments([CatalogPublicationReader.Capability,DriveCatalogFacts.Capability]).VerifyAndRead(inputs.Intent.Envelope!.Value.Span,actor);
+            var verified=new SignedProtocolDocuments([CatalogPublicationReader.Capability,DriveCatalogFacts.Capability, ImportedPhotoMetadata.Capability]).VerifyAndRead(inputs.Intent.Envelope!.Value.Span,actor);
             _=new CatalogPublicationReader(basis.Pin.Workspace).ReadCommit(verified);
             var recovery=new CurrentControlTransitionJournal(_database,_budget).ReadOwnedCatalogRootRecoveryIn(inputs,transaction,token);
             if(recovery.WithdrawnPlans!=value.WithdrawnRootPlans || recovery.Sha256!=value.RootRecoverySha256)

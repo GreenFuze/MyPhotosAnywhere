@@ -38,7 +38,7 @@ public sealed partial class CatalogGenerationCaptureRepository
         var sources=basis.Head.ReadSources(journal.RetainedControllerReference(basis.Pin,basis.Head.Sources,"library-source-configuration",transaction).Span,basis.Pin);
         if(publisher.Publisher is not {} actor || actor.ActorId!=scope.ActorId || actor.Epoch!=scope.ActorEpoch || sources.Revision>human.Revision)
             throw new CatalogGenerationCaptureConflictException();
-        var verified=new SignedProtocolDocuments([CatalogPublicationReader.Capability,DriveCatalogFacts.Capability])
+        var verified=new SignedProtocolDocuments([CatalogPublicationReader.Capability,DriveCatalogFacts.Capability, ImportedPhotoMetadata.Capability])
             .VerifyAndRead(inputs.Intent.Envelope!.Value.Span,actor);
         _=new CatalogPublicationReader(basis.Pin.Workspace).ReadCommit(verified);
         var head=ReadPublishedHead(transaction);

@@ -8,6 +8,25 @@ namespace Mpa.Processor.Web.Tests;
 [TestClass]
 public sealed partial class DesktopLibraryViewerReaderTests
 {
+    private static readonly System.Text.Json.JsonSerializerOptions ImportedWebJsonOptions=new(System.Text.Json.JsonSerializerDefaults.Web);
+    [TestMethod]
+    public async Task CanonicalViewerShowsImportedProvenanceWithoutReplacingHumanNamesOrObservedDates()
+    {
+        var selected=Selection();var photo=Photo();var raw="{\"title\":\"Export name.jpg\",\"description\":\"Literal <tag> שלום\",\"photoTakenTime\":{\"timestamp\":\"1\"},\"people\":[{\"name\":\"Unmatched hint\"}]}"u8.ToArray();
+        var document=TakeoutMetadataDocument.ParseSource(raw);var artifact=document.EncodeArtifact();
+        var imported=ImportedPhotoMetadata.FromTakeout(photo.Id,Guid.NewGuid(),Guid.NewGuid(),new string('a',64),photo.DriveVersion,new string('b',64),new(raw.Length,document.SourceSha256,"input.bin"),
+            new(artifact.Length,Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(artifact)),"output.bin"),document);
+        photo=photo with{ImportedMetadata=imported};var query=new ExactQueries((_,_,_)=>new(selected,photo));var frame=new CatalogViewerWindow(Guid.NewGuid(),1,0,[new(0,photo.Id)],selected.StageId,"account-A");
+        var reader=new DesktopLibraryViewerReader(query);var actual=(await reader.ReadAsync(frame,CancellationToken.None).ConfigureAwait(false)).Entries.Single().Photo!;
+        Assert.AreEqual(photo.Name,actual.Name);Assert.AreEqual("DriveCapture",actual.DateProvenance);Assert.AreEqual(1L,actual.EffectiveUtc);
+        Assert.AreEqual("Export name.jpg",actual.ImportedMetadata!.Title);Assert.AreEqual("Literal <tag> שלום",actual.ImportedMetadata.Description);Assert.AreEqual("Unmatched hint",actual.ImportedMetadata.NameHints.Single());
+        var json=System.Text.Json.JsonSerializer.SerializeToElement(actual,ImportedWebJsonOptions);
+        Assert.AreEqual(7,json.GetProperty("importedMetadata").EnumerateObject().Count());Assert.IsFalse(json.GetProperty("importedMetadata").TryGetProperty("jobId",out _));
+        photo=photo with{CapturedUtc=null,ModifiedUtc=9000};actual=(await reader.ReadAsync(frame,CancellationToken.None).ConfigureAwait(false)).Entries.Single().Photo!;
+        Assert.AreEqual("ImportedCapture",actual.DateProvenance);Assert.AreEqual(1000L,actual.EffectiveUtc);
+        photo=photo with{ImportedMetadata=null,ImportedAttention=new(2,new string('c',64),"conflicting-metadata")};actual=(await reader.ReadAsync(frame,CancellationToken.None).ConfigureAwait(false)).Entries.Single().Photo!;
+        Assert.AreEqual(9000L,actual.EffectiveUtc);Assert.AreEqual("conflicting-metadata",actual.ImportedMetadata!.Attention);Assert.IsNull(actual.ImportedMetadata.Description);Assert.AreEqual(0,actual.ImportedMetadata.NameHints.Count);
+    }
     [TestMethod]
     public async Task CanonicalViewerMetadataKeepsFrozenStageAccountPositionsAndMissingIdentities()
     {

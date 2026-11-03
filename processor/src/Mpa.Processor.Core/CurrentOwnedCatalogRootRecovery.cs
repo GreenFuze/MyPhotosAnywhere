@@ -39,7 +39,7 @@ public sealed partial class CurrentControlTransitionJournal
                 original.Policies.Sources.Revision!=scope.ConfigurationRevision || original.Policies.Publisher.Publisher is not {} publisher ||
                 publisher.ActorId!=scope.ActorId || publisher.Epoch!=scope.ActorEpoch || terminal?.Withdrawal is null)
                 throw new InvalidDataException("Original catalog Root work is not an exact independently withdrawn native binding.");
-            var verified=new SignedProtocolDocuments([CatalogPublicationReader.Capability,DriveCatalogFacts.Capability])
+            var verified=new SignedProtocolDocuments([CatalogPublicationReader.Capability,DriveCatalogFacts.Capability, ImportedPhotoMetadata.Capability])
                 .VerifyAndRead(captured.Intent.Envelope.Value.Span,publisher);
             _=new CatalogPublicationReader(basis.Pin.Workspace).ReadCommit(verified);
             count=checked(count+1);Append(new {plan,TerminalSha256=Hash(Encode(terminal))});

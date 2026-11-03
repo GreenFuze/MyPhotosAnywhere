@@ -76,7 +76,7 @@ public sealed partial class CatalogGenerationCaptureRepository
             throw new SigningHistoryRecoveryRequiredException();
         if(intent.Envelope is {} envelope)
         {
-            var verified=new SignedProtocolDocuments([CatalogPublicationReader.Capability,DriveCatalogFacts.Capability]).VerifyAndRead(envelope.Span,actor);
+            var verified=new SignedProtocolDocuments([CatalogPublicationReader.Capability,DriveCatalogFacts.Capability, ImportedPhotoMetadata.Capability]).VerifyAndRead(envelope.Span,actor);
             _=new CatalogPublicationReader(basis.Pin.Workspace).ReadCommit(verified);
         }
         var selected=ReadPublishedHead(transaction);

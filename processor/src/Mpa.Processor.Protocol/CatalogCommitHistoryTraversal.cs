@@ -19,7 +19,7 @@ public sealed class CatalogCommitHistoryTraversal
     private readonly TrustedProtocolActor _publisher;
     private readonly ICatalogObjectSource _source;
     private readonly int _maximum;
-    private readonly SignedProtocolDocuments _signed = new([CatalogPublicationReader.Capability, DriveCatalogFacts.Capability]);
+    private readonly SignedProtocolDocuments _signed = new([CatalogPublicationReader.Capability, DriveCatalogFacts.Capability, ImportedPhotoMetadata.Capability]);
     private readonly CatalogPublicationReader _schema;
 
     public CatalogCommitHistoryTraversal(CatalogWorkspace workspace, TrustedProtocolActor publisher,

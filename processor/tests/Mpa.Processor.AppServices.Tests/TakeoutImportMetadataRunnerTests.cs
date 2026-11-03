@@ -24,7 +24,7 @@ public sealed partial class AccountServiceTests
         await using(var original=new TakeoutOriginalUploadService(fixture.State,fixture.Service,input.Budget,new OriginalAuthority(input.Approval)))
             await original.UploadAsync(input.Job,deadline.Token).ConfigureAwait(false);
         var result=await metadata.RunAsync(completed,deadline.Token).ConfigureAwait(false);
-        Assert.AreEqual(new TakeoutImportMetadataResult(1,0,2,1,0),result);Assert.AreEqual(1,launches);
+        Assert.AreEqual(new TakeoutImportMetadataResult(1,0,2,1,0){ObservationsChanged=true},result);Assert.AreEqual(1,launches);
         File.Delete(input.Path+".json");
         File.Delete(Path.Combine(Path.GetDirectoryName(input.Path)!,"broken.json"));File.Delete(Path.Combine(Path.GetDirectoryName(input.Path)!,"other.json"));File.Delete(Path.Combine(Path.GetDirectoryName(input.Path)!,"oversized.json"));
         Assert.AreEqual(new TakeoutImportMetadataResult(0,1,2,1,0),await metadata.RunAsync(completed,deadline.Token).ConfigureAwait(false));Assert.AreEqual(1,launches);
@@ -58,7 +58,7 @@ public sealed partial class AccountServiceTests
         var before=await fixture.State.ExecuteAsync(db=>new TakeoutMetadataIssueRepository(db).ReadPage(completed.ImportId),deadline.Token).ConfigureAwait(false);Assert.AreEqual(4,before.Issues.Count);Assert.AreEqual("a.jpg.json",before.Issues.Single(issue=>issue.Retryable).Name);
         Assert.IsFalse((await fixture.State.ExecuteAsync(db=>new TakeoutImportInventoryRepository(db).Activity(completed.ImportId).Metadata!,deadline.Token).ConfigureAwait(false)).Finished);
         await File.WriteAllBytesAsync(path,raw,deadline.Token).ConfigureAwait(false);File.SetLastWriteTimeUtc(path,stamp);
-        var repaired=await runner.RunAsync(completed,deadline.Token).ConfigureAwait(false);Assert.AreEqual(new TakeoutImportMetadataResult(1,0,2,1,0),repaired);
+        var repaired=await runner.RunAsync(completed,deadline.Token).ConfigureAwait(false);Assert.AreEqual(new TakeoutImportMetadataResult(1,0,2,1,0){ObservationsChanged=true},repaired);
         var after=await fixture.State.ExecuteAsync(db=>new TakeoutMetadataIssueRepository(db).ReadPage(completed.ImportId),deadline.Token).ConfigureAwait(false);Assert.AreEqual(3,after.Issues.Count);Assert.IsTrue(after.Issues.All(issue=>!issue.Retryable));
         Assert.AreEqual(1,cloud.Allocations);CollectionAssert.AreEqual(input.Payload,cloud.Uploaded);CollectionAssert.AreEqual(input.Payload,await File.ReadAllBytesAsync(input.Path,deadline.Token).ConfigureAwait(false));Assert.AreEqual(0L,input.Budget.Status().ReservedBytes);
     }
