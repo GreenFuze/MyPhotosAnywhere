@@ -20,7 +20,7 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
     private readonly object _gate=new();
     private readonly CancellationTokenSource _stop=new();
     private CancellationTokenSource? _runStop;
-    private Task? _run,_pick,_pause,_disposal;
+    private Task? _run,_pick,_pause,_cleanup,_disposal;
     private TakeoutAssociationCatalog? _catalog;
     private TakeoutOriginalReader? _source;
     private ProcessorWorkState _status=ProcessorWorkState.Paused;
@@ -93,6 +93,23 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
     {
         lock(_gate){Check(caller,caller);var repository=new TakeoutImportInventoryRepository(database);_=repository.Activity(importId);repository.ClearIssue(importId);Wake();return repository.Activity(importId);}
     },caller);
+    public Task<TakeoutMetadataCleanupResult> CleanupMetadataAsync(Guid importId,CancellationToken caller)
+    {
+        lock(_gate)
+        {
+            Check(caller,caller);if(_metadata is null)throw new InvalidOperationException("Metadata processing is unavailable.");
+            if(_status!=ProcessorWorkState.Paused||_cleanup is{IsCompleted:false})throw new ProcessorWorkStateConflictException();
+            // Explicit admission belongs to the engine. Browser cancellation
+            // after this point cannot abandon a committed retirement intent.
+            var operation=Task.Run(async()=>
+            {
+                var completed=await _state.ExecuteAsync(db=>new TakeoutImportInventoryRepository(db).ReadCompleted(importId)
+                    ??throw new InvalidOperationException("Finish reviewing this import before cleanup."),_stop.Token).ConfigureAwait(false);
+                return await _metadata.CleanupBackedUpAsync(completed,_stop.Token).ConfigureAwait(false);
+            },CancellationToken.None);
+            _cleanup=operation;return operation;
+        }
+    }
     private void Wake()
     {
         _requests=checked(_requests+1);if(_stopping||_status is ProcessorWorkState.Paused or ProcessorWorkState.Pausing||_draining)return;
@@ -193,7 +210,7 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
         }
     }
     public Task ResumeAsync()
-    {lock(_gate){ObjectDisposedException.ThrowIf(_stopping,this);if(_status!=ProcessorWorkState.Paused||_source is not null||_catalog is not null)throw new ProcessorWorkStateConflictException();_status=ProcessorWorkState.Ready;Wake();return Task.CompletedTask;}}
+    {lock(_gate){ObjectDisposedException.ThrowIf(_stopping,this);if(_status!=ProcessorWorkState.Paused||_source is not null||_catalog is not null||_cleanup is{IsCompleted:false})throw new ProcessorWorkStateConflictException();_status=ProcessorWorkState.Ready;Wake();return Task.CompletedTask;}}
     public ValueTask DisposeAsync()
     {lock(_gate){_stopping=true;_status=ProcessorWorkState.Stopping;if(_disposal is{IsFaulted:true}&&!_exitConfirmed)_disposal=null;return new(_disposal??=StopAsync());}}
     public Task CloseAdmissionAsync()
@@ -201,8 +218,8 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
     private async Task StopAsync()
     {
         var failures=new List<Exception>();try{await _stop.CancelAsync().ConfigureAwait(false);}catch(Exception error){failures.Add(error);}
-        Task? run,pick,pause;lock(_gate){run=_run;pick=_pick;pause=_pause;}
-        foreach(var task in new[]{run,pick,pause}.OfType<Task>())
+        Task? run,pick,pause,cleanup;lock(_gate){run=_run;pick=_pick;pause=_pause;cleanup=_cleanup;}
+        foreach(var task in new[]{run,pick,pause,cleanup}.OfType<Task>())
         {
             try{await task.ConfigureAwait(false);}
             catch(OperationCanceledException)when(_stop.IsCancellationRequested){ }

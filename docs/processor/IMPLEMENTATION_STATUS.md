@@ -9,6 +9,56 @@ app. Earlier joint-release gate statements below are historical and superseded
 for this PC release; PC safety, signing, preservation and validation stay required.
 See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists.
 
+## Explicit backed-up metadata space cleanup (2026-11-03)
+
+Paused Imports now offers Free local metadata space. The host-only CSRF command
+accepts one canonical reviewed import id; paths, backup claims, duplicate fields
+and query parameters are rejected. The engine owns admitted cleanup after browser
+cancellation and joins it at Exit. Processing cannot resume over an active cleanup.
+This is an explicit action; automatic publication still retains private sources.
+
+Only an actual native ready result and its exact complete raw-bundle upload journal
+can admit retirement. Source/artifact/original bindings, first backup identity and
+all retained bytes are revalidated. The native raw payload, job/outbox and human
+metadata remain. A historical remote receipt is not current availability or remote
+deletion authority. Only a single successful owned attempt with empty diagnostics
+is eligible; unknown, failed, changed or unfinished evidence closes cleanup.
+
+An immutable per-item intent and retained last/pending pointer precede the atomic
+rename into one fixed private retirement slot. Every remaining file is checked
+before individual unlink; no recursive deletion occurs. Restart revalidates the
+native intent and full raw payload before completing partial work. Accounting
+includes partially removed markers and an absent main stage root. Recovery from
+native raw bytes requires the explicit retirement record; a missing file alone
+still fails. The1024item/32attempt bounds remain; retired slots admit new captures.
+Ordinary retained-file reads keep their small working-space bound; only actually
+retired reads reserve space for a full bounded raw bundle.
+
+The final source adds28Core,1Services,1Web and1frontend cases without removing old
+assertions. Affected Core checks cover103distinct cases:102passed in the broad run;
+one worker-startup/join failure occurred before cleanup and only its exact failed
+row was retried, passing. That failure remains recorded. All58old Web cases pass;
+the new HTTP case passes after correcting the new response to decimal strings.
+All26frontend checks and strict Desktop compilation pass without warnings.
+Native coverage includes actual DB reopen, eight partial-unlink boundaries, damaged
+evidence followed by successful repair/retry, native write failure, canceled queued
+readers, sequential first bindings, lost-root accounting and tight working space.
+The reproducible failed-validation lock retention was fixed with a synchronous
+lock owner; native reads are validated before the short pointer-write transaction.
+No version exception, deadline increase or warning suppression was added.
+
+Acceptance is incomplete. The v259 isolated ordinary import/backup/cleanup run
+reaches its unchanged40sec deadline during catalog publication, before cleanup.
+A CPU-profiled diagnostic run executes all assertions successfully in36sec; this
+does not replace ordinary acceptance. Earlier local timing failures remain in the
+evidence. Exact main/package verification and fresh native CI are required for
+this cleanup increment. The preceding d0a8ded has independently verified all60PC
+jobs/72reports, first attempt, on the four native runners
+(ci-d0a8ded-pc-validation-v241.json); no passed jobs were rerun.
+Unsupported/conflicting raw preservation,
+corrected-input/version repair, the remaining PC client/processing workflows,
+installers and actual UI/live/platform/signing/final publication remain unfinished.
+
 ## Preserve publication wake-ups for partial metadata passes (2026-11-03)
 
 A later capacity failure or joined pause could previously conceal metadata already

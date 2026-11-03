@@ -321,3 +321,16 @@ test('original choice pages reject invalid paths, receipts, oversized pages and 
     await assert.rejects(api.importOriginalChoices('00000000-0000-0000-0000-000000000000', null, new AbortController().signal), /saved import original page/);
   }); assert.equal(calls, 0);
 });
+
+test('explicit metadata cleanup sends only the saved import with CSRF and validates bounded slot counts', async () => {
+  let calls = 0;
+  await withBrowser(async (url, options) => {
+    if (url === '/api/session') return json({ csrf: 'c'.repeat(64), hostOwner: true });
+    calls++; assert.equal(url, '/api/import-metadata-cleanup'); assert.equal(options.method, 'POST'); assert.equal(options.credentials, 'same-origin');
+    assert.equal(options.headers['X-MPA-CSRF'], 'c'.repeat(64)); assert.deepEqual(JSON.parse(options.body), { id: importIdentity });
+    return json({ retired: '1', kept: '2' });
+  }, async api => { await api.connect(); assert.deepEqual(await api.cleanupImportMetadata(importIdentity), { retired: '1', kept: '2' }); await assert.rejects(api.cleanupImportMetadata('../source.bin'), /saved import/); });
+  assert.equal(calls, 1);
+  for (const value of [null, {}, { retired: 1, kept: '0' }, { retired: '01', kept: '0' }, { retired: '-1', kept: '0' }, { retired: '1', kept: '6400000' }, { retired: '0', kept: '900000000' }])
+    await withBrowser(async () => json(value), async api => { await assert.rejects(api.cleanupImportMetadata(importIdentity), /cleanup reply/); });
+});

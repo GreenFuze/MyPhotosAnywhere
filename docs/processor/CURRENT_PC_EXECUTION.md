@@ -151,3 +151,21 @@ CI before acceptance. CPU-heavy non-workspace work was observed, not stopped, an
 is not a proven cause. Prior exactd63bc17 now has full60-job/72-report PC evidence
 in ci-d63bc17-pc-validation-v226.json, with a focused recovery of one never-started
 macOS job and no passed tests reexecuted or failures waived.
+
+Explicit metadata-space cleanup continuation (2026-11-03): paused Imports can
+remove only verified processing copies whose full exact raw bytes remain in the
+native backup journal. Host/CSRF/canonical-id admission, joined engine lifetime,
+immutable per-item/last intents, fixed private-slot crash recovery and bounded
+accounting protect originals, external exports, human metadata and unknown/failed
+evidence. The1024item/32attempt limits stay unchanged. Missing files cannot create
+recovery permission. Ordinary unretired reads retain their previous small working
+space bound; only explicit retired-source reads reserve a complete raw bundle.
+Core28new cases, affected103distinct Core cases,58old+1new Web cases,26frontend
+checks and strict Desktop build have positive evidence; the one initial native
+worker-startup failure and its exact-row recovery remain recorded. The v259 isolated
+ordinary integration times out in catalog publication at40sec; the diagnostic trace
+run passes all assertions in36sec and is not ordinary acceptance. Exact main and
+fresh native CI for cleanup remain required. The parentd0a8ded is independently
+verified60PCjobs/72reports, first attempt (ci-d0a8ded-pc-validation-v241.json).
+Do not claim complete import/storage acceptance, unsupported/conflicting raw backup,
+version/input repair, a complete PC client, native installers or a final release.

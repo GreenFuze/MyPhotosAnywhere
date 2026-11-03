@@ -27,6 +27,7 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
     public Task<TakeoutImportActivity?> ChooseImportFolderAsync(Guid sourceId,CancellationToken token)=>Imports.ChooseFolderAsync(sourceId,token);
     public Task<TakeoutImportActivity> StartImportAsync(Guid importId,CancellationToken token)=>Imports.StartAsync(importId,token);
     public Task<TakeoutImportActivity> RetryImportAsync(Guid importId,CancellationToken token)=>Imports.RetryAsync(importId,token);
+    public Task<TakeoutMetadataCleanupResult> CleanupImportMetadataAsync(Guid importId,CancellationToken token)=>Imports.CleanupMetadataAsync(importId,token);
     private InitialLibraryPublicationRuntime Publication => _publication ?? throw new InvalidOperationException("The engine library publication owner has not been configured.");
     private LibraryWorkspaceSetup Setup => _setup ?? throw new InvalidOperationException("The native library setup owner has not been configured.");
     public Task<LibraryControllerPin?> LibraryAsync(CancellationToken cancellationToken) => Setup.CurrentAsync(cancellationToken);

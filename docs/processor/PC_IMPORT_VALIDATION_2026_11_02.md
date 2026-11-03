@@ -1,5 +1,41 @@
 # PC folder import increment
 
+Explicit metadata-space cleanup continuation (2026-11-03): the paused host browser
+can request cleanup for one reviewed import. The authenticated CSRF command rejects
+noncanonical ids, paths, caller backup claims, duplicate fields and queries. It
+returns decimal-string retired/kept counts. Browser closure cannot abandon admitted
+engine work; Resume cannot overlap it and Exit joins it. Automatic publication's
+existing retained-source assertions remain intact.
+
+Native readiness, complete raw payload, source/artifact/original bindings and the
+first actual upload outbox are checked before an immutable retirement intent.
+Only exact owned successful single-attempt processing copies may retire. A fixed
+sibling slot makes partial unlink measurable and recoverable from the native
+intent, including lost markers/root. Unknown or failed evidence is preserved.
+The original, external export, raw upload payload, native job/outbox and human
+metadata remain. No historical receipt or public recovery DTO grants deletion.
+Missing files alone cannot enable reconstruction. Existing1024/32bounds stay fixed.
+
+New native tests cover28cases, including eight interruption boundaries, full DB
+reopen, new capture after retirement, sequential immutable bindings, failed writes,
+queued-reader cancellation, changed/unmarked evidence, restored-input retry and
+unretired reads with only1MiB reservable headroom. The affected Core run passes102
+of103; the remaining row fails in worker startup/join before cleanup, and its exact
+single-row recovery passes without repeating the passed checks. The original
+failure is retained. All58old Web cases and the corrected new cleanup case pass;
+frontend26cases and strict Desktop build pass with no warnings. Source proof keeps
+299untouched test files byte-identical and all11old cases in changed files.
+
+The v259 isolated ordinary integration times out in catalog publication at its
+unchanged40sec deadline. A separately labeled diagnostic CPU trace completes the
+full import/current backup/explicit cleanup/retained retry assertions in36sec.
+Diagnostic success does not waive the ordinary timeout. Exact main and native CI
+for this increment remain required; actual UI/live/install/performance acceptance
+is unverified. The exact parentd0a8ded has verified60PCjobs/72native reports on all
+four runners, first attempt, with no old identities lost or warnings waived.
+Unsupported/conflicting raw preservation and corrected-input/version repair are
+still required before complete import/storage acceptance.
+
 Joined replay-input cleanup continuation (2026-11-03): only the verified duplicate
 worker input may retire, under the storage owner's held item admission and actual
 ready/outbox checks through its exact serial state owner. Primary raw source,

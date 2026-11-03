@@ -5,6 +5,9 @@ namespace Mpa.Processor.AppServices;
 
 public sealed record TakeoutImportMetadataResult(long Analyzed,long Retained,long Unsupported,long Unmatched,long WaitingForOriginal)
 {public long Unavailable{get;init;}public bool ObservationsChanged{get;init;}}
+public sealed record TakeoutMetadataCleanupResult(
+    [property:System.Text.Json.Serialization.JsonNumberHandling(System.Text.Json.Serialization.JsonNumberHandling.WriteAsString)] long Retired,
+    [property:System.Text.Json.Serialization.JsonNumberHandling(System.Text.Json.Serialization.JsonNumberHandling.WriteAsString)] long Kept);
 internal sealed class TakeoutMetadataAdmissionClosedException(Exception inner):Exception("Metadata worker admission closed before ownership transfer; captured work is retained.",inner);
 internal sealed class TakeoutMetadataInputUnavailableException(Exception inner):Exception("The captured metadata input is unavailable; its original binding is retained.",inner);
 
@@ -43,6 +46,38 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
     }
     private sealed class ObservationChanges
     {public bool Changed{get;private set;}public void Commit()=>Changed=true;}
+
+    public async Task<TakeoutMetadataCleanupResult> CleanupBackedUpAsync(TakeoutCompletedInventory completed,CancellationToken token)
+    {
+        if(Interlocked.CompareExchange(ref _running,1,0)!=0)throw new ProcessorWorkStateConflictException();
+        try
+        {
+            var workspace=await _state.ExecuteAsync(db=>
+            {
+                var pin=new LibraryAuthorityRepository(db,_budget).Controller()??throw new InvalidOperationException("Library setup is required before metadata cleanup.");
+                if(pin.LibraryId!=completed.Target.LibraryId)throw new InvalidDataException("Metadata cleanup belongs to another library.");return new CatalogWorkspace(pin.AccountId,pin.FolderId);
+            },token).ConfigureAwait(false);
+            using var catalog=await TakeoutAssociationCatalog.OpenCompletedAsync(completed,_budget,token).ConfigureAwait(false);
+            long retired=0,kept=0;string? after=null;
+            while(true)
+            {
+                var page=catalog.ReadPage(TakeoutEntryKind.JsonSidecar,after,token:token);
+                foreach(var entry in page.Entries)
+                {
+                    var captured=await _state.ExecuteAsync(db=>
+                    {
+                        var ready=new TakeoutMetadataJobRepository(db).ReadCompletedImported(completed.ImportId,entry.Key);
+                        return ready is null?null:new{Ready=ready,Backup=new MetadataSourceBackupRepository(db,_budget).Read(ready,workspace)};
+                    },token).ConfigureAwait(false);
+                    if(captured?.Backup is null){kept++;continue;}
+                    if(await _storage.RetireBackedUpItemAsync(captured.Ready,captured.Backup,_state,token).ConfigureAwait(false))retired++;
+                }
+                if(!page.HasMore)break;after=page.Entries[^1].Key;
+            }
+            return new(retired,kept);
+        }
+        finally{Volatile.Write(ref _running,0);}
+    }
 
     private async Task<TakeoutImportMetadataResult> RunOwnedAsync(TakeoutCompletedInventory completed,ObservationChanges changes,CancellationToken token)
     {

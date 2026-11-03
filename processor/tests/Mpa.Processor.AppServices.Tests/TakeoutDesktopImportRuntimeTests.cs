@@ -19,7 +19,9 @@ public sealed partial class AccountServiceTests
     public Task DesktopImportBacksUpExactRawSidecarThroughCurrentPublicationBeforeAnyPrivateRetirement()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false,rawBackup:true);
     [TestMethod]
     public Task DesktopRawMetadataRecoveryUsesSignedCatalogAndActualDriveWithoutPrivateInputsJobsOrLocators()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false,rawBackup:true,recover:true);
-    private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished,bool manualAssociation=false,bool rawBackup=false,bool recover=false)
+    [TestMethod]
+    public Task DesktopExplicitMetadataCleanupUsesActualRawBackupAndRetainsRetryWithoutAnotherOriginalUploadOrWorker()=>VerifyImportedPhotoPublicationAsync(legacyFinished:false,rawBackup:true,cleanup:true);
+    private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished,bool manualAssociation=false,bool rawBackup=false,bool recover=false,bool cleanup=false)
     {
         var started=Stopwatch.GetTimestamp();
         using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(40));await using var fixture=await CurrentReaderFixture.CreateAsync(addSource:true).ConfigureAwait(false);
@@ -162,6 +164,18 @@ public sealed partial class AccountServiceTests
             Assert.AreEqual(1,fixture.Data.MetadataMimeTypes.Values.Count(mime=>mime==MetadataSourceBundle.MimeType));
         }
         var replay=await imports.StartAsync(review.Id,deadline.Token).ConfigureAwait(false);Assert.AreEqual("originals-verified",replay.State);Assert.AreEqual(1,cloud.Allocations);
+        if(cleanup)
+        {
+            using var browserCleanup=new CancellationTokenSource();var operation=imports.CleanupMetadataAsync(review.Id,browserCleanup.Token);await browserCleanup.CancelAsync().ConfigureAwait(false);
+            Assert.AreEqual(new TakeoutMetadataCleanupResult(1,0),await operation.ConfigureAwait(false));
+            Assert.AreEqual(0,Directory.GetDirectories(metadataArea).Length);Assert.IsFalse(File.Exists(retainedRaw));
+            Assert.AreEqual(new TakeoutMetadataCleanupResult(0,0),await imports.CleanupMetadataAsync(review.Id,deadline.Token).ConfigureAwait(false));
+            var retained=await state.ExecuteAsync(db=>new TakeoutMetadataJobRepository(db).ReadCompletedImported(review.Id,portable.ImportedMetadata!.SidecarKey)!,deadline.Token).ConfigureAwait(false);
+            CollectionAssert.AreEqual(expectedMetadata.CopyRawSource(),(await metadataStorage.ReadVerifiedAndRetireReplayAsync(retained,state,deadline.Token).ConfigureAwait(false)).CopyRawSource());
+            var completed=await state.ExecuteAsync(db=>new TakeoutImportInventoryRepository(db).ReadCompleted(review.Id)!,deadline.Token).ConfigureAwait(false);
+            var retried=await metadata.RunAsync(completed,deadline.Token).ConfigureAwait(false);Assert.AreEqual(1L,retried.Retained);Assert.IsFalse(retried.ObservationsChanged);
+            Assert.AreEqual(1,metadataLaunches);Assert.AreEqual(1,cloud.Allocations);CollectionAssert.AreEqual(selection.Payload,await File.ReadAllBytesAsync(selection.Path,deadline.Token).ConfigureAwait(false));
+        }
         await imports.ResumeAsync().ConfigureAwait(false);await imports.PauseAsync().ConfigureAwait(false);Assert.AreEqual(1,scanNotifications);Assert.AreEqual(1,metadataLaunches);Assert.AreEqual(legacyFinished?2:1,metadataNotifications);
         if(recover)
         {

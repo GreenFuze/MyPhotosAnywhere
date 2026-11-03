@@ -343,6 +343,20 @@ public sealed class DesktopWebHost : IAsyncDisposable
                     _=>await importApplication.RetryImportAsync(importRequest.Id,token).ConfigureAwait(false)
                 };
                 await context.Response.WriteAsJsonAsync(new{import=importResult},token).ConfigureAwait(false);break;
+            case("POST","/api/import-metadata-cleanup"):
+            {
+                if(!session.HostOwner){context.Response.StatusCode=403;break;}
+                if(_application is not IDesktopImportApplication cleanupApplication){context.Response.StatusCode=404;break;}
+                using var cleanupBody=await System.Text.Json.JsonDocument.ParseAsync(context.Request.Body,new(){MaxDepth=4},token).ConfigureAwait(false);
+                if(context.Request.Query.Count!=0||cleanupBody.RootElement.ValueKind!=System.Text.Json.JsonValueKind.Object)throw new BadHttpRequestException("Choose only a saved import for cleanup.");
+                var cleanupProperties=cleanupBody.RootElement.EnumerateObject().ToArray();
+                if(cleanupProperties.Length!=1||cleanupProperties[0].Name!="id"||cleanupProperties[0].Value.ValueKind!=System.Text.Json.JsonValueKind.String||
+                    !Guid.TryParseExact(cleanupProperties[0].Value.GetString(),"D",out var cleanupId)||cleanupId==Guid.Empty||cleanupId.ToString("D")!=cleanupProperties[0].Value.GetString())throw new BadHttpRequestException("Choose an exact saved import for cleanup.");
+                var cleanupImports=await cleanupApplication.ImportsAsync(token).ConfigureAwait(false);
+                if(!cleanupImports.Imports.Any(value=>value.Id==cleanupId&&value.Entries is not null))throw new BadHttpRequestException("Choose a reviewed import for cleanup.");
+                if(!cleanupImports.Paused)throw new ProcessorWorkStateConflictException();
+                await context.Response.WriteAsJsonAsync(await cleanupApplication.CleanupImportMetadataAsync(cleanupId,token).ConfigureAwait(false),token).ConfigureAwait(false);break;
+            }
             case("GET","/api/import-original-choices"):
                 if(!session.HostOwner){context.Response.StatusCode=403;break;}
                 if(_application is not IDesktopImportApplication choiceApplication){context.Response.StatusCode=404;break;}

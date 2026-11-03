@@ -278,6 +278,14 @@ export class DesktopApi {
     if (value.next !== null && previous !== null && value.next < previous) throw invalid();
     return value as unknown as ImportMetadataIssues;
   }
+  async cleanupImportMetadata(id: string): Promise<{ retired: string; kept: string }> {
+    if (!libraryIdentity(id)) throw new Error('Choose a saved import for cleanup.');
+    const value = await this.sourceCommand('/api/import-metadata-cleanup', { id });
+    if (typeof value !== 'object' || value === null || !('retired' in value) || !('kept' in value) ||
+        typeof value.retired !== 'string' || typeof value.kept !== 'string' || !/^(0|[1-9][0-9]{0,6})$/.test(value.retired) || !/^(0|[1-9][0-9]{0,6})$/.test(value.kept) ||
+        BigInt(value.retired) + BigInt(value.kept) > 6400000n) throw new Error('The cleanup reply was lost. Saved metadata was retained; refresh before retrying.');
+    return { retired: value.retired, kept: value.kept };
+  }
   async importOriginalChoices(id: string, after: string | null, signal: AbortSignal): Promise<ImportOriginalChoices> {
     if (!libraryIdentity(id) || after !== null && !libraryIdentity(after)) throw new Error('Choose a saved import original page.');
     const query = new URLSearchParams({ id }); if (after !== null) query.set('after', after);

@@ -78,12 +78,16 @@ public sealed partial class WebHostTests
         public string? MetadataIssueAfter{get;private set;}
         public int OriginalChoiceReads{get;private set;}
         public bool RejectMetadataSelection{get;set;}
+        public bool ImportsPaused{get;set;}
+        public int MetadataCleanups{get;private set;}
+        public Task<Mpa.Processor.AppServices.TakeoutMetadataCleanupResult> CleanupImportMetadataAsync(Guid importId,CancellationToken token)
+        {token.ThrowIfCancellationRequested();Assert.AreEqual(Import.Id,importId);MetadataCleanups++;return Task.FromResult(new Mpa.Processor.AppServices.TakeoutMetadataCleanupResult(1,2));}
         public List<(Guid Import,string Sidecar,string Original)> MetadataSelections{get;}=[];
         public Task<TakeoutOriginalChoices> ImportOriginalChoicesAsync(Guid importId,string? after,CancellationToken token)
         {token.ThrowIfCancellationRequested();Assert.AreEqual(Import.Id,importId);OriginalChoiceReads++;return Task.FromResult(new TakeoutOriginalChoices([new(new string('b',64),"Folder/a.jpg","verified-file")],null));}
         public Task SelectImportMetadataOriginalAsync(Guid importId,string sidecarKey,string originalKey,CancellationToken token)
         {token.ThrowIfCancellationRequested();if(RejectMetadataSelection)throw new TakeoutMetadataSelectionException("The first selection was retained.");MetadataSelections.Add((importId,sidecarKey,originalKey));return Task.CompletedTask;}
-        public Task<DesktopImports> ImportsAsync(CancellationToken token){token.ThrowIfCancellationRequested();return Task.FromResult(new DesktopImports(true,[Import]));}
+        public Task<DesktopImports> ImportsAsync(CancellationToken token){token.ThrowIfCancellationRequested();return Task.FromResult(new DesktopImports(true,[Import],ImportsPaused));}
         public Task<TakeoutMetadataIssuePage> ImportMetadataIssuesAsync(Guid importId,string? after,CancellationToken token)
         {token.ThrowIfCancellationRequested();Assert.AreEqual(Import.Id,importId);MetadataIssueReads++;MetadataIssueAfter=after;return Task.FromResult(new TakeoutMetadataIssuePage([new(new string('a',64),"a.jpg.json","input-unavailable",true)],null));}
         public Task<TakeoutImportActivity?> ChooseImportFolderAsync(Guid sourceId,CancellationToken token)

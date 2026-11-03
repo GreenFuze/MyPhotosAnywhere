@@ -1,4 +1,5 @@
 using Mpa.Processor.Core;
+using Mpa.Processor.AppServices;
 
 namespace Mpa.Processor.Web;
 
@@ -12,4 +13,5 @@ public interface IDesktopImportApplication
     Task<TakeoutImportActivity?> ChooseImportFolderAsync(Guid sourceId,CancellationToken token);
     Task<TakeoutImportActivity> StartImportAsync(Guid importId,CancellationToken token);
     Task<TakeoutImportActivity> RetryImportAsync(Guid importId,CancellationToken token);
+    Task<TakeoutMetadataCleanupResult> CleanupImportMetadataAsync(Guid importId,CancellationToken token);
 }

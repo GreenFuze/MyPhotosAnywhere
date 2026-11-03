@@ -98,6 +98,15 @@ export function Imports({ api, back }: { api: DesktopApi; back: () => void }) {
     catch (error) { setNotice(error instanceof Error ? error.message : 'Import could not continue. Saved progress was retained.'); }
     finally { setBusy(false); }
   }
+  async function cleanup(id: string) {
+    if (busy || !data?.paused || !window.confirm('Remove extra local processing copies for metadata that has been backed up? Your photos, export files and saved metadata will stay unchanged.')) return;
+    setBusy(true); setNotice(null);
+    try {
+      const result = await api.cleanupImportMetadata(id);
+      setNotice(`Freed ${BigInt(result.retired).toLocaleString()} metadata processing slots. ${BigInt(result.kept).toLocaleString()} files still need processing or backup and were kept.`);
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Cleanup needs attention. Saved metadata was retained.'); }
+    finally { setBusy(false); }
+  }
   const labels = { reviewing: 'Reviewing selected files', ready: 'Ready to import', copying: 'Copying and verifying originals', 'originals-verified': 'Originals verified', 'needs-attention': 'Needs attention', paused: 'Paused', canceled: 'Canceled' };
   const enabled = sources.filter(source => source.enabled && source.accountConnected);
   return <section className="settings"><button className="back" onClick={back}>‹ Back to Photos</button><h1>Import photos</h1>
@@ -126,6 +135,8 @@ export function Imports({ api, back }: { api: DesktopApi; back: () => void }) {
           if (window.confirm(`Import all ${item.media ?? ''} photo and video originals from ${item.inputName} into ${target?.displayName ?? 'the captured Drive folder'}? The source files will stay unchanged.`)) void act('start', item.id);
         }}>Import all originals</button>}
         {item.state === 'needs-attention' && <><p>{item.issue === 'metadata-capacity' ? 'Metadata storage is full. Saved originals and unfinished metadata are retained.' : item.issue === 'drive-unavailable' ? 'Google Drive is unavailable. Reconnect or wait for access to return.' : item.issue === 'input-unavailable' ? 'The selected input is unavailable. Restore access to the same folder.' : 'The captured destination or account permission changed. Review Sources and the account connection.'}</p><button disabled={busy} onClick={() => { void act('retry', item.id); }}>Retry unfinished work</button></>}
+        {item.metadata && item.metadata.ready !== '0' && <div><p>Free extra local metadata processing space after backup. Pause processing in Settings first, then resume it after cleanup.</p>
+          <button disabled={busy || !data.paused} onClick={() => { void cleanup(item.id); }}>Free local metadata space</button></div>}
       </section>;
     })}
   </section>;

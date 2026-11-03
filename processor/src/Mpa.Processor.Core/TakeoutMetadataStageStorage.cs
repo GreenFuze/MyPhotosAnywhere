@@ -6,8 +6,10 @@ namespace Mpa.Processor.Core;
 public sealed class TakeoutMetadataCapacityException(string message):IOException(message);
 
 /// <summary>Private, retained sidecar snapshots and generated worker attempts. This
-/// owner never accepts an original path and never deletes the retained source or
-/// result bytes. A verified duplicate worker replay input may retire after join.
+/// owner never accepts an original path. Explicit cleanup may retire verified
+/// processing copies after exact raw bytes are retained in the native backup
+/// journal; immutable ready/retirement identities retain recovery. A verified
+/// duplicate worker replay input may retire automatically after join.
 /// A canceled capture resumes only after comparing its entire retained prefix.</summary>
 public sealed partial class TakeoutMetadataStageStorage : IDisposable
 {
@@ -52,7 +54,7 @@ public sealed partial class TakeoutMetadataStageStorage : IDisposable
                 lease=new(path,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);
                 if(!existed)WriteNew(Path.Combine(_root,"owner.json"),OwnerBytes(installation));
                 AssertBytes(Path.Combine(_root,"owner.json"),OwnerBytes(installation));
-                _=MeasureInventory(_root,installation);
+                RecoverItemRetirement();_=MeasureInventory(_root,installation);
                 _lease=lease;lease=null;
             }
             finally {lease?.Dispose();}
@@ -161,7 +163,24 @@ public sealed partial class TakeoutMetadataStageStorage : IDisposable
         }
         try
         {
-            if(retirementState is not null)await AssertReadyAsync(completed,retirementState,token).ConfigureAwait(false);
+            if(retirementState is not null)
+            {
+                var hasIntent=await retirementState.ExecuteAsync(db=>
+                {
+                    completed.AssertReadyForReplayRetirement(db);return new TakeoutMetadataRetirementRepository(db,_budget).HasIntent(completed);
+                },token).ConfigureAwait(false);
+                if(hasIntent)
+                {
+                    using var recoveryReservation=_budget.Reserve(2L*WorkspacePublicationRepository.MaximumPayloadBytes+65536);recoveryReservation.RecheckBeforeWrite(recoveryReservation.Bytes);
+                    var retired=await retirementState.ExecuteAsync(db=>
+                    {
+                        var journal=new TakeoutMetadataRetirementRepository(db,_budget);var captured=journal.Read(completed)??throw new InvalidDataException("Metadata recovery lost its exact native retirement intent.");
+                        if(journal.Pending() is not null)throw new InvalidOperationException("Join or recover pending metadata cleanup before reading retired bytes.");return captured.Document;
+                    },token).ConfigureAwait(false);
+                    if(Directory.Exists(Path.Combine(_root,name))||File.Exists(Path.Combine(_root,name))||Directory.Exists(RetiringPath)||File.Exists(RetiringPath))throw new InvalidDataException("Retired metadata has unexplained private evidence.");
+                    return retired;
+                }
+            }
             token.ThrowIfCancellationRequested();using var reserved=_budget.Reserve(checked(completed.Source.Bytes+completed.Artifact.Bytes+65536));reserved.RecheckBeforeWrite(reserved.Bytes);
             Regular(_root,true);AssertBytes(Path.Combine(_root,"owner.json"),OwnerBytes(_installation));
             var item=Path.Combine(_root,name);Regular(item,true);AssertBytes(Path.Combine(item,"claim.json"),ItemBytes(completed.JobId,completed.JobId,completed.ItemContext,_installation));
@@ -269,11 +288,11 @@ public sealed partial class TakeoutMetadataStageStorage : IDisposable
         lock(AccountingGate)
         {
             var root=Path.Combine(Path.GetFullPath(stateDirectory),Name);
-            if(!Directory.Exists(root)){if(File.Exists(root))throw new IOException("Metadata accounting refuses a replaced directory.");return 0;}
+            if(!Directory.Exists(root)){if(File.Exists(root))throw new IOException("Metadata accounting refuses a replaced directory.");return MeasureRetiringBytes(stateDirectory);}
             Regular(stateDirectory,true);var state=ReadMarker(Path.Combine(stateDirectory,"mpa-processor-state.json"));
             using var json=JsonDocument.Parse(state);
             if(!Guid.TryParseExact(json.RootElement.GetProperty("installationId").GetString(),"D",out var installation)||installation==Guid.Empty)throw new InvalidDataException("Metadata accounting lost its installation identity.");
-            AssertBytes(Path.Combine(root,"owner.json"),OwnerBytes(installation));return MeasureInventory(root,installation);
+            AssertBytes(Path.Combine(root,"owner.json"),OwnerBytes(installation));return checked(MeasureInventory(root,installation)+MeasureRetiringBytes(stateDirectory));
         }
     }
     private static long MeasureInventory(string root,Guid installation)
