@@ -158,7 +158,14 @@ class ManagementDeviceTest {
             }
             compose.onNodeWithTag("nav:Collections").performClick();compose.onNodeWithTag("collections:People").performClick()
             val features=androidx.lifecycle.ViewModelProvider(compose.activity)[com.myphotosanywhere.mpa.library.LibraryFeaturesModel::class.java]
-            compose.waitUntil(10000) { features.faces.value.any { it.id==faceId } };compose.waitForIdle()
+            // Faces and the canonical People list load independently. The scroll target
+            // belongs to the ready list, rather than its temporary loading container.
+            compose.waitUntil(10000) {
+                features.faces.value.any { it.id==faceId } && features.people.value.any { it.id==canonical } && compose.onAllNodes(
+                    hasTestTag("people-list") and SemanticsMatcher.expectValue(
+                        androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"People ready")
+                ).fetchSemanticsNodes().size==1
+            };compose.waitForIdle()
             compose.onNodeWithTag("people-list").performScrollToNode(hasTestTag("person-review:$canonical"))
             compose.onNodeWithTag("person-review:$canonical").performClick();compose.onNodeWithText("Name these faces").assertIsDisplayed()
             compose.onNodeWithText("Use Imported fixture name").assertExists()

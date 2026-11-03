@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="processor_connection_title">Shared library</string>
+    <string name="menu_shared_library_summary">Connect to the library prepared by MPA on your computer</string>
+    <string name="processor_connection_explanation">Connect this phone to your library through Google Drive. Your computer does the processing; your phone can browse the saved results while the computer is asleep.</string>
+    <string name="processor_connection_approved">Library approved on this phone</string>
+    <string name="processor_connection_choose_saved_account">Choose the Google account for this saved library.</string>
+    <string name="processor_connection_catalog_separate">Approving the connection does not mean that shared photos have finished syncing.</string>
+    <string name="processor_connection_code">Library connection code</string>
+    <string name="processor_connection_code_help">In MPA on your computer, open Settings → Library workspace → Show library connection code. Copy that code here.</string>
+    <string name="processor_connection_choose_account">Choose Google account and review</string>
+    <string name="processor_connection_google_pending">Finish Google sign-in, then return here to review the library.</string>
+    <string name="processor_connection_review">Review this library</string>
+    <string name="processor_connection_fingerprint">Controller fingerprint — compare with MPA on your computer</string>
+    <string name="processor_connection_confirm_source">I got this connection code from MPA on my computer.</string>
+    <string name="processor_connection_approve">Approve this library</string>
+    <string name="processor_connection_review_again">Review again</string>
+    <string name="processor_connection_refresh">Refresh saved connection</string>
+</resources>

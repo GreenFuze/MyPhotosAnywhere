@@ -1,0 +1,26 @@
+[
+  {
+    "libraryId": "94a81164-e980-4ec1-a566-cec36475b839",
+    "accountPermissionId": "account-A",
+    "fileId": "file",
+    "assetId": "ac788f9e-7648-8561-a695-8b98e20b13a6"
+  },
+  {
+    "libraryId": "94a81164-e980-4ec1-a566-cec36475b839",
+    "accountPermissionId": "account-B",
+    "fileId": "file",
+    "assetId": "a3ee2beb-997d-8c69-b043-dc8482679bec"
+  },
+  {
+    "libraryId": "94a81164-e980-4ec1-a566-cec36475b839",
+    "accountPermissionId": "account-A",
+    "fileId": "File",
+    "assetId": "7a9b190e-0991-8b6f-a47d-772d449b5f5a"
+  },
+  {
+    "libraryId": "4f292397-d323-4fe0-a907-1115aa3a5681",
+    "accountPermissionId": "account-A",
+    "fileId": "file",
+    "assetId": "b9d25a2e-433b-8b81-af1d-524aab22dadf"
+  }
+]

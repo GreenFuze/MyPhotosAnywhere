@@ -1,0 +1,76 @@
+{
+  "valid": [
+    {
+      "name": "sort-and-whitespace",
+      "input": " {\"z\": 1, \"a\": [true,null,\"\u05e9\u05dc\u05d5\u05dd\"]} ",
+      "canonical": "{\"a\":[true,null,\"\u05e9\u05dc\u05d5\u05dd\"],\"z\":1}"
+    },
+    {
+      "name": "controls-and-solidus",
+      "input": "{\"text\":\"a\\n\\t\\u0000\\/b\"}",
+      "canonical": "{\"text\":\"a\\n\\t\\u0000/b\"}"
+    },
+    {
+      "name": "negative-zero",
+      "input": "-0",
+      "canonical": "0"
+    },
+    {
+      "name": "safe-integer-boundary",
+      "input": "9007199254740991",
+      "canonical": "9007199254740991"
+    },
+    {
+      "name": "large-decimal-stays-string",
+      "input": "{\"sequence\":\"9223372036854775807\"}",
+      "canonical": "{\"sequence\":\"9223372036854775807\"}"
+    },
+    {
+      "name": "no-unicode-normalization",
+      "input": "{\"\u00e9\":\"e\u0301\"}",
+      "canonical": "{\"\u00e9\":\"e\u0301\"}"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "duplicate",
+      "input": "{\"a\":1,\"a\":2}"
+    },
+    {
+      "name": "escaped-duplicate",
+      "input": "{\"a\":1,\"\\u0061\":2}"
+    },
+    {
+      "name": "fraction",
+      "input": "1.0"
+    },
+    {
+      "name": "exponent",
+      "input": "1e0"
+    },
+    {
+      "name": "unsafe-integer",
+      "input": "9007199254740992"
+    },
+    {
+      "name": "unpaired-surrogate",
+      "input": "\"\\ud800\""
+    },
+    {
+      "name": "trailing",
+      "input": "{}true"
+    },
+    {
+      "name": "comment",
+      "input": "/*no*/{}"
+    },
+    {
+      "name": "trailing-comma",
+      "input": "[0,]"
+    },
+    {
+      "name": "utf8-bom",
+      "input": "\ufeff{}"
+    }
+  ]
+}

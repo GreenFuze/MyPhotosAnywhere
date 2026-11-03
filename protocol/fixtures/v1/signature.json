@@ -1,0 +1,8 @@
+{
+  "note": "Synthetic ephemeral test key. Only public material retained; this is never an authorized product actor.",
+  "publicKeySpki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEMGdayNHy0NIln11w64R/cGs7XPD38eQp\u002BM12gMCLy5OIT7V68cabZu\u002BLVrqadhqmG04zCdbkvDNxufmboH6Rxw==",
+  "body": "{\u0022format\u0022:\u0022mpa\u0022,\u0022major\u0022:1,\u0022minor\u0022:0,\u0022libraryId\u0022:\u002294a81164-e980-4ec1-a566-cec36475b839\u0022,\u0022kind\u0022:\u0022user-operation\u0022,\u0022requiredCapabilities\u0022:[],\u0022payload\u0022:{\u0022caption\u0022:\u0022\u05E9\u05DC\u05D5\u05DD\u0022,\u0022sequence\u0022:\u00221\u0022}}",
+  "Algorithm": "ES256",
+  "KeyId": "0ea3fbd77f64bf3a145723b62678cb1ce051666c372c514a19744abd46cdb4f1",
+  "Value": "lHRhmr9Zn5LyAW6kwnWwUevVJAW4t1943R7AnJfrKyeWRZZT4UEFyhumuf3DPJ-CG9EO3k0c-NAV47Wb-Dl3IQ"
+}

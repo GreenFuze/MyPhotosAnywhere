@@ -1,0 +1,43 @@
+{
+  "status": "Stage 0 Windows smoke inputs, not accepted product payload/redistribution closure",
+  "engineSource": "https://github.com/tesseract-ocr/tesseract/releases/tag/5.5.3",
+  "languageSourceRevision": "87416418657359cb625c412a48b6e1d6d41c29bd",
+  "assets": [
+    {
+      "file": "tesseract-ocr-w64-setup-5.5.3.20260724.exe",
+      "url": "https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-ocr-w64-setup-5.5.3.20260724.exe",
+      "bytes": 26573224,
+      "sha256": "bee9e3434bd94fd65387d9be28cd467a41f61b1275383b55b0f59a1331270ae4",
+      "role": "official-windows-test-archive; extract without running installer"
+    },
+    {
+      "file": "eng.traineddata",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/87416418657359cb625c412a48b6e1d6d41c29bd/eng.traineddata",
+      "bytes": 4113088,
+      "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "license": "Apache-2.0"
+    },
+    {
+      "file": "heb.traineddata",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/87416418657359cb625c412a48b6e1d6d41c29bd/heb.traineddata",
+      "bytes": 961404,
+      "sha256": "11f9e43ab227f786352a50f75c94c2e9906f1baba86d93276da19da7ce0904db",
+      "license": "Apache-2.0"
+    },
+    {
+      "file": "tessdata.LICENSE",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/87416418657359cb625c412a48b6e1d6d41c29bd/LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    }
+  ],
+  "fixtures": [
+    {
+      "file": "fixtures/ocr-latin.png",
+      "bytes": 9848,
+      "sha256": "48080df465398bf7bdc872f9cd2ad1dbfe86ea93ac41fa1786db01b9da07d132",
+      "expectedText": "MPA PROCESSOR 6045",
+      "scope": "Generated non-private Latin text, smoke only; not representative OCR quality"
+    }
+  ]
+}

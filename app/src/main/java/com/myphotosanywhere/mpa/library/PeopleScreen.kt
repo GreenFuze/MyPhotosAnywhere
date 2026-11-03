@@ -27,7 +27,6 @@ import com.myphotosanywhere.mpa.data.*
 import com.myphotosanywhere.mpa.people.FaceMatching
 import com.myphotosanywhere.mpa.people.FaceReview
 import com.myphotosanywhere.mpa.people.PeopleRepository
-import java.io.File
 
 @Composable
 internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces: List<FaceRecord>,enabled: Boolean,
@@ -54,20 +53,27 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
     var selected by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
     var namingPersonId by rememberSaveable { mutableStateOf<String?>(null) }
     val namingPerson=namingPersonId?.let { id -> people.firstOrNull { it.id==id } ?: Person(id,name) }
-    val review by produceState(FaceReview.Result(emptyList(),emptyMap()),faces) {
-        value=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { FaceReview.analyze(faces,PeopleRepository.MODEL_VERSION) }
+    val reviewInput=remember(faces) { PeopleFaceReviewInput(faces.toList()) }
+    val reviewed by produceState<PeopleFaceReviewSnapshot?>(null,reviewInput) {
+        value=PeopleFaceReviewSnapshot(reviewInput,kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            FaceReview.analyze(reviewInput.faces,PeopleRepository.MODEL_VERSION)
+        })
     }
+    // A background result belongs to one exact observed input. A previous result
+    // cannot declare the replacement input ready while its new effect is starting.
+    val review=reviewed?.takeIf { it.input===reviewInput }?.result
     val byId=faces.associateBy { it.id }
     val pending=faces.filter { it.personId==null && people.any { person -> person.id==it.suggestedPersonId } }
     val pendingIds=pending.map { it.id }.toSet()
-    val groups=review.groups.map { ids -> ids.filter { it !in pendingIds } }.filter { it.isNotEmpty() }
+    val groups=review?.groups.orEmpty().map { ids -> ids.filter { it !in pendingIds } }.filter { it.isNotEmpty() }
     fun startNaming(ids: List<String>,person: Person?=null) {
         naming=ids; selected=ids.toSet(); namingPersonId=person?.id; name=person?.name ?: ""
     }
     // A temporary header-only loading list must not clamp the saved person-card anchor.
     val loadingList=androidx.compose.foundation.lazy.rememberLazyListState()
     LazyColumn(Modifier.fillMaxSize().testTag("people-list").semantics {
-        stateDescription=when { state.error!=null -> "People could not update";!state.hasSnapshot -> "Loading people";indexingLabels -> "Updating saved names";else -> "People ready" }
+        contentDescription="Detected faces: ${faces.size}"
+        stateDescription=when { state.error!=null -> "People could not update";!state.hasSnapshot -> "Loading people";review==null -> "Reviewing detected faces";indexingLabels -> "Updating saved names";else -> "People ready" }
     },state=if(!state.hasSnapshot) loadingList else listState,
         contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item(key="people:heading") { Text("People",style=MaterialTheme.typography.headlineSmall) }
@@ -76,11 +82,11 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
             com.myphotosanywhere.mpa.management.GroupedMenu(listOf(com.myphotosanywhere.mpa.management.MenuEntry(
                 "Recognition settings",if(enabled) "On-device face matching is enabled" else "Face recognition is optional",
                 R.drawable.ic_action_settings,"people:settings",open=onSettings)))
-            if(state.loading || indexingLabels) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if(state.loading || review==null || indexingLabels) LinearProgressIndicator(Modifier.fillMaxWidth())
             if(indexingLabels) Text("Updating saved people names…",style=MaterialTheme.typography.bodySmall,modifier=Modifier.testTag("people:indexing"))
             state.error?.let { Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={ retryPeople++ }) { Text("Retry People") } }
             labelError?.let { Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={ model.app.personLabels.retry() }) { Text("Retry failed labels") } }
-            if(!state.loading && state.error==null && state.groups.isEmpty()) Text("People appear from your imported names and reviewed faces. Possible face matches need your confirmation.",style=MaterialTheme.typography.bodySmall)
+            if(!state.loading && review!=null && state.error==null && state.groups.isEmpty()) Text("People appear from your imported names and reviewed faces. Possible face matches need your confirmation.",style=MaterialTheme.typography.bodySmall)
         }
         items(state.groups,key={ "person:${it.person.id}" }) { group ->
             val person=group.person
@@ -104,7 +110,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
         }
         item(key="people:unassigned") {
             Text("Unassigned faces · ${faces.count { it.personId==null }}",style=MaterialTheme.typography.titleMedium)
-            val unavailable=review.diagnostics.values.count { it.status in listOf(FaceReview.Status.NO_EMBEDDING,FaceReview.Status.INVALID_EMBEDDING,FaceReview.Status.DIFFERENT_MODEL) }
+            val unavailable=review?.diagnostics?.values.orEmpty().count { it.status in listOf(FaceReview.Status.NO_EMBEDDING,FaceReview.Status.INVALID_EMBEDDING,FaceReview.Status.DIFFERENT_MODEL) }
             if(unavailable>0) Text("$unavailable unassigned faces lack usable matching data. Open Why separate? to check them.")
         }
         items(groups,key={ it.first() }) { ids ->
@@ -113,7 +119,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                 Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                     Text(if(group.size>1) "Possible group · ${group.size} faces" else "Unknown face")
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { group.take(4).forEach { face ->
-                        AsyncImage(File(face.cropPath),"Detected face",Modifier.size(64.dp).clickable { onPhoto(face.photoId) })
+                        AsyncImage(previewSource(face.cropPath),"Detected face",Modifier.size(64.dp).clickable { onPhoto(face.photoId) })
                     } }
                     TextButton(onClick={ startNaming(ids) },modifier=Modifier.testTag("name-faces:${ids.first()}")) { Text(if(group.size>1) "Review and name group" else "Name this person") }
                     group.forEach { face ->
@@ -134,7 +140,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
             items(naming,key={ it }) { id -> byId[id]?.let { face ->
                 Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                     Checkbox(checked=id in selected,onCheckedChange={ checked -> selected=if(checked) selected+id else selected-id })
-                    AsyncImage(File(face.cropPath),"Face to review",Modifier.size(64.dp).clickable { onPhoto(face.photoId) })
+                    AsyncImage(previewSource(face.cropPath),"Face to review",Modifier.size(64.dp).clickable { onPhoto(face.photoId) })
                     if(namingPerson!=null) TextButton(onClick={ model.unassignFace(id); naming=naming-id; selected=selected-id }) { Text("Wrong match") }
                 }
             } }
@@ -156,7 +162,7 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
             value=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { FaceReview.diagnose(id,faces,PeopleRepository.MODEL_VERSION) }
         }
         AlertDialog(onDismissRequest={ explaining=null },title={ Text("Face matching details") },text={ Column(Modifier.heightIn(max=440.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            byId[id]?.let { AsyncImage(File(it.cropPath),"Face being checked",Modifier.size(96.dp)) }
+            byId[id]?.let { AsyncImage(previewSource(it.cropPath),"Face being checked",Modifier.size(96.dp)) }
             diagnostic?.let { detail ->
                 Text(when(detail.status) {
                     FaceReview.Status.NO_EMBEDDING -> "Face detected, but no usable recognition data was extracted. Pose, face size or missing landmarks may have prevented matching. Rescan to retry."
@@ -172,12 +178,15 @@ internal fun PeopleScreen(model: LibraryFeaturesModel,people: List<Person>,faces
                 detail.named?.runnerUp?.let { (person,score) -> Text("Next named person: ${people.find { it.id==person }?.name ?: "Unknown"} · ${scoreText(score)}") }
                 detail.nearestFaceId?.let { nearest ->
                     Text("Most similar face in another photo: ${scoreText(requireNotNull(detail.nearestFaceScore))}")
-                    byId[nearest]?.let { face -> AsyncImage(File(face.cropPath),"Most similar face",Modifier.size(96.dp).clickable { explaining=null; onPhoto(face.photoId) }) }
+                    byId[nearest]?.let { face -> AsyncImage(previewSource(face.cropPath),"Most similar face",Modifier.size(96.dp).clickable { explaining=null; onPhoto(face.photoId) }) }
                 }
                 Text("Similarity threshold ${scoreText(FaceMatching.MIN_SIMILARITY)}; required lead over another named person ${scoreText(FaceMatching.MIN_MARGIN)}. Scores measure similarity, not probability. Groups require every pair to pass; separate faces in one photo stay separate.",style=MaterialTheme.typography.bodySmall)
             } ?: Text("Checking local recognition data…")
         } },confirmButton={ TextButton(onClick={ explaining=null }) { Text("Close") } })
     }
 }
+
+private class PeopleFaceReviewInput(val faces: List<FaceRecord>)
+private data class PeopleFaceReviewSnapshot(val input: PeopleFaceReviewInput,val result: FaceReview.Result)
 
 private fun scoreText(value: Float)=String.format(java.util.Locale.ROOT,"%.3f",value)

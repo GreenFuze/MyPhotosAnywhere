@@ -31,7 +31,9 @@ jobs:
           df -h .
           python3 -c 'import shutil; assert shutil.disk_usage(".").free >= 14 * 1024**3, "Insufficient space for the API 37 image and userdata"'
       - name: Install pinned stable Android SDK
-        run: python3 scripts/ci_android_sdk.py ${{ matrix.api }}
+        run: |
+          python3 scripts/test_ci_android_sdk.py
+          python3 scripts/ci_android_sdk.py ${{ matrix.api }}
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
