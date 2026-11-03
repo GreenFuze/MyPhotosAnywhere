@@ -139,3 +139,15 @@ capacity recovery, unsupported/conflicting raw backup, corrected-input/version
 repair and remaining approved PC workflows/installers/acceptance still remain.
 The preceding7df9282 is independently verified60PCjobs/72reports in
 ci-7df9282-pc-validation-v209.json; do not rerun that unchanged revision.
+
+Partial-pass publication correction (2026-11-03): a later capacity failure or
+joined pause no longer suppresses the wake-up for actually committed metadata.
+One notification follows joined work; retry reuses the first native job, raw bytes
+and artifact without another original upload. Two real native regressions fail on
+old production code and pass with the correction. No raw/item retirement or limit
+change occurs. Broader local publication timing checks still fail at40sec, including
+one unchanged committed-main binary; retain those failures and use fresh native
+CI before acceptance. CPU-heavy non-workspace work was observed, not stopped, and
+is not a proven cause. Prior exactd63bc17 now has full60-job/72-report PC evidence
+in ci-d63bc17-pc-validation-v226.json, with a focused recovery of one never-started
+macOS job and no passed tests reexecuted or failures waived.

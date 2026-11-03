@@ -9,6 +9,35 @@ app. Earlier joint-release gate statements below are historical and superseded
 for this PC release; PC safety, signing, preservation and validation stay required.
 See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists.
 
+## Preserve publication wake-ups for partial metadata passes (2026-11-03)
+
+A later capacity failure or joined pause could previously conceal metadata already
+committed by the pass. Retry then saw unchanged retained observations and could
+lose the publication wake-up permanently. The runner now records actual committed
+observations immediately after their native transaction, and emits one engine-owned
+wake-up after the pass's file/catalog/worker work retires, including failure paths.
+Original failures remain intact; if scheduling also fails, both errors are retained.
+Public result semantics, native attempts, source/artifact identities, originals and
+all deadlines/capacity bounds remain unchanged. No private evidence is evicted.
+
+Both new native pause/capacity cases first fail on unchanged d63bc17 specifically
+for the missing wake-up, then pass with immutable prefix reuse, exact retained raw
+bytes, first job/source/artifact identities, two callbacks across retry and one
+original upload. Strict Desktop compilation passes without warnings. The broader
+local run passes11cases but5existing publication cases exceed their unchanged40sec
+deadline. One unchanged committed-main binary also exceeds that deadline. Current
+CPU-heavy processes outside this workspace were observed and preserved; their
+causal contribution is not established. These local failures remain blocking
+evidence, not waived passes. Fresh native CI must validate the focused change.
+
+Prior d63bc17 is independently verified60PCjobs/72reports in
+ci-d63bc17-pc-validation-v226.json:142Protocol/629Core/787ordinaryServices/179Google/
+9LAN/58Web per native platform. One macOS continuity job never obtained a runner
+or executed a step; only it was retried. GitHub copied the55successful job records
+to new attempt IDs, retaining exact steps/times/runners; no passed work reexecuted.
+All original/current official logs, source additions, identities, unchanged limits,
+scale/reference and four25-case Desktop reports passed. No test failure was waived.
+
 ## Recover export metadata from the signed library (2026-11-03)
 
 Photo Details now offers Save export metadata for supported imported observations.

@@ -191,3 +191,15 @@ cancellation. Actual visual/live acceptance and clean-install enrollment remain
 unverified. Primary-file/generated-item retirement and capacity recovery remain
 unfinished; no public recovery DTO can authorize deletion. Prior exact7df9282 has
 independent60-job/72-report native PC evidence in ci-7df9282-pc-validation-v209.json.
+
+Partial metadata pass wake-up regression (2026-11-03): two actual pause/capacity
+cases reproduce the lost publication notification on unchanged d63bc17, then pass
+with the fix and unchanged40sec deadlines, exact retained source/artifact/job,
+finished retry and a single original upload. No primary deletion or capacity
+reclamation is claimed. Strict Desktop compilation0warnings/errors. The broader
+local run has11passes/5existing40sec publication timeouts, and one unchanged-main
+binary also times out. These failures remain unwaived and require clean/native CI
+validation; observed non-workspace CPU workloads were left untouched. Prior exact
+d63bc17 is independently verified60PCjobs/72reports in
+ci-d63bc17-pc-validation-v226.json, including complete original/retry logs and proof
+that only a never-started queued macOS job executed anew.

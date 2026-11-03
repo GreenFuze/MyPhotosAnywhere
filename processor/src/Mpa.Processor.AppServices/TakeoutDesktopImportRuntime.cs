@@ -130,7 +130,7 @@ public sealed class TakeoutDesktopImportRuntime(ProcessorStateCoordinator state,
                                 var repository=new TakeoutImportInventoryRepository(database);
                                 return repository.Activity(item.Id).Metadata is{Finished:true}&&new TakeoutImportedPhotoFactsRepository(database).HasObservedImport(item.Id)?null:repository.ReadCompleted(item.Id)??throw new InvalidDataException("The reviewed metadata input disappeared.");
                             },token).ConfigureAwait(false);
-                            if(completed is not null){var result=await _metadata.RunAsync(completed,token).ConfigureAwait(false);if(result.ObservationsChanged)_metadataReady?.Invoke();}
+                            if(completed is not null)await _metadata.RunAndNotifyAsync(completed,_metadataReady,token).ConfigureAwait(false);
                         }
                     }
                     catch(Exception error)when(error is HttpRequestException or StaleLibraryConfigurationException or StaleDriveConnectionException or UnauthorizedAccessException or FileNotFoundException or DirectoryNotFoundException or TakeoutMetadataCapacityException)
