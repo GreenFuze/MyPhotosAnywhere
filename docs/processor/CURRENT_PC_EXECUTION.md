@@ -39,8 +39,12 @@ issue rather than an engine fault. The UI separates metadata processing from
 verified originals and pending catalog work. Native composition/integration,
 retained-result integrity, the unchanged1024item bound and frontend contracts pass
 local focused checks (current-takeout-metadata-desktop-validation-v89.json).
-Next finish per-item metadata issue detail/repair, imported-fact projection and
-publication with human precedence, and owned generated-cache retirement. The
+Per-item metadata details now retain the captured filename and cause in bounded
+60-row pages. Restoring access retries only unavailable metadata while reusing
+verified originals and permanent classifications. Local native/HTTP/API evidence
+is current-takeout-issue-validation-v117.json; actual UI/live acceptance remains.
+Next finish explicit corrected-input/manual association repair, imported-fact
+projection and publication with human precedence, and owned generated-cache retirement. The
 metadata workflow is not complete until those steps and actual UI/live acceptance
 pass. The Windows UI tool failed to initialize;
 keep visual acceptance unverified and continue independent work. Do not confuse

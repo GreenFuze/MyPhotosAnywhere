@@ -296,6 +296,15 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 if(!session.HostOwner){context.Response.StatusCode=403;break;}
                 if(_application is not IDesktopImportApplication imports){context.Response.StatusCode=404;break;}
                 await context.Response.WriteAsJsonAsync(await imports.ImportsAsync(token).ConfigureAwait(false),token).ConfigureAwait(false);break;
+            case("GET","/api/import-metadata-issues"):
+                if(!session.HostOwner){context.Response.StatusCode=403;break;}
+                if(_application is not IDesktopImportApplication issueApplication){context.Response.StatusCode=404;break;}
+                var issueIdText=RequiredQuery(context,"id");var issueAfter=OptionalQuery(context,"after",64);
+                if(!Guid.TryParseExact(issueIdText,"D",out var issueImportId)||issueImportId==Guid.Empty||issueImportId.ToString("D")!=issueIdText||
+                    issueAfter is not null&&(issueAfter.Length!=64||issueAfter.Any(c=>c is not(>='0' and <='9') and not(>='a' and <='f'))))throw new BadHttpRequestException("Choose a captured import and issue page.");
+                var issueImport=(await issueApplication.ImportsAsync(token).ConfigureAwait(false)).Imports.SingleOrDefault(value=>value.Id==issueImportId)??throw new BadHttpRequestException("That saved import is unavailable.");
+                if(issueImport.Entries is null)throw new ProcessorWorkStateConflictException();
+                await context.Response.WriteAsJsonAsync(await issueApplication.ImportMetadataIssuesAsync(issueImportId,issueAfter,token).ConfigureAwait(false),token).ConfigureAwait(false);break;
             case("POST","/api/import-folders"):
             case("POST","/api/import-start"):
             case("POST","/api/import-retry"):

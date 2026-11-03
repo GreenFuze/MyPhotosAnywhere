@@ -172,7 +172,7 @@ public sealed partial class WebHostTests
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/accounts") { Content = JsonContent.Create(new { operation = "connect" }) };
         request.Headers.Add("Origin", host.HttpsEndpoint.GetLeftPart(UriPartial.Authority)); request.Headers.Add("X-MPA-CSRF", session.GetProperty("csrf").GetString());
         using var denied = await http.SendAsync(request).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
-        foreach (var path in new[] { "api/library", "api/workspace-inspection?account=account&folder=metadata", "api/library-publication", "api/library-connection", "api/imports" })
+        foreach (var path in new[] { "api/library", "api/workspace-inspection?account=account&folder=metadata", "api/library-publication", "api/library-connection", "api/imports", "api/import-metadata-issues?id="+engine.Import.Id.ToString("D") })
         { using var setup = await http.GetAsync(path).ConfigureAwait(false); Assert.AreEqual(HttpStatusCode.Forbidden, setup.StatusCode); }
         var approval = new Mpa.Processor.AppServices.ApproveLibraryWorkspace("account", "metadata", 1, 7, 1, new string('a', 64), false, true);
         using (var setup = await SourceMutationAsync(http, host.HttpsEndpoint, HttpMethod.Post, approval, session.GetProperty("csrf").GetString(), "api/library").ConfigureAwait(false))

@@ -7,6 +7,7 @@ namespace Mpa.Processor.AppServices.Tests;
 
 public sealed partial class AccountServiceTests
 {
+    private static readonly string[] PermanentImportMetadataCodes = ["invalid-metadata", "name-mismatch", "metadata-too-large"];
     [TestMethod]
     public async Task ImportedMetadataRunsInstalledNativeWorkerOnlyAfterActualOriginalVerificationAndBadSidecarsDoNotBlockItsCopy()
     {
@@ -25,6 +26,7 @@ public sealed partial class AccountServiceTests
         var result=await metadata.RunAsync(completed,deadline.Token).ConfigureAwait(false);
         Assert.AreEqual(new TakeoutImportMetadataResult(1,0,2,1,0),result);Assert.AreEqual(1,launches);
         File.Delete(input.Path+".json");
+        File.Delete(Path.Combine(Path.GetDirectoryName(input.Path)!,"broken.json"));File.Delete(Path.Combine(Path.GetDirectoryName(input.Path)!,"other.json"));File.Delete(Path.Combine(Path.GetDirectoryName(input.Path)!,"oversized.json"));
         Assert.AreEqual(new TakeoutImportMetadataResult(0,1,2,1,0),await metadata.RunAsync(completed,deadline.Token).ConfigureAwait(false));Assert.AreEqual(1,launches);
         await fixture.State.ExecuteAsync(db=>
         {
@@ -39,6 +41,26 @@ public sealed partial class AccountServiceTests
         Assert.AreEqual(ProcessorWorkState.Ready,native.State);Assert.IsNull(native.Failure);Assert.AreEqual(0L,input.Budget.Status().ReservedBytes);
         var progress=await fixture.State.ExecuteAsync(db=>new TakeoutImportInventoryRepository(db).Activity(completed.ImportId).Metadata,deadline.Token).ConfigureAwait(false);
         Assert.AreEqual(new TakeoutMetadataProgress(4,1,3,0,true),progress);
+        var issuePage=await fixture.State.ExecuteAsync(db=>new TakeoutMetadataIssueRepository(db).ReadPage(completed.ImportId),deadline.Token).ConfigureAwait(false);
+        CollectionAssert.AreEquivalent(PermanentImportMetadataCodes,issuePage.Issues.Select(issue=>issue.Code).ToArray());Assert.IsTrue(issuePage.Issues.All(issue=>!issue.Retryable));
+    }
+
+    [TestMethod]
+    public async Task UnavailableMetadataFileDoesNotStopOtherItemsAndResolvingItRetainsOnlyTheRemainingIssues()
+    {
+        using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(40));await using var fixture=new Fixture();
+        var input=await PrepareOriginalJobAsync(fixture,deadline.Token,metadata:true).ConfigureAwait(false);var path=input.Path+".json";var raw=await File.ReadAllBytesAsync(path,deadline.Token).ConfigureAwait(false);var stamp=File.GetLastWriteTimeUtc(path);
+        var completed=await fixture.State.ExecuteAsync(db=>{var imports=new TakeoutImportInventoryRepository(db);return imports.ReadCompleted(imports.Identities().Single())!;},deadline.Token).ConfigureAwait(false);
+        var cloud=new OriginalCloud(input.Payload);WireOriginal(fixture,cloud);await using(var original=new TakeoutOriginalUploadService(fixture.State,fixture.Service,input.Budget,new OriginalAuthority(input.Approval)))await original.UploadAsync(input.Job,deadline.Token).ConfigureAwait(false);
+        using var storage=await fixture.State.ExecuteAsync(db=>new TakeoutMetadataStageStorage(db,input.Budget),deadline.Token).ConfigureAwait(false);await using var native=new ProcessorWorkSupervisor();
+        var runner=new TakeoutImportMetadataRunner(fixture.State,input.Budget,storage,native,token=>TakeoutWorkerInstallation.OpenInstalledAsync(Path.Combine(AppContext.BaseDirectory,"workers","takeout-metadata"),token));
+        File.Delete(path);var unavailable=await runner.RunAsync(completed,deadline.Token).ConfigureAwait(false);Assert.AreEqual(1L,unavailable.Unavailable);Assert.AreEqual(2L,unavailable.Unsupported);Assert.AreEqual(1L,unavailable.Unmatched);
+        var before=await fixture.State.ExecuteAsync(db=>new TakeoutMetadataIssueRepository(db).ReadPage(completed.ImportId),deadline.Token).ConfigureAwait(false);Assert.AreEqual(4,before.Issues.Count);Assert.AreEqual("a.jpg.json",before.Issues.Single(issue=>issue.Retryable).Name);
+        Assert.IsFalse((await fixture.State.ExecuteAsync(db=>new TakeoutImportInventoryRepository(db).Activity(completed.ImportId).Metadata!,deadline.Token).ConfigureAwait(false)).Finished);
+        await File.WriteAllBytesAsync(path,raw,deadline.Token).ConfigureAwait(false);File.SetLastWriteTimeUtc(path,stamp);
+        var repaired=await runner.RunAsync(completed,deadline.Token).ConfigureAwait(false);Assert.AreEqual(new TakeoutImportMetadataResult(1,0,2,1,0),repaired);
+        var after=await fixture.State.ExecuteAsync(db=>new TakeoutMetadataIssueRepository(db).ReadPage(completed.ImportId),deadline.Token).ConfigureAwait(false);Assert.AreEqual(3,after.Issues.Count);Assert.IsTrue(after.Issues.All(issue=>!issue.Retryable));
+        Assert.AreEqual(1,cloud.Allocations);CollectionAssert.AreEqual(input.Payload,cloud.Uploaded);CollectionAssert.AreEqual(input.Payload,await File.ReadAllBytesAsync(input.Path,deadline.Token).ConfigureAwait(false));Assert.AreEqual(0L,input.Budget.Status().ReservedBytes);
     }
 
     [TestMethod]

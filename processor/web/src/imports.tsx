@@ -1,5 +1,39 @@
 import { useEffect, useState } from 'react';
-import type { DesktopApi, PhotoImports, Source } from './api';
+import type { DesktopApi, PhotoImports, Source, ImportMetadataIssue, ImportMetadataIssueCode } from './api';
+
+const issueMessages: Record<ImportMetadataIssueCode, string> = {
+  'invalid-metadata': 'This metadata file could not be read.',
+  'unsupported-metadata': 'This file is not supported photo metadata.',
+  'metadata-too-large': 'This metadata file exceeds the processing limit.',
+  'name-mismatch': 'Its photo name does not match the reviewed export.',
+  'missing-media': 'The matching photo is missing from the reviewed input.',
+  'ambiguous-media': 'More than one reviewed photo matches this file.',
+  'input-unavailable': 'Restore access to the captured file to retry.'
+};
+
+function MetadataIssues({ api, id, disabled, retry }: { api: DesktopApi; id: string; disabled: boolean; retry: () => void }) {
+  const [open, setOpen] = useState(false); const [cursor, setCursor] = useState<string | null>(null); const [reload, setReload] = useState(0);
+  const [issues, setIssues] = useState<ImportMetadataIssue[]>([]); const [next, setNext] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false); const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const stop = new AbortController(); setBusy(true); setNotice(null);
+    void api.importMetadataIssues(id, cursor, stop.signal).then(page => {
+      if (!stop.signal.aborted) { setIssues(page.issues); setNext(page.next); }
+    }).catch(error => { if (!stop.signal.aborted) setNotice(error instanceof Error ? error.message : 'Metadata issue details could not load.'); })
+      .finally(() => { if (!stop.signal.aborted) setBusy(false); });
+    return () => { stop.abort(); };
+  }, [api, id, cursor, open, reload]);
+  if (!open) return <button onClick={() => setOpen(true)}>Review metadata issues</button>;
+  return <section aria-label="Metadata issues"><h3>Metadata files needing attention</h3>
+    {notice && <p role="alert">{notice}</p>}{busy && <p role="status">Loading issue details…</p>}
+    {issues.map(issue => <div key={issue.key}><strong>{issue.name}</strong><p>{issueMessages[issue.code]}</p></div>)}
+    {!busy && !notice && issues.length === 0 && next === null && <p>No unresolved metadata issues.</p>}
+    {next !== null && <button disabled={busy} onClick={() => setCursor(next)}>More issues</button>}
+    <button disabled={busy} onClick={() => { setCursor(null); setReload(value => value + 1); }}>Refresh issues</button>
+    {issues.some(issue => issue.retryable) && <button disabled={busy || disabled} onClick={retry}>Retry unavailable files</button>}
+  </section>;
+}
 
 export function Imports({ api, back }: { api: DesktopApi; back: () => void }) {
   const [data, setData] = useState<PhotoImports | null>(null);
@@ -45,6 +79,7 @@ export function Imports({ api, back }: { api: DesktopApi; back: () => void }) {
         {item.metadata && <div role="status"><p>{item.metadata.finished ? 'Metadata processing finished · catalog processing pending' : 'Processing imported metadata'}</p>
           <p>{BigInt(item.metadata.ready).toLocaleString()} of {BigInt(item.metadata.total).toLocaleString()} sidecars processed</p>
           {item.metadata.issues !== '0' && <p>{BigInt(item.metadata.issues).toLocaleString()} sidecars could not be applied or matched. Verified originals are retained.</p>}
+          {item.metadata.issues !== '0' && <MetadataIssues api={api} id={item.id} disabled={busy || data.paused} retry={() => { void act('retry', item.id); }} />}
           {item.metadata.waiting !== '0' && <p>{BigInt(item.metadata.waiting).toLocaleString()} sidecars are waiting for their original photos to verify.</p>}
         </div>}
         {item.state === 'ready' && <button disabled={busy || item.media === '0'} onClick={() => {

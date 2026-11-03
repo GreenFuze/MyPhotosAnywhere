@@ -211,20 +211,22 @@ public sealed partial class TakeoutMetadataOperationTests
         internal ArtifactDescriptor Descriptor=>new(Raw.Length,Convert.ToHexStringLower(SHA256.HashData(Raw)),"input.bin");
         internal CancellationToken Token=>_deadline.Token;
         internal string StateDirectory=>_database.StateDirectory;
-        internal static async Task<ImportedFixture> CreateAsync()
+        internal static async Task<ImportedFixture> CreateAsync(int additionalSidecars=0)
         {
-            var fixture=new ImportedFixture();try{await fixture.InitializeAsync().ConfigureAwait(false);return fixture;}catch{await fixture.DisposeAsync().ConfigureAwait(false);throw;}
+            var fixture=new ImportedFixture();try{await fixture.InitializeAsync(additionalSidecars).ConfigureAwait(false);return fixture;}catch{await fixture.DisposeAsync().ConfigureAwait(false);throw;}
         }
-        private async Task InitializeAsync()
+        private async Task InitializeAsync(int additionalSidecars)
         {
             var input=Path.Combine(Root.Path,"input");Directory.CreateDirectory(input);await File.WriteAllBytesAsync(Path.Combine(input,"a.jpg"),new byte[]{1,2,3},Token).ConfigureAwait(false);
-            await File.WriteAllBytesAsync(Path.Combine(input,"a.jpg.json"),Raw,Token).ConfigureAwait(false);_database=new(Path.Combine(Root.Path,"state"));Budget=new(new MeasuredSpace(_database.StateDirectory));
+            await File.WriteAllBytesAsync(Path.Combine(input,"a.jpg.json"),Raw,Token).ConfigureAwait(false);
+            for(var ordinal=0;ordinal<additionalSidecars;ordinal++)await File.WriteAllBytesAsync(Path.Combine(input,"extra-"+ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)+".json"),Raw,Token).ConfigureAwait(false);
+            _database=new(Path.Combine(Root.Path,"state"));Budget=new(new MeasuredSpace(_database.StateDirectory));
             using(var selected=TakeoutSelectedInput.OpenFolder(Guid.NewGuid(),input))
             {
                 var imports=new TakeoutImportInventoryRepository(_database);var id=Guid.NewGuid();imports.Ensure(id,new(Guid.NewGuid(),"account-one",1,"destination-one",1),[selected.Binding]);
                 var work=imports.Claim(id)!;using var catalog=TakeoutAssociationCatalog.Open(_database,work,Budget,Token);catalog.AddPart(selected,Token);await catalog.SealAsync(Token).ConfigureAwait(false);imports.Complete(work,catalog);Completed=imports.ReadCompleted(id)!;
             }
-            Catalog=await TakeoutAssociationCatalog.OpenCompletedAsync(Completed,Budget,Token).ConfigureAwait(false);Sidecar=Catalog.ReadPage(TakeoutEntryKind.JsonSidecar).Entries.Single();
+            Catalog=await TakeoutAssociationCatalog.OpenCompletedAsync(Completed,Budget,Token).ConfigureAwait(false);Sidecar=Catalog.ReadPage(TakeoutEntryKind.JsonSidecar).Entries.Single(entry=>entry.RelativePath=="a.jpg.json");
             await using(var source=await TakeoutOriginalReader.CaptureAsync(Completed,Catalog,Catalog.ReadPage(TakeoutEntryKind.Media).Entries.Single(),Token).ConfigureAwait(false))
             {
                 var originals=new TakeoutOriginalJobRepository(_database);var id=originals.Ensure(source.Capture,Guid.NewGuid());var work=originals.ObserveAcknowledgedBytes(originals.RetainAllocatedFileId(originals.Claim(id)!,"first-verified-file"),3);

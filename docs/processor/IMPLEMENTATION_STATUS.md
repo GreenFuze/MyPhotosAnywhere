@@ -9,7 +9,31 @@ app. Earlier joint-release gate statements below are historical and superseded
 for this PC release; PC safety, signing, preservation and validation stay required.
 See CURRENT_PC_EXECUTION.md for the current scope. No complete0.6 release exists.
 
-## Current PC import increment (2026-11-02; not complete PC acceptance)
+## Per-file import metadata attention (2026-11-03; PC acceptance unfinished)
+
+Imports now has a bounded per-file metadata issue reader and review controls with
+the captured relative filename, exact cause and access-restoration retry. The
+native inventory mints each input binding; the browser supplies only a saved import
+ID and bounded cursor. Issue observations cannot create jobs, publication authority
+or original-backup receipts. First observed raw hashes and sealed index/selection
+bindings cannot be replaced on retry. A resolved issue requires the real ready
+receipt and reverified retained source/artifact. Permanent failures remain visible
+without rereading deleted external sidecars; unavailable files do not stop others.
+
+Evidence current-takeout-issue-validation-v117.json freezes747files (743sources plus
+4generated assets):29affected Core,10Services,3HTTP and18frontend API cases pass.
+This includes real installed-worker recovery after input access returns, unchanged
+original bytes/first upload identity, forced pause ordering/capacity, and actual
+portable catalog publication/activation preserving the human filename. Strict
+Desktop build has0warnings/errors; all4web assets and7tested worker files match.
+Google responses remain controlled. Corrected replacement metadata and ambiguous
+manual association repair are still unfinished, as are imported-fact projection/
+publication, cache retirement, actual UI/live acceptance, installers and PC release.
+No deadline, warning or assertion was relaxed. A restricted test-host handshake
+aborted before test execution; the exact command passes with normal local process
+access and its original timeouts. The failed log is retained, not counted as a pass.
+
+## Previous PC import increment (2026-11-02; not complete PC acceptance)
 
 Desktop imports now run the installed metadata worker automatically after original
 verification and display durable processing/issue counts separately from original

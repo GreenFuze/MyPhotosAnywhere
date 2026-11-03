@@ -161,6 +161,46 @@ test('canonical preview URLs carry only captured identities and cancellation rem
 });
 const importIdentity = '22222222-2222-4222-8222-222222222222';
 const validImport = () => ({ id: importIdentity, inputName: 'Takeout photos', target: { libraryId: '33333333-3333-4333-8333-333333333333', accountId: 'account-one', accountRevision: '1', folderId: 'photos', configurationRevision: '2' }, state: 'copying', entries: '12', media: '10', verified: '3', requested: true, issue: null, metadata: null });
+
+const metadataIssue = () => ({ key: 'b'.repeat(64), name: 'Photos/שלום <photo>.jpg.json', code: 'input-unavailable', retryable: true });
+test('metadata issues are bounded same-origin reads bound to a saved import and advancing cursor', async () => {
+  const signal = new AbortController().signal; const after = 'a'.repeat(64); const page = { issues: [metadataIssue()], next: 'c'.repeat(64) };
+  await withBrowser(async (url, options) => {
+    const uri = new URL(url, 'https://local.invalid'); assert.equal(uri.pathname, '/api/import-metadata-issues');
+    assert.equal(uri.searchParams.get('id'), importIdentity); assert.equal(uri.searchParams.get('after'), after);
+    assert.equal(options.signal, signal); assert.equal(options.credentials, 'same-origin'); assert.equal(options.method, undefined); return json(page);
+  }, async api => { assert.deepEqual(await api.importMetadataIssues(importIdentity, after, signal), page); });
+  // A page containing only resolved native rows can still advance without displaying those rows.
+  await withBrowser(async () => json({ issues: [], next: 'b'.repeat(64) }), async api => {
+    assert.deepEqual(await api.importMetadataIssues(importIdentity, after, signal), { issues: [], next: 'b'.repeat(64) });
+  });
+});
+
+test('metadata details reject forged paths, identities, status claims, oversized pages and nonadvancing cursors', async () => {
+  const issue = metadataIssue(); const page = { issues: [issue], next: null }; const after = 'a'.repeat(64);
+  const invalid = [null, {}, { ...page, issues: Array(61).fill(issue) }, { ...page, issues: [issue, issue] },
+    { ...page, issues: [issue, { ...issue, key: 'a'.repeat(64) }] }, { ...page, next: after }, { ...page, next: 'A'.repeat(64) },
+    { ...page, next: 'a'.repeat(63) + 'b' }, { ...page, issues: [{ ...issue, key: 'z'.repeat(64) }] },
+    ...['', '/outside.json', 'C:/outside.json', '../outside.json', 'a/../outside.json', 'a//b.json', 'a\\b.json', 'a\u0000.json', 'x'.repeat(4097)].map(name => ({ ...page, issues: [{ ...issue, name }] })),
+    ...[{ code: 'unknown' }, { code: ['input-unavailable'] }, { retryable: false }, { code: 'invalid-metadata', retryable: true }, { retryable: 'true' }].map(change => ({ ...page, issues: [{ ...issue, ...change }] }))];
+  for (const value of invalid) await withBrowser(async () => json(value), async api => {
+    await assert.rejects(api.importMetadataIssues(importIdentity, after, new AbortController().signal), /invalid metadata issue details/);
+  });
+  let calls = 0;
+  await withBrowser(async () => { calls++; return json(page); }, async api => {
+    await assert.rejects(api.importMetadataIssues('00000000-0000-0000-0000-000000000000', null, new AbortController().signal), /saved import issue page/);
+    await assert.rejects(api.importMetadataIssues(importIdentity, '../outside', new AbortController().signal), /saved import issue page/);
+  }); assert.equal(calls, 0);
+});
+
+test('canceling metadata details never sends a retry or changes saved work', async () => {
+  const stop = new AbortController(); stop.abort(); let calls = 0;
+  await withBrowser(async (url, options) => {
+    calls++; assert.equal(new URL(url, 'https://local.invalid').pathname, '/api/import-metadata-issues');
+    assert.equal(options.signal, stop.signal); assert.equal(options.method, undefined); throw new DOMException('Canceled', 'AbortError');
+  }, async api => { await assert.rejects(api.importMetadataIssues(importIdentity, null, stop.signal), { name: 'AbortError' }); });
+  assert.equal(calls, 1);
+});
 test('import progress keeps exact decimal counts and never infers verified originals from an offset', async () => {
   await withBrowser(async () => json({ canChooseFolder: true, paused: false, imports: [validImport()] }), async api => {
     const actual = await api.imports(new AbortController().signal); assert.equal(actual.imports[0].verified, '3'); assert.equal(actual.imports[0].state, 'copying');

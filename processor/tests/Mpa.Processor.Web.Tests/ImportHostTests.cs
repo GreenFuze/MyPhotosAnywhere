@@ -16,6 +16,7 @@ public sealed partial class WebHostTests
         await using var host=await DesktopWebHost.StartAsync(engine,assets.Path,null,CancellationToken.None).ConfigureAwait(false);
         using var http=Client(host.LocalEndpoint);var diagnostics=new List<Exception>();host.Diagnostic+=diagnostics.Add;
         using(var anonymous=await http.GetAsync("api/imports").ConfigureAwait(false))Assert.AreEqual(HttpStatusCode.Unauthorized,anonymous.StatusCode);
+        using(var anonymousIssues=await http.GetAsync("api/import-metadata-issues?id="+engine.Import.Id.ToString("D")).ConfigureAwait(false))Assert.AreEqual(HttpStatusCode.Unauthorized,anonymousIssues.StatusCode);
         using var login=await LoginAsync(http,host.OpenLocalBrowser(),host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false);login.EnsureSuccessStatusCode();
         var csrf=(await login.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false)).GetProperty("csrf").GetString();
         using(var read=await http.GetAsync("api/imports").ConfigureAwait(false))
@@ -50,11 +51,34 @@ public sealed partial class WebHostTests
         Assert.AreEqual(0,diagnostics.Count);Assert.AreEqual(0,host.FrameworkDiagnostics.Count);
     }
 
+    [TestMethod]
+    public async Task MetadataIssueReadsRequireCapturedImportAndCursorWithoutAdmittingAnyMutation()
+    {
+        using var assets=new Assets();var engine=new Engine();await using var host=await DesktopWebHost.StartAsync(engine,assets.Path,null,CancellationToken.None).ConfigureAwait(false);
+        using var http=Client(host.LocalEndpoint);using var login=await LoginAsync(http,host.OpenLocalBrowser(),host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false);login.EnsureSuccessStatusCode();
+        var route="api/import-metadata-issues?id="+engine.Import.Id.ToString("D");var after=new string('0',64);
+        using(var read=await http.GetAsync(route+"&after="+after).ConfigureAwait(false))
+        {
+            read.EnsureSuccessStatusCode();var page=await read.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false);var issue=page.GetProperty("issues")[0];
+            Assert.AreEqual("a.jpg.json",issue.GetProperty("name").GetString());Assert.AreEqual("input-unavailable",issue.GetProperty("code").GetString());Assert.IsTrue(issue.GetProperty("retryable").GetBoolean());Assert.AreEqual(JsonValueKind.Null,page.GetProperty("next").ValueKind);
+        }
+        Assert.AreEqual(1,engine.MetadataIssueReads);Assert.AreEqual(after,engine.MetadataIssueAfter);
+        foreach(var invalid in new[]{"api/import-metadata-issues", "api/import-metadata-issues?id="+Guid.Empty.ToString("D"),"api/import-metadata-issues?id="+Guid.NewGuid().ToString("D"),"api/import-metadata-issues?id="+engine.Import.Id.ToString("N"),route+"&after=../outside",route+"&after="+new string('A',64),route+"&after="+new string('a',65),route+"&id="+engine.Import.Id.ToString("D")})
+        {using var rejected=await http.GetAsync(invalid).ConfigureAwait(false);Assert.AreEqual(HttpStatusCode.BadRequest,rejected.StatusCode,invalid);}
+        engine.Import=engine.Import with{State="reviewing",Entries=null,Media=null};
+        using(var pending=await http.GetAsync(route).ConfigureAwait(false))Assert.AreEqual(HttpStatusCode.Conflict,pending.StatusCode);
+        Assert.AreEqual(1,engine.MetadataIssueReads);Assert.AreEqual(0,engine.ImportCommands.Count);Assert.AreEqual(0,host.FrameworkDiagnostics.Count);
+    }
+
     private sealed partial class Engine:IDesktopImportApplication
     {
         public TakeoutImportActivity Import{get;set;}=new(Guid.NewGuid(),"photos",new(Guid.NewGuid(),"account",1,"destination",1),"ready",1,1,0,false,null);
         public List<(string Action,Guid Id)> ImportCommands{get;}=[];
+        public int MetadataIssueReads{get;private set;}
+        public string? MetadataIssueAfter{get;private set;}
         public Task<DesktopImports> ImportsAsync(CancellationToken token){token.ThrowIfCancellationRequested();return Task.FromResult(new DesktopImports(true,[Import]));}
+        public Task<TakeoutMetadataIssuePage> ImportMetadataIssuesAsync(Guid importId,string? after,CancellationToken token)
+        {token.ThrowIfCancellationRequested();Assert.AreEqual(Import.Id,importId);MetadataIssueReads++;MetadataIssueAfter=after;return Task.FromResult(new TakeoutMetadataIssuePage([new(new string('a',64),"a.jpg.json","input-unavailable",true)],null));}
         public Task<TakeoutImportActivity?> ChooseImportFolderAsync(Guid sourceId,CancellationToken token)
         {token.ThrowIfCancellationRequested();ImportCommands.Add(("choose",sourceId));return Task.FromResult<TakeoutImportActivity?>(null);}
         public Task<TakeoutImportActivity> StartImportAsync(Guid importId,CancellationToken token)

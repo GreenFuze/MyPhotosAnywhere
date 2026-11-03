@@ -1,5 +1,18 @@
 # PC folder import increment
 
+Latest per-file attention evidence (2026-11-03):
+current-takeout-issue-validation-v117.json and input-v117.json freeze747files.
+The native issue observations retain exact input/index/first-source bindings and
+bounded pages. Restoring access processes an unavailable file while permanent
+issues remain visible, with no original re-upload.29affected Core,10Services,
+3authenticated HTTP/host-owner and18frontend API cases pass; strict Desktop build
+has0warnings/errors. The actual native portable-catalog test still preserves human
+filename and canonical identity under its unchanged40sec deadline. All4packaged
+web assets and7worker files match the tested bundle. These checks use controlled
+Google and do not claim actual UI/live acceptance. Explicit corrected-input/manual
+association repair, imported-fact projection/publication, cache retirement and the
+remaining complete PC/install/release acceptance are still required.
+
 Exact5638738 now has60verified PC CI jobs/72reports on Windows, Linux and both Mac
 architectures. All113Protocol/566Core/773ordinary Services/179Google/9LAN/49Web cases
 per platform preserve prior identities and add the committed new source methods

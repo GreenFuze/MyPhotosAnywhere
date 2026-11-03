@@ -35,6 +35,9 @@ export interface ActivityPage { jobs: SourceJob[]; nextCursor: string | null }
 
 export class AuthenticationRequired extends Error {}
 export interface ImportMetadataProgress { total: string; ready: string; issues: string; waiting: string; finished: boolean }
+export type ImportMetadataIssueCode = 'invalid-metadata' | 'unsupported-metadata' | 'metadata-too-large' | 'name-mismatch' | 'missing-media' | 'ambiguous-media' | 'input-unavailable';
+export interface ImportMetadataIssue { key: string; name: string; code: ImportMetadataIssueCode; retryable: boolean }
+export interface ImportMetadataIssues { issues: ImportMetadataIssue[]; next: string | null }
 export interface PhotoImport { id: string; inputName: string; target: { libraryId: string; accountId: string; accountRevision: string; folderId: string; configurationRevision: string }; state: 'reviewing' | 'ready' | 'copying' | 'originals-verified' | 'needs-attention' | 'paused' | 'canceled'; entries: string | null; media: string | null; verified: string; requested: boolean; issue: string | null; metadata: ImportMetadataProgress | null }
 export interface PhotoImports { canChooseFolder: boolean; paused: boolean; imports: PhotoImport[] }
 export interface LibraryPublication {
@@ -226,6 +229,25 @@ export class DesktopApi {
     const value = await this.sourceCommand('/api/import-' + action, { id });
     if (typeof value !== 'object' || value === null || !('import' in value)) throw new Error('The import reply was lost. Refresh Imports before retrying.');
     return value.import === null ? null : this.importItem(value.import);
+  }
+  async importMetadataIssues(id: string, after: string | null, signal: AbortSignal): Promise<ImportMetadataIssues> {
+    const key = (x: unknown): x is string => typeof x === 'string' && /^[a-f0-9]{64}$/.test(x);
+    if (!libraryIdentity(id) || after !== null && !key(after)) throw new Error('Choose a saved import issue page.');
+    const query = new URLSearchParams({ id }); if (after !== null) query.set('after', after);
+    const value = await this.get<unknown>('/api/import-metadata-issues?' + query, signal);
+    const invalid = () => new Error('MPA returned invalid metadata issue details. Saved work was retained.');
+    if (typeof value !== 'object' || value === null || !('issues' in value) || !Array.isArray(value.issues) || value.issues.length > 60 || !('next' in value) || value.next !== null && (!key(value.next) || after !== null && value.next <= after)) throw invalid();
+    const codes = ['invalid-metadata', 'unsupported-metadata', 'metadata-too-large', 'name-mismatch', 'missing-media', 'ambiguous-media', 'input-unavailable'];
+    let previous = after;
+    for (const raw of value.issues) {
+      const item: unknown = raw;
+      if (typeof item !== 'object' || item === null || !('key' in item) || !key(item.key) || previous !== null && item.key <= previous ||
+        !('name' in item) || typeof item.name !== 'string' || item.name.length < 1 || item.name.length > 4096 || item.name.startsWith('/') || /^[a-z]:/i.test(item.name) || /[\\\u0000-\u001f]/.test(item.name) || item.name.split('/').some(part => part === '' || part === '.' || part === '..') ||
+        !('code' in item) || typeof item.code !== 'string' || !codes.includes(item.code) || !('retryable' in item) || typeof item.retryable !== 'boolean' || item.retryable !== (item.code === 'input-unavailable')) throw invalid();
+      previous = item.key;
+    }
+    if (value.next !== null && previous !== null && value.next < previous) throw invalid();
+    return value as unknown as ImportMetadataIssues;
   }
   private importItem(value: unknown): PhotoImport {
     const invalid = () => new Error('MPA returned conflicting import progress. Saved work was retained.');
