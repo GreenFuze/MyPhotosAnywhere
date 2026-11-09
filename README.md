@@ -4,6 +4,19 @@ An Android photo library with offline browsing, Google Drive storage, and AI edi
 
 Repository: [GreenFuze/MyPhotosAnywhere](https://github.com/GreenFuze/MyPhotosAnywhere). The owner's selected license is included in [LICENSE](LICENSE).
 
+## Desktop development (0.6, in progress)
+
+On Windows, run [build_desktop.bat](build_desktop.bat) to install the locked frontend,
+type-check/build it, audit dependencies, restore locked .NET packages and build Desktop
+in Release mode. Use the exact .NET SDK in `processor/global.json` and Node.js/npm
+compatible with `processor/web/package.json` (CI uses Node.js 22.22.0).
+
+[build_and_run_desktop.bat](build_and_run_desktop.bat) builds successfully before launching
+the desktop web client and forwards native options such as `--background` or
+`--state-directory "C:\path to a dedicated profile"`. Both scripts work from another
+working directory and stop at the first failure. Development listeners remain loopback-only.
+These are source-development helpers; the joint 0.6 APK/installers are not yet released.
+
 ## Project status
 
 [MPA 0.5.33](https://github.com/GreenFuze/MyPhotosAnywhere/releases/tag/v0.5.33) adds device folders, explicit backup with metadata and safe offline-download cleanup. [Download APK](https://github.com/GreenFuze/MyPhotosAnywhere/releases/download/v0.5.33/MPA-0.5.33-debug.apk) · [Validation](docs/releases/v0.5.33.md).

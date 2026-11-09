@@ -1,0 +1,15 @@
+{
+  "note": "Independent Python cryptography signature, public-only. Expand the documented scalar in both canonical templates. Four bounded 60000-byte strings fit the total wire cap; serializer escape expansion must not reject them.",
+  "publicKeySpki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEz3jXPEvN70h9yFtrvxMWDmf14FMf/C91kUTK+y7aSVx78oSNv5y1Jqu9di1c0rkZBOZRhj3+21NCWbI68PRsNQ==",
+  "repeatedScalar": "\u2028",
+  "repeatCount": 20000,
+  "bodyTemplate": "{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"aux1\":\"__MPA_REPEAT__\",\"aux2\":\"__MPA_REPEAT__\",\"aux3\":\"__MPA_REPEAT__\",\"caption\":\"__MPA_REPEAT__\"},\"requiredCapabilities\":[],\"sequence\":\"1\"}",
+  "envelopeTemplate": "{\"document\":{\"actorId\":\"6c803c09-3b11-49cb-a3dc-1d42c3dc6f30\",\"epoch\":\"1\",\"format\":\"mpa\",\"kind\":\"user-operation\",\"libraryId\":\"94a81164-e980-4ec1-a566-cec36475b839\",\"major\":1,\"minor\":0,\"payload\":{\"aux1\":\"__MPA_REPEAT__\",\"aux2\":\"__MPA_REPEAT__\",\"aux3\":\"__MPA_REPEAT__\",\"caption\":\"__MPA_REPEAT__\"},\"requiredCapabilities\":[],\"sequence\":\"1\"},\"format\":\"mpa-signed-document\",\"major\":1,\"signature\":{\"algorithm\":\"ES256\",\"keyId\":\"6fb16167008d3a566bef94c3dbd6152614df6897a2b34888cfd8d6b707bf3d09\",\"value\":\"kYpesQlJZGyTvj2GFKFF80WV4uEGRMrmRYTFR9DkbYb8voGFHuQxOl5ne_LFWM-8HoKnpwOXL8rs4v3d_0bhZQ\"}}",
+  "bodySha256": "b355d022904073570bc9e4e2826ebdbd56e14e6a47e406e03b54290b2e114aee",
+  "envelopeSha256": "fc7fae50999df5100a9b16211b94a6a1da55614e2963d620c31e122b9766d93e",
+  "signature": {
+    "algorithm": "ES256",
+    "keyId": "6fb16167008d3a566bef94c3dbd6152614df6897a2b34888cfd8d6b707bf3d09",
+    "value": "kYpesQlJZGyTvj2GFKFF80WV4uEGRMrmRYTFR9DkbYb8voGFHuQxOl5ne_LFWM-8HoKnpwOXL8rs4v3d_0bhZQ"
+  }
+}

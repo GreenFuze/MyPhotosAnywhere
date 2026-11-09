@@ -10,7 +10,7 @@ import sys
 
 class WarningGate:
     LABEL = "The Configuration.setVisible(boolean) method has been deprecated."
-    LINK = "https://docs.gradle.org/9.8.1/userguide/upgrading_version_9.html#deprecate-visible-property"
+    LINK = "https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#deprecate-visible-property"
     FAILURE = "Deprecated Gradle features were used in this build, making it incompatible with Gradle 10"
 
     def evaluate(self, status, output, report):
@@ -96,8 +96,8 @@ def main():
             plugins = Path("build.gradle.kts").read_text(encoding="utf-8")
             wrapper = Path("gradle/wrapper/gradle-wrapper.properties").read_text(encoding="utf-8")
             if ('id("com.android.application") version "9.4.1"' not in plugins
-                    or "gradle-9.8.1-bin.zip" not in wrapper):
-                raise ValueError("The approved exception is limited to AGP 9.4.1 and Gradle 9.8.1.")
+                    or "gradle-9.8.2-bin.zip" not in wrapper):
+                raise ValueError("The approved AGP 9.4.1 call must be reproduced on the pinned Gradle 9.8.2.")
         if lint_requested:
             import xml.etree.ElementTree as ET
             issues = ET.parse(lint_report).getroot().findall("issue")

@@ -3,9 +3,10 @@ package com.myphotosanywhere.mpa.metadata
 import com.myphotosanywhere.mpa.people.FaceRegion
 import com.myphotosanywhere.mpa.edit.EditRecipe
 import java.io.StringReader
-import java.io.StringWriter
+import java.io.OutputStreamWriter
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.transform.TransformerFactory
+import javax.xml.transform.TransformerException
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
 import org.w3c.dom.Element
@@ -35,46 +36,70 @@ object XmpCodec {
         isNamespaceAware=true; isExpandEntityReferences=false
         // Android's parser does not implement every JAXP feature. Reject declarations before parsing too.
         require(!Regex("<!\\s*(DOCTYPE|ENTITY)",RegexOption.IGNORE_CASE).containsMatchIn(xml)) { "XMP document declarations are not supported." }
-        require(xml.toByteArray(Charsets.UTF_8).size<=MAX_BYTES) { "XMP exceeds the 2 MiB limit." }
+        XmpSizeBudget().add(xml)
         runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl",true) }
         runCatching { setFeature("http://xml.org/sax/features/external-general-entities",false) }
         runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities",false) }
     }.newDocumentBuilder().parse(InputSource(StringReader(xml)))
     fun encode(catalog: XmpCatalog,previous: String?=null): String {
+        // Count the minimum wire size before allocating any catalog DOM nodes.
+        // The final bounded stream also accounts for escaping and retained foreign XML.
+        val budget=XmpSizeBudget()
+        visitCatalog(catalog,{ name,attrs ->
+            budget.add("<mpa:$name/>")
+            attrs.forEach { (key,value) -> if(value!=null) {
+                budget.add(" $key=\"\"");budget.add(value.toString())
+            } }
+        },{})
         val doc=document(previous ?: "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"$RDF\"><rdf:Description rdf:about=\"\"/></rdf:RDF></x:xmpmeta>")
         val descriptions=doc.getElementsByTagNameNS(RDF,"Description")
         require(descriptions.length>0) { "Missing XMP RDF description." }
         val old=doc.getElementsByTagNameNS(NS,"Catalog")
         // Only our catalog is replaced. Lightroom/MWG and other external fields are preserved.
         while(old.length>0) old.item(0).parentNode.removeChild(old.item(0))
-        fun node(name: String,attrs: Map<String,Any?>): Element = doc.createElementNS(NS,"mpa:$name").apply {
-            attrs.forEach { (key,value) -> if(value!=null) setAttribute(key,value.toString()) }
+        var parent=descriptions.item(0)
+        visitCatalog(catalog,{ name,attrs ->
+            val element=doc.createElementNS(NS,"mpa:$name")
+            attrs.forEach { (key,value) -> if(value!=null) element.setAttribute(key,value.toString()) }
+            if(name=="Catalog") element.setAttributeNS("http://www.w3.org/2000/xmlns/","xmlns:mpa",NS)
+            parent.appendChild(element);parent=element
+        },{ parent=parent.parentNode })
+        val output=BoundedXmpOutput()
+        try {
+            OutputStreamWriter(output,Charsets.UTF_8).use { writer ->
+                TransformerFactory.newInstance().newTransformer().transform(DOMSource(doc),StreamResult(writer))
+            }
+        } catch(error: TransformerException) {
+            generateSequence<Throwable>(error) { it.cause }.filterIsInstance<XmpSizeLimitException>().firstOrNull()?.let { throw it }
+            throw error
         }
-        val root=node("Catalog",mapOf("schema" to 1,"account" to catalog.accountId,"folder" to catalog.folderId))
-        root.setAttributeNS("http://www.w3.org/2000/xmlns/","xmlns:mpa",NS)
-        descriptions.item(0).appendChild(root)
-        catalog.people.forEach { root.appendChild(node("Person",mapOf("id" to it.id,"name" to it.name))) }
-        catalog.aliases.forEach { root.appendChild(node("PersonAlias",mapOf("key" to it.key,"name" to it.name,
-            "binding" to it.binding,"person" to it.personId,"ignored" to it.ignored))) }
-        catalog.albums.forEach { root.appendChild(node("Album",mapOf("id" to it.id,"name" to it.name))) }
+        return output.toString(Charsets.UTF_8.name()).also { decode(it) }
+    }
+    /** Both passes enumerate exactly the same attributes; neither retains a second catalog. */
+    private fun visitCatalog(catalog: XmpCatalog,start: (String,Map<String,Any?>)->Unit,end: ()->Unit) {
+        fun leaf(name: String,attrs: Map<String,Any?>) { start(name,attrs);end() }
+        start("Catalog",mapOf("schema" to 1,"account" to catalog.accountId,"folder" to catalog.folderId))
+        catalog.people.forEach { leaf("Person",mapOf("id" to it.id,"name" to it.name)) }
+        catalog.aliases.forEach { leaf("PersonAlias",mapOf("key" to it.key,"name" to it.name,
+            "binding" to it.binding,"person" to it.personId,"ignored" to it.ignored)) }
+        catalog.albums.forEach { leaf("Album",mapOf("id" to it.id,"name" to it.name)) }
         catalog.assets.forEach { a ->
-            val asset=node("Asset",mapOf("id" to a.id,"remote" to a.remoteId,"sha256" to a.sha256,"bytes" to a.bytes,
+            start("Asset",mapOf("id" to a.id,"remote" to a.remoteId,"sha256" to a.sha256,"bytes" to a.bytes,
                 "favorite" to a.favorite,"archived" to a.archived,"place" to a.place,"latitude" to a.latitude,
                 "longitude" to a.longitude,"captured" to a.capturedAt,"parent" to a.parentId,"provider" to a.provider,
                 "instructions" to a.instructions,"labels" to a.labels,"recipe" to a.recipe,"importedMetadata" to a.importedMetadata))
-            root.appendChild(asset)
-            a.albums.forEach { asset.appendChild(node("Member",mapOf("album" to it))) }
-            a.faces.forEach { f -> asset.appendChild(node("Face",mapOf("id" to f.id,"person" to f.personId,
+            a.albums.forEach { leaf("Member",mapOf("album" to it)) }
+            a.faces.forEach { f -> leaf("Face",mapOf("id" to f.id,"person" to f.personId,
                 "corrected" to f.corrected,"left" to f.region?.left,"top" to f.region?.top,"right" to f.region?.right,
-                "bottom" to f.region?.bottom,"width" to f.width,"height" to f.height,"model" to f.model))) }
+                "bottom" to f.region?.bottom,"width" to f.width,"height" to f.height,"model" to f.model)) }
             a.photoPeople?.let { p ->
-                val names=node("PhotoPeople",mapOf("origin" to p.origin));asset.appendChild(names)
-                p.members.forEach { names.appendChild(node("Named",mapOf("alias" to it.aliasKey,"person" to it.personId,"excluded" to it.excluded))) }
+                start("PhotoPeople",mapOf("origin" to p.origin))
+                p.members.forEach { leaf("Named",mapOf("alias" to it.aliasKey,"person" to it.personId,"excluded" to it.excluded)) }
+                end()
             }
+            end()
         }
-        val output=StringWriter()
-        TransformerFactory.newInstance().newTransformer().transform(DOMSource(doc),StreamResult(output))
-        return output.toString().also { decode(it) } // Apply the same limits to our own exports.
+        end()
     }
     fun decode(xml: String): XmpCatalog {
         val doc=document(xml); val roots=doc.getElementsByTagNameNS(NS,"Catalog")

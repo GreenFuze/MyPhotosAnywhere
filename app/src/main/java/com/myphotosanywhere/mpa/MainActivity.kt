@@ -332,7 +332,7 @@ private fun LibraryScreen(importNavigation: Int=0,model: LibraryViewModel = view
                     deviceOnly=true;deviceFolderKey=folder.key;filter="All";sourceKey=null;albumId=null;personId=null;importedPersonKey=null;navigation.open(ShellDestination.PHOTOS)
                 },onAll={ deviceOnly=true;deviceFolderKey=null;filter="All";sourceKey=null;albumId=null;personId=null;importedPersonKey=null;navigation.open(ShellDestination.PHOTOS) })
                 16 -> com.myphotosanywhere.mpa.trash.TrashScreen(trash,navigationClearance,onSources={ navigation.open(ShellDestination.STORAGE) })
-                4,7,8,9,10,11,12,13,14,15,17,18 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
+                4,7,8,9,10,11,12,13,14,15,17,18,20 -> com.myphotosanywhere.mpa.management.ManagementScreen(navigation.destination,photos,features,navigation::open)
             }
         }
         MotionVisibility(busy || featureBusy,MotionEdge.TOP,Modifier.align(Alignment.TopCenter)) {

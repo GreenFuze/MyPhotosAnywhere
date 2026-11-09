@@ -1,0 +1,49 @@
+name: Processor Linux codec feasibility
+on:
+  push:
+    paths:
+      - 'processor/probes/*codec*'
+      - 'processor/probes/fetch_ocr_assets.py'
+      - '.github/workflows/processor-codec-feasibility.yml'
+  pull_request:
+    paths:
+      - 'processor/probes/*codec*'
+      - 'processor/probes/fetch_ocr_assets.py'
+      - '.github/workflows/processor-codec-feasibility.yml'
+permissions:
+  contents: read
+concurrency:
+  group: processor-codec-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  codec:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Verify publisher and build restricted CPU decoder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force processor/build/codec-ci | Out-Null
+          python processor/probes/prepare_linux_codec.py *> processor/build/codec-ci/driver.log
+          $mpaCodecExit = $LASTEXITCODE
+          Get-Content processor/build/codec-ci/driver.log
+          exit $mpaCodecExit
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-codec-linux-x64
+          path: |
+            processor/build/codec-ci/
+            processor/build/codec-preparation-*/*.log
+            processor/build/codec-feasibility/linux-build-*/*.log
+            processor/build/codec-feasibility/linux-build-*/report.json
+            processor/build/codec-feasibility/linux-build-*/source-changes.json
+          if-no-files-found: error
+          retention-days: 14

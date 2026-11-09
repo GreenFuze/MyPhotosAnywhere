@@ -94,9 +94,17 @@ class DragSelectionDeviceTest {
                 compose.waitForIdle()
                 assertEquals((listOf(8)+listOf(0,1,2,3)).map { fixture.photos[it].id }.toSet(),selected.targets.value.map { it.photoId }.toSet())
                 compose.waitUntil(10000) { compose.onAllNodesWithText("5 selected").fetchSemanticsNodes().size==1 }
-                for(index in listOf(8,0,1,2,3)) compose.onNodeWithTag("photo:${fixture.photos[index].id}").assertIsSelected()
-                compose.onNodeWithTag("photo:${fixture.photos[4].id}").assertIsNotSelected()
-                compose.onNodeWithTag("photo:${fixture.photos[5].id}").assertIsNotSelected()
+                // Selection chrome reduces the viewport. A lazy mosaic may legitimately
+                // uncompose tile8 while retaining its selected identity. Bring each checked
+                // item into view rather than requiring all seven nodes to coexist on screen.
+                for(index in listOf(8,0,1,2,3,4,5)) {
+                    val key="photo:${fixture.photos[index].id}"
+                    compose.onNodeWithTag("photos:grid").performScrollToIndex(index)
+                    waitReady(key)
+                    if(index in listOf(8,0,1,2,3)) compose.onNodeWithTag(key).assertIsSelected()
+                    else compose.onNodeWithTag(key).assertIsNotSelected()
+                }
+                compose.onNodeWithTag("photos:grid").performScrollToIndex(0);waitReady(first.key)
                 compose.mainClock.advanceTimeByFrame();compose.waitForIdle()
                 screenshot("drag-selection-${layout.name.lowercase()}")
                 compose.onNodeWithTag("selection:close").performClick();assertTrue(selected.targets.value.isEmpty())

@@ -5,11 +5,69 @@ import os
 import subprocess
 import sys
 import urllib.request
+import json
+import re
+import xml.etree.ElementTree as ET
+
+
+class InstalledAndroidSdk:
+    """Verify exact installed metadata and usable files; CLI success alone is insufficient."""
+    def __init__(self, root):
+        self.root = Path(root)
+
+    def verify(self, packages):
+        records = []
+        executable = '.exe' if os.name == 'nt' else ''
+        for specification in packages:
+            package, version = specification.split('@')
+            parts = package.split('/')
+            if any(part in ('.', '..') or not re.fullmatch(r'[A-Za-z0-9_.-]+', part) for part in parts):
+                raise ValueError('SDK package must be a canonical relative path.')
+            if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
+                raise ValueError('SDK packages require an exact stable revision.')
+            expected = tuple(int(value) for value in version.split('.'))
+            if len(expected) != 3 or any(value < 0 for value in expected):
+                raise ValueError('SDK packages require an exact stable revision.')
+            directory = self.root.joinpath(*parts)
+            metadata = directory / 'package.xml'
+            if not metadata.is_file():
+                raise RuntimeError('SDK CLI did not install the required package: ' + specification)
+            with metadata.open('rb') as source:
+                raw = source.read(256 * 1024 + 1)
+            if len(raw) > 256 * 1024:
+                raise RuntimeError('Installed SDK metadata exceeds its bound: ' + specification)
+            entries = [element for element in ET.fromstring(raw).iter() if element.tag.rsplit('}', 1)[-1] == 'localPackage']
+            if len(entries) != 1 or entries[0].get('path') != package.replace('/', ';'):
+                raise RuntimeError('Installed SDK metadata has a different package identity: ' + specification)
+            revisions = [element for element in entries[0] if element.tag.rsplit('}', 1)[-1] == 'revision']
+            if len(revisions) != 1:
+                raise RuntimeError('Installed SDK revision is missing or ambiguous: ' + specification)
+            fields = [element.tag.rsplit('}', 1)[-1] for element in revisions[0]]
+            if len(fields) != len(set(fields)) or set(fields) - {'major', 'minor', 'micro', 'preview'}:
+                raise RuntimeError('Installed SDK revision is ambiguous: ' + specification)
+            values = {element.tag.rsplit('}', 1)[-1]: int(element.text) for element in revisions[0]}
+            actual = tuple(values.get(key, 0) for key in ('major', 'minor', 'micro'))
+            if actual != expected or values.get('preview', 0) != 0:
+                raise RuntimeError('Installed SDK revision differs from the stable pin: ' + specification)
+            required = []
+            if parts[0] == 'system-images': required = ['system.img', 'ramdisk.img']
+            elif parts[0] == 'platforms': required = ['android.jar']
+            elif parts[0] == 'platform-tools': required = ['adb' + executable]
+            elif parts[0] == 'emulator': required = ['emulator' + executable]
+            elif parts[0] == 'build-tools': required = ['aapt2' + executable, 'lib/apksigner.jar']
+            elif parts[0] == 'ndk': required = ['source.properties', 'ndk-build.cmd' if os.name == 'nt' else 'ndk-build']
+            else: raise ValueError('SDK package role has no verification policy: ' + package)
+            for name in required:
+                path = directory / name
+                if not path.is_file() or path.stat().st_size == 0:
+                    raise RuntimeError('SDK package is incomplete: ' + specification + ' / ' + name)
+            records.append({'package': package, 'revision': version, 'metadataSha256': hashlib.sha256(raw).hexdigest(), 'requiredFiles': required})
+        return records
 
 
 class AndroidSdkSetup:
-    CLI_SHA256 = "c8f88b14aa00e44a542dd3597cbdcb015e55511e33c2dd69920f41f5b086e228"
-    CLI_VERSION = "1.0.16625370"
+    CLI_SHA256 = "43204dcc42955f4698b7a7ca945f26c26f594f9239f5f8e11b3b73d4ceaa11ae"
+    CLI_VERSION = "1.1.16717390"
 
     def __init__(self):
         self.sdk = Path(os.environ["ANDROID_HOME"])
@@ -18,8 +76,12 @@ class AndroidSdkSetup:
         self.cli = self.bin / "android"
 
     def run(self, *args):
-        subprocess.run([str(self.cli), "--no-metrics", f"--sdk={self.sdk}", *args],
-                       check=True, input="y\n" * 100, text=True)
+        result = subprocess.run([str(self.cli), "--no-metrics", f"--sdk={self.sdk}", *args],
+                                input="y\n" * 100, text=True, capture_output=True, timeout=900)
+        diagnostics = Path('build/diagnostics'); diagnostics.mkdir(parents=True, exist_ok=True)
+        (diagnostics / 'sdk-install.log').write_text(result.stdout + result.stderr, encoding='utf-8')
+        print(result.stdout, end='', flush=True); print(result.stderr, end='', file=sys.stderr, flush=True)
+        result.check_returncode()
 
     def install(self, api=None):
         # The published endpoint is mutable. Both the binary digest and version
@@ -39,9 +101,12 @@ class AndroidSdkSetup:
         if api:
             image = {"29": "system-images/android-29/default/x86_64@8.0.0",
                      "35": "system-images/android-35/default/x86_64@2.0.0",
-                     "37.0": "system-images/android-37.0/google_apis/x86_64@6.0.0"}[api]
+                     "37.0": "system-images/android-37.0/google_apis/x86_64@8.0.0"}[api]
             packages += ["emulator@37.2.12", image]
         self.run("sdk", "install", *packages)
+        verified = InstalledAndroidSdk(self.sdk).verify(packages)
+        Path('build/diagnostics/sdk-installation.json').write_text(json.dumps({'cliVersion': self.CLI_VERSION,
+            'cliSha256': self.CLI_SHA256, 'packages': verified}, indent=2) + '\n', encoding='utf-8')
         with open(os.environ["GITHUB_PATH"], "a", encoding="utf-8") as output:
             output.write(f"{self.bin}\n{self.sdk / 'platform-tools'}\n{self.sdk / 'emulator'}\n")
 

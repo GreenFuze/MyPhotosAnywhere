@@ -1,0 +1,44 @@
+namespace Mpa.Processor.Web;
+
+public sealed record DesktopAccount(string Id, string Name, bool Connected, long Revision);
+public sealed record DesktopPendingAccount(Guid Id, string? ExpectedAccountId);
+public sealed record DesktopSnapshot(Guid LibraryId, string State, IReadOnlyList<DesktopAccount> Accounts,
+    IReadOnlyList<DesktopPendingAccount>? Pending = null, int CredentialCleanupCount = 0, Mpa.Processor.Core.StorageBudgetStatus? StorageAttention = null);
+public enum DesktopAccountOperation { Connect, Check, Disconnect, Resume, Abandon, Cleanup }
+public sealed record DesktopAccountCommand(DesktopAccountOperation Operation, string? AccountId, Guid? PendingId, long? ExpectedRevision);
+public sealed record DesktopPreview(byte[] Bytes, string MimeType);
+public sealed record DesktopFolder(string Id, string Name, bool CanListChildren);
+public sealed record DesktopFolderLocation(DesktopFolder Current, IReadOnlyList<DesktopFolder> Children, string? NextCursor, bool IncompleteSearch);
+public sealed record DesktopAddSource(string AccountId, string FolderId, bool IncludeDescendants, long ExpectedRevision);
+public sealed record DesktopUpdateSource(Guid Id, bool Enabled, bool IncludeDescendants, long ExpectedSourceRevision, long ExpectedRevision);
+public sealed record DesktopViewerEntry(long Position, Guid AssetId, DesktopCatalogPhoto? Photo);
+public sealed record DesktopViewerWindow(Guid Id, long Count, long Position, IReadOnlyList<DesktopViewerEntry> Entries,Guid? StageId=null,string? AccountId=null);
+public sealed record DesktopLibraryPublication(string Stage, string? Detail, bool CanRetry);
+
+/// <summary>UI-independent bounded operations. Requests may cancel reads; admitted durable
+/// jobs are owned by the engine and expose captured IDs/status through separate operations.</summary>
+public interface IDesktopWebApplication
+{
+    Task<DesktopSnapshot> SnapshotAsync(CancellationToken cancellationToken);
+    Task<Mpa.Processor.Core.LibraryControllerPin?> LibraryAsync(CancellationToken cancellationToken);
+    Task<Mpa.Processor.AppServices.LibraryWorkspaceInspection> InspectWorkspaceAsync(string accountId, string folderId, CancellationToken cancellationToken);
+    Task<Mpa.Processor.Core.LibraryControllerPin> ApproveWorkspaceAsync(Mpa.Processor.AppServices.ApproveLibraryWorkspace request, CancellationToken cancellationToken);
+    Task<DesktopLibraryPublication> LibraryPublicationAsync(CancellationToken cancellationToken);
+    Task<DesktopLibraryPublication> RequestLibraryPublicationAsync(CancellationToken cancellationToken);
+    Task<DesktopCatalogPage> CatalogAsync(string? accountId, string? position, bool newer, long? dateUtc, CancellationToken cancellationToken);
+    Task<DesktopPreview?> CatalogPreviewAsync(Guid id, CancellationToken cancellationToken);
+    Task<DesktopViewerWindow> OpenViewerAsync(Guid browser, Mpa.Processor.Core.CatalogViewerRequest request, CancellationToken cancellationToken);
+    Task<DesktopViewerWindow> ReadViewerAsync(Guid browser, Guid id, long position, CancellationToken cancellationToken);
+    Task CloseViewerAsync(Guid browser, Guid id, CancellationToken cancellationToken);
+    Task CloseBrowserViewersAsync(Guid browser, CancellationToken cancellationToken);
+    Task PauseAsync(CancellationToken cancellationToken);
+    Task ResumeAsync(CancellationToken cancellationToken);
+    Task AccountAsync(DesktopAccountCommand command, CancellationToken cancellationToken);
+    Task<Mpa.Processor.Core.LibrarySourceSnapshot> SourcesAsync(CancellationToken cancellationToken);
+    Task<DesktopFolderLocation> FoldersAsync(string accountId, string folderId, string? cursor, CancellationToken cancellationToken);
+    Task<Mpa.Processor.Core.LibrarySourceSnapshot> AddSourceAsync(DesktopAddSource request, CancellationToken cancellationToken);
+    Task<Mpa.Processor.Core.LibrarySourceSnapshot> UpdateSourceAsync(DesktopUpdateSource request, CancellationToken cancellationToken);
+    Task<Mpa.Processor.Core.SourceDiscoveryActivityPage> ActivityAsync(Guid? cursor, CancellationToken cancellationToken);
+    Task<Mpa.Processor.Core.SourceDiscoverySchedule> RequestScanAsync(Mpa.Processor.Core.SourceScanRequest request, CancellationToken cancellationToken);
+    Task<int> RetrySourceAsync(Mpa.Processor.Core.SourceRetryRequest request, CancellationToken cancellationToken);
+}

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Internal MPA protocol version 1 contracts.</Description>
+    <Version>0.6.0</Version>
+  </PropertyGroup>
+</Project>

@@ -505,6 +505,17 @@ class DeviceSmokeTest {
                 modelVersion=com.myphotosanywhere.mpa.people.PeopleRepository.MODEL_VERSION))
             compose.onNodeWithTag("nav:Collections").performClick()
             compose.onNode(hasText("People") and hasClickAction()).performClick()
+            val features=compose.runOnUiThread {
+                androidx.lifecycle.ViewModelProvider(compose.activity)[com.myphotosanywhere.mpa.library.LibraryFeaturesModel::class.java]
+            }
+            // Room collection and background review are not Compose idling resources.
+            // Require the seeded row AND its current rendered review before scrolling.
+            compose.waitUntil(10000) {
+                features.faces.value.any { it.id==face } && compose.onAllNodes(
+                    hasTestTag("people-list") and hasContentDescription("Detected faces: ${features.faces.value.size}") and
+                        SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"People ready")
+                ).fetchSemanticsNodes().size==1
+            }
             // Diagnostics can be below the fold when schedule controls expand on compact devices.
             // Scroll to the actual content rather than assuming the whole header is in the semantics viewport.
             compose.onNodeWithTag("people-list").performScrollToNode(hasText("unassigned faces lack usable matching data",substring=true))

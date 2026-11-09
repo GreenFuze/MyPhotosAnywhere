@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "mpa.processor.protocol": {
+        "type": "Project"
+      },
+      "mpa.processor.workerruntime": {
+        "type": "Project"
+      }
+    }
+  }
+}

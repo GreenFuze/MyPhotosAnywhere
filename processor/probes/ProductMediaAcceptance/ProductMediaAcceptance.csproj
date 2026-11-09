@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Mpa.Processor.Core/Mpa.Processor.Core.csproj" />
+    <ProjectReference Include="../../src/Mpa.Processor.GoogleDrive/Mpa.Processor.GoogleDrive.csproj" />
+  </ItemGroup>
+</Project>

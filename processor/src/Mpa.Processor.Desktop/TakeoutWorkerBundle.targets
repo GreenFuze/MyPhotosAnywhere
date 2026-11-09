@@ -1,0 +1,46 @@
+<Project>
+  <!-- Build the approved first-party analysis with the desktop. Do not search a
+       user's SDK/PATH or acquire executable code when an import starts. -->
+  <Target Name="BundleTakeoutWorker" AfterTargets="Build">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)../Mpa.Processor.WorkerHost/Mpa.Processor.WorkerHost.csproj" Targets="GetTargetPath" BuildInParallel="false">
+      <Output TaskParameter="TargetOutputs" ItemName="_TakeoutWorkerAssembly" />
+    </MSBuild>
+    <Error Condition="'@(_TakeoutWorkerAssembly->Count())' != '1'" Text="The first-party Takeout worker must have exactly one built assembly." />
+    <PropertyGroup>
+      <_TakeoutWorkerSource>@(_TakeoutWorkerAssembly->'%(RootDir)%(Directory)')</_TakeoutWorkerSource>
+      <_TakeoutWorkerHostName>Mpa.Processor.WorkerHost</_TakeoutWorkerHostName>
+      <_TakeoutWorkerHostName Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Windows')))">Mpa.Processor.WorkerHost.exe</_TakeoutWorkerHostName>
+      <_TakeoutWorkerDestination>$(OutDir)workers/takeout-metadata/</_TakeoutWorkerDestination>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(_TakeoutWorkerSource)$(_TakeoutWorkerHostName)')" Text="The installed Takeout worker requires its native apphost; SDK fallback is unavailable." />
+    <ItemGroup>
+      <_TakeoutWorkerFiles Include="$(_TakeoutWorkerSource)**/*" Exclude="$(_TakeoutWorkerSource)**/*.pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_TakeoutWorkerFiles)" DestinationFiles="@(_TakeoutWorkerFiles->'$(_TakeoutWorkerDestination)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <GetFileHash Files="$(_TakeoutWorkerDestination)$(_TakeoutWorkerHostName)" Algorithm="SHA256">
+      <Output TaskParameter="Hash" PropertyName="_TakeoutWorkerHostHash" />
+    </GetFileHash>
+    <GetFileHash Files="$(_TakeoutWorkerDestination)Mpa.Processor.WorkerHost.dll" Algorithm="SHA256">
+      <Output TaskParameter="Hash" PropertyName="_TakeoutWorkerAssemblyHash" />
+    </GetFileHash>
+    <PropertyGroup>
+      <_TakeoutHostSha>$([System.String]::Copy('$(_TakeoutWorkerHostHash)').ToLowerInvariant())</_TakeoutHostSha>
+      <_TakeoutAssemblySha>$([System.String]::Copy('$(_TakeoutWorkerAssemblyHash)').ToLowerInvariant())</_TakeoutAssemblySha>
+    </PropertyGroup>
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(_TakeoutHostSha)', '^[a-f0-9]{64}$')) Or !$([System.Text.RegularExpressions.Regex]::IsMatch('$(_TakeoutAssemblySha)', '^[a-f0-9]{64}$'))" Text="The installed worker must have exact SHA-256 host and assembly fingerprints." />
+    <WriteLinesToFile File="$(_TakeoutWorkerDestination)worker.json" Overwrite="true" WriteOnlyWhenDifferent="true" Encoding="UTF-8"
+      Lines="{&quot;format&quot;:&quot;mpa-installed-takeout-worker-1&quot;,&quot;host&quot;:&quot;$(_TakeoutWorkerHostName)&quot;,&quot;hostSha256&quot;:&quot;$(_TakeoutHostSha)&quot;,&quot;assembly&quot;:&quot;Mpa.Processor.WorkerHost.dll&quot;,&quot;assemblySha256&quot;:&quot;$(_TakeoutAssemblySha)&quot;}" />
+  </Target>
+  <Target Name="PublishTakeoutWorker" BeforeTargets="ComputeFilesToPublish" DependsOnTargets="BundleTakeoutWorker">
+    <ItemGroup>
+      <_TakeoutWorkerPublish Include="$(_TakeoutWorkerDestination)**/*" />
+    </ItemGroup>
+    <ItemGroup>
+      <_TakeoutWorkerPublish Update="@(_TakeoutWorkerPublish)">
+        <RelativePath>workers/takeout-metadata/%(_TakeoutWorkerPublish.RecursiveDir)%(_TakeoutWorkerPublish.Filename)%(_TakeoutWorkerPublish.Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </_TakeoutWorkerPublish>
+      <ResolvedFileToPublish Include="@(_TakeoutWorkerPublish)" />
+    </ItemGroup>
+  </Target>
+</Project>

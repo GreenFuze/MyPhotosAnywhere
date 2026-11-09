@@ -18,3 +18,12 @@ app/src/main/assets/mobile_facenet.part
 # Python diagnostic tooling caches
 __pycache__/
 *.pyc
+
+# Processor generated outputs and private feasibility inputs
+**/bin/
+**/obj/
+processor/.models/
+processor/.private/
+processor/.runtime-source/
+**/node_modules/
+processor/web/dist/

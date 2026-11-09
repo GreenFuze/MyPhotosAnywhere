@@ -1,0 +1,358 @@
+name: Processor protocol contracts
+on:
+  push:
+    paths:
+      - 'processor/src/**'
+      - 'processor/tests/**'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - 'protocol/**'
+      - '.github/workflows/processor-protocol.yml'
+  pull_request:
+    paths:
+      - 'processor/src/**'
+      - 'processor/tests/**'
+      - 'processor/Directory.Build.props'
+      - 'processor/global.json'
+      - 'protocol/**'
+      - '.github/workflows/processor-protocol.yml'
+permissions:
+  contents: read
+concurrency:
+  group: processor-protocol-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: true
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
+        contract_group: [metadata, application, headers, continuity, publication, graphs, fresh, outgoing, drain, composition]
+    runs-on: ${{ matrix.runner }}
+    # All six projects and every original case remain required on this exact SHA.
+    # Windows run40296922461 passed all404 Core cases but its two unchanged100k
+    # preparations consumed21m of the shared30m runner window. Separate the
+    # independent metadata/application processes into mandatory groups; keep every
+    # fixture, assertion, diagnostic gate and the30m job limit. The four original
+    # Core discovery/snapshot scale cases run below in mandatory per-fixture jobs.
+    # fc141de Windows completed226 Services cases (27m47s of reported test time)
+    # before the same30m job deadline, with zero failed cases. Require all Services
+    # exactly once across headers, continuity, current publication and application.
+    # c6aa4d5 Windows application completed561 cases in26m49s under the same30m
+    # deadline. New current-upload/builder cases add substantial native work.
+    # Require the CurrentDependency family in its own mandatory group on every
+    # existing platform; keep all original cases/streams/scale and30m limits.
+    # 1bd7932 Windows application consumed22m31s for538 unchanged cases.
+    # The new actual graph/frozen-file producer cases perform multiple complete
+    # capture/upload/readback passes. Require their own graphs group on every
+    # existing platform rather than consume that original30m application's headroom.
+    # The new current first-header cases own real dependency preparation/native
+    # sealing and provider retry. Require their own fresh group on every existing
+    # platform, preserving all691 prior ordinary Services cases exactly once.
+    # Nine joined outgoing cases perform actual graph/header/Root/canonical/private
+    # retirement and retry. Require their own outgoing group on all four existing
+    # platforms; retain all706 prior Services identities and unchanged30m deadlines.
+    # Seven drain cases complete real original/next generations and independently
+    # recheck unchanged-ready, joined Root recovery and offline historical cleanup.
+    # Require a drain group on all four platforms; retain all715 previous identities.
+    # Six actual desktop composition/cold-bootstrap/background/restart cases have
+    # a mandatory composition group on all platforms; retain all722 prior cases.
+    # Three indexed canonical account/legacy/offline cases remain mandatory in
+    # the composition group. All728 prior Services and447 prior Core plus10 new
+    # private-index/compatibility Core cases stay required on every platform.
+    # Six canonical viewer capture/composition cases hold actual native owners.
+    # Keep their mandatory checks in composition on all four platforms, with
+    # every prior731 Services/457 Core/38 Web identity and the same job limits.
+    # No test assertion, original job deadline or scale benchmark is relaxed.
+    timeout-minutes: 30
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.303'
+      - name: Locked restore and strict contract tests
+        working-directory: processor
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/protocol-tests | Out-Null
+          $mpaAllProjects = @(
+            @{ Name = 'protocol'; Path = 'tests/Mpa.Processor.Protocol.Tests/Mpa.Processor.Protocol.Tests.csproj' },
+            @{ Name = 'core'; Path = 'tests/Mpa.Processor.Core.Tests/Mpa.Processor.Core.Tests.csproj' },
+            @{ Name = 'google'; Path = 'tests/Mpa.Processor.GoogleDrive.Tests/Mpa.Processor.GoogleDrive.Tests.csproj' },
+            @{ Name = 'setup'; Path = 'tests/Mpa.Processor.AppServices.Tests/Mpa.Processor.AppServices.Tests.csproj' },
+            @{ Name = 'lan'; Path = 'tests/Mpa.Processor.Lan.Tests/Mpa.Processor.Lan.Tests.csproj' },
+            @{ Name = 'web'; Path = 'tests/Mpa.Processor.Web.Tests/Mpa.Processor.Web.Tests.csproj' }
+          )
+          $mpaProjectNames = if ('${{ matrix.contract_group }}' -eq 'metadata') {
+            @('protocol', 'core', 'google')
+          } elseif ('${{ matrix.contract_group }}' -eq 'application') {
+            @('setup', 'lan', 'web')
+          } elseif ('${{ matrix.contract_group }}' -in @('headers', 'continuity', 'publication', 'graphs', 'fresh', 'outgoing', 'drain', 'composition')) {
+            @('setup')
+          } else {
+            throw 'Unknown required contract group.'
+          }
+          $mpaProjects = @($mpaAllProjects | Where-Object { $_.Name -in $mpaProjectNames })
+          $mpaExpectedProjects = if ('${{ matrix.contract_group }}' -in @('headers', 'continuity', 'publication', 'graphs', 'fresh', 'outgoing', 'drain', 'composition')) { 1 } else { 3 }
+          if ($mpaProjects.Count -ne $mpaExpectedProjects) { throw 'The contract group lost a required project.' }
+          foreach ($mpaProject in $mpaProjects) {
+            $mpaName = $mpaProject.Name
+            dotnet restore $mpaProject.Path --locked-mode *> "build/protocol-tests/$mpaName-restore.log"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $mpaArguments = @($mpaProject.Path, '--no-restore', '-c', 'Release', '--logger', "trx;LogFileName=$mpaName.trx", '--results-directory', 'build/protocol-tests')
+            # Every pre-existing assertion remains here. The newly added publication
+            # measurements and immutable-reuse cases have separate mandatory matrices
+            # on this same SHA; none is dropped or made optional.
+            if ($mpaName -eq 'setup') {
+              $mpaBaseFilter = 'TestCategory!=LargeCatalogPublication&TestCategory!=ImmutableDependencyReuse'
+              $mpaHeaderFamilies = @('CurrentHeader', 'CurrentSignedPartial')
+              $mpaContinuityFamilies = @('CurrentOwnedLineage', 'CurrentSupersession', 'CurrentUnsigned', 'MaterializedPredecessor')
+              $mpaPublicationFamilies = @('CurrentDependency')
+              $mpaGraphFamilies = @('CurrentPreparedGraph')
+              $mpaFreshFamilies = @('CurrentFreshHeader')
+              $mpaOutgoingFamilies = @('CurrentPublicationOwner')
+              $mpaDrainFamilies = @('CurrentGenerationDrain')
+              $mpaCompositionFamilies = @('CurrentDesktopComposition', 'CurrentCanonicalAccount', 'CanonicalViewerCapture', 'CanonicalViewerComposition')
+              $mpaHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotHeaders = ($mpaHeaderFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaContinuity = ($mpaContinuityFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotContinuity = ($mpaContinuityFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaPublication = ($mpaPublicationFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotPublication = ($mpaPublicationFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaGraphs = ($mpaGraphFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotGraphs = ($mpaGraphFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaFresh = ($mpaFreshFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotFresh = ($mpaFreshFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaOutgoing = ($mpaOutgoingFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotOutgoing = ($mpaOutgoingFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaDrain = ($mpaDrainFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotDrain = ($mpaDrainFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaComposition = ($mpaCompositionFamilies | ForEach-Object { "FullyQualifiedName~$_" }) -join '|'
+              $mpaNotComposition = ($mpaCompositionFamilies | ForEach-Object { "FullyQualifiedName!~$_" }) -join '&'
+              $mpaServiceFilter = switch ('${{ matrix.contract_group }}') {
+                'headers' { "$mpaBaseFilter&($mpaHeaders)" }
+                'continuity' { "$mpaBaseFilter&$mpaNotHeaders&($mpaContinuity)" }
+                'publication' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&($mpaPublication)" }
+                'graphs' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&($mpaGraphs)" }
+                'fresh' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&$mpaNotGraphs&($mpaFresh)" }
+                'outgoing' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&$mpaNotGraphs&$mpaNotFresh&($mpaOutgoing)" }
+                'drain' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&$mpaNotGraphs&$mpaNotFresh&$mpaNotOutgoing&($mpaDrain)" }
+                'composition' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&$mpaNotGraphs&$mpaNotFresh&$mpaNotOutgoing&$mpaNotDrain&($mpaComposition)" }
+                'application' { "$mpaBaseFilter&$mpaNotHeaders&$mpaNotContinuity&$mpaNotPublication&$mpaNotGraphs&$mpaNotFresh&$mpaNotOutgoing&$mpaNotDrain&$mpaNotComposition" }
+                default { throw 'Unknown required Services partition.' }
+              }
+              $mpaArguments += @('--filter', $mpaServiceFilter)
+            }
+            if ($mpaName -eq 'core') { $mpaArguments += @('--filter', 'FullyQualifiedName!~Mpa.Processor.Core.Tests.DiscoveredCatalogTests.LargeDiscoveryFixturesKeepQueriesAndReturnedPagesBounded&FullyQualifiedName!~Mpa.Processor.Core.Tests.FrozenCatalogSnapshotTests.LargeCapturesMeasureStorageAndMemoryWhileAnImportWritesBesideTheirLiveObservation') }
+            # Keep every original test and the30-minute job limit. Archive per-case
+            # progress and a mini dump if Windows enters an unbounded test/cleanup.
+            if ($mpaName -eq 'setup' -and '${{ matrix.runner }}' -eq 'windows-2025') {
+              $mpaArguments += @('--logger', 'console;verbosity=normal', '--blame-hang', '--blame-hang-timeout', '5m', '--blame-hang-dump-type', 'mini')
+            }
+            dotnet test @mpaArguments *> "build/protocol-tests/$mpaName-test.log"
+            $mpaContractExit = $LASTEXITCODE
+            Get-Content "build/protocol-tests/$mpaName-test.log"
+            if ($mpaContractExit -ne 0) { exit $mpaContractExit }
+          }
+          $mpaDiagnostic = Get-ChildItem build/protocol-tests/*.log | Select-String -Pattern '\bwarning\b|\berror\s+[A-Z]+\d+\s*:'
+          if ($mpaDiagnostic) { $mpaDiagnostic; throw 'Protocol diagnostics are blocking.' }
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-protocol-${{ matrix.runner }}-${{ matrix.contract_group }}
+          path: processor/build/protocol-tests/
+          if-no-files-found: error
+          retention-days: 14
+  core-scale:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: true
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
+        fixture: [discovery, snapshot]
+    runs-on: ${{ matrix.runner }}
+    # Original fixtures/assertions, original 10k/100k sizes and the same30m job
+    # limit. Isolation prevents one fixture consuming another project's runner
+    # window. Every OS must pass BOTH cases of BOTH fixtures on this exact SHA.
+    timeout-minutes: 30
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.303'
+      - name: Original Core discovery and snapshot scale assertions
+        working-directory: processor
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force build/core-scale | Out-Null
+          $mpaProject = 'tests/Mpa.Processor.Core.Tests/Mpa.Processor.Core.Tests.csproj'
+          $mpaFixture = if ('${{ matrix.fixture }}' -eq 'discovery') {
+            'Mpa.Processor.Core.Tests.DiscoveredCatalogTests.LargeDiscoveryFixturesKeepQueriesAndReturnedPagesBounded'
+          } elseif ('${{ matrix.fixture }}' -eq 'snapshot') {
+            'Mpa.Processor.Core.Tests.FrozenCatalogSnapshotTests.LargeCapturesMeasureStorageAndMemoryWhileAnImportWritesBesideTheirLiveObservation'
+          } else { throw 'Unknown required Core scale fixture.' }
+          dotnet restore $mpaProject --locked-mode *> build/core-scale/restore.log
+          if ($LASTEXITCODE -ne 0) { Get-Content build/core-scale/restore.log; exit $LASTEXITCODE }
+          dotnet test $mpaProject --no-restore -c Release --filter "FullyQualifiedName~$mpaFixture" --logger 'trx;LogFileName=core-scale.trx' --results-directory build/core-scale *> build/core-scale/test.log
+          $mpaExit = $LASTEXITCODE
+          Get-Content build/core-scale/test.log
+          if ($mpaExit -ne 0) { exit $mpaExit }
+          $mpaDiagnostic = Get-ChildItem build/core-scale/*.log | Select-String -Pattern '\bwarning\b|\berror\s+[A-Z]+\d+\s*:'
+          if ($mpaDiagnostic) { $mpaDiagnostic; throw 'Core scale diagnostics are blocking.' }
+          [xml]$mpaTrx = Get-Content build/core-scale/core-scale.trx
+          $mpaSummary = $mpaTrx.TestRun.ResultSummary
+          if ($mpaSummary.outcome -ne 'Completed' -or $mpaSummary.Counters.total -ne '2' -or $mpaSummary.Counters.executed -ne '2' -or $mpaSummary.Counters.passed -ne '2') {
+            throw 'Both original10k/100k Core fixture cases must pass without skips.'
+          }
+          foreach ($mpaCounter in @('failed','error','warning','notExecuted','timeout','aborted','inconclusive')) {
+            if ([int]$mpaSummary.Counters.GetAttribute($mpaCounter) -ne 0) { throw "Unresolved Core scale outcome: $mpaCounter" }
+          }
+          $mpaCaseNames = @($mpaTrx.TestRun.Results.UnitTestResult.testName)
+          if (@($mpaCaseNames | Where-Object { $_.EndsWith(' (10000)') }).Count -ne 1 -or @($mpaCaseNames | Where-Object { $_.EndsWith(' (100000)') }).Count -ne 1) {
+            throw 'Original Core scale fixture sizes changed.'
+          }
+          @{ Source = '${{ github.sha }}'; Runner = '${{ matrix.runner }}'; Fixture = $mpaFixture;
+             DiscoverySourceSha256 = (Get-FileHash tests/Mpa.Processor.Core.Tests/DiscoveredCatalogTests.cs -Algorithm SHA256).Hash.ToLowerInvariant();
+             SnapshotSourceSha256 = (Get-FileHash tests/Mpa.Processor.Core.Tests/FrozenCatalogSnapshotTests.cs -Algorithm SHA256).Hash.ToLowerInvariant();
+             TestAssemblySha256 = (Get-FileHash tests/Mpa.Processor.Core.Tests/bin/Release/net10.0/Mpa.Processor.Core.Tests.dll -Algorithm SHA256).Hash.ToLowerInvariant() } |
+            ConvertTo-Json | Set-Content build/core-scale/source.json -Encoding utf8
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-core-scale-${{ matrix.runner }}-${{ matrix.fixture }}
+          path: processor/build/core-scale/
+          if-no-files-found: error
+          retention-days: 14
+  scale:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: true
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    # New real 10k/100k publication fixtures took 43m52s locally before key reuse.
+    # Keep each fixture's own cancellation and every preservation assertion; this
+    # job budget separates measurements from the unchanged regression matrix.
+    timeout-minutes: 70
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.303'
+      - name: Locked large publication measurements and preservation assertions
+        working-directory: processor
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force build/catalog-scale | Out-Null
+          $mpaProject = 'tests/Mpa.Processor.AppServices.Tests/Mpa.Processor.AppServices.Tests.csproj'
+          dotnet restore $mpaProject --locked-mode *> build/catalog-scale/restore.log
+          if ($LASTEXITCODE -ne 0) { Get-Content build/catalog-scale/restore.log; exit $LASTEXITCODE }
+          dotnet test $mpaProject --no-restore -c Release --filter 'TestCategory=LargeCatalogPublication' --logger 'trx;LogFileName=scale.trx' --results-directory build/catalog-scale *> build/catalog-scale/test.log
+          $mpaTestExit = $LASTEXITCODE
+          Get-Content build/catalog-scale/test.log
+          if ($mpaTestExit -ne 0) { exit $mpaTestExit }
+          $mpaDiagnostic = Get-ChildItem build/catalog-scale/*.log | Select-String -Pattern '\bwarning\b|\berror\s+[A-Z]+\d+\s*:'
+          if ($mpaDiagnostic) { $mpaDiagnostic; throw 'Scale diagnostics are blocking.' }
+          [xml]$mpaTrx = Get-Content build/catalog-scale/scale.trx
+          $mpaSummary = $mpaTrx.TestRun.ResultSummary
+          if ($mpaSummary.outcome -ne 'Completed' -or $mpaSummary.Counters.total -ne '2' -or $mpaSummary.Counters.passed -ne '2') {
+            throw 'Both large-fixture preservation cases must pass without skips.'
+          }
+          foreach ($mpaCounter in @('failed','error','warning','notExecuted','timeout','aborted','inconclusive')) {
+            if ([int]$mpaSummary.Counters.GetAttribute($mpaCounter) -ne 0) { throw "Unresolved scale outcome: $mpaCounter" }
+          }
+          $mpaMetrics = @($mpaTrx.TestRun.Results.UnitTestResult | ForEach-Object {
+            if ($_.outcome -ne 'Passed') { throw 'Unpassed scale fixture.' }
+            $mpaLines = @(([string]$_.Output.StdOut) -split "`n" | Where-Object { $_.Trim().StartsWith('{"incrementalGenerationFixture"') })
+            if ($mpaLines.Count -ne 1) { throw 'Each real fixture must retain its measured report.' }
+            $mpaLines[0] | ConvertFrom-Json
+          })
+          if (@($mpaMetrics.incrementalGenerationFixture | Sort-Object -Unique) -join ',' -ne '10000,100000') { throw 'Scale fixture sizes changed.' }
+          @{ Source = '${{ github.sha }}'; Runner = '${{ matrix.runner }}'; Measurements = $mpaMetrics;
+             Scope = 'Actual native capture/current owner/full prepared graph with synthetic Drive; live network, UI and final signed completion remain separate.';
+             TestAssemblySha256 = (Get-FileHash tests/Mpa.Processor.AppServices.Tests/bin/Release/net10.0/Mpa.Processor.AppServices.Tests.dll -Algorithm SHA256).Hash.ToLowerInvariant() } |
+            ConvertTo-Json -Depth 12 | Set-Content build/catalog-scale/report.json -Encoding utf8
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-catalog-scale-${{ matrix.runner }}
+          path: processor/build/catalog-scale/
+          if-no-files-found: error
+          retention-days: 14
+  dependency-references:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: true
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    # Only the thirteen NEW immutable-reference cases run here. The preceding
+    # Windows regression matrix took 28m13s; preserve its existing 30m budget and
+    # every old assertion while adding these required native cases separately.
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.303'
+      - name: Locked immutable-reference recovery and preservation assertions
+        working-directory: processor
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force build/catalog-reference | Out-Null
+          $mpaProject = 'tests/Mpa.Processor.AppServices.Tests/Mpa.Processor.AppServices.Tests.csproj'
+          dotnet restore $mpaProject --locked-mode *> build/catalog-reference/restore.log
+          if ($LASTEXITCODE -ne 0) { Get-Content build/catalog-reference/restore.log; exit $LASTEXITCODE }
+          dotnet test $mpaProject --no-restore -c Release --filter 'TestCategory=ImmutableDependencyReuse' --logger 'trx;LogFileName=reference.trx' --results-directory build/catalog-reference *> build/catalog-reference/test.log
+          $mpaTestExit = $LASTEXITCODE
+          Get-Content build/catalog-reference/test.log
+          if ($mpaTestExit -ne 0) { exit $mpaTestExit }
+          $mpaDiagnostic = Get-ChildItem build/catalog-reference/*.log | Select-String -Pattern '\bwarning\b|\berror\s+[A-Z]+\d+\s*:'
+          if ($mpaDiagnostic) { $mpaDiagnostic; throw 'Reference diagnostics are blocking.' }
+          [xml]$mpaTrx = Get-Content build/catalog-reference/reference.trx
+          $mpaSummary = $mpaTrx.TestRun.ResultSummary
+          if ($mpaSummary.outcome -ne 'Completed' -or $mpaSummary.Counters.total -ne '13' -or $mpaSummary.Counters.passed -ne '13') {
+            throw 'All thirteen immutable-reference preservation cases must pass without skips.'
+          }
+          foreach ($mpaCounter in @('failed','error','warning','notExecuted','timeout','aborted','inconclusive')) {
+            if ([int]$mpaSummary.Counters.GetAttribute($mpaCounter) -ne 0) { throw "Unresolved reference outcome: $mpaCounter" }
+          }
+          $mpaCases = @($mpaTrx.TestRun.Results.UnitTestResult | ForEach-Object {
+            if ($_.outcome -ne 'Passed') { throw 'Unpassed immutable-reference case.' }
+            @{ Name = $_.testName; Outcome = $_.outcome }
+          })
+          @{ Source = '${{ github.sha }}'; Runner = '${{ matrix.runner }}'; Cases = $mpaCases;
+             Scope = 'Actual native exact references, current owner, changed facts and signed completion with synthetic Drive; live network, UI and release acceptance remain separate.';
+             TestAssemblySha256 = (Get-FileHash tests/Mpa.Processor.AppServices.Tests/bin/Release/net10.0/Mpa.Processor.AppServices.Tests.dll -Algorithm SHA256).Hash.ToLowerInvariant() } |
+            ConvertTo-Json -Depth 12 | Set-Content build/catalog-reference/report.json -Encoding utf8
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: processor-catalog-reference-${{ matrix.runner }}
+          path: processor/build/catalog-reference/
+          if-no-files-found: error
+          retention-days: 14

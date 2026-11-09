@@ -3,6 +3,11 @@ set -euo pipefail
 mpa_api=${1:?API level required}
 mpa_target=default
 if [[ "$mpa_api" == "37.0" ]]; then mpa_target=google_apis; fi
+mpa_image_dir="$ANDROID_HOME/system-images/android-$mpa_api/$mpa_target/x86_64"
+if [[ ! -s "$mpa_image_dir/system.img" || ! -s "$mpa_image_dir/ramdisk.img" || ! -s "$mpa_image_dir/package.xml" ]]; then
+  printf 'Required pinned system image is missing or incomplete: %s\n' "$mpa_image_dir" >&2
+  exit 1
+fi
 mpa_avd_dir="$HOME/.android/avd/mpa.avd"
 mkdir -p "$mpa_avd_dir" build/diagnostics
 cat > "$HOME/.android/avd/mpa.ini" <<EOF
@@ -37,7 +42,7 @@ printf '# Fresh CI host\n' > "$HOME/.android/emu-update-last-check.ini"
 # broadcast receiver when Kotlin/DEX compilation competes with system startup.
 # Keep the same strict gate; connectedDebugAndroidTest still executes every test.
 python3 scripts/gradle_checks.py --log build/diagnostics/device-build.log -- assembleDebug assembleDebugAndroidTest
-adb start-server
+timeout --kill-after=2s 20s adb start-server
 emulator -avd mpa -port 5554 -no-window -gpu swiftshader -noaudio -no-boot-anim \
   -camera-back none -camera-front none -no-metrics -no-snapshot \
   -feature -QuickbootFileBacked,-Vulkan -show-kernel > build/diagnostics/emulator.log 2>&1 &
@@ -49,18 +54,21 @@ mpa_cleanup() {
     kill "$mpa_logcat_pid" 2>/dev/null || true
     wait "$mpa_logcat_pid" 2>/dev/null || true
   elif [[ "$mpa_logcat_started" != true ]]; then
-    adb logcat -d -v threadtime > build/diagnostics/logcat.txt 2>&1 || true
+    # Before a device appears, plain logcat waits forever. Diagnostics must not
+    # turn a failed emulator launch into a job timeout or mask the original error.
+    timeout --kill-after=2s 10s adb logcat -d -v threadtime > build/diagnostics/logcat.txt 2>&1 || true
   fi
-  adb emu kill || true
+  timeout --kill-after=2s 10s adb emu kill || true
   wait "$mpa_emulator_pid" || true
   cat build/diagnostics/emulator.log
 }
 trap mpa_cleanup EXIT
 mpa_booted=false
-for ((mpa_attempt=0; mpa_attempt<120; mpa_attempt++)); do
+mpa_boot_deadline=$((SECONDS+600))
+while (( SECONDS < mpa_boot_deadline )); do
   if ! kill -0 "$mpa_emulator_pid" 2>/dev/null; then exit 1; fi
-  if adb devices | grep -q $'emulator-5554\tdevice$'; then
-    if [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" == "1" ]]; then
+  if timeout --kill-after=2s 5s adb devices | grep -q $'emulator-5554\tdevice$'; then
+    if [[ "$(timeout --kill-after=2s 5s adb shell getprop sys.boot_completed | tr -d '\r')" == "1" ]]; then
       mpa_booted=true
       break
     fi
@@ -72,8 +80,18 @@ if [[ "$mpa_booted" != true ]]; then
   printf 'Emulator did not complete boot\n' >&2
   exit 1
 fi
-# Keep the complete stream: a final bounded-buffer dump can lose early tests
-# and allocation traces. Cleanup must never overwrite a started capture.
+# Preparation can intentionally restart adbd/framework for the narrowly verified
+# API29 boot-time heap mismatch. Preserve its diagnostics separately; a streaming
+# connection opened before adb root can terminate before any app test starts.
+# Start the owned, uninterrupted TEST stream only after preparation actually joins.
+adb logcat -d -v threadtime > build/diagnostics/logcat-before-preparation.txt
+python3 scripts/test_emulator_heap.py
+if [[ "$mpa_api" == "29" ]]; then
+  python3 scripts/emulator_heap.py "$mpa_api"
+fi
+adb logcat -d -v threadtime > build/diagnostics/logcat-after-preparation.txt
+# Keep every test event/allocation trace. An unexpected disconnect during tests
+# remains blocking; never reconnect, truncate, retry tests or replace this stream.
 adb logcat -v threadtime > build/diagnostics/logcat.txt 2> build/diagnostics/logcat-reader.txt &
 mpa_logcat_pid=$!
 mpa_logcat_started=true
