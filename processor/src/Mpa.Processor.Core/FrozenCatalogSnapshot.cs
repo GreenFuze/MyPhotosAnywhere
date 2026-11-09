@@ -50,7 +50,8 @@ public sealed partial class FrozenCatalogSnapshot : IDisposable
                 using (var setup = owner._connection.CreateCommand())
                 {
                     setup.CommandText = "PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA cache_size=-2048; PRAGMA temp_store=FILE;" +
-                        "PRAGMA application_id=1297105222; CREATE TABLE fact(id TEXT PRIMARY KEY,payload BLOB NOT NULL,sha256 TEXT NOT NULL) STRICT;";
+                        "PRAGMA application_id=1297105222; CREATE TABLE fact(id TEXT PRIMARY KEY,payload BLOB NOT NULL,sha256 TEXT NOT NULL) STRICT;" +
+                        "CREATE TABLE imported_observation(key TEXT PRIMARY KEY,asset_id TEXT NOT NULL,payload BLOB NOT NULL,sha256 TEXT NOT NULL) STRICT;";
                     setup.ExecuteNonQuery();
                 }
                 using var transaction = owner._connection.BeginTransaction(); using var insert = owner._connection.CreateCommand(); insert.Transaction = transaction;
@@ -65,6 +66,7 @@ public sealed partial class FrozenCatalogSnapshot : IDisposable
                         cancellationToken.ThrowIfCancellationRequested(); var bytes = codec.Encode(asset.Id.ToString("N")[..2], [asset]);
                         id.Value = asset.Id.ToString("D"); payload.Value = bytes; hash.Value = Hash(bytes);
                         if (insert.ExecuteNonQuery() != 1) throw new InvalidOperationException("Catalog capture did not retain exactly one fact.");
+                        if(asset.ImportedMetadata is not null||asset.ImportedAttention is not null)owner.CaptureImportedObservations(ownedSource,asset,transaction,cancellationToken);
                         owner.Count = checked(owner.Count + 1); after = asset.Id;
                     }
                     if (!page.HasMore) break;

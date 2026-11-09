@@ -199,3 +199,21 @@ Unsupported/conflicting raw preservation, corrected-input/version repair, Drive 
 input and full hierarchy, remaining approved processing/photo-client workflows,
 six installers and actual UI/live/platform/performance/signing/final tested PC
 publication remain unfinished. No Android work or acceptance gate was added.
+
+
+The exact ZIP import revision 98b1707 passed all 60 PC jobs and 72 native reports.
+Evidence is in preflight-060/ci-98b1707-pc-validation-v286.json.
+
+Supported sidecars with conflicting observations are now included in raw backup for
+newly captured generations. The frozen catalog retains all observations from its
+original read transaction, and the backup pass verifies each against its native
+ready result and exact source bytes before storing the bundle. The published
+photo still shows that the metadata conflicts. An older pending generation resumes
+using its original snapshot and upload identities. Already published generations
+are not rebuilt just to backfill these backups.
+
+The focused native checks cover the bounded frozen observation pages, the
+original-to-worker-to-conflict-backup workflow, and existing backup and cleanup.
+The tests confirm both original sidecars are backed up while the human filename
+and original photo remain intact. Unsupported raw preservation, conflict
+resolution, Drive ZIP input, remaining PC workflows and release gates are open.

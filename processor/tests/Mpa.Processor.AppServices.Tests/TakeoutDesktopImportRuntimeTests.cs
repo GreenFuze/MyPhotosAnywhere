@@ -27,7 +27,11 @@ public sealed partial class AccountServiceTests
     [DataRow(true)]
     public Task DesktopZipImportReviewsCompressedPartsAndPublishesVerifiedOriginalAndBackedUpMetadataWithoutExtraction(bool multipart)
         =>VerifyImportedPhotoPublicationAsync(legacyFinished:false,rawBackup:true,zipParts:multipart?2:1);
-    private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished,bool manualAssociation=false,bool rawBackup=false,bool recover=false,bool cleanup=false,int zipParts=0)
+    [TestMethod]
+    public Task DesktopImportBacksUpBothConflictingSidecarsWithoutChoosingOneOrUploadingTheOriginalAgain()
+        =>VerifyImportedPhotoPublicationAsync(legacyFinished:false,rawBackup:true,conflictingSidecar:true);
+
+    private static async Task VerifyImportedPhotoPublicationAsync(bool legacyFinished,bool manualAssociation=false,bool rawBackup=false,bool recover=false,bool cleanup=false,int zipParts=0,bool conflictingSidecar=false)
     {
         var started=Stopwatch.GetTimestamp();
         using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(40));await using var fixture=await CurrentReaderFixture.CreateAsync(addSource:true).ConfigureAwait(false);
@@ -38,6 +42,13 @@ public sealed partial class AccountServiceTests
         {
             var raw=System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllBytesAsync(selection.Path+".json",deadline.Token).ConfigureAwait(false))!;raw["title"]="Different export title.jpg";
             await File.WriteAllBytesAsync(selection.Path+".json",System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(raw),deadline.Token).ConfigureAwait(false);
+        }
+        byte[]? conflictBytes = null;
+        var conflictPath = selection.Path + ".supplemental-metadata.json";
+        if (conflictingSidecar)
+        {
+            conflictBytes = """{"title":"a.jpg","description":"Another description","photoTakenTime":{"timestamp":"2"}}"""u8.ToArray();
+            await File.WriteAllBytesAsync(conflictPath, conflictBytes, deadline.Token).ConfigureAwait(false);
         }
         var archives=new List<string>();var archiveHashes=new List<byte[]>();
         if(zipParts>0)
@@ -90,12 +101,24 @@ public sealed partial class AccountServiceTests
             Assert.AreEqual(0,(await imports.MetadataIssuesAsync(review.Id,null,deadline.Token).ConfigureAwait(false)).Issues.Count);
             await imports.SelectMetadataOriginalAsync(review.Id,issue.Key,chosen.Key,deadline.Token).ConfigureAwait(false);
         }
-        Assert.AreEqual(new TakeoutMetadataProgress(1,1,0,0,true),processed.Metadata);Assert.AreEqual(1,metadataLaunches);
+        if (conflictingSidecar)
+        {
+            Assert.AreEqual(new TakeoutMetadataProgress(2, 2, 0, 0, true), processed.Metadata);
+            Assert.AreEqual(2, metadataLaunches);
+        }
+        else
+        {
+            Assert.AreEqual(new TakeoutMetadataProgress(1,1,0,0,true),processed.Metadata);Assert.AreEqual(1,metadataLaunches);
+        }
         Measure("metadata-ready");
         var expectedMetadata=TakeoutMetadataDocument.ParseSource(await File.ReadAllBytesAsync(selection.Path+".json",deadline.Token).ConfigureAwait(false));
         var metadataArea=Path.Combine(setup.StateDirectory,"takeout-metadata-stages");
         Assert.AreEqual(0,Directory.EnumerateFiles(metadataArea,"input.bin",SearchOption.AllDirectories).Count(),"Only joined duplicate worker inputs should retire automatically.");
-        var retainedRaw=Directory.EnumerateFiles(metadataArea,"source.bin",SearchOption.AllDirectories).Single();
+        var retainedSources = Directory.EnumerateFiles(metadataArea, "source.bin", SearchOption.AllDirectories).ToArray();
+        if (conflictingSidecar) Assert.AreEqual(2, retainedSources.Length);
+        var retainedRaw=conflictingSidecar
+            ? retainedSources.Single(path => File.ReadAllBytes(path).AsSpan().SequenceEqual(expectedMetadata.CopyRawSource()))
+            : retainedSources.Single();
         CollectionAssert.AreEqual(expectedMetadata.CopyRawSource(),await File.ReadAllBytesAsync(retainedRaw,deadline.Token).ConfigureAwait(false));
         File.Delete(selection.Path+".json");await imports.PauseAsync().ConfigureAwait(false);
         if(legacyFinished)
@@ -146,6 +169,53 @@ public sealed partial class AccountServiceTests
         var activated=current.Catalog.Selection;Assert.IsNotNull(activated);Assert.AreEqual(published.Commit,activated.Catalog);
         var page=await current.Catalog.ReadPageAsync(activated.StageId,null,60,deadline.Token).ConfigureAwait(false);Assert.IsNotNull(page);
         var portable=page.Page.Assets.Single(value=>value.Id==imported.Id);Assert.AreEqual("Human renamed.jpg",portable.Name);
+        if (conflictingSidecar)
+        {
+            Assert.IsNull(portable.ImportedMetadata);
+            Assert.IsNotNull(portable.ImportedAttention);
+            Assert.AreEqual("conflicting-metadata", portable.ImportedAttention.Code);
+            Assert.AreEqual(2L, portable.ImportedAttention.Candidates);
+            Assert.AreEqual(imported.Facts.CapturedUtc, portable.CapturedUtc);
+            Assert.AreEqual(imported.Facts.CapturedUtc ?? imported.Facts.ModifiedUtc, portable.EffectiveUtc);
+            var backup = await state.ExecuteAsync(db =>
+            {
+                var completed = new TakeoutImportInventoryRepository(db).ReadCompleted(review.Id)!;
+                var uploads = new WorkspacePublicationRepository(db, fixture.Data.Budget);
+                var raw = uploads.Identities().Select(id => uploads.Read(id)!).Single(row => row.Role == MetadataSourceBundle.Role);
+                return (Completed: completed, Upload: raw);
+            }, deadline.Token).ConfigureAwait(false);
+            var remote = fixture.Data.Cloud[backup.Upload.FileId!];
+            var rawBundle = MetadataSourceBundle.Read(remote.Bytes.Span);
+            Assert.AreEqual(2, rawBundle.Sources.Count);
+            CollectionAssert.AreEqual(expectedMetadata.CopyRawSource(), rawBundle.ReadSource(expectedMetadata.SourceSha256));
+            var other = TakeoutMetadataDocument.ParseSource(conflictBytes!);
+            CollectionAssert.AreEqual(conflictBytes!, rawBundle.ReadSource(other.SourceSha256));
+            using (var catalog = await TakeoutAssociationCatalog.OpenCompletedAsync(backup.Completed, fixture.Data.Budget, deadline.Token).ConfigureAwait(false))
+            {
+                var sidecars = catalog.ReadPage(TakeoutEntryKind.JsonSidecar, token: deadline.Token).Entries;
+                await state.ExecuteAsync(db =>
+                {
+                    var jobs = new TakeoutMetadataJobRepository(db);
+                    var receipts = new MetadataSourceBackupRepository(db, fixture.Data.Budget);
+                    var workspace = new CatalogWorkspace(backup.Upload.Scope.AccountId, backup.Upload.Scope.FolderId);
+                    foreach (var sidecar in sidecars)
+                    {
+                        var result = jobs.ReadCompletedImported(review.Id, sidecar.Key);
+                        Assert.IsNotNull(result);
+                        Assert.AreEqual("first-original-id", result.Imported.Original.FileId);
+                        Assert.AreEqual(backup.Upload.Id, receipts.Read(result, workspace)!.PublicationId);
+                    }
+                    return true;
+                }, deadline.Token).ConfigureAwait(false);
+            }
+            Assert.AreEqual("originals-verified", (await imports.StartAsync(review.Id, deadline.Token).ConfigureAwait(false)).State);
+            Assert.AreEqual(1, cloud.Allocations);
+            Assert.AreEqual(2, metadataLaunches);
+            CollectionAssert.AreEqual(selection.Payload, await File.ReadAllBytesAsync(selection.Path, deadline.Token).ConfigureAwait(false));
+            CollectionAssert.AreEqual(conflictBytes!, await File.ReadAllBytesAsync(conflictPath, deadline.Token).ConfigureAwait(false));
+            Measure("conflict-backup-verified");
+            return;
+        }
         Assert.IsNotNull(portable.ImportedMetadata);Assert.AreEqual(expectedMetadata.SourceSha256,portable.ImportedMetadata.Source.Sha256);Assert.AreEqual(expectedMetadata.Description,portable.ImportedMetadata.Description);
         Assert.AreEqual(expectedMetadata.Title,portable.ImportedMetadata.Title);Assert.AreEqual(expectedMetadata.CapturedUtc,portable.ImportedMetadata.CapturedUtc);
         Assert.AreEqual(imported.Facts.CapturedUtc,portable.CapturedUtc);

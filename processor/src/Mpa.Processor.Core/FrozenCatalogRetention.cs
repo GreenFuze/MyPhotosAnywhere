@@ -7,11 +7,12 @@ namespace Mpa.Processor.Core;
 public sealed partial class FrozenCatalogSnapshot
 {
     private sealed record RetentionHeader(string Format, int Major, WorkspacePublicationScope Scope, Guid SnapshotId, Guid CommitIntentId,
-        long DiscoveryRevision, long Assets, CatalogSourceCoverage[] Coverage);
+        long DiscoveryRevision, long Assets, CatalogSourceCoverage[] Coverage,
+        [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]long? ImportedObservations=null);
     private FrozenCatalogSnapshot(string path, RetentionHeader header)
     {
         _path = path; LibraryId = header.Scope.LibraryId; ConfigurationRevision = header.Scope.ConfigurationRevision;
-        DiscoveryRevision = header.DiscoveryRevision; Count = header.Assets; Coverage = header.Coverage.ToList().AsReadOnly();
+        DiscoveryRevision = header.DiscoveryRevision; Count = header.Assets; Coverage = header.Coverage.ToList().AsReadOnly();ImportedObservationCount=header.ImportedObservations;
     }
     internal long RetainedWriteBudget()
     {
@@ -24,7 +25,7 @@ public sealed partial class FrozenCatalogSnapshot
     {
         ObjectDisposedException.ThrowIf(_closed, this); token.ThrowIfCancellationRequested();
         if (claim.Scope.LibraryId != LibraryId || claim.Scope.ConfigurationRevision != ConfigurationRevision || claim.Phase != "capturing") throw new CatalogGenerationCaptureConflictException();
-        var header = new RetentionHeader("mpa-retained-catalog", 1, claim.Scope, claim.SnapshotId, claim.CommitIntentId, DiscoveryRevision, Count, Coverage.ToArray());
+        var header = new RetentionHeader("mpa-retained-catalog", 1, claim.Scope, claim.SnapshotId, claim.CommitIntentId, DiscoveryRevision, Count, Coverage.ToArray(),ImportedObservationCount);
         var bytes = new CanonicalJson(256 * 1024).Encode(JsonSerializer.SerializeToUtf8Bytes(header));
         using var target = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = destination, Mode = SqliteOpenMode.ReadWrite, Pooling = false, DefaultTimeout = 5 }.ToString());
         target.Open();
@@ -45,6 +46,11 @@ public sealed partial class FrozenCatalogSnapshot
         using var connection = ReadRetainedConnection(path); var header = ReadRetentionHeader(connection, claim);
         using var count = connection.CreateCommand(); count.CommandText = "SELECT count(*) FROM fact";
         if ((long)count.ExecuteScalar()! != header.Assets) throw new InvalidDataException("Retained capture fact count disagrees with its complete header.");
+        if(header.ImportedObservations is{} observations)
+        {
+            count.CommandText="SELECT count(*) FROM imported_observation";
+            if(observations<0||(long)count.ExecuteScalar()! != observations)throw new InvalidDataException("Retained imported observation count disagrees with its complete header.");
+        }
         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (file.Length is < 4096 or > CatalogGenerationCaptureRepository.MaximumSnapshotBytes) throw new InvalidDataException("Retained catalog size exceeds its bound.");
         using var digest = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);

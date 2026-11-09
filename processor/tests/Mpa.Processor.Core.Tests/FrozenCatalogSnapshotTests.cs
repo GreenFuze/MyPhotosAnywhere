@@ -1,4 +1,7 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using Mpa.Processor.Protocol;
 using Microsoft.Data.Sqlite;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -124,6 +127,54 @@ public sealed class FrozenCatalogSnapshotTests
             generatedMetadataBytes = new FileInfo(Directory.GetFiles(fixture.CapturePath, "*.sqlite").Single()).Length,
             reservedBytes = fixture.Budget.Status().ReservedBytes, retainedReadPageBound = 250,
             scope = "private metadata staging and interleaved import write; shared-test-process memory; native UI, compression and Drive publication remain separate" }));
+    }
+
+    [TestMethod]
+    public void FrozenConflictBackupPagesContainTheExactObservationSetFromBeforeALaterWrite()
+    {
+        using var fixture = new Fixture();
+        fixture.Add([Fact("photo", 20), Fact("unrelated", null)]);
+        Guid asset;
+        using (var initial = CatalogFactsSnapshot.Open(fixture.Database))
+            asset = initial.ReadPage("").Assets.Single(photo => photo.FileId == "photo").Id;
+        var document = TakeoutMetadataDocument.ParseSource("""{"title":"photo.jpg","description":"Retained source","photoTakenTime":{"timestamp":"1"}}"""u8.ToArray());
+        var raw = document.CopyRawSource();
+        var artifact = document.EncodeArtifact();
+        var sourceDescriptor = new ArtifactDescriptor(raw.Length, document.SourceSha256, "input.bin");
+        var artifactDescriptor = new ArtifactDescriptor(artifact.Length, Convert.ToHexStringLower(SHA256.HashData(artifact)), "result.json");
+        var importId = Guid.NewGuid();
+        string AddObservation()
+        {
+            var job = Guid.NewGuid();
+            var observation = ImportedPhotoMetadata.FromTakeout(asset, importId, job, new string('1',64), 1,
+                new string('2',64), sourceDescriptor, artifactDescriptor, document);
+            var bytes = observation.Encode();
+            var key = TakeoutImportedPhotoFactsRepository.Prefix + asset.ToString("D") + ":" + job.ToString("D") + ":" +
+                Convert.ToHexStringLower(SHA256.HashData(bytes));
+            using var insert = fixture.Database.Connection.CreateCommand();
+            insert.CommandText = "INSERT INTO processor_meta(key,value) VALUES($key,$value)";
+            insert.Parameters.AddWithValue("$key",key);
+            insert.Parameters.AddWithValue("$value",Encoding.UTF8.GetString(bytes));
+            Assert.AreEqual(1,insert.ExecuteNonQuery());
+            return key;
+        }
+        var keys = Enumerable.Range(0,17).Select(_ => AddObservation()).Order(StringComparer.Ordinal).ToArray();
+        using var live = CatalogFactsSnapshot.Open(fixture.Database);
+        var later = AddObservation();
+        using var frozen = FrozenCatalogSnapshot.CaptureAndRelease(live, fixture.Directory, fixture.Budget);
+        Assert.AreEqual(17L, frozen.ImportedObservationCount);
+        var photo = frozen.ReadPage("").Assets.Single(value => value.Id == asset);
+        Assert.IsNull(photo.ImportedMetadata);
+        Assert.AreEqual(17L, photo.ImportedAttention!.Candidates);
+        Assert.AreEqual("conflicting-metadata", photo.ImportedAttention.Code);
+        Assert.AreEqual("Photo.jpg", photo.Name);
+        var first = frozen.ReadImportedObservations();
+        Assert.IsTrue(first.HasMore);
+        Assert.AreEqual(16, first.Observations.Count);
+        var second = frozen.ReadImportedObservations(first.Observations[^1].Key);
+        Assert.IsFalse(second.HasMore);
+        CollectionAssert.AreEqual(keys, first.Observations.Concat(second.Observations).Select(value => value.Key).ToArray());
+        Assert.IsFalse(second.Observations.Any(value => value.Key == later));
     }
 
     private static DiscoveredDriveAsset Fact(string file, long? capture) => new(file, 1, "Photo.jpg", "image/jpeg", 40, 30, capture, null, null, 0);
