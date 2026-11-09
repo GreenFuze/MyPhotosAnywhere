@@ -217,3 +217,15 @@ original-to-worker-to-conflict-backup workflow, and existing backup and cleanup.
 The tests confirm both original sidecars are backed up while the human filename
 and original photo remain intact. Unsupported raw preservation, conflict
 resolution, Drive ZIP input, remaining PC workflows and release gates are open.
+
+
+The supported conflict backup revision 0bb72c1 passed all 60 PC jobs and 72 native
+reports on its first attempts. Evidence is preflight-060/ci-0bb72c1-pc-validation-v294.json.
+
+Desktop import issues can now save the retained original bytes for malformed or
+unmatched metadata files within the existing source size limit. The first bytes
+and issue commit together, and the download verifies their original digest and
+entry binding. A user can also select an original for an unmatched supported
+sidecar after its export file has gone away. The native tests cover rollback,
+corruption, exact recovery and manual selection. Oversized input retention and
+Drive backup for opaque sources are still open.

@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Mpa.Processor.Core.Tests;
@@ -20,6 +21,48 @@ public sealed partial class TakeoutMetadataOperationTests
             using var corrupt=db.Connection.CreateCommand();corrupt.CommandText="UPDATE processor_meta SET value=json_set(value,'$.entry.relativePath','changed.json') WHERE key=$key";corrupt.Parameters.AddWithValue("$key","takeout-metadata-item-v1:"+fixture.Completed.ImportId.ToString("D")+":"+fixture.Sidecar.Key);Assert.AreEqual(1,corrupt.ExecuteNonQuery());
             Assert.ThrowsExactly<InvalidDataException>(()=>issues.ReadPage(fixture.Completed.ImportId));return true;
         },fixture.Token).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    public async Task RejectedSidecarBytesCommitWithTheIssueAndRejectReplacementOrCorruption()
+    {
+        await using var fixture = await ImportedFixture.CreateAsync().ConfigureAwait(false);
+        var input = fixture.Catalog.CaptureMetadataIssueInput(fixture.Completed, fixture.Sidecar);
+        await fixture.State.ExecuteAsync(db =>
+        {
+            var issues = new TakeoutMetadataIssueRepository(db);
+            var importId = fixture.Completed.ImportId;
+            var sidecarKey = fixture.Sidecar.Key;
+            var before = new DurableJobRepository(db).PendingReceiptCount();
+            using var command = db.Connection.CreateCommand();
+            command.CommandText = """
+                CREATE TRIGGER reject_raw_metadata BEFORE INSERT ON processor_meta
+                WHEN NEW.key LIKE 'takeout-metadata-raw-v1:%'
+                BEGIN SELECT RAISE(ABORT,'injected raw source write failure'); END
+                """;
+            command.ExecuteNonQuery();
+            Assert.ThrowsExactly<SqliteException>(() => issues.RecordRetainedRaw(input, "invalid-metadata", fixture.Raw));
+            Assert.IsNull(issues.Find(fixture.Completed, sidecarKey));
+            Assert.IsNull(issues.ReadRetainedRaw(importId, sidecarKey));
+            command.CommandText = "DROP TRIGGER reject_raw_metadata";
+            command.ExecuteNonQuery();
+
+            issues.RecordRetainedRaw(input, "invalid-metadata", fixture.Raw);
+            issues.RecordRetainedRaw(input, "invalid-metadata", fixture.Raw);
+            Assert.IsTrue(issues.ReadPage(importId).Issues.Single().RawAvailable);
+            var replacement = fixture.Raw.ToArray();
+            replacement[0] ^= 1;
+            Assert.ThrowsExactly<InvalidDataException>(() => issues.RecordRetainedRaw(input, "invalid-metadata", replacement));
+            CollectionAssert.AreEqual(fixture.Raw, issues.ReadRetainedRaw(importId, sidecarKey));
+            Assert.AreEqual(before, new DurableJobRepository(db).PendingReceiptCount());
+
+            command.CommandText = "UPDATE processor_meta SET value=$value WHERE key=$key";
+            command.Parameters.AddWithValue("$value", Convert.ToBase64String(replacement));
+            command.Parameters.AddWithValue("$key", "takeout-metadata-raw-v1:" + importId.ToString("D") + ":" + sidecarKey);
+            Assert.AreEqual(1, command.ExecuteNonQuery());
+            Assert.ThrowsExactly<InvalidDataException>(() => issues.ReadRetainedRaw(importId, sidecarKey));
+            return true;
+        }, fixture.Token).ConfigureAwait(false);
     }
 
     [TestMethod]

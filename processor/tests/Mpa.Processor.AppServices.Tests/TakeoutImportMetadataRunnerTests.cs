@@ -25,6 +25,8 @@ public sealed partial class AccountServiceTests
             await original.UploadAsync(input.Job,deadline.Token).ConfigureAwait(false);
         var result=await metadata.RunAsync(completed,deadline.Token).ConfigureAwait(false);
         Assert.AreEqual(new TakeoutImportMetadataResult(1,0,2,1,0){ObservationsChanged=true},result);Assert.AreEqual(1,launches);
+        var broken = await File.ReadAllBytesAsync(Path.Combine(Path.GetDirectoryName(input.Path)!, "broken.json"), deadline.Token).ConfigureAwait(false);
+        var unmatched = await File.ReadAllBytesAsync(Path.Combine(Path.GetDirectoryName(input.Path)!, "other.json"), deadline.Token).ConfigureAwait(false);
         File.Delete(input.Path+".json");
         File.Delete(Path.Combine(Path.GetDirectoryName(input.Path)!,"broken.json"));File.Delete(Path.Combine(Path.GetDirectoryName(input.Path)!,"other.json"));File.Delete(Path.Combine(Path.GetDirectoryName(input.Path)!,"oversized.json"));
         Assert.AreEqual(new TakeoutImportMetadataResult(0,1,2,1,0),await metadata.RunAsync(completed,deadline.Token).ConfigureAwait(false));Assert.AreEqual(1,launches);
@@ -43,6 +45,21 @@ public sealed partial class AccountServiceTests
         Assert.AreEqual(new TakeoutMetadataProgress(4,1,3,0,true),progress);
         var issuePage=await fixture.State.ExecuteAsync(db=>new TakeoutMetadataIssueRepository(db).ReadPage(completed.ImportId),deadline.Token).ConfigureAwait(false);
         CollectionAssert.AreEquivalent(PermanentImportMetadataCodes,issuePage.Issues.Select(issue=>issue.Code).ToArray());Assert.IsTrue(issuePage.Issues.All(issue=>!issue.Retryable));
+        await fixture.State.ExecuteAsync(db =>
+        {
+            var issues = new TakeoutMetadataIssueRepository(db);
+            var malformed = issuePage.Issues.Single(issue => issue.Code == "invalid-metadata");
+            var unmatchedIssue = issuePage.Issues.Single(issue => issue.Code == "name-mismatch");
+            var oversized = issuePage.Issues.Single(issue => issue.Code == "metadata-too-large");
+            Assert.IsTrue(malformed.RawAvailable);
+            Assert.IsTrue(unmatchedIssue.RawAvailable);
+            Assert.IsFalse(oversized.RawAvailable);
+            CollectionAssert.AreEqual(broken, issues.ReadRetainedRaw(completed.ImportId, malformed.Key));
+            CollectionAssert.AreEqual(unmatched, issues.ReadRetainedRaw(completed.ImportId, unmatchedIssue.Key));
+            Assert.IsNull(issues.ReadRetainedRaw(completed.ImportId, oversized.Key));
+            Assert.IsNull(issues.ReadRetainedRaw(Guid.NewGuid(), malformed.Key));
+            return true;
+        }, deadline.Token).ConfigureAwait(false);
     }
 
     [TestMethod]

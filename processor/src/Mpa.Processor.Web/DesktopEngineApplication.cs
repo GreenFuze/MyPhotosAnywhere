@@ -22,6 +22,8 @@ public sealed class DesktopEngineApplication(Guid libraryId, ProcessorStateCoord
     private TakeoutDesktopImportRuntime Imports=>_imports??throw new InvalidOperationException("Desktop import has not been configured.");
     public async Task<DesktopImports> ImportsAsync(CancellationToken token)=>new(Imports.CanChooseFolder,await Imports.ListAsync(token).ConfigureAwait(false),Imports.State is ProcessorWorkState.Paused or ProcessorWorkState.Pausing,Imports.CanChooseArchives);
     public Task<TakeoutMetadataIssuePage> ImportMetadataIssuesAsync(Guid importId,string? after,CancellationToken token)=>Imports.MetadataIssuesAsync(importId,after,token);
+    public Task<byte[]?> ImportMetadataIssueSourceAsync(Guid importId, string key, CancellationToken token)
+        => Imports.MetadataIssueSourceAsync(importId, key, token);
     public Task<TakeoutOriginalChoices> ImportOriginalChoicesAsync(Guid importId,string? after,CancellationToken token)=>Imports.OriginalChoicesAsync(importId,after,token);
     public Task SelectImportMetadataOriginalAsync(Guid importId,string sidecarKey,string originalKey,CancellationToken token)=>Imports.SelectMetadataOriginalAsync(importId,sidecarKey,originalKey,token);
     public Task<TakeoutImportActivity?> ChooseImportFolderAsync(Guid sourceId,CancellationToken token)=>Imports.ChooseFolderAsync(sourceId,token);

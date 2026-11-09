@@ -148,11 +148,22 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
         if(sidecar.Bytes is <1 or >TakeoutMetadataDocument.MaximumSourceBytes)
         {await RecordIssueAsync(completed,catalog,sidecar,"metadata-too-large",null,token).ConfigureAwait(false);return SidecarResult.Unsupported;}
         using var reservation=_budget.Reserve(checked(sidecar.Bytes*4+65536));reservation.RecheckBeforeWrite(reservation.Bytes);
-        var raw=await ReadSidecarAsync(completed,catalog,sidecar,token).ConfigureAwait(false);TakeoutMetadataDocument document;
+        var retained = selection is null ? null : await _state.ExecuteAsync(db =>
+            new TakeoutMetadataIssueRepository(db).ReadRetainedRaw(completed.ImportId, sidecar.Key), token).ConfigureAwait(false);
+        var raw = retained ?? await ReadSidecarAsync(completed,catalog,sidecar,token).ConfigureAwait(false);
+        TakeoutMetadataDocument document;
         try{document=TakeoutMetadataDocument.ParseSource(raw);}catch(TakeoutMetadataIssueException error)
-        {await RecordIssueAsync(completed,catalog,sidecar,error.Code,Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(raw)),token).ConfigureAwait(false);return SidecarResult.Unsupported;}
+        {
+            reservation.RecheckBeforeWrite(reservation.Bytes);
+            await RetainIssueSourceAsync(completed, catalog, sidecar, error.Code, raw, token).ConfigureAwait(false);
+            return SidecarResult.Unsupported;
+        }
         var association=selection is null?catalog.AssociateMetadata(sidecar.Key,document):catalog.AssociateMetadata(completed,selection,document);if(association.Status!="matched")
-        {await RecordIssueAsync(completed,catalog,sidecar,association.Status,document.SourceSha256,token).ConfigureAwait(false);return SidecarResult.Unmatched;}
+        {
+            reservation.RecheckBeforeWrite(reservation.Bytes);
+            await RetainIssueSourceAsync(completed, catalog, sidecar, association.Status, raw, token).ConfigureAwait(false);
+            return SidecarResult.Unmatched;
+        }
         var original=await _state.ExecuteAsync(db=>new TakeoutOriginalJobRepository(db).ReadVerified(completed.ImportId,association.Media!.Key),token).ConfigureAwait(false);
         if(original is null)return SidecarResult.Waiting;
         var descriptor=new ArtifactDescriptor(raw.Length,document.SourceSha256,"input.bin");
@@ -160,6 +171,17 @@ public sealed class TakeoutImportMetadataRunner(ProcessorStateCoordinator state,
         {var jobs=new TakeoutMetadataJobRepository(db);return jobs.Claim(jobs.EnsureImported(original,association,descriptor));},token).ConfigureAwait(false);
         if(work is null)throw new ProcessorWorkStateConflictException();
         await AnalyzeAsync(work,raw,token).ConfigureAwait(false);return await ResolveAfterAnalysisAsync(completed,catalog,sidecar,changes,token).ConfigureAwait(false);
+    }
+
+    private Task<bool> RetainIssueSourceAsync(TakeoutCompletedInventory completed, TakeoutAssociationCatalog catalog,
+        TakeoutCapturedEntry sidecar, string code, byte[] raw, CancellationToken token)
+    {
+        var input = catalog.CaptureMetadataIssueInput(completed, sidecar);
+        return _state.ExecuteAsync(db =>
+        {
+            new TakeoutMetadataIssueRepository(db).RecordRetainedRaw(input, code, raw);
+            return true;
+        }, token);
     }
 
     private Task<bool> RecordIssueAsync(TakeoutCompletedInventory completed,TakeoutAssociationCatalog catalog,TakeoutCapturedEntry sidecar,string code,string? hash,CancellationToken token)

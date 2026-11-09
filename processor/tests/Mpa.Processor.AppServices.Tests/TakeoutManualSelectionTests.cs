@@ -24,8 +24,10 @@ public sealed partial class AccountServiceTests
             await fixture.State.ExecuteAsync(db=>
             {
                 var issues=new TakeoutMetadataIssueRepository(db);var unmatched=issues.ReadPage(completed.ImportId).Issues.Single(value=>value.Code=="name-mismatch");var original=new TakeoutOriginalJobRepository(db).ReadChoices(completed.ImportId).Originals.Single();
+                Assert.IsTrue(unmatched.RawAvailable);
                 issues.SelectOriginal(completed.ImportId,unmatched.Key,original.Key);return true;
             },deadline.Token).ConfigureAwait(false);
+            File.Delete(Path.Combine(Path.GetDirectoryName(input.Path)!, "other.json"));
         }
         finally{release.TrySetResult();await pass.ConfigureAwait(false);}
         await fixture.State.ExecuteAsync(db=>

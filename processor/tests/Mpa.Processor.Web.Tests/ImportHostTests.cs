@@ -70,11 +70,53 @@ public sealed partial class WebHostTests
         Assert.AreEqual(1,engine.MetadataIssueReads);Assert.AreEqual(0,engine.ImportCommands.Count);Assert.AreEqual(0,host.FrameworkDiagnostics.Count);
     }
 
+    [TestMethod]
+    public async Task RetainedMetadataIssueDownloadRequiresHostSessionAndServesOpaqueAttachment()
+    {
+        using var assets = new Assets();
+        var engine = new Engine { MetadataIssueSource = "{malformed"u8.ToArray() };
+        await using var host = await DesktopWebHost.StartAsync(engine, assets.Path, null, CancellationToken.None).ConfigureAwait(false);
+        using var http = Client(host.LocalEndpoint);
+        var route = "api/import-metadata-issue-source?id=" + engine.Import.Id.ToString("D") + "&key=" + new string('a',64);
+        using (var anonymous = await http.GetAsync(route).ConfigureAwait(false))
+            Assert.AreEqual(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        Assert.AreEqual(0, engine.MetadataIssueSourceReads);
+        using var login = await LoginAsync(http, host.OpenLocalBrowser(), host.LocalEndpoint.GetLeftPart(UriPartial.Authority)).ConfigureAwait(false);
+        login.EnsureSuccessStatusCode();
+        using (var forged = await http.GetAsync(route + "&path=other.json").ConfigureAwait(false))
+            Assert.AreEqual(HttpStatusCode.BadRequest, forged.StatusCode);
+        Assert.AreEqual(0, engine.MetadataIssueSourceReads);
+        using (var saved = await http.GetAsync(route).ConfigureAwait(false))
+        {
+            saved.EnsureSuccessStatusCode();
+            Assert.AreEqual("application/octet-stream", saved.Content.Headers.ContentType?.MediaType);
+            Assert.AreEqual("attachment", saved.Content.Headers.ContentDisposition?.DispositionType);
+            Assert.IsTrue(saved.Headers.CacheControl?.NoStore);
+            CollectionAssert.AreEqual(engine.MetadataIssueSource, await saved.Content.ReadAsByteArrayAsync().ConfigureAwait(false));
+        }
+        engine.MetadataIssueSource = null;
+        using (var absent = await http.GetAsync(route).ConfigureAwait(false))
+            Assert.AreEqual(HttpStatusCode.NotFound, absent.StatusCode);
+        Assert.AreEqual(2, engine.MetadataIssueSourceReads);
+        Assert.AreEqual(0, engine.ImportCommands.Count);
+        Assert.AreEqual(0, host.FrameworkDiagnostics.Count);
+    }
+
     private sealed partial class Engine:IDesktopImportApplication
     {
         public TakeoutImportActivity Import{get;set;}=new(Guid.NewGuid(),"photos",new(Guid.NewGuid(),"account",1,"destination",1),"ready",1,1,0,false,null);
         public List<(string Action,Guid Id)> ImportCommands{get;}=[];
         public int MetadataIssueReads{get;private set;}
+        public byte[]? MetadataIssueSource { get; set; }
+        public int MetadataIssueSourceReads { get; private set; }
+        public Task<byte[]?> ImportMetadataIssueSourceAsync(Guid importId, string key, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            Assert.AreEqual(Import.Id, importId);
+            Assert.AreEqual(new string('a', 64), key);
+            MetadataIssueSourceReads++;
+            return Task.FromResult(MetadataIssueSource);
+        }
         public string? MetadataIssueAfter{get;private set;}
         public int OriginalChoiceReads{get;private set;}
         public bool RejectMetadataSelection{get;set;}

@@ -37,7 +37,7 @@ export interface ActivityPage { jobs: SourceJob[]; nextCursor: string | null }
 export class AuthenticationRequired extends Error {}
 export interface ImportMetadataProgress { total: string; ready: string; issues: string; waiting: string; finished: boolean }
 export type ImportMetadataIssueCode = 'invalid-metadata' | 'unsupported-metadata' | 'metadata-too-large' | 'name-mismatch' | 'missing-media' | 'ambiguous-media' | 'input-unavailable';
-export interface ImportMetadataIssue { key: string; name: string; code: ImportMetadataIssueCode; retryable: boolean }
+export interface ImportMetadataIssue { key: string; name: string; code: ImportMetadataIssueCode; retryable: boolean; rawAvailable?: boolean }
 export interface ImportMetadataIssues { issues: ImportMetadataIssue[]; next: string | null }
 export interface ImportOriginalChoice { key: string; name: string; fileId: string }
 export interface ImportOriginalChoices { originals: ImportOriginalChoice[]; next: string | null }
@@ -273,11 +273,16 @@ export class DesktopApi {
       const item: unknown = raw;
       if (typeof item !== 'object' || item === null || !('key' in item) || !key(item.key) || previous !== null && item.key <= previous ||
         !('name' in item) || typeof item.name !== 'string' || item.name.length < 1 || item.name.length > 4096 || item.name.startsWith('/') || /^[a-z]:/i.test(item.name) || /[\\\u0000-\u001f]/.test(item.name) || item.name.split('/').some(part => part === '' || part === '.' || part === '..') ||
-        !('code' in item) || typeof item.code !== 'string' || !codes.includes(item.code) || !('retryable' in item) || typeof item.retryable !== 'boolean' || item.retryable !== (item.code === 'input-unavailable')) throw invalid();
+        !('code' in item) || typeof item.code !== 'string' || !codes.includes(item.code) || !('retryable' in item) || typeof item.retryable !== 'boolean' || item.retryable !== (item.code === 'input-unavailable') ||
+        ('rawAvailable' in item && (typeof item.rawAvailable !== 'boolean' || item.rawAvailable && item.retryable))) throw invalid();
       previous = item.key;
     }
     if (value.next !== null && previous !== null && value.next < previous) throw invalid();
     return value as unknown as ImportMetadataIssues;
+  }
+  importMetadataIssueSourceUrl(id: string, key: string): string {
+    if (!libraryIdentity(id) || !/^[a-f0-9]{64}$/.test(key)) throw new Error('Choose a saved metadata file.');
+    return '/api/import-metadata-issue-source?' + new URLSearchParams({ id, key });
   }
   async cleanupImportMetadata(id: string): Promise<{ retired: string; kept: string }> {
     if (!libraryIdentity(id)) throw new Error('Choose a saved import for cleanup.');

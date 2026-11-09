@@ -66,6 +66,7 @@ function MetadataIssues({ api, id, disabled, retry }: { api: DesktopApi; id: str
   return <section aria-label="Metadata issues"><h3>Metadata files needing attention</h3>
     {notice && <p role="alert">{notice}</p>}{busy && <p role="status">Loading issue details…</p>}
     {issues.map(issue => <div key={issue.key}><strong>{issue.name}</strong><p>{issueMessages[issue.code]}</p>
+      {issue.rawAvailable && <a href={api.importMetadataIssueSourceUrl(id, issue.key)} download>Save retained metadata file</a>}
       {['name-mismatch', 'missing-media', 'ambiguous-media'].includes(issue.code) && <MetadataOriginalPicker api={api} id={id} issue={issue} disabled={disabled || busy} />}
     </div>)}
     {!busy && !notice && issues.length === 0 && next === null && <p>No unresolved metadata issues.</p>}

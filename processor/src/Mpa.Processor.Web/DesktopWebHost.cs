@@ -323,6 +323,25 @@ public sealed class DesktopWebHost : IAsyncDisposable
                 var issueImport=(await issueApplication.ImportsAsync(token).ConfigureAwait(false)).Imports.SingleOrDefault(value=>value.Id==issueImportId)??throw new BadHttpRequestException("That saved import is unavailable.");
                 if(issueImport.Entries is null)throw new ProcessorWorkStateConflictException();
                 await context.Response.WriteAsJsonAsync(await issueApplication.ImportMetadataIssuesAsync(issueImportId,issueAfter,token).ConfigureAwait(false),token).ConfigureAwait(false);break;
+            case ("GET", "/api/import-metadata-issue-source"):
+            {
+                if (!session.HostOwner) { context.Response.StatusCode = 403; break; }
+                if (_application is not IDesktopImportApplication sourceApplication) { context.Response.StatusCode = 404; break; }
+                var sourceId = RequiredQuery(context, "id");
+                var sourceKey = RequiredQuery(context, "key");
+                if (context.Request.Query.Count != 2 || !Guid.TryParseExact(sourceId, "D", out var importId) ||
+                    importId == Guid.Empty || importId.ToString("D") != sourceId || !ImportKey(sourceKey))
+                    throw new BadHttpRequestException("Choose a saved import and captured metadata file.");
+                var sourceBytes = await sourceApplication.ImportMetadataIssueSourceAsync(importId, sourceKey, token).ConfigureAwait(false);
+                if (sourceBytes is null) { context.Response.StatusCode = 404; break; }
+                if (sourceBytes.Length is < 1 or > Mpa.Processor.Protocol.TakeoutMetadataDocument.MaximumSourceBytes)
+                    throw new InvalidDataException("Retained metadata bytes exceed their original download bound.");
+                context.Response.ContentType = "application/octet-stream";
+                context.Response.ContentLength = sourceBytes.Length;
+                context.Response.Headers.ContentDisposition = $"attachment; filename=\"metadata-{sourceKey}.json\"";
+                await context.Response.Body.WriteAsync(sourceBytes, token).ConfigureAwait(false);
+                break;
+            }
             case("POST","/api/import-folders"):
             case("POST","/api/import-archives"):
             case("POST","/api/import-start"):
