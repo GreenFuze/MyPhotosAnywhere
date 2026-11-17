@@ -18,3 +18,18 @@ app/src/main/assets/mobile_facenet.part
 # Python diagnostic tooling caches
 __pycache__/
 *.pyc
+
+# ArchiCode local state
+.archicode/local.json
+.archicode/runs/
+.archicode/incidents/
+.archicode/artifacts/
+.archicode/summaries/
+.archicode/manifests/
+.archicode/memory/
+.archicode/memory-notes/
+.archicode/reviews/
+.archicode/repair-backup-*/
+.archicode/runtime/
+.archicode/tmp/
+gaia-staging-*/

@@ -1,0 +1,1023 @@
+{
+  "id": "flow-main--user-journeys",
+  "name": "User Journeys & UX",
+  "description": "Evidence-bounded user journeys covering device-photo access changes, opening indexed photos, and dismissing import summaries. Paths describe interactions and outcomes asserted by supplied device tests.",
+  "ignored": false,
+  "perspective": {
+    "kind": "user-journeys",
+    "source": "codebase-importer",
+    "generated": true,
+    "question": "How do user-facing routes and interactions traverse the system?",
+    "confidence": "medium",
+    "evidenceBasis": [
+      "routes",
+      "UI symbols and paths",
+      "direct dependencies",
+      "ordered source-observed behavioral contracts",
+      "provider-authored lens concepts grounded to canonical code subjects",
+      "bounded repository architecture documents"
+    ],
+    "limitations": [
+      "Only routes and interaction paths visible in source are shown; analytics and undocumented behavior are outside this view.",
+      "1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower.",
+      "Concept nodes are evidence-bounded architectural interpretations, not additional implementation sources of truth."
+    ],
+    "checkedAt": "2026-10-22T12:16:48.001Z",
+    "coverage": {
+      "subjects": 10,
+      "relations": 9,
+      "observedRelations": 0,
+      "inferredRelations": 9
+    }
+  },
+  "nodes": {
+    "node-project": {
+      "id": "node-project",
+      "type": "perspective",
+      "title": "MyPhotosAnywhere — User Journeys & UX",
+      "description": "How do user-facing routes and interactions traverse the system? Route- and UI-bearing components with their direct production collaborators. This is code-observed interaction structure, not a claimed product specification.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "shape": "note"
+      },
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "Gradle",
+        "SQLite",
+        "Python"
+      ],
+      "acceptanceCriteria": [
+        "MyPhotosAnywhere — User Journeys & UX responsibilities are represented by current source files",
+        "MyPhotosAnywhere — User Journeys & UX relationships and data flow are visible in the map",
+        "Future changes to MyPhotosAnywhere — User Journeys & UX can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:project:myphotosanywhere",
+        "kind": "concept",
+        "evidenceStatus": "context"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:16:48.001Z",
+        "claims": [
+          {
+            "relation": "cover",
+            "kind": "directory",
+            "path": "."
+          }
+        ]
+      },
+      "customProperties": {
+        "Perspective question": "How do user-facing routes and interactions traverse the system?",
+        "Confidence": "exploratory",
+        "Evidence basis": "routes, UI symbols and paths, direct dependencies, ordered source-observed behavioral contracts",
+        "Limitations": "Only routes and interaction paths visible in source are shown; analytics and undocumented behavior are outside this view. 1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower."
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-device-photo-user": {
+      "id": "node-lens-device-photo-user",
+      "type": "actor",
+      "title": "User with device photos in the library",
+      "description": "The initiating context contains indexed device photos, including a photo materialized into an owned original.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#9a7fc4",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 300
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "User with device photos in the library responsibilities are represented by current source files",
+        "User with device photos in the library relationships and data flow are visible in the map",
+        "Future changes to User with device photos in the library can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:user-journey:eda82715978a4eb0db9c",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "eda82715978a4eb0db9c"
+      },
+      "customProperties": {
+        "Lens role": "actor",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-revoke-access": {
+      "id": "node-lens-revoke-access",
+      "type": "trigger",
+      "title": "Device photo access is revoked",
+      "description": "The access-revocation scenario starts after photo permission has been revoked externally and verifies that the current permission is no longer granted.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#9a7fc4",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 410,
+        "y": 80
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Device photo access is revoked responsibilities are represented by current source files",
+        "Device photo access is revoked relationships and data flow are visible in the map",
+        "Future changes to Device photo access is revoked can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:user-journey:913ec9109edf56dcf5fa",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "913ec9109edf56dcf5fa"
+      },
+      "customProperties": {
+        "Lens role": "trigger",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-reconcile-device-library": {
+      "id": "node-lens-reconcile-device-library",
+      "type": "journey-step",
+      "title": "Reconcile the device library",
+      "description": "After revocation, the scenario invokes deviceMedia.reconcile() and queries the timeline to examine the resulting library state.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#9a7fc4",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 740,
+        "y": 80
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Reconcile the device library responsibilities are represented by current source files",
+        "Reconcile the device library relationships and data flow are visible in the map",
+        "Future changes to Reconcile the device library can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:user-journey:4aa8dfcae2077332796c",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "4aa8dfcae2077332796c"
+      },
+      "customProperties": {
+        "Lens role": "journey-step",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-retain-library-content": {
+      "id": "node-lens-retain-library-content",
+      "type": "outcome",
+      "title": "Keep metadata and owned originals",
+      "description": "The externalRevocationKeepsMetadataAndOwnedOriginalsThenSelectedGrantIsRechecked test specifies preservation of metadata and owned originals after external access is revoked.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#9a7fc4",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 1070,
+        "y": 80
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Keep metadata and owned originals responsibilities are represented by current source files",
+        "Keep metadata and owned originals relationships and data flow are visible in the map",
+        "Future changes to Keep metadata and owned originals can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:user-journey:808a2e6f4c9a48861839",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "808a2e6f4c9a48861839"
+      },
+      "customProperties": {
+        "Lens role": "outcome",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-selected-photo-grant": {
+      "id": "node-lens-selected-photo-grant",
+      "type": "trigger",
+      "title": "Selected photo access is granted",
+      "description": "The same access-revocation scenario continues with a selected photo grant.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#9a7fc4",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 1400,
+        "y": 80
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Selected photo access is granted responsibilities are represented by current source files",
+        "Selected photo access is granted relationships and data flow are visible in the map",
+        "Future changes to Selected photo access is granted can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:user-journey:e7842c8580eb008c9692",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "e7842c8580eb008c9692"
+      },
+      "customProperties": {
+        "Lens role": "trigger",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-rechecked-selected-access": {
+      "id": "node-lens-rechecked-selected-access",
+      "type": "outcome",
+      "title": "Recheck selected photo access",
+      "description": "The scenario specifies that selected access is rechecked after the grant; the supplied evidence does not establish a broader restoration of access.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#9a7fc4",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 1730,
+        "y": 80
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Recheck selected photo access responsibilities are represented by current source files",
+        "Recheck selected photo access relationships and data flow are visible in the map",
+        "Future changes to Recheck selected photo access can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:user-journey:f508f4447e17e8bdee9f",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "f508f4447e17e8bdee9f"
+      },
+      "customProperties": {
+        "Lens role": "outcome",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-gallery": {
+      "id": "node-gallery",
+      "type": "journey-step",
+      "title": "Open an indexed device photo",
+      "description": "With an indexed photo available, show the newest timeline, wait for its enabled photo item and completed refresh, then click the photo.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4477BB",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 410,
+        "y": 520
+      },
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "SQLite"
+      ],
+      "acceptanceCriteria": [
+        "Changing gallery density preserves the actual first visible photo identity.",
+        "The date indicator remains within the photo viewport."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:dc27f6a3218fbfa00d31",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "dc27f6a3218fbfa00d31"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:16:48.001Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryPolishDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/search/SearchScreen.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/BlockMosaic.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/DateScrubbing.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/GalleryPresentation.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/JustifiedMosaic.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/MosaicContinuity.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/RemotePhotoDetails.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/SqliteViewerSession.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/ThumbnailGeometry.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineAnchorClearance.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineAnchorRestorer.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineDateNavigation.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineGrid.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineGridViewport.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineModels.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineOrder.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelinePagingSource.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/AdaptiveThumbnailDeviceTest.kt",
+            "symbol": "Fixture"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/AdaptiveThumbnailDeviceTest.kt",
+            "symbol": "AdaptiveThumbnailDeviceTest"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/ui/GalleryBarPolicy.kt",
+            "symbol": "GalleryBarPolicy"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineViewer.kt",
+            "symbol": "TimelineMediaState"
+          },
+          {
+            "relation": "own",
+            "kind": "function",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineViewer.kt",
+            "symbol": "kotlinx"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineModels.kt",
+            "symbol": "TimelineQuery"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, User Journeys & UX, Runtime & Integration Flows, Data Ownership & Persistence, Modules & Components, Dependency Health",
+        "Lens confidence": "Product Capabilities: medium, User Journeys & UX: exploratory, Runtime & Integration Flows: medium, Data Ownership & Persistence: medium, Modules & Components: high, Dependency Health: high",
+        "Evidence basis": "34 files; 12 symbols; 0 routes; 23 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.62",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "yes",
+        "Dependency community": "community-1",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "",
+        "Runtime interactions": "shared-read:album, shared-read:deviceFolder, shared-read:deviceOnly, shared-read:filter, shared-read:first, shared-read:importedPerson, shared-read:last, shared-read:person, shared-read:source, shared-read:text, shared-read:type, shared-read:columns, shared-read:layout, shared-read:key, shared-read:millis, shared-read:offset, shared-read:query, data-entity:entries, data-entity:cloud_photos, data-entity:device_media, data-entity:faces, data-entity:filtered, data-entity:photo_people"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-review-70c43c54e11219fee05d": {
+      "id": "node-lens-review-70c43c54e11219fee05d",
+      "type": "outcome",
+      "title": "View the selected device photo",
+      "description": "The viewer appears with selected.photoId equal to the photo clicked in the timeline.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5f88a8",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 740,
+        "y": 520
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "View the selected device photo responsibilities are represented by current source files",
+        "View the selected device photo relationships and data flow are visible in the map",
+        "Future changes to View the selected device photo can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:review:70c43c54e11219fee05d",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "70c43c54e11219fee05d"
+      },
+      "customProperties": {
+        "Lens role": "outcome",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in cited repository evidence",
+        "Interpretation boundary": "This lens concept explains an evidenced behavior without claiming canonical code ownership",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-imports": {
+      "id": "node-imports",
+      "type": "journey-step",
+      "title": "Dismiss an import summary",
+      "description": "When an import dismissal control is visible, click it and wait for that job's progress entry to disappear. The test subsequently delivers a late completion notification and recreates the activity.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#AA7733",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 410,
+        "y": 300
+      },
+      "techStack": [
+        "Kotlin",
+        "Android"
+      ],
+      "acceptanceCriteria": [
+        "Dismiss an import summary responsibilities are represented by current source files",
+        "Dismiss an import summary relationships and data flow are visible in the map",
+        "Future changes to Dismiss an import summary can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:50516df8547d1f01444d",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "50516df8547d1f01444d"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:16:48.001Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportRecoveryDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveRangeChannel.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveTakeoutArchive.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveTakeoutBrowser.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveTakeoutMetadata.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportConnectionRecovery.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportControls.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDuplicateFinder.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportErrorDismissal.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportExecution.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportForegroundRecovery.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportHistory.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportItemRecovery.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportJobProgress.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportNetwork.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveRangeChannel.kt",
+            "symbol": "DriveRangeChannel"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportControls.kt",
+            "symbol": "ImportModel"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportControls.kt",
+            "symbol": "class"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/UxAcceptanceDeviceTest.kt",
+            "symbol": "UxAcceptanceDeviceTest"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/TakeoutMetadata.kt",
+            "symbol": "TakeoutMetadata"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/TakeoutMetadata.kt",
+            "symbol": "TakeoutCodec"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, User Journeys & UX, Runtime & Integration Flows, Data Ownership & Persistence, Modules & Components, Dependency Health",
+        "Lens confidence": "Product Capabilities: medium, User Journeys & UX: exploratory, Runtime & Integration Flows: medium, Data Ownership & Persistence: medium, Modules & Components: high, Dependency Health: high",
+        "Evidence basis": "152 files; 12 symbols; 0 routes; 27 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.52",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "yes",
+        "Dependency community": "community-1",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "",
+        "Runtime interactions": "shared-read:path, shared-read:binding, shared-read:job:$job, shared-read:job:$job, shared-read:next, shared-read:job, shared-read:kind, shared-read:job, shared-read:job, http-call:@uri:newRawUri, data-entity:import_items, data-entity:import_jobs, data-entity:photos, data-entity:cloud_photos, data-entity:import_items, data-entity:import_jobs, data-entity:metadata_states, data-entity:photos, data-entity:cloud_photos, data-entity:import_jobs, data-entity:import_items, data-entity:import_jobs, data-entity:photos, data-entity:takeout_downloads, data-entity:takeout_sidecars, data-entity:metadata_states, data-entity:sqlite_master"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-review-fef623387a37b6c56689": {
+      "id": "node-lens-review-fef623387a37b6c56689",
+      "type": "outcome",
+      "title": "Keep dismissed summaries hidden without changing imports",
+      "description": "Late completion leaves the notification absent, and dismissed progress entries remain absent after activity recreation. Assertions verify that job records, item records, and source bytes remain unchanged. A dismissed cancelled import can be restored through the dismissed-import controls.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5f88a8",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 740,
+        "y": 300
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "Keep dismissed summaries hidden without changing imports responsibilities are represented by current source files",
+        "Keep dismissed summaries hidden without changing imports relationships and data flow are visible in the map",
+        "Future changes to Keep dismissed summaries hidden without changing imports can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:review:fef623387a37b6c56689",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "fef623387a37b6c56689"
+      },
+      "customProperties": {
+        "Lens role": "outcome",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in cited repository evidence",
+        "Interpretation boundary": "This lens concept explains an evidenced behavior without claiming canonical code ownership",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    }
+  },
+  "edges": {
+    "edge-lens-device-photo-user--revoke-access": {
+      "id": "edge-lens-device-photo-user--revoke-access",
+      "source": "node-lens-device-photo-user",
+      "target": "node-lens-revoke-access",
+      "lineStyle": "dashed",
+      "label": "loses device photo permission",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "user-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-revoke-access--reconcile-device-library": {
+      "id": "edge-lens-revoke-access--reconcile-device-library",
+      "source": "node-lens-revoke-access",
+      "target": "node-lens-reconcile-device-library",
+      "lineStyle": "dashed",
+      "label": "precedes reconciliation with permission revoked",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "user-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-reconcile-device-library--retain-library-content": {
+      "id": "edge-lens-reconcile-device-library--retain-library-content",
+      "source": "node-lens-reconcile-device-library",
+      "target": "node-lens-retain-library-content",
+      "lineStyle": "dashed",
+      "label": "preserves metadata and owned originals",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "user-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-retain-library-content--selected-photo-grant": {
+      "id": "edge-lens-retain-library-content--selected-photo-grant",
+      "source": "node-lens-retain-library-content",
+      "target": "node-lens-selected-photo-grant",
+      "lineStyle": "dashed",
+      "label": "is followed by a selected photo grant",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "user-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-selected-photo-grant--rechecked-selected-access": {
+      "id": "edge-lens-selected-photo-grant--rechecked-selected-access",
+      "source": "node-lens-selected-photo-grant",
+      "target": "node-lens-rechecked-selected-access",
+      "lineStyle": "dashed",
+      "label": "prompts a fresh access check",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "user-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-review-beed6c31511c": {
+      "id": "edge-review-beed6c31511c",
+      "source": "node-lens-device-photo-user",
+      "target": "node-gallery",
+      "lineStyle": "dashed",
+      "label": "selects an indexed photo from the timeline",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "architecture-review"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+            "line": 75,
+            "fact": "The test clicks the timeline item identified by photo.id."
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-review-15dc11e978c8": {
+      "id": "edge-review-15dc11e978c8",
+      "source": "node-gallery",
+      "target": "node-lens-review-70c43c54e11219fee05d",
+      "lineStyle": "dashed",
+      "label": "opens the viewer with the selected photo identity",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "architecture-review"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+            "line": 77,
+            "fact": "The test asserts the viewer's selected.photoId equals photo.id after waiting for viewer-screen."
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-review-fccdd84cf367": {
+      "id": "edge-review-fccdd84cf367",
+      "source": "node-lens-device-photo-user",
+      "target": "node-imports",
+      "lineStyle": "dashed",
+      "label": "when an import summary is visible, dismisses it",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "architecture-review"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 51,
+            "fact": "The test performs a click on dismiss-import for the job."
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-review-ec709ead7d26": {
+      "id": "edge-review-ec709ead7d26",
+      "source": "node-imports",
+      "target": "node-lens-review-fef623387a37b6c56689",
+      "lineStyle": "dashed",
+      "label": "hides the summary while preserving import records and source bytes",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "architecture-review"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 54,
+            "fact": "The late completion notification remains absent."
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 59,
+            "fact": "Dismissed progress entries remain absent after recreation; lines 60-64 exercise restoration."
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 66,
+            "fact": "Job and item equality assertions and the source-byte assertion verify preserved underlying state."
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    }
+  },
+  "subflows": {},
+  "groups": {}
+}

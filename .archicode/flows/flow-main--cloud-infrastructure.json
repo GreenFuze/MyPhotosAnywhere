@@ -1,0 +1,298 @@
+{
+  "id": "flow-main--cloud-infrastructure",
+  "name": "Cloud & Infrastructure",
+  "description": "Deployment, cloud, container, gateway, delivery, and managed external-service evidence detected in the repository.",
+  "ignored": false,
+  "perspective": {
+    "kind": "cloud-infrastructure",
+    "source": "codebase-importer",
+    "generated": true,
+    "question": "How is the system deployed, hosted, and connected to managed infrastructure?",
+    "confidence": "medium",
+    "evidenceBasis": [
+      "infrastructure paths and symbols",
+      "cloud SDK usage",
+      "deployment configuration",
+      "provider-authored lens concepts grounded to canonical code subjects",
+      "bounded repository architecture documents"
+    ],
+    "limitations": [
+      "This reflects repository declarations, not the current state of cloud accounts or deployed resources.",
+      "1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower.",
+      "Concept nodes are evidence-bounded architectural interpretations, not additional implementation sources of truth."
+    ],
+    "checkedAt": "2026-10-22T12:16:48.001Z",
+    "coverage": {
+      "subjects": 3,
+      "relations": 2,
+      "observedRelations": 0,
+      "inferredRelations": 2
+    }
+  },
+  "nodes": {
+    "node-project": {
+      "id": "node-project",
+      "type": "perspective",
+      "title": "MyPhotosAnywhere — Cloud & Infrastructure",
+      "description": "How is the system deployed, hosted, and connected to managed infrastructure? Deployment, cloud, container, gateway, delivery, and managed external-service evidence detected in the repository.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "shape": "note"
+      },
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "Gradle",
+        "SQLite",
+        "Python"
+      ],
+      "acceptanceCriteria": [
+        "MyPhotosAnywhere — Cloud & Infrastructure responsibilities are represented by current source files",
+        "MyPhotosAnywhere — Cloud & Infrastructure relationships and data flow are visible in the map",
+        "Future changes to MyPhotosAnywhere — Cloud & Infrastructure can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:project:myphotosanywhere",
+        "kind": "concept",
+        "evidenceStatus": "context"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:16:48.001Z",
+        "claims": [
+          {
+            "relation": "cover",
+            "kind": "directory",
+            "path": "."
+          }
+        ]
+      },
+      "customProperties": {
+        "Perspective question": "How is the system deployed, hosted, and connected to managed infrastructure?",
+        "Confidence": "medium",
+        "Evidence basis": "infrastructure paths and symbols, cloud SDK usage, deployment configuration",
+        "Limitations": "This reflects repository declarations, not the current state of cloud accounts or deployed resources. 1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower."
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-gradle-config": {
+      "id": "node-lens-gradle-config",
+      "type": "build-artifact",
+      "title": "Repository Gradle Configuration",
+      "description": "Root Gradle files and wrapper artifacts establish the repository build configuration. No executed build result is supplied.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#b8875f",
+        "shape": "document"
+      },
+      "position": {
+        "x": 80,
+        "y": 300
+      },
+      "techStack": [
+        "kotlin"
+      ],
+      "acceptanceCriteria": [
+        "Repository Gradle Configuration responsibilities are represented by current source files",
+        "Repository Gradle Configuration relationships and data flow are visible in the map",
+        "Future changes to Repository Gradle Configuration can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:infrastructure:259559d7cebe90af06c9",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "259559d7cebe90af06c9"
+      },
+      "customProperties": {
+        "Lens role": "build-artifact",
+        "Canonical code anchors": "code:0fb812fa4689afd3ae3d, code:8f0742645df3008a07c8",
+        "Evidence paths": "build.gradle.kts, settings.gradle.kts, gradle/wrapper/gradle-wrapper.properties, gradlew",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-app-build": {
+      "id": "node-lens-app-build",
+      "type": "deployable",
+      "title": "Android App Module Build",
+      "description": "app/build.gradle.kts is the observed manifest for the app Gradle module. The evidence identifies an Android application target without proving a released artifact.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#b8875f",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 410,
+        "y": 300
+      },
+      "techStack": [
+        "kotlin",
+        "java",
+        "androidx",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Android App Module Build responsibilities are represented by current source files",
+        "Android App Module Build relationships and data flow are visible in the map",
+        "Future changes to Android App Module Build can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:infrastructure:d0faddbc2e32b5fd858e",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "d0faddbc2e32b5fd858e"
+      },
+      "customProperties": {
+        "Lens role": "deployable",
+        "Canonical code anchors": "code:f5bbb798bf6dd4468d64",
+        "Evidence paths": "app/build.gradle.kts, app/src/main/java/com/myphotosanywhere/mpa/MpaApplication.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-device-validation": {
+      "id": "node-lens-device-validation",
+      "type": "deployable",
+      "title": "Android Device Validation Target",
+      "description": "Android instrumentation tests use targetContext, MediaStore, and the application instance. Emulator and screenshot scripts provide supporting validation-tool declarations.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#b8875f",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 740,
+        "y": 300
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android",
+        "python",
+        "bash"
+      ],
+      "acceptanceCriteria": [
+        "Android Device Validation Target responsibilities are represented by current source files",
+        "Android Device Validation Target relationships and data flow are visible in the map",
+        "Future changes to Android Device Validation Target can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:infrastructure:3d9c5cfc09957abf1ec1",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "3d9c5cfc09957abf1ec1"
+      },
+      "customProperties": {
+        "Lens role": "deployable",
+        "Canonical code anchors": "code:686b75dfa80936675511, code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt, scripts/ci_emulator.sh, scripts/collect_png_evidence.py",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    }
+  },
+  "edges": {
+    "edge-lens-gradle-config--app-build": {
+      "id": "edge-lens-gradle-config--app-build",
+      "source": "node-lens-gradle-config",
+      "target": "node-lens-app-build",
+      "lineStyle": "dashed",
+      "label": "provides the Gradle build boundary for the app module",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "delivery-flow"
+        ],
+        "locations": [
+          {
+            "path": "build.gradle.kts"
+          },
+          {
+            "path": "settings.gradle.kts"
+          },
+          {
+            "path": "gradle/wrapper/gradle-wrapper.properties"
+          },
+          {
+            "path": "gradlew"
+          },
+          {
+            "path": "app/build.gradle.kts"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/MpaApplication.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-app-build--device-validation": {
+      "id": "edge-lens-app-build--device-validation",
+      "source": "node-lens-app-build",
+      "target": "node-lens-device-validation",
+      "lineStyle": "dashed",
+      "label": "defines the application targeted by device instrumentation",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "delivery-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/build.gradle.kts"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/MpaApplication.kt"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt"
+          },
+          {
+            "path": "scripts/ci_emulator.sh"
+          },
+          {
+            "path": "scripts/collect_png_evidence.py"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    }
+  },
+  "subflows": {},
+  "groups": {}
+}

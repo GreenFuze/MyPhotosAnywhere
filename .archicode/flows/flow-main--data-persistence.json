@@ -1,0 +1,2195 @@
+{
+  "id": "flow-main--data-persistence",
+  "name": "Data Ownership & Persistence",
+  "description": "Persistence-bearing components and evidence-backed read, write, synchronization, and migration collaborators.",
+  "ignored": false,
+  "perspective": {
+    "kind": "data-persistence",
+    "source": "codebase-importer",
+    "generated": true,
+    "question": "Where is data owned, transformed, stored, and migrated?",
+    "confidence": "medium",
+    "evidenceBasis": [
+      "storage and schema signals",
+      "migrations",
+      "named data operations and shared-data contracts",
+      "provider-authored lens concepts grounded to canonical code subjects",
+      "bounded repository architecture documents"
+    ],
+    "limitations": [
+      "Durable persistence is claimed only when a concrete repository sink is observed; otherwise this lens represents transient state or declared data concepts.",
+      "1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower.",
+      "Concept nodes are evidence-bounded architectural interpretations, not additional implementation sources of truth."
+    ],
+    "checkedAt": "2026-10-22T12:16:48.001Z",
+    "coverage": {
+      "subjects": 20,
+      "relations": 38,
+      "observedRelations": 33,
+      "inferredRelations": 5
+    }
+  },
+  "nodes": {
+    "node-project": {
+      "id": "node-project",
+      "type": "perspective",
+      "title": "MyPhotosAnywhere — Data Ownership & Persistence",
+      "description": "Where is data owned, transformed, stored, and migrated? Persistence-bearing components and evidence-backed read, write, synchronization, and migration collaborators.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "shape": "note"
+      },
+      "position": {
+        "x": 80,
+        "y": 740
+      },
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "Gradle",
+        "SQLite",
+        "Python"
+      ],
+      "acceptanceCriteria": [
+        "MyPhotosAnywhere — Data Ownership & Persistence responsibilities are represented by current source files",
+        "MyPhotosAnywhere — Data Ownership & Persistence relationships and data flow are visible in the map",
+        "Future changes to MyPhotosAnywhere — Data Ownership & Persistence can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:project:myphotosanywhere",
+        "kind": "concept",
+        "evidenceStatus": "context"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:16:48.001Z",
+        "claims": [
+          {
+            "relation": "cover",
+            "kind": "directory",
+            "path": "."
+          }
+        ]
+      },
+      "customProperties": {
+        "Perspective question": "Where is data owned, transformed, stored, and migrated?",
+        "Confidence": "medium",
+        "Evidence basis": "storage and schema signals, migrations, named data operations and shared-data contracts",
+        "Limitations": "Durable persistence is claimed only when a concrete repository sink is observed; otherwise this lens represents transient state or declared data concepts. 1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower."
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-external-media": {
+      "id": "node-lens-external-media",
+      "type": "data-state",
+      "title": "MediaStore URI and Image Bytes",
+      "description": "Android content-provider URIs and image bytes are the source data in the observed reconciliation fixture.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 520
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "MediaStore URI and Image Bytes responsibilities are represented by current source files",
+        "MediaStore URI and Image Bytes relationships and data flow are visible in the map",
+        "Future changes to MediaStore URI and Image Bytes can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:data:dbc5a2d49dc55c53f3e2",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "dbc5a2d49dc55c53f3e2"
+      },
+      "customProperties": {
+        "Lens role": "data-state",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "implemented-durable",
+        "Storage durability": "Concrete durable sink observed",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-device-records": {
+      "id": "node-lens-device-records",
+      "type": "data-store",
+      "title": "Device Availability and Photo Identity",
+      "description": "device_media stores the URI-to-photoId mapping and availability used by the tests; LibraryFollowupDatabase also declares device_scan_seen.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 410,
+        "y": 593.3333333333334
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "kotlinx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Device Availability and Photo Identity responsibilities are represented by current source files",
+        "Device Availability and Photo Identity relationships and data flow are visible in the map",
+        "Future changes to Device Availability and Photo Identity can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:data:8ea8d93c9ec3632baef1",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "8ea8d93c9ec3632baef1"
+      },
+      "customProperties": {
+        "Lens role": "data-store",
+        "Canonical code anchors": "code:447f89150db48a1ab8ed, code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "implemented-durable",
+        "Storage durability": "Concrete durable sink observed",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-photo-records": {
+      "id": "node-lens-photo-records",
+      "type": "data-store",
+      "title": "Persistent Photo Records",
+      "description": "PhotoDatabase declares photos and handoffs. Device tests resolve device_media.photoId through the photos access surface.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 1188.1481481481483
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Persistent Photo Records responsibilities are represented by current source files",
+        "Persistent Photo Records relationships and data flow are visible in the map",
+        "Future changes to Persistent Photo Records can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:data:13f43429d710b52e42e5",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "13f43429d710b52e42e5"
+      },
+      "customProperties": {
+        "Lens role": "data-store",
+        "Canonical code anchors": "code:447f89150db48a1ab8ed",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/data/PhotoRepository.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "implemented-durable",
+        "Storage durability": "Concrete durable sink observed",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-library-entities": {
+      "id": "node-lens-library-entities",
+      "type": "data-store",
+      "title": "Albums, People, Faces, and Drafts",
+      "description": "LibraryDatabase declares albums, album_photos, people, faces, face_scans, and edit_drafts as persistent library entities.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 410,
+        "y": 373.33333333333337
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Albums, People, Faces, and Drafts responsibilities are represented by current source files",
+        "Albums, People, Faces, and Drafts relationships and data flow are visible in the map",
+        "Future changes to Albums, People, Faces, and Drafts can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:data:2d8c8038d3e6ad18adf9",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "2d8c8038d3e6ad18adf9"
+      },
+      "customProperties": {
+        "Lens role": "data-store",
+        "Canonical code anchors": "code:447f89150db48a1ab8ed",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "implemented-durable",
+        "Storage durability": "Concrete durable sink observed",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-migration": {
+      "id": "node-lens-migration",
+      "type": "migration",
+      "title": "Library Schema Evolution",
+      "description": "LibraryMigration references album_photos, edit_drafts, and face_scans; versioned PhotoDatabase JSON schemas provide schema-history artifacts.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 300
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Library Schema Evolution responsibilities are represented by current source files",
+        "Library Schema Evolution relationships and data flow are visible in the map",
+        "Future changes to Library Schema Evolution can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:data:2ae8d66890678aa9f014",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "2ae8d66890678aa9f014"
+      },
+      "customProperties": {
+        "Lens role": "migration",
+        "Canonical code anchors": "code:447f89150db48a1ab8ed",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt, app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/10.json, app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/11.json, app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/12.json, app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/2.json, app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/3.json, app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/4.json, app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/5.json, app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/6.json, app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/7.json, app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/8.json, app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/9.json",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-cloud-records": {
+      "id": "node-lens-cloud-records",
+      "type": "data-state",
+      "title": "Cloud Index and Transfer Records",
+      "description": "CloudDatabase declares cloud_photos, cloud_folders, sync_states, downloads, drive_sources, and scan_folders. DriveDatabase declares drive_connection and drive_backups.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 410,
+        "y": 813.3333333333334
+      },
+      "techStack": [
+        "kotlin",
+        "java",
+        "androidx"
+      ],
+      "acceptanceCriteria": [
+        "Cloud Index and Transfer Records responsibilities are represented by current source files",
+        "Cloud Index and Transfer Records relationships and data flow are visible in the map",
+        "Future changes to Cloud Index and Transfer Records can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:data:e97cae86015acb384e40",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "e97cae86015acb384e40"
+      },
+      "customProperties": {
+        "Lens role": "data-state",
+        "Canonical code anchors": "code:e62f506fd4c5e62011a3",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/drive/DriveDatabase.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-import-records": {
+      "id": "node-lens-import-records",
+      "type": "data-state",
+      "title": "Import Job and Item Records",
+      "description": "ImportDatabase defines ImportJob and ImportItem. Device tests directly manipulate import_jobs and import_items, confirming concrete persistent sinks.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "techStack": [
+        "kotlin",
+        "java",
+        "org",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Import Job and Item Records responsibilities are represented by current source files",
+        "Import Job and Item Records relationships and data flow are visible in the map",
+        "Future changes to Import Job and Item Records can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:data:dc52eb0637407f0a191c",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "dc52eb0637407f0a191c"
+      },
+      "customProperties": {
+        "Lens role": "data-state",
+        "Canonical code anchors": "code:50516df8547d1f01444d",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-selection-state": {
+      "id": "node-lens-selection-state",
+      "type": "data-state",
+      "title": "Transient Media Selection",
+      "description": "MediaSelection carries selected-media identities and local/cloud attributes. No durable selection sink is established by the supplied evidence.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 960
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Transient Media Selection responsibilities are represented by current source files",
+        "Transient Media Selection relationships and data flow are visible in the map",
+        "Future changes to Transient Media Selection can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:data:a5ccd89e6f9a281afa2a",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "a5ccd89e6f9a281afa2a"
+      },
+      "customProperties": {
+        "Lens role": "data-state",
+        "Canonical code anchors": "code:82204c4893c3f886dbee",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/selection/MediaSelection.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-cloud-photos": {
+      "id": "node-observed-architecture-data-entity-cloud-photos",
+      "type": "data-entity",
+      "title": "cloud_photos",
+      "description": "cloud_photos is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 88.14814814814827
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "cloud_photos responsibilities are represented by current source files",
+        "cloud_photos relationships and data flow are visible in the map",
+        "Future changes to cloud_photos can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:cloud-photos",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-cloud-photos"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportRecoveryDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/TimelineScaleTest.kt, app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineSql.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-device-media": {
+      "id": "node-observed-architecture-data-entity-device-media",
+      "type": "data-entity",
+      "title": "device_media",
+      "description": "device_media is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 1070,
+        "y": 740
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "device_media responsibilities are represented by current source files",
+        "device_media relationships and data flow are visible in the map",
+        "Future changes to device_media can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:device-media",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-device-media"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt, app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineSql.kt, app/src/main/java/com/myphotosanywhere/mpa/data/DeviceStorageMigration.kt, app/src/test/java/com/myphotosanywhere/mpa/device/LibraryFollowupMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-drive-backups": {
+      "id": "node-observed-architecture-data-entity-drive-backups",
+      "type": "data-entity",
+      "title": "drive_backups",
+      "description": "drive_backups is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 1070,
+        "y": 1180
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "drive_backups responsibilities are represented by current source files",
+        "drive_backups relationships and data flow are visible in the map",
+        "Future changes to drive_backups can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:drive-backups",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-drive-backups"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt, app/src/main/java/com/myphotosanywhere/mpa/drive/DriveDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-drive-sources": {
+      "id": "node-observed-architecture-data-entity-drive-sources",
+      "type": "data-entity",
+      "title": "drive_sources",
+      "description": "drive_sources is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 748.1481481481483
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "drive_sources responsibilities are represented by current source files",
+        "drive_sources relationships and data flow are visible in the map",
+        "Future changes to drive_sources can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:drive-sources",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-drive-sources"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/drive/DriveSources.kt, app/src/main/java/com/myphotosanywhere/mpa/drive/DriveDatabase.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-drive-trash": {
+      "id": "node-observed-architecture-data-entity-drive-trash",
+      "type": "data-entity",
+      "title": "drive_trash",
+      "description": "drive_trash is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 1070,
+        "y": 300
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "drive_trash responsibilities are represented by current source files",
+        "drive_trash relationships and data flow are visible in the map",
+        "Future changes to drive_trash can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:drive-trash",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-drive-trash"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/TrashDeviceTest.kt, app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/trash/TrashScaleTest.kt, app/src/test/java/com/myphotosanywhere/mpa/trash/TrashMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-faces": {
+      "id": "node-observed-architecture-data-entity-faces",
+      "type": "data-entity",
+      "title": "faces",
+      "description": "faces is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 1070,
+        "y": 520
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "faces responsibilities are represented by current source files",
+        "faces relationships and data flow are visible in the map",
+        "Future changes to faces can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:faces",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-faces"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineSql.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-import-items": {
+      "id": "node-observed-architecture-data-entity-import-items",
+      "type": "data-entity",
+      "title": "import_items",
+      "description": "import_items is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 1070,
+        "y": 80
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "import_items responsibilities are represented by current source files",
+        "import_items relationships and data flow are visible in the map",
+        "Future changes to import_items can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:import-items",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-import-items"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/DeviceSmokeTest.kt, app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-import-jobs": {
+      "id": "node-observed-architecture-data-entity-import-jobs",
+      "type": "data-entity",
+      "title": "import_jobs",
+      "description": "import_jobs is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 1400,
+        "y": 210.3703703703704
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "import_jobs responsibilities are represented by current source files",
+        "import_jobs relationships and data flow are visible in the map",
+        "Future changes to import_jobs can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:import-jobs",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-import-jobs"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/UxAcceptanceDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/DeviceSmokeTest.kt, app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ShellNavigationDeviceTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-manual-device-backups": {
+      "id": "node-observed-architecture-data-entity-manual-device-backups",
+      "type": "data-entity",
+      "title": "manual_device_backups",
+      "description": "manual_device_backups is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 308.14814814814827
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "manual_device_backups responsibilities are represented by current source files",
+        "manual_device_backups relationships and data flow are visible in the map",
+        "Future changes to manual_device_backups can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:manual-device-backups",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-manual-device-backups"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/data/DeviceStorageMigration.kt, app/src/test/java/com/myphotosanywhere/mpa/device/LibraryFollowupMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-people": {
+      "id": "node-observed-architecture-data-entity-people",
+      "type": "data-entity",
+      "title": "people",
+      "description": "people is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 528.1481481481483
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "people responsibilities are represented by current source files",
+        "people relationships and data flow are visible in the map",
+        "Future changes to people can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:people",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-people"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-photos": {
+      "id": "node-observed-architecture-data-entity-photos",
+      "type": "data-entity",
+      "title": "photos",
+      "description": "photos is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 1070,
+        "y": 960
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "photos responsibilities are represented by current source files",
+        "photos relationships and data flow are visible in the map",
+        "Future changes to photos can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:photos",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-photos"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/search/SearchScaleTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryArrivalDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt, app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/TimelineScaleTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/DateScrubScaleTest.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/DrivePersistenceTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-sync-states": {
+      "id": "node-observed-architecture-data-entity-sync-states",
+      "type": "data-entity",
+      "title": "sync_states",
+      "description": "sync_states is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 968.1481481481483
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "sync_states responsibilities are represented by current source files",
+        "sync_states relationships and data flow are visible in the map",
+        "Future changes to sync_states can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:sync-states",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-sync-states"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/drive/ScanMigration.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "transient-or-conceptual",
+        "Storage durability": "No durable sink observed; transient, declared, or conceptual only"
+      },
+      "attachments": [],
+      "todos": []
+    }
+  },
+  "edges": {
+    "edge-lens-external-media--device-records": {
+      "id": "edge-lens-external-media--device-records",
+      "source": "node-lens-external-media",
+      "target": "node-lens-device-records",
+      "lineStyle": "dashed",
+      "label": "is reconciled into available device-media mappings",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "data-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-device-records--photo-records": {
+      "id": "edge-lens-device-records--photo-records",
+      "source": "node-lens-device-records",
+      "target": "node-lens-photo-records",
+      "lineStyle": "dashed",
+      "label": "resolves photoId through the photos access surface",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "data-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoRepository.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-migration--library-entities": {
+      "id": "edge-lens-migration--library-entities",
+      "source": "node-lens-migration",
+      "target": "node-lens-library-entities",
+      "lineStyle": "dashed",
+      "label": "references library entities during schema evolution",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "data-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt"
+          },
+          {
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/10.json"
+          },
+          {
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/11.json"
+          },
+          {
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/12.json"
+          },
+          {
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/2.json"
+          },
+          {
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/3.json"
+          },
+          {
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/4.json"
+          },
+          {
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/5.json"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-selection-state--photo-records": {
+      "id": "edge-lens-selection-state--photo-records",
+      "source": "node-lens-selection-state",
+      "target": "node-lens-photo-records",
+      "lineStyle": "dashed",
+      "label": "carries a selected local-photo reference",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "data-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/MediaSelection.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoRepository.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-selection-state--cloud-records": {
+      "id": "edge-lens-selection-state--cloud-records",
+      "source": "node-lens-selection-state",
+      "target": "node-lens-cloud-records",
+      "lineStyle": "dashed",
+      "label": "carries a selected cloud-photo reference",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "data-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/MediaSelection.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveDatabase.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-device-library-architecture-data-entity-device-media": {
+      "id": "edge-observed-architecture-relation-cluster-device-library-architecture-data-entity-device-media",
+      "source": "node-lens-external-media",
+      "target": "node-observed-architecture-data-entity-device-media",
+      "lineStyle": "solid",
+      "label": "references device_media data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+            "line": 62,
+            "fact": "device_media"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+            "line": 46,
+            "fact": "device_media"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-device-library-architecture-data-entity-drive-backups": {
+      "id": "edge-observed-architecture-relation-cluster-device-library-architecture-data-entity-drive-backups",
+      "source": "node-lens-external-media",
+      "target": "node-observed-architecture-data-entity-drive-backups",
+      "lineStyle": "solid",
+      "label": "references drive_backups data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+            "line": 86,
+            "fact": "drive_backups"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-device-library-architecture-data-entity-manual-device-backups": {
+      "id": "edge-observed-architecture-relation-cluster-device-library-architecture-data-entity-manual-device-backups",
+      "source": "node-lens-external-media",
+      "target": "node-observed-architecture-data-entity-manual-device-backups",
+      "lineStyle": "solid",
+      "label": "references manual_device_backups data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+            "line": 85,
+            "fact": "manual_device_backups"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-device-library-architecture-data-entity-photos": {
+      "id": "edge-observed-architecture-relation-cluster-device-library-architecture-data-entity-photos",
+      "source": "node-lens-external-media",
+      "target": "node-observed-architecture-data-entity-photos",
+      "lineStyle": "solid",
+      "label": "references photos data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+            "line": 87,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+            "line": 96,
+            "fact": "photos"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-drive-architecture-data-entity-cloud-photos": {
+      "id": "edge-observed-architecture-relation-cluster-drive-architecture-data-entity-cloud-photos",
+      "source": "node-lens-cloud-records",
+      "target": "node-observed-architecture-data-entity-cloud-photos",
+      "lineStyle": "solid",
+      "label": "references cloud_photos data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt",
+            "line": 34,
+            "fact": "cloud_photos"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-drive-architecture-data-entity-drive-backups": {
+      "id": "edge-observed-architecture-relation-cluster-drive-architecture-data-entity-drive-backups",
+      "source": "node-lens-cloud-records",
+      "target": "node-observed-architecture-data-entity-drive-backups",
+      "lineStyle": "solid",
+      "label": "references drive_backups data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveDatabase.kt",
+            "line": 83,
+            "fact": "drive_backups"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-drive-architecture-data-entity-drive-sources": {
+      "id": "edge-observed-architecture-relation-cluster-drive-architecture-data-entity-drive-sources",
+      "source": "node-lens-cloud-records",
+      "target": "node-observed-architecture-data-entity-drive-sources",
+      "lineStyle": "solid",
+      "label": "references drive_sources data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt",
+            "line": 49,
+            "fact": "drive_sources"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveSources.kt",
+            "line": 41,
+            "fact": "drive_sources"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveDatabase.kt",
+            "line": 50,
+            "fact": "drive_sources"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-drive-architecture-data-entity-photos": {
+      "id": "edge-observed-architecture-relation-cluster-drive-architecture-data-entity-photos",
+      "source": "node-lens-cloud-records",
+      "target": "node-observed-architecture-data-entity-photos",
+      "lineStyle": "solid",
+      "label": "references photos data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryArrivalDeviceTest.kt",
+            "line": 112,
+            "fact": "photos"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-drive-architecture-data-entity-sync-states": {
+      "id": "edge-observed-architecture-relation-cluster-drive-architecture-data-entity-sync-states",
+      "source": "node-lens-cloud-records",
+      "target": "node-observed-architecture-data-entity-sync-states",
+      "lineStyle": "solid",
+      "label": "references sync_states data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt",
+            "line": 45,
+            "fact": "sync_states"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-gallery-architecture-data-entity-device-media": {
+      "id": "edge-observed-architecture-relation-cluster-gallery-architecture-data-entity-device-media",
+      "source": "node-observed-architecture-data-entity-cloud-photos",
+      "target": "node-observed-architecture-data-entity-device-media",
+      "lineStyle": "solid",
+      "label": "references device_media data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineSql.kt",
+            "line": 38,
+            "fact": "device_media"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-gallery-architecture-data-entity-faces": {
+      "id": "edge-observed-architecture-relation-cluster-gallery-architecture-data-entity-faces",
+      "source": "node-observed-architecture-data-entity-cloud-photos",
+      "target": "node-observed-architecture-data-entity-faces",
+      "lineStyle": "solid",
+      "label": "references faces data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineSql.kt",
+            "line": 83,
+            "fact": "faces"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-imports-architecture-data-entity-cloud-photos": {
+      "id": "edge-observed-architecture-relation-cluster-imports-architecture-data-entity-cloud-photos",
+      "source": "node-lens-import-records",
+      "target": "node-observed-architecture-data-entity-cloud-photos",
+      "lineStyle": "solid",
+      "label": "references cloud_photos data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt",
+            "line": 117,
+            "fact": "cloud_photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportRecoveryDeviceTest.kt",
+            "line": 46,
+            "fact": "cloud_photos"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-imports-architecture-data-entity-import-items": {
+      "id": "edge-observed-architecture-relation-cluster-imports-architecture-data-entity-import-items",
+      "source": "node-lens-import-records",
+      "target": "node-observed-architecture-data-entity-import-items",
+      "lineStyle": "solid",
+      "label": "references import_items data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 73,
+            "fact": "import_items"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt",
+            "line": 122,
+            "fact": "import_items"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt",
+            "line": 47,
+            "fact": "import_items"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-imports-architecture-data-entity-import-jobs": {
+      "id": "edge-observed-architecture-relation-cluster-imports-architecture-data-entity-import-jobs",
+      "source": "node-lens-import-records",
+      "target": "node-observed-architecture-data-entity-import-jobs",
+      "lineStyle": "solid",
+      "label": "references import_jobs data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/UxAcceptanceDeviceTest.kt",
+            "line": 82,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 74,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt",
+            "line": 122,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt",
+            "line": 46,
+            "fact": "import_jobs"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-imports-architecture-data-entity-photos": {
+      "id": "edge-observed-architecture-relation-cluster-imports-architecture-data-entity-photos",
+      "source": "node-lens-import-records",
+      "target": "node-observed-architecture-data-entity-photos",
+      "lineStyle": "solid",
+      "label": "references photos data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 132,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt",
+            "line": 118,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt",
+            "line": 87,
+            "fact": "photos"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-cloud-photos": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-cloud-photos",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-cloud-photos",
+      "lineStyle": "solid",
+      "label": "references cloud_photos data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/TimelineScaleTest.kt",
+            "line": 34,
+            "fact": "cloud_photos"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-device-media": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-device-media",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-device-media",
+      "lineStyle": "solid",
+      "label": "references device_media data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt",
+            "line": 36,
+            "fact": "device_media"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/DeviceStorageMigration.kt",
+            "line": 9,
+            "fact": "device_media"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/device/LibraryFollowupMigrationTest.kt",
+            "line": 65,
+            "fact": "device_media"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-drive-backups": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-drive-backups",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-drive-backups",
+      "lineStyle": "solid",
+      "label": "references drive_backups data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 37,
+            "fact": "drive_backups"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 37,
+            "fact": "drive_backups"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt",
+            "line": 43,
+            "fact": "drive_backups"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt",
+            "line": 37,
+            "fact": "drive_backups"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+            "line": 44,
+            "fact": "drive_backups"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-drive-sources": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-drive-sources",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-drive-sources",
+      "lineStyle": "solid",
+      "label": "references drive_sources data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 36,
+            "fact": "drive_sources"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 36,
+            "fact": "drive_sources"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt",
+            "line": 42,
+            "fact": "drive_sources"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt",
+            "line": 36,
+            "fact": "drive_sources"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-drive-trash": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-drive-trash",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-drive-trash",
+      "lineStyle": "solid",
+      "label": "references drive_trash data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/trash/TrashScaleTest.kt",
+            "line": 38,
+            "fact": "drive_trash"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/trash/TrashMigrationTest.kt",
+            "line": 58,
+            "fact": "drive_trash"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-faces": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-faces",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-faces",
+      "lineStyle": "solid",
+      "label": "references faces data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt",
+            "line": 49,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt",
+            "line": 68,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt",
+            "line": 44,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 35,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 35,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt",
+            "line": 41,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt",
+            "line": 35,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+            "line": 42,
+            "fact": "faces"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-import-items": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-import-items",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-import-items",
+      "lineStyle": "solid",
+      "label": "references import_items data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt",
+            "line": 75,
+            "fact": "import_items"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 40,
+            "fact": "import_items"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 40,
+            "fact": "import_items"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-import-jobs": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-import-jobs",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-import-jobs",
+      "lineStyle": "solid",
+      "label": "references import_jobs data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ShellNavigationDeviceTest.kt",
+            "line": 87,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 39,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 39,
+            "fact": "import_jobs"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-manual-device-backups": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-manual-device-backups",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-manual-device-backups",
+      "lineStyle": "solid",
+      "label": "references manual_device_backups data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt",
+            "line": 52,
+            "fact": "manual_device_backups"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/DeviceStorageMigration.kt",
+            "line": 12,
+            "fact": "manual_device_backups"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/device/LibraryFollowupMigrationTest.kt",
+            "line": 66,
+            "fact": "manual_device_backups"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-people": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-people",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-people",
+      "lineStyle": "solid",
+      "label": "references people data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt",
+            "line": 45,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt",
+            "line": 67,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt",
+            "line": 17,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 34,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 34,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt",
+            "line": 40,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt",
+            "line": 34,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+            "line": 41,
+            "fact": "people"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-photos": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-photos",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-photos",
+      "lineStyle": "solid",
+      "label": "references photos data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt",
+            "line": 65,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/search/SearchScaleTest.kt",
+            "line": 48,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt",
+            "line": 114,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/TimelineScaleTest.kt",
+            "line": 32,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/DateScrubScaleTest.kt",
+            "line": 56,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt",
+            "line": 12,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/DrivePersistenceTest.kt",
+            "line": 46,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 33,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 33,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt",
+            "line": 39,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt",
+            "line": 33,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+            "line": 40,
+            "fact": "photos"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-sync-states": {
+      "id": "edge-observed-architecture-relation-cluster-library-storage-architecture-data-entity-sync-states",
+      "source": "node-lens-device-records",
+      "target": "node-observed-architecture-data-entity-sync-states",
+      "lineStyle": "solid",
+      "label": "references sync_states data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/ScanMigration.kt",
+            "line": 14,
+            "fact": "sync_states"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 38,
+            "fact": "sync_states"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 38,
+            "fact": "sync_states"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt",
+            "line": 44,
+            "fact": "sync_states"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt",
+            "line": 38,
+            "fact": "sync_states"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+            "line": 43,
+            "fact": "sync_states"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-management-architecture-data-entity-drive-backups": {
+      "id": "edge-observed-architecture-relation-cluster-management-architecture-data-entity-drive-backups",
+      "source": "node-observed-architecture-data-entity-cloud-photos",
+      "target": "node-observed-architecture-data-entity-drive-backups",
+      "lineStyle": "solid",
+      "label": "references drive_backups data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt",
+            "line": 28,
+            "fact": "drive_backups"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-management-architecture-data-entity-drive-trash": {
+      "id": "edge-observed-architecture-relation-cluster-management-architecture-data-entity-drive-trash",
+      "source": "node-observed-architecture-data-entity-cloud-photos",
+      "target": "node-observed-architecture-data-entity-drive-trash",
+      "lineStyle": "solid",
+      "label": "references drive_trash data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/TrashDeviceTest.kt",
+            "line": 52,
+            "fact": "drive_trash"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt",
+            "line": 20,
+            "fact": "drive_trash"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-management-architecture-data-entity-import-items": {
+      "id": "edge-observed-architecture-relation-cluster-management-architecture-data-entity-import-items",
+      "source": "node-observed-architecture-data-entity-cloud-photos",
+      "target": "node-observed-architecture-data-entity-import-items",
+      "lineStyle": "solid",
+      "label": "references import_items data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt",
+            "line": 26,
+            "fact": "import_items"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-management-architecture-data-entity-import-jobs": {
+      "id": "edge-observed-architecture-relation-cluster-management-architecture-data-entity-import-jobs",
+      "source": "node-observed-architecture-data-entity-cloud-photos",
+      "target": "node-observed-architecture-data-entity-import-jobs",
+      "lineStyle": "solid",
+      "label": "references import_jobs data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt",
+            "line": 138,
+            "fact": "import_jobs"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-management-architecture-data-entity-photos": {
+      "id": "edge-observed-architecture-relation-cluster-management-architecture-data-entity-photos",
+      "source": "node-observed-architecture-data-entity-cloud-photos",
+      "target": "node-observed-architecture-data-entity-photos",
+      "lineStyle": "solid",
+      "label": "references photos data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt",
+            "line": 77,
+            "fact": "photos"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-people-architecture-data-entity-import-jobs": {
+      "id": "edge-observed-architecture-relation-cluster-people-architecture-data-entity-import-jobs",
+      "source": "node-observed-architecture-data-entity-import-items",
+      "target": "node-observed-architecture-data-entity-import-jobs",
+      "lineStyle": "solid",
+      "label": "references import_jobs data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/DeviceSmokeTest.kt",
+            "line": 128,
+            "fact": "import_jobs"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    }
+  },
+  "subflows": {},
+  "groups": {}
+}

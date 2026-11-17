@@ -1,0 +1,4556 @@
+{
+  "id": "flow-main",
+  "name": "Codebase Structure (Evidence)",
+  "description": "Code-derived hierarchy, implementation scopes, and evidence-backed relationships. Perspective flows reuse these subjects without becoming separate implementation truths.",
+  "ignored": false,
+  "evidenceBackbone": true,
+  "nodes": {
+    "node-project": {
+      "id": "node-project",
+      "type": "project",
+      "title": "MyPhotosAnywhere",
+      "description": "An Android photo-library application organized around local and cloud media, imports, browsing, metadata, and library management. MainActivity and MpaApplication identify the application composition surface, while repository classes, database declarations, and device tests provide the strongest architectural evidence.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "shape": "hexagon"
+      },
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "Gradle",
+        "SQLite",
+        "Python"
+      ],
+      "acceptanceCriteria": [
+        "MyPhotosAnywhere responsibilities are represented by current source files",
+        "MyPhotosAnywhere relationships and data flow are visible in the map",
+        "Future changes to MyPhotosAnywhere can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:project:myphotosanywhere",
+        "kind": "concept",
+        "evidenceStatus": "context"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "cover",
+            "kind": "directory",
+            "path": "."
+          }
+        ]
+      },
+      "customProperties": {
+        "Architecture lenses": "System Context, Product Capabilities, User Journeys & UX, Runtime & Integration Flows, Data Ownership & Persistence, Cloud & Infrastructure, Entrypoint & Request Traces, Modules & Components, Dependency Health",
+        "Lens evidence": "System Context [high]: entrypoints, runtime and trust boundaries, external service evidence, repository manifests; Product Capabilities [medium]: public routes and entrypoints, exported public surface, production responsibilities, source-observed behavioral contracts; User Journeys & UX [exploratory]: routes, UI symbols and paths, direct dependencies, ordered source-observed behavioral contracts; Runtime & Integration Flows [medium]: entrypoints, runtime relation kinds, connected system boundaries, public routes, external SDK and endpoint evidence; Data Ownership & Persistence [medium]: storage and schema signals, migrations, named data operations and shared-data contracts; Cloud & Infrastructure [medium]: infrastructure paths and symbols, cloud SDK usage, deployment configuration; Entrypoint & Request Traces [high]: entrypoints and routes, resolved calls, runtime contracts, maximum three architecture hops; Modules & Components [high]: architectural importance, entrypoints and boundaries, observed static collaboration; Dependency Health [high]: dependency centrality, strongly connected components, source-located import evidence",
+        "Reverse-engineering model": "Canonical code-derived graph with evidence-bounded architectural interpretations"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-android-app": {
+      "id": "node-android-app",
+      "type": "system",
+      "title": "Android Photo Application",
+      "description": "The app is an evidenced Gradle module with app/build.gradle.kts as its boundary manifest. MpaApplication, MainActivity, and LibraryViewModel provide application, activity, and presentation-state abstractions. Its drill-down separates browsing, device access, Drive integration, imports, persistent library records, and domain operations. Worker class names identify background responsibilities, but the supplied evidence does not establish separate processes or independently deployed services.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4477BB",
+        "shape": "hexagon"
+      },
+      "position": {
+        "x": 410,
+        "y": 80
+      },
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "Android Photo Application responsibilities are represented by current source files",
+        "Android Photo Application relationships and data flow are visible in the map",
+        "Future changes to Android Photo Application can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:f5bbb798bf6dd4468d64",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "f5bbb798bf6dd4468d64"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": "app/build.gradle.kts"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/LibraryViewModel.kt"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/MainActivity.kt"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/MpaApplication.kt"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".gitattributes"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".gitignore"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/BlockMosaicDeviceTest.kt"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/MosaicDeviceTest.kt"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/TimelineContinuityTest.kt"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/ThumbnailWorker.kt"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": "LICENSE"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": "README.md"
+          },
+          {
+            "relation": "cover",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/MpaApplication.kt",
+            "symbol": "MpaApplication"
+          },
+          {
+            "relation": "cover",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/BlockMosaicDeviceTest.kt",
+            "symbol": "BlockMosaicDeviceTest"
+          },
+          {
+            "relation": "cover",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/MainActivity.kt",
+            "symbol": "MainActivity"
+          },
+          {
+            "relation": "cover",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/LibraryViewModel.kt",
+            "symbol": "LibraryViewModel"
+          },
+          {
+            "relation": "cover",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/TimelineContinuityTest.kt",
+            "symbol": "TimelineContinuityTest"
+          },
+          {
+            "relation": "cover",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/MosaicDeviceTest.kt",
+            "symbol": "MosaicDeviceTest"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "System Context, Runtime & Integration Flows, Cloud & Infrastructure, Entrypoint & Request Traces",
+        "Lens confidence": "System Context: high, Runtime & Integration Flows: medium, Cloud & Infrastructure: medium, Entrypoint & Request Traces: high",
+        "Evidence basis": "353 files; 12 symbols; 5 routes; 30 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "/missing, /present/labelled, /missing/file, /present/older, /missing/$it",
+        "Runtime interactions": "shared-read:bytes, shared-read:captured, shared-read:id, shared-read:path, shared-read:rows, shared-read:sha, shared-read:uri, shared-read:path, shared-read:faces, shared-read:indexCloud, shared-read:indexingPaused, shared-read:maps, shared-read:nightEnd, shared-read:nightStart, shared-read:objects, shared-read:originalBudget, shared-read:overnight, shared-read:sidecars, shared-read:thumbnailBudget, shared-read:key, shared-read:bindingKey, shared-read:backupId, shared-read:key, shared-read:binding, shared-read:job:$job, shared-read:job:$job, shared-read:next, shared-read:job, shared-read:kind, shared-read:job"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-engineering": {
+      "id": "node-engineering",
+      "type": "system",
+      "title": "Build and Device Validation Toolchain",
+      "description": "Repository-side tooling executes outside the Android application's runtime boundary. scripts/gradle_checks.py exposes WarningGate and main as an observed executable entrypoint. AndroidSdkSetup, NativeStages, UpgradeSigner, DeviceScreenshotReader, and ScreenshotCollector identify SDK setup, native validation stages, signing, and screenshot collection responsibilities. Gradle configuration and GitHub workflow files establish build and automation declarations; their presence does not prove a live release or deployment.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#667788",
+        "shape": "hexagon"
+      },
+      "position": {
+        "x": 80,
+        "y": 290
+      },
+      "techStack": [
+        "Python",
+        "Gradle",
+        "GitHub Actions",
+        "Shell"
+      ],
+      "acceptanceCriteria": [
+        "Build and Device Validation Toolchain responsibilities are represented by current source files",
+        "Build and Device Validation Toolchain relationships and data flow are visible in the map",
+        "Future changes to Build and Device Validation Toolchain can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:41d5842b548fadbe10dc",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "41d5842b548fadbe10dc"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/android.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/device.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/model.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release03.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release04.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release044.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release050.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release051.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release052.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release053.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release054.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release055.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release056.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release057.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release058.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": ".github/workflows/release059.yml"
+          },
+          {
+            "relation": "cover",
+            "kind": "file",
+            "path": "build.gradle.kts"
+          },
+          {
+            "relation": "cover",
+            "kind": "class",
+            "path": "scripts/gradle_checks.py",
+            "symbol": "WarningGate"
+          },
+          {
+            "relation": "cover",
+            "kind": "function",
+            "path": "scripts/gradle_checks.py",
+            "symbol": "main"
+          },
+          {
+            "relation": "cover",
+            "kind": "class",
+            "path": "scripts/ci_android_sdk.py",
+            "symbol": "AndroidSdkSetup"
+          },
+          {
+            "relation": "cover",
+            "kind": "class",
+            "path": "scripts/ci_upgrade_signer.py",
+            "symbol": "UpgradeSigner"
+          },
+          {
+            "relation": "cover",
+            "kind": "class",
+            "path": "scripts/collect_png_evidence.py",
+            "symbol": "DeviceScreenshotReader"
+          },
+          {
+            "relation": "cover",
+            "kind": "class",
+            "path": "scripts/native_stages.py",
+            "symbol": "NativeStages"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "System Context, User Journeys & UX, Runtime & Integration Flows, Entrypoint & Request Traces",
+        "Lens confidence": "System Context: high, User Journeys & UX: exploratory, Runtime & Integration Flows: medium, Entrypoint & Request Traces: high",
+        "Evidence basis": "40 files; 12 symbols; 1 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "yes",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "/sdcard/Download/MPA/",
+        "Runtime interactions": ""
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-reference": {
+      "id": "node-reference",
+      "type": "documentation",
+      "title": "Product and Engineering Reference",
+      "description": "The documentation includes validation guidance, recognition and sidecar reference material, release notes, branding assets, and an example XMP sidecar. These are reference artifacts rather than independently executing application components.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#998866",
+        "shape": "document"
+      },
+      "position": {
+        "x": 428.51851851851853,
+        "y": 290
+      },
+      "techStack": [
+        "Markdown",
+        "SVG",
+        "XMP"
+      ],
+      "acceptanceCriteria": [
+        "Product and Engineering Reference responsibilities are represented by current source files",
+        "Product and Engineering Reference relationships and data flow are visible in the map",
+        "Future changes to Product and Engineering Reference can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:aa15675dd496e4da3d56",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "aa15675dd496e4da3d56"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/branding/mpa-icon.svg"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/branding/README.md"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/examples/IMG_0001.jpg.xmp"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/RECOGNITION_AND_SIDECARS.md"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.2.0.md"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.3.0.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.3.0.md"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.4.0-alpha.1.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.4.0-alpha.1.md"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.4.0-alpha.2.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.4.0-alpha.2.md"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.4.0.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.4.0.md"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.4.1.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.4.1.md"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.4.2.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.4.2.md"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "docs/releases/v0.4.3.json"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "docs",
+        "Mental lenses": "",
+        "Lens confidence": "",
+        "Evidence basis": "131 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": ""
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-gallery": {
+      "id": "node-gallery",
+      "type": "component",
+      "title": "Timeline Browsing and Search",
+      "description": "TimelineRepository and TimelineQuery identify the timeline query boundary, while TimelineGrid, TimelineViewer, and TimelineDateNavigation provide gallery presentation responsibilities. SearchScreen supplies a separate search interface. GalleryPolishDeviceTest contains catalogued checks for preserving the first visible photo identity when density changes and keeping the date within the photo viewport. SqliteViewerSession references an entries entity; its durability beyond the viewer session is not established.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4477BB",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 470,
+        "y": 2320
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "SQLite"
+      ],
+      "acceptanceCriteria": [
+        "Changing gallery density preserves the actual first visible photo identity.",
+        "The date indicator remains within the photo viewport."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:dc27f6a3218fbfa00d31",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "dc27f6a3218fbfa00d31"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryPolishDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/search/SearchScreen.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/BlockMosaic.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/DateScrubbing.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/GalleryPresentation.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/JustifiedMosaic.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/MosaicContinuity.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/RemotePhotoDetails.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/SqliteViewerSession.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/ThumbnailGeometry.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineAnchorClearance.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineAnchorRestorer.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineDateNavigation.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineGrid.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineGridViewport.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineModels.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineOrder.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelinePagingSource.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/AdaptiveThumbnailDeviceTest.kt",
+            "symbol": "Fixture"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/AdaptiveThumbnailDeviceTest.kt",
+            "symbol": "AdaptiveThumbnailDeviceTest"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/ui/GalleryBarPolicy.kt",
+            "symbol": "GalleryBarPolicy"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineViewer.kt",
+            "symbol": "TimelineMediaState"
+          },
+          {
+            "relation": "own",
+            "kind": "function",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineViewer.kt",
+            "symbol": "kotlinx"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineModels.kt",
+            "symbol": "TimelineQuery"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, User Journeys & UX, Runtime & Integration Flows, Data Ownership & Persistence, Modules & Components, Dependency Health",
+        "Lens confidence": "Product Capabilities: medium, User Journeys & UX: exploratory, Runtime & Integration Flows: medium, Data Ownership & Persistence: medium, Modules & Components: high, Dependency Health: high",
+        "Evidence basis": "34 files; 12 symbols; 0 routes; 23 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.62",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "yes",
+        "Dependency community": "community-1",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "",
+        "Runtime interactions": "shared-read:album, shared-read:deviceFolder, shared-read:deviceOnly, shared-read:filter, shared-read:first, shared-read:importedPerson, shared-read:last, shared-read:person, shared-read:source, shared-read:text, shared-read:type, shared-read:columns, shared-read:layout, shared-read:key, shared-read:millis, shared-read:offset, shared-read:query, data-entity:entries, data-entity:cloud_photos, data-entity:device_media, data-entity:faces, data-entity:filtered, data-entity:photo_people"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-androidtest-java-com-myphotosanywhere-mpa-timeline-gallerypolishdevicetest-kt-item-densityviewport": {
+      "id": "node-app-src-androidtest-java-com-myphotosanywhere-mpa-timeline-gallerypolishdevicetest-kt-item-densityviewport",
+      "type": "component",
+      "title": "Density Viewport Comparison",
+      "description": "The DensityViewport item in GalleryPolishDeviceTest.kt provides gallery device-test context for comparing viewport anchors. Its supplied diagnostic text is \"before=$anchor after=$after\".",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 80,
+        "y": 360
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "GalleryPolishDeviceTest.kt contains the DensityViewport item associated with \"before=$anchor after=$after\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:6aca58ea9f3d26d02784",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "6aca58ea9f3d26d02784"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryPolishDeviceTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "DensityViewport",
+        "Catalog source": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryPolishDeviceTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-androidtest-java-com-myphotosanywhere-mpa-timeline-gallerypolishdevicetest-kt-item-dateseekstate": {
+      "id": "node-app-src-androidtest-java-com-myphotosanywhere-mpa-timeline-gallerypolishdevicetest-kt-item-dateseekstate",
+      "type": "component",
+      "title": "Date Seek State Diagnostics",
+      "description": "The DateSeekState item in GalleryPolishDeviceTest.kt identifies date-seeking state in gallery device-test diagnostics. Its supplied text references the last observed state as \"last: $lastSeekState\".",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "GalleryPolishDeviceTest.kt contains the DateSeekState item associated with \"last: $lastSeekState\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:95a497c41e8f3a9ba88f",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "95a497c41e8f3a9ba88f"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryPolishDeviceTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "DateSeekState",
+        "Catalog source": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryPolishDeviceTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-androidtest-java-com-myphotosanywhere-mpa-timeline-gallerypolishdevicetest-kt-item-dateviewport": {
+      "id": "node-app-src-androidtest-java-com-myphotosanywhere-mpa-timeline-gallerypolishdevicetest-kt-item-dateviewport",
+      "type": "component",
+      "title": "Date Viewport Anchor Comparison",
+      "description": "The DateViewport item in GalleryPolishDeviceTest.kt provides gallery device-test context for comparing date viewport anchors. Its supplied diagnostic text is \"before=$beforeAnchor after=$afterAnchor\".",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 470,
+        "y": 80
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "GalleryPolishDeviceTest.kt contains the DateViewport item associated with \"before=$beforeAnchor after=$afterAnchor\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:0c0ad72c950d7e6d91b6",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "0c0ad72c950d7e6d91b6"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryPolishDeviceTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "DateViewport",
+        "Catalog source": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryPolishDeviceTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-device-library": {
+      "id": "node-device-library",
+      "type": "component",
+      "title": "Device Media Access and Backup Choices",
+      "description": "DeviceLibraryModel, DeviceLibraryScreen, DeviceFoldersScreen, and SelectionBackupDialog identify device-library presentation and backup choices. DeviceLibraryDeviceTest shows MediaStore insertion followed by app.deviceMedia.reconcile(), a device_media lookup, and resolution through database.photos(). DeviceLibraryAccessDeviceTest distinguishes indexed media from materialized media and checks permission state during a revocation scenario. These observations establish an Android content-provider boundary without establishing a separate application process.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#338899",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 470,
+        "y": 360
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "MediaStore"
+      ],
+      "acceptanceCriteria": [
+        "After reconciling an inserted MediaStore image, its available device_media row resolves to an existing Photo record."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:8068ed01c02fcd12d369",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "8068ed01c02fcd12d369"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/BackupMetadataNotice.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceBackupDialog.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceFolders.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceFoldersScreen.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceLibraryScreen.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceMediaLibrary.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceMediaProjection.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceOriginalStaging.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DevicePhotoPreview.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/SelectionBackupDialog.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+            "symbol": "DeviceLibraryDeviceTest"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceLibraryScreen.kt",
+            "symbol": "DeviceLibraryModel"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+            "symbol": "DeviceAccessFixture"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceBackupDialog.kt",
+            "symbol": "DeviceBackupRequest"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+            "symbol": "DeviceLibraryAccessDeviceTest"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceMediaLibrary.kt",
+            "symbol": "DevicePhotoAccess"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, User Journeys & UX, Runtime & Integration Flows, Data Ownership & Persistence, Cloud & Infrastructure, Modules & Components",
+        "Lens confidence": "Product Capabilities: medium, User Journeys & UX: exploratory, Runtime & Integration Flows: medium, Data Ownership & Persistence: medium, Cloud & Infrastructure: medium, Modules & Components: high",
+        "Evidence basis": "12 files; 12 symbols; 0 routes; 14 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.13",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "community-1",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "",
+        "Runtime interactions": "shared-read:bytes, shared-read:captured, shared-read:id, shared-read:path, shared-read:rows, shared-read:sha, shared-read:uri, http-call:@uri:getContentUri, data-entity:device_media, data-entity:photos, data-entity:device_media, data-entity:drive_backups, data-entity:manual_device_backups, data-entity:photos"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-drive": {
+      "id": "node-drive",
+      "type": "component",
+      "title": "Drive Connection, Synchronization, and Backup",
+      "description": "DriveGateway, DriveCoordinator, DriveViewModel, and FolderBrowser distinguish integration, coordination, and browsing responsibilities. DriveBackupWorker and CloudSyncWorker identify background backup and synchronization responsibilities. DriveDatabase and CloudDatabase declare connection, backup, cloud-photo, folder, download, source, and scan entities. DriveConnectionException and DriveBackupBlocked expose explicit failure concepts; the supplied evidence does not reveal their complete handling paths.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#338899",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 860,
+        "y": 360
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin",
+        "Android"
+      ],
+      "acceptanceCriteria": [
+        "Drive Connection, Synchronization, and Backup responsibilities are represented by current source files",
+        "Drive Connection, Synchronization, and Backup relationships and data flow are visible in the map",
+        "Future changes to Drive Connection, Synchronization, and Backup can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:e62f506fd4c5e62011a3",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "e62f506fd4c5e62011a3"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudSync.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveBackupWorker.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveConnectionException.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveCoordinator.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveDatabase.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveGateway.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveScreen.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveSources.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveViewModel.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/DateScrubDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryArrivalDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ViewerDetailsDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/VisualDetailsDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/search/SearchFilters.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/edit/PhotoRendererTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/DriveTakeoutArchiveTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/selection/MediaSelectionTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt",
+            "symbol": "CloudPhoto"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt",
+            "symbol": "CloudFolder"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt",
+            "symbol": "SyncState"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt",
+            "symbol": "ScanFolder"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt",
+            "symbol": "DownloadTask"
+          },
+          {
+            "relation": "own",
+            "kind": "symbol",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudDatabase.kt",
+            "symbol": "CloudDao"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, User Journeys & UX, Runtime & Integration Flows, Data Ownership & Persistence, Dependency Health",
+        "Lens confidence": "Product Capabilities: medium, User Journeys & UX: exploratory, Runtime & Integration Flows: medium, Data Ownership & Persistence: medium, Dependency Health: high",
+        "Evidence basis": "19 files; 12 symbols; 0 routes; 14 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.75",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "yes",
+        "Dependency community": "community-1",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "",
+        "Runtime interactions": "shared-read:bindingKey, shared-read:backupId, data-entity:photos, data-entity:cloud_folders, data-entity:cloud_photos, data-entity:downloads, data-entity:drive_sources, data-entity:scan_folders, data-entity:sync_states, data-entity:drive_backups, data-entity:drive_connection, data-entity:drive_sources, data-entity:drive_connection, data-entity:drive_sources"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-imports": {
+      "id": "node-imports",
+      "type": "component",
+      "title": "Import Jobs and Takeout Metadata",
+      "description": "ImportRepository, ImportModel, ImportRuntime, and ImportHistory identify import execution, controls, runtime context, and history responsibilities. ImportDatabase declares ImportJob and ImportItem, with matching import_jobs and import_items operations visible in device tests. TakeoutMetadata, TakeoutCodec, DriveTakeoutMetadata, and DriveRangeChannel identify metadata parsing and Drive-backed input abstractions. Recovery tests provide evidence that item and job recovery are distinct concerns, without proving the full retry algorithm.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#AA7733",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 1480
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin",
+        "Android"
+      ],
+      "acceptanceCriteria": [
+        "Import Jobs and Takeout Metadata responsibilities are represented by current source files",
+        "Import Jobs and Takeout Metadata relationships and data flow are visible in the map",
+        "Future changes to Import Jobs and Takeout Metadata can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:50516df8547d1f01444d",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "50516df8547d1f01444d"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportRecoveryDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveRangeChannel.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveTakeoutArchive.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveTakeoutBrowser.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveTakeoutMetadata.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportConnectionRecovery.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportControls.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDuplicateFinder.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportErrorDismissal.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportExecution.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportForegroundRecovery.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportHistory.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportItemRecovery.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportJobProgress.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportNetwork.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveRangeChannel.kt",
+            "symbol": "DriveRangeChannel"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportControls.kt",
+            "symbol": "ImportModel"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportControls.kt",
+            "symbol": "class"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/UxAcceptanceDeviceTest.kt",
+            "symbol": "UxAcceptanceDeviceTest"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/TakeoutMetadata.kt",
+            "symbol": "TakeoutMetadata"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/TakeoutMetadata.kt",
+            "symbol": "TakeoutCodec"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, User Journeys & UX, Runtime & Integration Flows, Data Ownership & Persistence, Modules & Components, Dependency Health",
+        "Lens confidence": "Product Capabilities: medium, User Journeys & UX: exploratory, Runtime & Integration Flows: medium, Data Ownership & Persistence: medium, Modules & Components: high, Dependency Health: high",
+        "Evidence basis": "152 files; 12 symbols; 0 routes; 27 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.52",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "yes",
+        "Dependency community": "community-1",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "",
+        "Runtime interactions": "shared-read:path, shared-read:binding, shared-read:job:$job, shared-read:job:$job, shared-read:next, shared-read:job, shared-read:kind, shared-read:job, shared-read:job, http-call:@uri:newRawUri, data-entity:import_items, data-entity:import_jobs, data-entity:photos, data-entity:cloud_photos, data-entity:import_items, data-entity:import_jobs, data-entity:metadata_states, data-entity:photos, data-entity:cloud_photos, data-entity:import_jobs, data-entity:import_items, data-entity:import_jobs, data-entity:photos, data-entity:takeout_downloads, data-entity:takeout_sidecars, data-entity:metadata_states, data-entity:sqlite_master"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-library-storage": {
+      "id": "node-library-storage",
+      "type": "component",
+      "title": "Photo Records and Media Storage",
+      "description": "Provides shared Room/SQLite persistence and media-storage operations. PhotoDatabase.kt defines photo and AI handoff records; LibraryDatabase.kt defines albums, memberships, edit drafts, people, faces, and scan records with query and mutation DAOs. LibraryFollowupDatabase.kt adds MediaStore references, scan tracking, manual backup authorizations with captured destinations and metadata receipts, person aliases, photo-person labels and origins, and a durable people indexing queue. Triggers enqueue indexing when imported metadata or source binding changes and remove associated label, queue, and device-reference rows when photos are deleted. LibraryPresenceDao derives a boolean Drive-presence result from cloud records or completed backup receipts with identity and trash checks. OfflineStorageRepository scans in batches of 120 and delegates eligible app-owned downloaded-copy removal to MediaCache, retaining ineligible items and recording access or verification failures. Versioned migrations evolve this shared state.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#7766AA",
+        "shape": "database"
+      },
+      "position": {
+        "x": 80,
+        "y": 2040
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin",
+        "SQLite"
+      ],
+      "acceptanceCriteria": [
+        "A device_media.photoId produced by reconciliation resolves through database.photos().find."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:447f89150db48a1ab8ed",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "447f89150db48a1ab8ed"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/10.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/11.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/12.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/2.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/3.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/4.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/5.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/6.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/7.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/8.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/schemas/com.myphotosanywhere.mpa.data.PhotoDatabase/9.json"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/DeviceCopyIdentity.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/DeviceStorageMigration.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/MediaCache.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/OfflineStorage.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt",
+            "symbol": "Photo"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt",
+            "symbol": "Handoff"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt",
+            "symbol": "PhotoDatabase"
+          },
+          {
+            "relation": "own",
+            "kind": "symbol",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt",
+            "symbol": "PhotoDao"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/DeviceCopyIdentity.kt",
+            "symbol": "DeviceCopyIdentity"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt",
+            "symbol": "Album"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, User Journeys & UX, Runtime & Integration Flows, Data Ownership & Persistence, Modules & Components, Dependency Health",
+        "Lens confidence": "Product Capabilities: medium, User Journeys & UX: exploratory, Runtime & Integration Flows: medium, Data Ownership & Persistence: medium, Modules & Components: high, Dependency Health: high",
+        "Evidence basis": "71 files; 12 symbols; 5 routes; 30 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "1.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "yes",
+        "Dependency community": "community-1",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "/missing, /present/labelled, /missing/file, /present/older, /missing/$it",
+        "Runtime interactions": "shared-read:key, data-entity:photos, data-entity:import_jobs, data-entity:photos, data-entity:cloud_photos, data-entity:photos, data-entity:drive_trash, data-entity:device_media, data-entity:manual_device_backups, data-entity:album_photos, data-entity:albums, data-entity:edit_drafts, data-entity:face_scans, data-entity:faces, data-entity:people, data-entity:device_media, data-entity:device_scan_seen, data-entity:faces, data-entity:IF, data-entity:manual_device_backups, data-entity:people, data-entity:people_index_queue, data-entity:person_aliases, data-entity:photo_people, data-entity:photo_people_origins, data-entity:photos, data-entity:album_photos, data-entity:albums, data-entity:edit_drafts, data-entity:face_scans"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-metadata": {
+      "id": "node-metadata",
+      "type": "component",
+      "title": "Portable and Manual Photo Metadata",
+      "description": "MetadataRepository and MetadataPreview identify metadata access and preview responsibilities. ManualPhotoMetadata provides a manual metadata abstraction, and XmpCatalog exports PortablePerson and PortableAlbum. These files ground portable metadata and manual annotation concepts, but the supplied snippets do not establish the complete sidecar write or synchronization path.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#7766AA",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 470,
+        "y": 2040
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin",
+        "XMP"
+      ],
+      "acceptanceCriteria": [
+        "Portable and Manual Photo Metadata responsibilities are represented by current source files",
+        "Portable and Manual Photo Metadata relationships and data flow are visible in the map",
+        "Future changes to Portable and Manual Photo Metadata can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:44201ff338a4dc1b23e4",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "44201ff338a4dc1b23e4"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/ManualPhotoMetadata.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/MetadataRepository.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/XmpCatalog.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/edit/EditRecipe.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/XmpCatalog.kt",
+            "symbol": "PortablePerson"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/XmpCatalog.kt",
+            "symbol": "PortableAlbum"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/XmpCatalog.kt",
+            "symbol": "PortableAlias"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/XmpCatalog.kt",
+            "symbol": "PortableMembership"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/XmpCatalog.kt",
+            "symbol": "PortablePhotoPeople"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/XmpCatalog.kt",
+            "symbol": "PortableFace"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, Runtime & Integration Flows, Data Ownership & Persistence, Dependency Health",
+        "Lens confidence": "Product Capabilities: medium, Runtime & Integration Flows: medium, Data Ownership & Persistence: medium, Dependency Health: high",
+        "Evidence basis": "4 files; 12 symbols; 0 routes; 1 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.13",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "yes",
+        "Dependency community": "community-1",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "",
+        "Runtime interactions": "shared-read:binding"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-people": {
+      "id": "node-people",
+      "type": "component",
+      "title": "People Identity and Face Regions",
+      "description": "PeopleRepository and PeopleWorker identify people-processing responsibilities. FaceRegion and FaceRegions describe face-region abstractions, while CanonicalPersonGroup and CanonicalPeopleState identify canonical identity grouping. CanonicalPeopleIndexTest supplies reviewed and new catalog items, including the rule that a missing face must not create a person. LibraryDatabase separately owns the evidenced people, faces, and face_scans entity declarations.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#9977AA",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 860,
+        "y": 1760
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin",
+        "Android"
+      ],
+      "acceptanceCriteria": [
+        "A missing face does not create a person in the canonical people index."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:4e53e59e86db1f3932c0",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "4e53e59e86db1f3932c0"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/people/PeopleMenusDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndex.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/CanonicalPeopleRepository.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/FaceEmbedding.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/FaceMatching.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/FaceRegions.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/FaceReview.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/ImportedPeople.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/IndexWindow.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/LabelFaceSuggestions.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/PeopleRepository.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/RecognitionResources.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndexTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/DeviceSmokeTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/MultiSourceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/metadata/XmpCodecTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/people/RecognitionResourcesTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/FaceRegions.kt",
+            "symbol": "FaceRegion"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/FaceRegions.kt",
+            "symbol": "FaceRegions"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/people/PeopleMenusDeviceTest.kt",
+            "symbol": "DialogFrame"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/CanonicalPeopleRepository.kt",
+            "symbol": "CanonicalPersonGroup"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/PeopleRepository.kt",
+            "symbol": "PeopleRepository"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/people/PeopleMenusDeviceTest.kt",
+            "symbol": "PeopleMenusDeviceTest"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, User Journeys & UX, Runtime & Integration Flows, Data Ownership & Persistence, Dependency Health",
+        "Lens confidence": "Product Capabilities: medium, User Journeys & UX: exploratory, Runtime & Integration Flows: medium, Data Ownership & Persistence: medium, Dependency Health: high",
+        "Evidence basis": "17 files; 12 symbols; 0 routes; 9 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.23",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "yes",
+        "Dependency community": "community-1",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "",
+        "Runtime interactions": "shared-read:done, shared-read:errors, shared-read:manual, shared-read:photoCursor, shared-read:sourceCursor, shared-read:total, data-entity:import_items, data-entity:import_jobs, data-entity:takeout_downloads"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-people-canonicalpeopleindextest-kt-item-reviewed": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-people-canonicalpeopleindextest-kt-item-reviewed",
+      "type": "component",
+      "title": "Reviewed Person Index Fixture",
+      "description": "The reviewed item in CanonicalPeopleIndexTest.kt identifies a reviewed-person test fixture with the supplied value \"Samuel\". It belongs to the canonical people index test context.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 860,
+        "y": 2040
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "CanonicalPeopleIndexTest.kt contains the reviewed item associated with \"Samuel\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:1eb31a6eed1cb62389f1",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "1eb31a6eed1cb62389f1"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.430Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndexTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "reviewed",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndexTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-people-canonicalpeopleindextest-kt-item-new": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-people-canonicalpeopleindextest-kt-item-new",
+      "type": "component",
+      "title": "New Person Index Fixture",
+      "description": "The new item in CanonicalPeopleIndexTest.kt identifies a new-person test fixture with the supplied value \"New\". It belongs to the canonical people index test context.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 470,
+        "y": 1760
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "CanonicalPeopleIndexTest.kt contains the new item associated with \"New\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:2a9d7d824dc0bf642b00",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "2a9d7d824dc0bf642b00"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndexTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "new",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndexTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-people-canonicalpeopleindextest-kt-item-deleted": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-people-canonicalpeopleindextest-kt-item-deleted",
+      "type": "component",
+      "title": "Deleted Person Index Fixture",
+      "description": "The deleted item in CanonicalPeopleIndexTest.kt identifies a deleted-person test fixture with the supplied value \"Old\". It belongs to the canonical people index test context.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 860,
+        "y": 80
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "CanonicalPeopleIndexTest.kt contains the deleted item associated with \"Old\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:693c7e207acededdb6d5",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "693c7e207acededdb6d5"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndexTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "deleted",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndexTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-media-actions": {
+      "id": "node-media-actions",
+      "type": "component",
+      "title": "Selection, Editing, and AI Handoff",
+      "description": "MediaSelection and SelectionTarget represent selected media using identity, local-photo, cloud-photo, byte-count, hash, and version fields. DragRangeSelection and SelectionChrome provide selection interaction responsibilities. SelectionRepository references albums and exposes Unavailable, while EditorModel and AiHandoff identify editing and handoff operations. URI operations are observed in SelectionRepository and AiHandoff, but their extracted labels do not prove HTTP transport or completed external edits.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#BB6688",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 2320
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin",
+        "Android"
+      ],
+      "acceptanceCriteria": [
+        "Selection, Editing, and AI Handoff responsibilities are represented by current source files",
+        "Selection, Editing, and AI Handoff relationships and data flow are visible in the map",
+        "Future changes to Selection, Editing, and AI Handoff can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:82204c4893c3f886dbee",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "82204c4893c3f886dbee"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/ai/AiHandoff.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/core/AiProvider.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/edit/EditorModel.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/DragRangeSelection.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/DragSelectionGesture.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/MediaSelection.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/SelectionChrome.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/SelectionRepository.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/SelectionViewModel.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/SelectionChromeDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/MediaSelection.kt",
+            "symbol": "SelectionTarget"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/MediaSelection.kt",
+            "symbol": "MediaSelection"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/MediaSelection.kt",
+            "symbol": "class"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/MediaSelection.kt",
+            "symbol": "BulkAction"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/MediaSelection.kt",
+            "symbol": "SelectionFailure"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/MediaSelection.kt",
+            "symbol": "SelectionResult"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, User Journeys & UX, Runtime & Integration Flows, Data Ownership & Persistence, Modules & Components, Dependency Health",
+        "Lens confidence": "Product Capabilities: medium, User Journeys & UX: exploratory, Runtime & Integration Flows: medium, Data Ownership & Persistence: medium, Modules & Components: high, Dependency Health: high",
+        "Evidence basis": "10 files; 11 symbols; 0 routes; 11 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.21",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "yes",
+        "Dependency community": "community-1",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "",
+        "Runtime interactions": "shared-read:bytes, shared-read:cloud, shared-read:key, shared-read:md5, shared-read:name, shared-read:photo, shared-read:sha, shared-read:version, http-call:@uri:newUri, http-call:@uri:newUri, data-entity:albums"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-management": {
+      "id": "node-management",
+      "type": "component",
+      "title": "Library Preferences and Trash",
+      "description": "ManagementScreen, SettingsMenu, GroupedMenus, and PhotosViewPreferencesModel identify user-facing library controls. LibrarySettings exposes storage budgets, recognition and sidecar settings, overnight scheduling fields, cloud indexing, and indexing pause state. ActivitySummary supplies an activity summary abstraction. DriveTrashRepository and DriveTrashDatabase identify a distinct trash responsibility with a concrete drive_trash entity.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#778855",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 470,
+        "y": 1480
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin",
+        "Android"
+      ],
+      "acceptanceCriteria": [
+        "Library Preferences and Trash responsibilities are represented by current source files",
+        "Library Preferences and Trash relationships and data flow are visible in the map",
+        "Future changes to Library Preferences and Trash can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:c02d5b3eefe9398f69ae",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "c02d5b3eefe9398f69ae"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/TrashDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/core/LibrarySettings.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/ActivitySummary.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/GroupedMenus.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/ManagementScreen.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/PhotosViewPreferences.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashFailures.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashIndex.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashRepository.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashVersion.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashWorker.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/TrashPagingSource.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/TrashScreen.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/TrashViewModel.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/TrashVisibility.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/people/CanonicalPeopleScaleTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/ActivitySummary.kt",
+            "symbol": "ActivitySummary"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/ManagementScreen.kt",
+            "symbol": "SettingsMenu"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/core/LibrarySettings.kt",
+            "symbol": "StorageSettings"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/core/LibrarySettings.kt",
+            "symbol": "LibrarySettings"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt",
+            "symbol": "ManagementDeviceTest"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt",
+            "symbol": "ManagementChromeDeviceTest"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, User Journeys & UX, Runtime & Integration Flows, Data Ownership & Persistence, Dependency Health",
+        "Lens confidence": "Product Capabilities: medium, User Journeys & UX: exploratory, Runtime & Integration Flows: medium, Data Ownership & Persistence: medium, Dependency Health: high",
+        "Evidence basis": "22 files; 12 symbols; 0 routes; 19 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.44",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "yes",
+        "Dependency community": "community-1",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "",
+        "Runtime interactions": "shared-read:faces, shared-read:indexCloud, shared-read:indexingPaused, shared-read:maps, shared-read:nightEnd, shared-read:nightStart, shared-read:objects, shared-read:originalBudget, shared-read:overnight, shared-read:sidecars, shared-read:thumbnailBudget, data-entity:cloud_photos, data-entity:import_jobs, data-entity:photos, data-entity:drive_trash, data-entity:cloud_photos, data-entity:drive_backups, data-entity:drive_trash, data-entity:import_items"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-github-workflows-verification-support": {
+      "id": "node-github-workflows-verification-support",
+      "type": "component",
+      "title": "Automated Checks and Device Evidence",
+      "description": "Python and Bash scripts support SDK setup, native validation stages, signing, and device screenshot evidence collection and validation. WarningGate and main in scripts/gradle_checks.py provide an executable check entrypoint, while NativeStages, PngEvidenceValidator, and RuntimeCaptureVerifier define additional validation responsibilities. Supporting tests cover warning gates, native stages, and PNG evidence. GitHub workflow declarations cover Android, device, model, and release automation; these files alone do not establish active release execution.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "subflowId": "subflow-engineering",
+      "techStack": [
+        "Python",
+        "Bash",
+        "GitHub Actions"
+      ],
+      "acceptanceCriteria": [
+        "scripts/gradle_checks.py defines WarningGate and main.",
+        "The supporting scripts define AndroidSdkSetup, UpgradeSigner, DeviceScreenshotReader, NativeStages, PngEvidenceValidator, and RuntimeCaptureVerifier.",
+        "WarningGateTest, NativeStagesTest, and PngEvidenceTest provide validation test coverage.",
+        "The supplied GitHub workflow files declare Android, device, model, and release automation."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:686b75dfa80936675511",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "686b75dfa80936675511"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "scripts/test_native_stages.py"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "scripts/native_stages.py"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "scripts/gradle_checks.py"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "scripts/ci_emulator.sh"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "scripts/run_device_checks.sh"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/android.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "scripts/gradle_checks.py",
+            "symbol": "WarningGate"
+          },
+          {
+            "relation": "own",
+            "kind": "function",
+            "path": "scripts/gradle_checks.py",
+            "symbol": "main"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "scripts/ci_android_sdk.py",
+            "symbol": "AndroidSdkSetup"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "scripts/ci_upgrade_signer.py",
+            "symbol": "UpgradeSigner"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "scripts/collect_png_evidence.py",
+            "symbol": "DeviceScreenshotReader"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "scripts/native_stages.py",
+            "symbol": "NativeStages"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows, Cloud & Infrastructure, Modules & Components",
+        "Lens confidence": "Runtime & Integration Flows: medium, Cloud & Infrastructure: medium, Modules & Components: high",
+        "Evidence basis": "33 files; 12 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "yes",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": ""
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-direct": {
+      "id": "node-direct",
+      "type": "component",
+      "title": "Root Build Configuration and Launchers",
+      "description": "settings.gradle.kts, build.gradle.kts, and gradle.properties hold repository-level Gradle configuration. The gradlew and gradlew.bat launchers provide shell and Windows entrypoints for invoking the Gradle wrapper.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 410,
+        "y": 80
+      },
+      "subflowId": "subflow-engineering",
+      "techStack": [
+        "Gradle",
+        "Kotlin DSL"
+      ],
+      "acceptanceCriteria": [
+        "Root Gradle configuration is present in settings.gradle.kts, build.gradle.kts, and gradle.properties.",
+        "Both gradlew and gradlew.bat are present as platform-specific build launchers."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:8f0742645df3008a07c8",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "8f0742645df3008a07c8"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "settings.gradle.kts"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "build.gradle.kts"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "gradlew"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "gradlew.bat"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "gradle.properties"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Product Capabilities, Cloud & Infrastructure, Modules & Components",
+        "Lens confidence": "Product Capabilities: medium, Cloud & Infrastructure: medium, Modules & Components: high",
+        "Evidence basis": "5 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": ""
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-gradle": {
+      "id": "node-gradle",
+      "type": "component",
+      "title": "Gradle Distribution Bootstrap",
+      "description": "gradle/wrapper/gradle-wrapper.jar supplies the Gradle wrapper bootstrap, and gradle-wrapper.properties holds its configuration. These files support wrapper-based Gradle startup without establishing any application runtime responsibility.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 290
+      },
+      "subflowId": "subflow-engineering",
+      "techStack": [
+        "Gradle Wrapper"
+      ],
+      "acceptanceCriteria": [
+        "gradle/wrapper contains both gradle-wrapper.jar and gradle-wrapper.properties.",
+        "gradle-wrapper.properties specifies the Gradle distribution used by the wrapper."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:0fb812fa4689afd3ae3d",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "0fb812fa4689afd3ae3d"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "gradle/wrapper/gradle-wrapper.jar"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "gradle/wrapper/gradle-wrapper.properties"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Cloud & Infrastructure, Modules & Components",
+        "Lens confidence": "Cloud & Infrastructure: medium, Modules & Components: high",
+        "Evidence basis": "2 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": ""
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-metadata-metadatapersistencetest-kt-item-photo": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-metadata-metadatapersistencetest-kt-item-photo",
+      "type": "component",
+      "title": "Metadata Persistence Photo Fixture",
+      "description": "The photo item in MetadataPersistenceTest.kt identifies the \"photo.jpg\" fixture used in the metadata persistence test context. The supplied evidence does not specify its metadata fields or persistence assertions.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 80,
+        "y": 1760
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "MetadataPersistenceTest.kt contains the photo item associated with \"photo.jpg\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:da76b07f5854e3918fd1",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "da76b07f5854e3918fd1"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/metadata/MetadataPersistenceTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "photo",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/metadata/MetadataPersistenceTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-metadata-metadatapersistencetest-kt-item-fresh-local-id": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-metadata-metadatapersistencetest-kt-item-fresh-local-id",
+      "type": "component",
+      "title": "Fresh Local Identity Metadata Fixture",
+      "description": "The fresh-local-id item in MetadataPersistenceTest.kt distinguishes a \"photo.jpg\" fixture by a fresh local identity. It belongs to the metadata persistence test context.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 80,
+        "y": 640
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "MetadataPersistenceTest.kt contains the fresh-local-id item associated with \"photo.jpg\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:408505da3b1ac8ade936",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "408505da3b1ac8ade936"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/metadata/MetadataPersistenceTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "fresh-local-id",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/metadata/MetadataPersistenceTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-metadata-metadatapersistencetest-kt-item-local": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-metadata-metadatapersistencetest-kt-item-local",
+      "type": "component",
+      "title": "Local Photo Metadata Fixture",
+      "description": "The local item in MetadataPersistenceTest.kt identifies a local-photo fixture with the supplied value \"photo.jpg\". It belongs to the metadata persistence test context.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 860,
+        "y": 1480
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "MetadataPersistenceTest.kt contains the local item associated with \"photo.jpg\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:2d1212cdaddcb3aa1e0e",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "2d1212cdaddcb3aa1e0e"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/metadata/MetadataPersistenceTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "local",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/metadata/MetadataPersistenceTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-photo": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-photo",
+      "type": "component",
+      "title": "Hash Migration Photo Fixture",
+      "description": "The photo item in HashIndexMigrationTest.kt identifies the photo fixture \"p.jpg\" within the hash index migration test context. The supplied evidence does not establish which photo fields the migration changes.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 470,
+        "y": 1200
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "HashIndexMigrationTest.kt contains the photo item associated with \"p.jpg\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:411f9409919c9573c00c",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "411f9409919c9573c00c"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "photo",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-person": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-person",
+      "type": "component",
+      "title": "Hash Migration Person Fixture",
+      "description": "The person item in HashIndexMigrationTest.kt identifies the person fixture \"Sam\" within the hash index migration test context. No relationship to other fixtures is established by the supplied edges.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 80,
+        "y": 1200
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "HashIndexMigrationTest.kt contains the person item associated with \"Sam\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:47902f7a4480e40e3629",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "47902f7a4480e40e3629"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "person",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-face": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-face",
+      "type": "component",
+      "title": "Hash Migration Face Fixture",
+      "description": "The face item in HashIndexMigrationTest.kt identifies a face-related fixture associated with the supplied value \"photo\". It belongs to the hash index migration test context.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 470,
+        "y": 920
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "HashIndexMigrationTest.kt contains the face item associated with \"photo\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:4e535118947fcc6f8594",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "4e535118947fcc6f8594"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "face",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-binding": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-binding",
+      "type": "component",
+      "title": "Hash Migration Account Binding Fixture",
+      "description": "The binding item in HashIndexMigrationTest.kt identifies a binding fixture associated with the supplied value \"account\". It belongs to the hash index migration test context.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 470,
+        "y": 640
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "HashIndexMigrationTest.kt contains the binding item associated with \"account\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:8cfb8e41f84634a31b37",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "8cfb8e41f84634a31b37"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "binding",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-upload": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-upload",
+      "type": "component",
+      "title": "Hash Migration Upload Fixture",
+      "description": "The upload item in HashIndexMigrationTest.kt identifies an upload-related fixture associated with the supplied value \"binding\". The evidence establishes its test context without specifying upload execution behavior.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 860,
+        "y": 1200
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "HashIndexMigrationTest.kt contains the upload item associated with \"binding\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:5a309c78f5f86dc1555f",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "5a309c78f5f86dc1555f"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "upload",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-existing-job": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-existing-job",
+      "type": "component",
+      "title": "Hash Migration Existing Job Fixture",
+      "description": "The existing-job item in HashIndexMigrationTest.kt identifies an existing-job fixture associated with the supplied value \"binding\". It belongs to the hash index migration test context.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 860,
+        "y": 640
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "HashIndexMigrationTest.kt contains the existing-job item associated with \"binding\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:b7cf4f0574fd42f4ad72",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "b7cf4f0574fd42f4ad72"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "existing-job",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-existing-item": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-existing-item",
+      "type": "component",
+      "title": "Hash Migration Existing Job Item Fixture",
+      "description": "The existing-item item in HashIndexMigrationTest.kt identifies an existing-item fixture associated with the supplied value \"existing-job\". It belongs to the hash index migration test context.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 80,
+        "y": 920
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "HashIndexMigrationTest.kt contains the existing-item item associated with \"existing-job\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:c6a86c502fa6c87f6fd4",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "c6a86c502fa6c87f6fd4"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "existing-item",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-idle": {
+      "id": "node-app-src-test-java-com-myphotosanywhere-mpa-importing-hashindexmigrationtest-kt-item-idle",
+      "type": "component",
+      "title": "Hash Migration Idle Token Fixture",
+      "description": "The idle item in HashIndexMigrationTest.kt identifies a fixture associated with the supplied value \"idle-token\". The evidence places it in the hash index migration test context without establishing token lifecycle behavior.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "document"
+      },
+      "position": {
+        "x": 860,
+        "y": 920
+      },
+      "subflowId": "subflow-android-app",
+      "techStack": [
+        "Kotlin"
+      ],
+      "acceptanceCriteria": [
+        "HashIndexMigrationTest.kt contains the idle item associated with \"idle-token\"."
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:b0b55adc4893c62ea401",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "b0b55adc4893c62ea401"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:20:30.431Z",
+        "claims": [
+          {
+            "relation": "share",
+            "kind": "file",
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Runtime & Integration Flows",
+        "Lens confidence": "Runtime & Integration Flows: medium",
+        "Evidence basis": "0 files; 0 symbols; 0 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "",
+        "Runtime interactions": "",
+        "Catalog item key": "idle",
+        "Catalog source": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt"
+      },
+      "attachments": [],
+      "todos": []
+    }
+  },
+  "edges": {
+    "edge-gallery--management": {
+      "id": "edge-gallery--management",
+      "source": "node-gallery",
+      "target": "node-management",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "reads library preferences",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/AdaptiveThumbnailDeviceTest.kt",
+            "line": 10,
+            "fact": "com.myphotosanywhere.mpa.core.LibrarySettings"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-gallery--library-storage": {
+      "id": "edge-gallery--library-storage",
+      "source": "node-gallery",
+      "target": "node-library-storage",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "queries photo records and loads thumbnails",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/AdaptiveThumbnailDeviceTest.kt",
+            "line": 11,
+            "fact": "com.myphotosanywhere.mpa.data.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/AdaptiveThumbnailDeviceTest.kt",
+            "line": 12,
+            "fact": "com.myphotosanywhere.mpa.thumbnails.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryPolishDeviceTest.kt",
+            "line": 25,
+            "fact": "com.myphotosanywhere.mpa.data.Photo"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/search/SearchScreen.kt",
+            "line": 22,
+            "fact": "com.myphotosanywhere.mpa.data.Album"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineModels.kt",
+            "line": 3,
+            "fact": "com.myphotosanywhere.mpa.data.Photo"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineRepository.kt",
+            "line": 6,
+            "fact": "com.myphotosanywhere.mpa.data.PhotoDatabase"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-device-library--library-storage": {
+      "id": "edge-device-library--library-storage",
+      "source": "node-device-library",
+      "target": "node-library-storage",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "integrates device media with library records",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+            "line": 16,
+            "fact": "com.myphotosanywhere.mpa.data.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceMediaLibrary.kt",
+            "line": 16,
+            "fact": "com.myphotosanywhere.mpa.data.*"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-device-library--drive": {
+      "id": "edge-device-library--drive",
+      "source": "node-device-library",
+      "target": "node-drive",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "references cloud records in device tests",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+            "line": 17,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-people--drive": {
+      "id": "edge-people--drive",
+      "source": "node-people",
+      "target": "node-drive",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "references backup worker in smoke tests",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/DeviceSmokeTest.kt",
+            "line": 13,
+            "fact": "com.myphotosanywhere.mpa.drive.DriveBackupWorker"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-library-storage--media-actions": {
+      "id": "edge-library-storage--media-actions",
+      "source": "node-library-storage",
+      "target": "node-media-actions",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "supports media selection and AI handoff",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/DragSelectionDeviceTest.kt",
+            "line": 22,
+            "fact": "com.myphotosanywhere.mpa.selection.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/SelectionDeviceTest.kt",
+            "line": 14,
+            "fact": "com.myphotosanywhere.mpa.selection.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/MediaCache.kt",
+            "line": 4,
+            "fact": "com.myphotosanywhere.mpa.core.*"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/trash/DriveTrashRepositoryTest.kt",
+            "line": 7,
+            "fact": "com.myphotosanywhere.mpa.selection.SelectionTarget"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-imports--library-storage": {
+      "id": "edge-imports--library-storage",
+      "source": "node-imports",
+      "target": "node-library-storage",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "integrates imported photos with library storage",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 14,
+            "fact": "com.myphotosanywhere.mpa.data.Photo"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt",
+            "line": 11,
+            "fact": "com.myphotosanywhere.mpa.data.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportRecoveryDeviceTest.kt",
+            "line": 6,
+            "fact": "com.myphotosanywhere.mpa.data.PhotoDatabase"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/UxAcceptanceDeviceTest.kt",
+            "line": 23,
+            "fact": "com.myphotosanywhere.mpa.data.Photo"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/UxCompletionDeviceTest.kt",
+            "line": 14,
+            "fact": "com.myphotosanywhere.mpa.data.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/WarningContractsDeviceTest.kt",
+            "line": 11,
+            "fact": "com.myphotosanywhere.mpa.data.StorageBudget"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportErrorDismissal.kt",
+            "line": 4,
+            "fact": "com.myphotosanywhere.mpa.data.PhotoDatabase"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportHistory.kt",
+            "line": 6,
+            "fact": "com.myphotosanywhere.mpa.data.PhotoDatabase"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-imports--gallery": {
+      "id": "edge-imports--gallery",
+      "source": "node-imports",
+      "target": "node-gallery",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "integrates import controls with gallery presentation",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 16,
+            "fact": "com.myphotosanywhere.mpa.library.OriginalImageReader"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 17,
+            "fact": "com.myphotosanywhere.mpa.library.OriginalPhotoView"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/UxAcceptanceDeviceTest.kt",
+            "line": 26,
+            "fact": "com.myphotosanywhere.mpa.library.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/UxCompletionDeviceTest.kt",
+            "line": 17,
+            "fact": "com.myphotosanywhere.mpa.library.LibraryFeaturesModel"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportControls.kt",
+            "line": 34,
+            "fact": "com.myphotosanywhere.mpa.R"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportControls.kt",
+            "line": 35,
+            "fact": "com.myphotosanywhere.mpa.ui.MotionVisibility"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportControls.kt",
+            "line": 36,
+            "fact": "com.myphotosanywhere.mpa.ui.MotionEdge"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportControls.kt",
+            "line": 37,
+            "fact": "com.myphotosanywhere.mpa.ui.ShellIcon"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-imports--drive": {
+      "id": "edge-imports--drive",
+      "source": "node-imports",
+      "target": "node-drive",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "accesses Drive archives and cloud records",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt",
+            "line": 12,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportRecoveryDeviceTest.kt",
+            "line": 7,
+            "fact": "com.myphotosanywhere.mpa.drive.CloudPhoto"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/UxAcceptanceDeviceTest.kt",
+            "line": 24,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/UxCompletionDeviceTest.kt",
+            "line": 15,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveTakeoutArchive.kt",
+            "line": 4,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveTakeoutBrowser.kt",
+            "line": 11,
+            "fact": "com.myphotosanywhere.mpa.drive.DriveGateway"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveTakeoutMetadata.kt",
+            "line": 7,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportConnectionRecovery.kt",
+            "line": 3,
+            "fact": "com.myphotosanywhere.mpa.drive.DriveConnectionException"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-imports--metadata": {
+      "id": "edge-imports--metadata",
+      "source": "node-imports",
+      "target": "node-metadata",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "processes XMP metadata during Takeout imports",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt",
+            "line": 14,
+            "fact": "com.myphotosanywhere.mpa.metadata.XmpCodec"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/DriveTakeoutMetadata.kt",
+            "line": 8,
+            "fact": "com.myphotosanywhere.mpa.metadata.XmpCodec"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/TakeoutCleanup.kt",
+            "line": 5,
+            "fact": "com.myphotosanywhere.mpa.metadata.XmpCodec"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-management--library-storage": {
+      "id": "edge-management--library-storage",
+      "source": "node-management",
+      "target": "node-library-storage",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "accesses photo records for trash management",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt",
+            "line": 20,
+            "fact": "com.myphotosanywhere.mpa.data.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/people/CanonicalPeopleScaleTest.kt",
+            "line": 8,
+            "fact": "com.myphotosanywhere.mpa.data.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/SearchChromeDeviceTest.kt",
+            "line": 15,
+            "fact": "com.myphotosanywhere.mpa.search.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/TrashDeviceTest.kt",
+            "line": 9,
+            "fact": "com.myphotosanywhere.mpa.data.Photo"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/ManagementScreen.kt",
+            "line": 22,
+            "fact": "com.myphotosanywhere.mpa.data.Photo"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashIndex.kt",
+            "line": 3,
+            "fact": "com.myphotosanywhere.mpa.data.PhotoDatabase"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashRepository.kt",
+            "line": 5,
+            "fact": "com.myphotosanywhere.mpa.data.PhotoDatabase"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/TrashPagingSource.kt",
+            "line": 7,
+            "fact": "com.myphotosanywhere.mpa.data.PhotoDatabase"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-management--drive": {
+      "id": "edge-management--drive",
+      "source": "node-management",
+      "target": "node-drive",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "presents Drive status and manages cloud trash",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt",
+            "line": 21,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/TrashDeviceTest.kt",
+            "line": 10,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/ActivitySummary.kt",
+            "line": 5,
+            "fact": "com.myphotosanywhere.mpa.drive.SyncState"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/ManagementScreen.kt",
+            "line": 23,
+            "fact": "com.myphotosanywhere.mpa.drive.DriveStorageScreen"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashFailures.kt",
+            "line": 4,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashRepository.kt",
+            "line": 6,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/data/ThumbnailAvailabilityTest.kt",
+            "line": 6,
+            "fact": "com.myphotosanywhere.mpa.drive.CloudPhoto"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/device/LibraryPresenceTest.kt",
+            "line": 6,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-management--imports": {
+      "id": "edge-management--imports",
+      "source": "node-management",
+      "target": "node-imports",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "summarizes import jobs and history",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt",
+            "line": 22,
+            "fact": "com.myphotosanywhere.mpa.importing.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/ActivitySummary.kt",
+            "line": 3,
+            "fact": "com.myphotosanywhere.mpa.importing.ImportJob"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/ActivitySummary.kt",
+            "line": 4,
+            "fact": "com.myphotosanywhere.mpa.importing.ImportHistory"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/management/ManagementScreen.kt",
+            "line": 24,
+            "fact": "com.myphotosanywhere.mpa.importing.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashIndex.kt",
+            "line": 4,
+            "fact": "com.myphotosanywhere.mpa.drive.DriveFile"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-people--library-storage": {
+      "id": "edge-people--library-storage",
+      "source": "node-people",
+      "target": "node-library-storage",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "accesses person labels and face records",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/people/PeopleMenusDeviceTest.kt",
+            "line": 22,
+            "fact": "com.myphotosanywhere.mpa.data.Person"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndex.kt",
+            "line": 5,
+            "fact": "com.myphotosanywhere.mpa.data.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/CanonicalPeopleRepository.kt",
+            "line": 3,
+            "fact": "com.myphotosanywhere.mpa.data.Person"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/FaceRegions.kt",
+            "line": 3,
+            "fact": "com.myphotosanywhere.mpa.data.FaceRecord"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/FaceReview.kt",
+            "line": 3,
+            "fact": "com.myphotosanywhere.mpa.data.FaceRecord"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/LabelFaceSuggestions.kt",
+            "line": 3,
+            "fact": "com.myphotosanywhere.mpa.data.FaceRecord"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/LabelFaceSuggestions.kt",
+            "line": 4,
+            "fact": "com.myphotosanywhere.mpa.data.PhotoPersonLabel"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/PeopleRepository.kt",
+            "line": 14,
+            "fact": "com.myphotosanywhere.mpa.data.*"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-people--gallery": {
+      "id": "edge-people--gallery",
+      "source": "node-people",
+      "target": "node-gallery",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "queries timelines for people",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/people/PeopleMenusDeviceTest.kt",
+            "line": 23,
+            "fact": "com.myphotosanywhere.mpa.library.LibraryFeaturesModel"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/people/PeopleMenusDeviceTest.kt",
+            "line": 24,
+            "fact": "com.myphotosanywhere.mpa.library.PersonManagementDialog"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/CanonicalPeopleRepository.kt",
+            "line": 4,
+            "fact": "com.myphotosanywhere.mpa.timeline.TimelineQuery"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/CanonicalPeopleRepository.kt",
+            "line": 5,
+            "fact": "com.myphotosanywhere.mpa.timeline.TimelineRepository"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/CanonicalPeopleRepository.kt",
+            "line": 6,
+            "fact": "com.myphotosanywhere.mpa.timeline.TimelineSql"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-library-storage--drive": {
+      "id": "edge-library-storage--drive",
+      "source": "node-library-storage",
+      "target": "node-drive",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "integrates Drive connections and cloud records",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/search/SearchScaleTest.kt",
+            "line": 9,
+            "fact": "com.myphotosanywhere.mpa.drive.DriveSource"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/SearchDeviceTest.kt",
+            "line": 11,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/SelectionDeviceTest.kt",
+            "line": 13,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/TimelineScaleTest.kt",
+            "line": 9,
+            "fact": "com.myphotosanywhere.mpa.drive.DriveSource"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/trash/TrashScaleTest.kt",
+            "line": 9,
+            "fact": "com.myphotosanywhere.mpa.drive.DriveSource"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt",
+            "line": 15,
+            "fact": "com.myphotosanywhere.mpa.drive.DriveConnection"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt",
+            "line": 16,
+            "fact": "com.myphotosanywhere.mpa.drive.DriveBackup"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt",
+            "line": 17,
+            "fact": "com.myphotosanywhere.mpa.drive.DriveDao"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-drive--gallery": {
+      "id": "edge-drive--gallery",
+      "source": "node-drive",
+      "target": "node-gallery",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "integrates Drive screens with gallery presentation",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/DateScrubDeviceTest.kt",
+            "line": 24,
+            "fact": "com.myphotosanywhere.mpa.library.LibraryFeaturesModel"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ViewerDetailsDeviceTest.kt",
+            "line": 18,
+            "fact": "com.myphotosanywhere.mpa.library.LibraryFeaturesModel"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/VisualDetailsDeviceTest.kt",
+            "line": 10,
+            "fact": "com.myphotosanywhere.mpa.library.PhotoFactsRepository"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveScreen.kt",
+            "line": 56,
+            "fact": "com.myphotosanywhere.mpa.R"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveScreen.kt",
+            "line": 57,
+            "fact": "com.myphotosanywhere.mpa.ui.ShellIcon"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveScreen.kt",
+            "line": 58,
+            "fact": "com.myphotosanywhere.mpa.ui.MotionVisibility"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveScreen.kt",
+            "line": 59,
+            "fact": "com.myphotosanywhere.mpa.ui.MotionEdge"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-device-library--gallery": {
+      "id": "edge-device-library--gallery",
+      "source": "node-device-library",
+      "target": "node-gallery",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "integrates device folders with timeline queries",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceBackupDialog.kt",
+            "line": 12,
+            "fact": "com.myphotosanywhere.mpa.library.LibraryFeaturesModel"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceFoldersScreen.kt",
+            "line": 11,
+            "fact": "com.myphotosanywhere.mpa.R"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceFoldersScreen.kt",
+            "line": 12,
+            "fact": "com.myphotosanywhere.mpa.library.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceFoldersScreen.kt",
+            "line": 13,
+            "fact": "com.myphotosanywhere.mpa.timeline.TimelineQuery"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceLibraryScreen.kt",
+            "line": 23,
+            "fact": "com.myphotosanywhere.mpa.R"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/SelectionBackupDialog.kt",
+            "line": 12,
+            "fact": "com.myphotosanywhere.mpa.library.LibraryFeaturesModel"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-device-library--management": {
+      "id": "edge-device-library--management",
+      "source": "node-device-library",
+      "target": "node-management",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "builds backup choices and grouped menus",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceBackupDialog.kt",
+            "line": 13,
+            "fact": "com.myphotosanywhere.mpa.management.PreferenceChoice"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceLibraryScreen.kt",
+            "line": 24,
+            "fact": "com.myphotosanywhere.mpa.management.GroupedMenu"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceLibraryScreen.kt",
+            "line": 25,
+            "fact": "com.myphotosanywhere.mpa.management.MenuEntry"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/SelectionBackupDialog.kt",
+            "line": 13,
+            "fact": "com.myphotosanywhere.mpa.management.PreferenceChoice"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-device-library--media-actions": {
+      "id": "edge-device-library--media-actions",
+      "source": "node-device-library",
+      "target": "node-media-actions",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "accesses media selection for backup choices",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/SelectionBackupDialog.kt",
+            "line": 14,
+            "fact": "com.myphotosanywhere.mpa.selection.*"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-metadata--library-storage": {
+      "id": "edge-metadata--library-storage",
+      "source": "node-metadata",
+      "target": "node-library-storage",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "associates metadata with library records",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/ManualPhotoMetadata.kt",
+            "line": 4,
+            "fact": "com.myphotosanywhere.mpa.data.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/MetadataRepository.kt",
+            "line": 7,
+            "fact": "com.myphotosanywhere.mpa.data.*"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-metadata--drive": {
+      "id": "edge-metadata--drive",
+      "source": "node-metadata",
+      "target": "node-drive",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "associates metadata with cloud records",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/ManualPhotoMetadata.kt",
+            "line": 5,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/MetadataRepository.kt",
+            "line": 8,
+            "fact": "com.myphotosanywhere.mpa.drive.*"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-metadata--people": {
+      "id": "edge-metadata--people",
+      "source": "node-metadata",
+      "target": "node-people",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "represents face regions in photo metadata",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/ManualPhotoMetadata.kt",
+            "line": 6,
+            "fact": "com.myphotosanywhere.mpa.people.FaceRegion"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/MetadataRepository.kt",
+            "line": 9,
+            "fact": "com.myphotosanywhere.mpa.people.FaceRegion"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/XmpCatalog.kt",
+            "line": 3,
+            "fact": "com.myphotosanywhere.mpa.people.FaceRegion"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-people--imports": {
+      "id": "edge-people--imports",
+      "source": "node-people",
+      "target": "node-imports",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "decodes people metadata from Takeout",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/ImportedPeople.kt",
+            "line": 5,
+            "fact": "com.myphotosanywhere.mpa.importing.TakeoutCodec"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndexTest.kt",
+            "line": 7,
+            "fact": "com.myphotosanywhere.mpa.importing.TakeoutCodec"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-people--management": {
+      "id": "edge-people--management",
+      "source": "node-people",
+      "target": "node-management",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "reads library settings for people",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/PeopleRepository.kt",
+            "line": 15,
+            "fact": "com.myphotosanywhere.mpa.core.LibrarySettings"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/MultiSourceTest.kt",
+            "line": 5,
+            "fact": "com.myphotosanywhere.mpa.core.LibrarySettings"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndexTest.kt",
+            "line": 5,
+            "fact": "com.myphotosanywhere.mpa.core.LibrarySettings"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-gallery--media-actions": {
+      "id": "edge-gallery--media-actions",
+      "source": "node-gallery",
+      "target": "node-media-actions",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "selects search results and timeline entries",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/search/SearchScreen.kt",
+            "line": 25,
+            "fact": "com.myphotosanywhere.mpa.selection.SelectionTarget"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineGrid.kt",
+            "line": 16,
+            "fact": "com.myphotosanywhere.mpa.selection.*"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-media-actions--drive": {
+      "id": "edge-media-actions--drive",
+      "source": "node-media-actions",
+      "target": "node-drive",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "represents cloud photos as selection targets",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/MediaSelection.kt",
+            "line": 5,
+            "fact": "com.myphotosanywhere.mpa.drive.CloudPhoto"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-management--media-actions": {
+      "id": "edge-management--media-actions",
+      "source": "node-management",
+      "target": "node-media-actions",
+      "lineStyle": "solid",
+      "animated": false,
+      "label": "identifies selected media for trash operations",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 1,
+        "relationKinds": [
+          "dependency",
+          "use"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashRepository.kt",
+            "line": 7,
+            "fact": "com.myphotosanywhere.mpa.selection.SelectionTarget"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/TrashViewModel.kt",
+            "line": 10,
+            "fact": "com.myphotosanywhere.mpa.selection.SelectionTarget"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    }
+  },
+  "subflows": {
+    "subflow-android-app": {
+      "id": "subflow-android-app",
+      "name": "Android Photo Application",
+      "ignored": false,
+      "parentNodeId": "node-android-app"
+    },
+    "subflow-engineering": {
+      "id": "subflow-engineering",
+      "name": "Build and Device Validation Toolchain",
+      "ignored": false,
+      "parentNodeId": "node-engineering"
+    }
+  },
+  "groups": {}
+}

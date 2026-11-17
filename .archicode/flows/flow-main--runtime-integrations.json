@@ -1,0 +1,1128 @@
+{
+  "id": "flow-main--runtime-integrations",
+  "name": "Runtime & Integration Flows",
+  "description": "Entrypoints, public runtime contracts, connected system boundaries, external services, and evidence-bearing communication relationships.",
+  "ignored": false,
+  "perspective": {
+    "kind": "runtime-integrations",
+    "source": "codebase-importer",
+    "generated": true,
+    "question": "What executes, calls, hosts, or communicates at runtime?",
+    "confidence": "medium",
+    "evidenceBasis": [
+      "entrypoints",
+      "runtime relation kinds",
+      "connected system boundaries",
+      "public routes",
+      "external SDK and endpoint evidence",
+      "provider-authored lens concepts grounded to canonical code subjects",
+      "bounded repository architecture documents"
+    ],
+    "limitations": [
+      "Only statically recoverable entrypoints and matched runtime contracts are shown; dynamic configuration may add paths.",
+      "1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower.",
+      "Concept nodes are evidence-bounded architectural interpretations, not additional implementation sources of truth."
+    ],
+    "checkedAt": "2026-10-22T12:16:48.001Z",
+    "coverage": {
+      "subjects": 14,
+      "relations": 17,
+      "observedRelations": 11,
+      "inferredRelations": 6
+    }
+  },
+  "nodes": {
+    "node-project": {
+      "id": "node-project",
+      "type": "perspective",
+      "title": "MyPhotosAnywhere — Runtime & Integration Flows",
+      "description": "What executes, calls, hosts, or communicates at runtime? Entrypoints, public runtime contracts, connected system boundaries, external services, and evidence-bearing communication relationships.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "shape": "note"
+      },
+      "position": {
+        "x": 80,
+        "y": 1400
+      },
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "Gradle",
+        "SQLite",
+        "Python"
+      ],
+      "acceptanceCriteria": [
+        "MyPhotosAnywhere — Runtime & Integration Flows responsibilities are represented by current source files",
+        "MyPhotosAnywhere — Runtime & Integration Flows relationships and data flow are visible in the map",
+        "Future changes to MyPhotosAnywhere — Runtime & Integration Flows can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:project:myphotosanywhere",
+        "kind": "concept",
+        "evidenceStatus": "context"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:16:48.001Z",
+        "claims": [
+          {
+            "relation": "cover",
+            "kind": "directory",
+            "path": "."
+          }
+        ]
+      },
+      "customProperties": {
+        "Perspective question": "What executes, calls, hosts, or communicates at runtime?",
+        "Confidence": "medium",
+        "Evidence basis": "entrypoints, runtime relation kinds, connected system boundaries, public routes, external SDK and endpoint evidence",
+        "Limitations": "Only statically recoverable entrypoints and matched runtime contracts are shown; dynamic configuration may add paths. 1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower."
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-publish": {
+      "id": "node-lens-publish",
+      "type": "runtime-step",
+      "title": "Publish MediaStore Content",
+      "description": "Device tests insert content, write image bytes, and update IS_PENDING through Android contentResolver.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5f88a8",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 410,
+        "y": 831.6666666666667
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Publish MediaStore Content responsibilities are represented by current source files",
+        "Publish MediaStore Content relationships and data flow are visible in the map",
+        "Future changes to Publish MediaStore Content can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:runtime:db5330585d9d520ad80f",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "db5330585d9d520ad80f"
+      },
+      "customProperties": {
+        "Lens role": "runtime-step",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "implemented-effect",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-scan": {
+      "id": "node-lens-scan",
+      "type": "runtime-step",
+      "title": "Reconcile Device Media",
+      "description": "The test explicitly invokes app.deviceMedia.reconcile() after the content update.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5f88a8",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 740,
+        "y": 905
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Reconcile Device Media responsibilities are represented by current source files",
+        "Reconcile Device Media relationships and data flow are visible in the map",
+        "Future changes to Reconcile Device Media can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:runtime:84eeb1092cee51ca1abf",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "84eeb1092cee51ca1abf"
+      },
+      "customProperties": {
+        "Lens role": "runtime-step",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "implemented-effect",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-lookup": {
+      "id": "node-lens-lookup",
+      "type": "runtime-step",
+      "title": "Read the Device-to-Photo Mapping",
+      "description": "A SQL query selects photoId from device_media using the media URI and available=1.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5f88a8",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 1070,
+        "y": 584.1666666666666
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Read the Device-to-Photo Mapping responsibilities are represented by current source files",
+        "Read the Device-to-Photo Mapping relationships and data flow are visible in the map",
+        "Future changes to Read the Device-to-Photo Mapping can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:runtime:37425c8c49442621e99c",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "37425c8c49442621e99c"
+      },
+      "customProperties": {
+        "Lens role": "runtime-step",
+        "Canonical code anchors": "code:447f89150db48a1ab8ed, code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "implemented-effect",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-materialize": {
+      "id": "node-lens-materialize",
+      "type": "runtime-step",
+      "title": "Materialize or Resolve Photo Content",
+      "description": "The observed fixture branches between app.deviceMedia.materialize(id) and database.photos().find(id). This is a tested branch, not evidence that every device photo is copied.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5f88a8",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 1400,
+        "y": 584.1666666666666
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Materialize or Resolve Photo Content responsibilities are represented by current source files",
+        "Materialize or Resolve Photo Content relationships and data flow are visible in the map",
+        "Future changes to Materialize or Resolve Photo Content can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:runtime:2141f5e3679369f095bb",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "2141f5e3679369f095bb"
+      },
+      "customProperties": {
+        "Lens role": "runtime-step",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "implemented-effect",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-gradle-main": {
+      "id": "node-lens-gradle-main",
+      "type": "runtime-step",
+      "title": "Enter Repository Build Checks",
+      "description": "scripts/gradle_checks.py exports main and is explicitly identified as an executable entrypoint.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5f88a8",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 410,
+        "y": 1051.6666666666667
+      },
+      "techStack": [
+        "python",
+        "bash"
+      ],
+      "acceptanceCriteria": [
+        "Enter Repository Build Checks responsibilities are represented by current source files",
+        "Enter Repository Build Checks relationships and data flow are visible in the map",
+        "Future changes to Enter Repository Build Checks can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:runtime:a894e28a6a378985160d",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "a894e28a6a378985160d"
+      },
+      "customProperties": {
+        "Lens role": "runtime-step",
+        "Canonical code anchors": "code:686b75dfa80936675511",
+        "Evidence paths": "scripts/gradle_checks.py",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-warning-gate": {
+      "id": "node-lens-warning-gate",
+      "type": "runtime-step",
+      "title": "Apply the Warning Gate Responsibility",
+      "description": "WarningGate is exported by the same check script. Its exact invocation and failure conditions are not supplied.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5f88a8",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 740,
+        "y": 1125
+      },
+      "techStack": [
+        "python",
+        "bash"
+      ],
+      "acceptanceCriteria": [
+        "Apply the Warning Gate Responsibility responsibilities are represented by current source files",
+        "Apply the Warning Gate Responsibility relationships and data flow are visible in the map",
+        "Future changes to Apply the Warning Gate Responsibility can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:runtime:45f56c82cfe816b0a37c",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "45f56c82cfe816b0a37c"
+      },
+      "customProperties": {
+        "Lens role": "runtime-step",
+        "Canonical code anchors": "code:686b75dfa80936675511",
+        "Evidence paths": "scripts/gradle_checks.py",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-missing": {
+      "id": "node-observed-architecture-public-interface-route-http-missing",
+      "type": "public-interface",
+      "title": "HTTP /missing",
+      "description": "HTTP /missing is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /missing responsibilities are represented by current source files",
+        "HTTP /missing relationships and data flow are visible in the map",
+        "Future changes to HTTP /missing can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-missing",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-missing"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/search/SearchRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-missing-file": {
+      "id": "node-observed-architecture-public-interface-route-http-missing-file",
+      "type": "public-interface",
+      "title": "HTTP /missing/file",
+      "description": "HTTP /missing/file is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 520
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /missing/file responsibilities are represented by current source files",
+        "HTTP /missing/file relationships and data flow are visible in the map",
+        "Future changes to HTTP /missing/file can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-missing-file",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-missing-file"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-missing-it": {
+      "id": "node-observed-architecture-public-interface-route-http-missing-it",
+      "type": "public-interface",
+      "title": "HTTP /missing/$it",
+      "description": "HTTP /missing/$it is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 300
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /missing/$it responsibilities are represented by current source files",
+        "HTTP /missing/$it relationships and data flow are visible in the map",
+        "Future changes to HTTP /missing/$it can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-missing-it",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-missing-it"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-present-labelled": {
+      "id": "node-observed-architecture-public-interface-route-http-present-labelled",
+      "type": "public-interface",
+      "title": "HTTP /present/labelled",
+      "description": "HTTP /present/labelled is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 740
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /present/labelled responsibilities are represented by current source files",
+        "HTTP /present/labelled relationships and data flow are visible in the map",
+        "Future changes to HTTP /present/labelled can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-present-labelled",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-present-labelled"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-present-older": {
+      "id": "node-observed-architecture-public-interface-route-http-present-older",
+      "type": "public-interface",
+      "title": "HTTP /present/older",
+      "description": "HTTP /present/older is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 960
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /present/older responsibilities are represented by current source files",
+        "HTTP /present/older relationships and data flow are visible in the map",
+        "Future changes to HTTP /present/older can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-present-older",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-present-older"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-sdcard-download-mpa": {
+      "id": "node-observed-architecture-public-interface-route-http-sdcard-download-mpa",
+      "type": "public-interface",
+      "title": "HTTP /sdcard/Download/MPA/",
+      "description": "HTTP /sdcard/Download/MPA/ is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 1180
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /sdcard/Download/MPA/ responsibilities are represented by current source files",
+        "HTTP /sdcard/Download/MPA/ relationships and data flow are visible in the map",
+        "Future changes to HTTP /sdcard/Download/MPA/ can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-sdcard-download-mpa",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-sdcard-download-mpa"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "scripts/collect_png_evidence.py",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-review-23e3c7fd75f577f476a3": {
+      "id": "node-lens-review-23e3c7fd75f577f476a3",
+      "type": "runtime-step",
+      "title": "Prepare the Device Access Fixture",
+      "description": "DeviceAccessFixture.prepare runs on Dispatchers.IO, requires full device-media permission, and prepares two image fixtures before reconciliation and photo resolution. This entrypoint describes device-test execution.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5f88a8",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 1620
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "Prepare the Device Access Fixture responsibilities are represented by current source files",
+        "Prepare the Device Access Fixture relationships and data flow are visible in the map",
+        "Future changes to Prepare the Device Access Fixture can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:review:23e3c7fd75f577f476a3",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "23e3c7fd75f577f476a3"
+      },
+      "customProperties": {
+        "Lens role": "runtime-step",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in cited repository evidence",
+        "Interpretation boundary": "This lens concept explains an evidenced behavior without claiming canonical code ownership",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-review-23895af6bad6b7eab579": {
+      "id": "node-lens-review-23895af6bad6b7eab579",
+      "type": "external-boundary",
+      "title": "Android MediaStore Images Provider",
+      "description": "The fixture uses contentResolver to insert into MediaStore.Images.Media.EXTERNAL_CONTENT_URI, write image bytes through the returned URI, and clear IS_PENDING before invoking device-media reconciliation. This is an Android content-provider boundary; the excerpt does not establish HTTP transport or a separate application process.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5f88a8",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 740,
+        "y": 685
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "Android MediaStore Images Provider responsibilities are represented by current source files",
+        "Android MediaStore Images Provider relationships and data flow are visible in the map",
+        "Future changes to Android MediaStore Images Provider can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:review:23895af6bad6b7eab579",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "23895af6bad6b7eab579"
+      },
+      "customProperties": {
+        "Lens role": "external-boundary",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in cited repository evidence",
+        "Interpretation boundary": "This lens concept explains an evidenced behavior without claiming canonical code ownership",
+        "Claim basis": "implemented-effect"
+      },
+      "attachments": [],
+      "todos": []
+    }
+  },
+  "edges": {
+    "edge-lens-publish--scan": {
+      "id": "edge-lens-publish--scan",
+      "source": "node-lens-publish",
+      "target": "node-lens-scan",
+      "lineStyle": "dashed",
+      "label": "is followed by device reconciliation",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "runtime-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-scan--lookup": {
+      "id": "edge-lens-scan--lookup",
+      "source": "node-lens-scan",
+      "target": "node-lens-lookup",
+      "lineStyle": "dashed",
+      "label": "is followed by a mapping query",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "runtime-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-lookup--materialize": {
+      "id": "edge-lens-lookup--materialize",
+      "source": "node-lens-lookup",
+      "target": "node-lens-materialize",
+      "lineStyle": "dashed",
+      "label": "supplies the photo identity for the tested branch",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "runtime-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-gradle-main--warning-gate": {
+      "id": "edge-lens-gradle-main--warning-gate",
+      "source": "node-lens-gradle-main",
+      "target": "node-lens-warning-gate",
+      "lineStyle": "dashed",
+      "label": "shares the check script with the exported warning gate",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "runtime-flow"
+        ],
+        "locations": [
+          {
+            "path": "scripts/gradle_checks.py"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-cluster-android-app": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-cluster-android-app",
+      "source": "node-observed-architecture-public-interface-route-http-missing",
+      "target": "node-lens-publish",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/search/SearchRepositoryTest.kt",
+            "line": 82,
+            "fact": "HTTP /missing"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-cluster-library-storage": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-cluster-library-storage",
+      "source": "node-observed-architecture-public-interface-route-http-missing",
+      "target": "node-lens-lookup",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/search/SearchRepositoryTest.kt",
+            "line": 82,
+            "fact": "HTTP /missing"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-file-cluster-android-app": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-file-cluster-android-app",
+      "source": "node-observed-architecture-public-interface-route-http-missing-file",
+      "target": "node-lens-publish",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing/file",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 97,
+            "fact": "HTTP /missing/file"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-file-cluster-library-storage": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-file-cluster-library-storage",
+      "source": "node-observed-architecture-public-interface-route-http-missing-file",
+      "target": "node-lens-lookup",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing/file",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 97,
+            "fact": "HTTP /missing/file"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-it-cluster-android-app": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-it-cluster-android-app",
+      "source": "node-observed-architecture-public-interface-route-http-missing-it",
+      "target": "node-lens-publish",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing/$it",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 175,
+            "fact": "HTTP /missing/$it"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-it-cluster-library-storage": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-it-cluster-library-storage",
+      "source": "node-observed-architecture-public-interface-route-http-missing-it",
+      "target": "node-lens-lookup",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing/$it",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 175,
+            "fact": "HTTP /missing/$it"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-present-labelled-cluster-android-app": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-present-labelled-cluster-android-app",
+      "source": "node-observed-architecture-public-interface-route-http-present-labelled",
+      "target": "node-lens-publish",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /present/labelled",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 96,
+            "fact": "HTTP /present/labelled"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-present-labelled-cluster-library-storage": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-present-labelled-cluster-library-storage",
+      "source": "node-observed-architecture-public-interface-route-http-present-labelled",
+      "target": "node-lens-lookup",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /present/labelled",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 96,
+            "fact": "HTTP /present/labelled"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-present-older-cluster-android-app": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-present-older-cluster-android-app",
+      "source": "node-observed-architecture-public-interface-route-http-present-older",
+      "target": "node-lens-publish",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /present/older",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 97,
+            "fact": "HTTP /present/older"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-present-older-cluster-library-storage": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-present-older-cluster-library-storage",
+      "source": "node-observed-architecture-public-interface-route-http-present-older",
+      "target": "node-lens-lookup",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /present/older",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 97,
+            "fact": "HTTP /present/older"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-sdcard-download-mpa-cluster-engineering": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-sdcard-download-mpa-cluster-engineering",
+      "source": "node-observed-architecture-public-interface-route-http-sdcard-download-mpa",
+      "target": "node-lens-gradle-main",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /sdcard/Download/MPA/",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "scripts/collect_png_evidence.py",
+            "line": 15,
+            "fact": "HTTP /sdcard/Download/MPA/"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-review-9a1f410d0932": {
+      "id": "edge-review-9a1f410d0932",
+      "source": "node-lens-review-23e3c7fd75f577f476a3",
+      "target": "node-lens-publish",
+      "lineStyle": "dashed",
+      "label": "inserts and publishes two image fixtures",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "architecture-review"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+            "line": 28,
+            "fact": "prepare executes withContext(Dispatchers.IO)."
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+            "line": 29,
+            "fact": "The fixture checks that current device-media permission is full."
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+            "line": 31,
+            "fact": "The fixture prepares two images."
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-review-47793fee46d5": {
+      "id": "edge-review-47793fee46d5",
+      "source": "node-lens-publish",
+      "target": "node-lens-review-23895af6bad6b7eab579",
+      "lineStyle": "dashed",
+      "label": "inserts image records, writes PNG bytes, and clears IS_PENDING through contentResolver",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "architecture-review"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+            "line": 39,
+            "fact": "contentResolver.insert targets MediaStore.Images.Media.EXTERNAL_CONTENT_URI."
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+            "line": 41,
+            "fact": "The returned URI is opened for writing PNG bytes."
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+            "line": 43,
+            "fact": "contentResolver.update clears IS_PENDING before reconcile is invoked on line 44."
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    }
+  },
+  "subflows": {},
+  "groups": {}
+}

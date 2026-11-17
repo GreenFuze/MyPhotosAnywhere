@@ -1,0 +1,1061 @@
+{
+  "id": "flow-main--product-capabilities",
+  "name": "Product Capabilities",
+  "description": "User, API, CLI, and library-facing capabilities grounded in observable interfaces and source behavior.",
+  "ignored": false,
+  "perspective": {
+    "kind": "product-capabilities",
+    "source": "codebase-importer",
+    "generated": true,
+    "question": "What does the product expose or enable, and where are those responsibilities owned?",
+    "confidence": "medium",
+    "evidenceBasis": [
+      "public routes and entrypoints",
+      "exported public surface",
+      "production responsibilities",
+      "source-observed behavioral contracts",
+      "provider-authored lens concepts grounded to canonical code subjects",
+      "bounded repository architecture documents"
+    ],
+    "limitations": [
+      "Capability names summarize code responsibilities; they are not a substitute for product requirements.",
+      "1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower.",
+      "Concept nodes are evidence-bounded architectural interpretations, not additional implementation sources of truth."
+    ],
+    "checkedAt": "2026-10-22T12:16:48.001Z",
+    "coverage": {
+      "subjects": 16,
+      "relations": 9,
+      "observedRelations": 5,
+      "inferredRelations": 4
+    }
+  },
+  "nodes": {
+    "node-project": {
+      "id": "node-project",
+      "type": "perspective",
+      "title": "MyPhotosAnywhere — Product Capabilities",
+      "description": "What does the product expose or enable, and where are those responsibilities owned? User, API, CLI, and library-facing capabilities grounded in observable interfaces and source behavior.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "shape": "note"
+      },
+      "position": {
+        "x": 80,
+        "y": 2720
+      },
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "Gradle",
+        "SQLite",
+        "Python"
+      ],
+      "acceptanceCriteria": [
+        "MyPhotosAnywhere — Product Capabilities responsibilities are represented by current source files",
+        "MyPhotosAnywhere — Product Capabilities relationships and data flow are visible in the map",
+        "Future changes to MyPhotosAnywhere — Product Capabilities can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:project:myphotosanywhere",
+        "kind": "concept",
+        "evidenceStatus": "context"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:16:48.001Z",
+        "claims": [
+          {
+            "relation": "cover",
+            "kind": "directory",
+            "path": "."
+          }
+        ]
+      },
+      "customProperties": {
+        "Perspective question": "What does the product expose or enable, and where are those responsibilities owned?",
+        "Confidence": "medium",
+        "Evidence basis": "public routes and entrypoints, exported public surface, production responsibilities, source-observed behavioral contracts",
+        "Limitations": "Capability names summarize code responsibilities; they are not a substitute for product requirements. 1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower."
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-browse": {
+      "id": "node-lens-browse",
+      "type": "capability",
+      "title": "Browse Photos by Date",
+      "description": "View a timeline, navigate dates, adjust gallery density, and inspect individual media. Device tests verify that visible photo positions remain stable while photos arrive and thumbnails change; selecting the new-photos indicator then reveals the newest photo.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 410,
+        "y": 520
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Browse Photos by Date responsibilities are represented by current source files",
+        "Browse Photos by Date relationships and data flow are visible in the map",
+        "Future changes to Browse Photos by Date can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:functional:4074973bad1b10c69749",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "4074973bad1b10c69749"
+      },
+      "customProperties": {
+        "Lens role": "capability",
+        "Canonical code anchors": "code:dc27f6a3218fbfa00d31",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineGrid.kt, app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineDateNavigation.kt, app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineViewer.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-find": {
+      "id": "node-lens-find",
+      "type": "capability",
+      "title": "Find Photos",
+      "description": "Search the photo library in a dedicated search view. Device tests verify that the query survives activity recreation and remains available when returning to Search, while switching to Photos does not carry the search's no-match state into browsing.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 740
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Find Photos responsibilities are represented by current source files",
+        "Find Photos relationships and data flow are visible in the map",
+        "Future changes to Find Photos can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:functional:55ef5f5cf71793156305",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "55ef5f5cf71793156305"
+      },
+      "customProperties": {
+        "Lens role": "capability",
+        "Canonical code anchors": "code:dc27f6a3218fbfa00d31",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/search/SearchScreen.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-device": {
+      "id": "node-lens-device",
+      "type": "capability",
+      "title": "Access Device Photos",
+      "description": "Browse device folders and bring available device photos into the library. Device tests reconcile MediaStore images into photo records, open those same photo identities in the timeline viewer, and distinguish indexing a photo from materializing its original.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Access Device Photos responsibilities are represented by current source files",
+        "Access Device Photos relationships and data flow are visible in the map",
+        "Future changes to Access Device Photos can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:functional:cb1168ea7e6f029f8f5d",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "cb1168ea7e6f029f8f5d"
+      },
+      "customProperties": {
+        "Lens role": "capability",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceFoldersScreen.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-cloud": {
+      "id": "node-lens-cloud",
+      "type": "capability",
+      "title": "Browse and Back Up with Drive",
+      "description": "Drive browsing, connection, synchronization, and backup are represented by FolderBrowser, DriveCoordinator, CloudSync, and DriveBackupWorker.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 410,
+        "y": 300
+      },
+      "techStack": [
+        "kotlin",
+        "java",
+        "androidx"
+      ],
+      "acceptanceCriteria": [
+        "Browse and Back Up with Drive responsibilities are represented by current source files",
+        "Browse and Back Up with Drive relationships and data flow are visible in the map",
+        "Future changes to Browse and Back Up with Drive can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:functional:efe328dde6350e0b8f90",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "efe328dde6350e0b8f90"
+      },
+      "customProperties": {
+        "Lens role": "capability",
+        "Canonical code anchors": "code:e62f506fd4c5e62011a3",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveViewModel.kt, app/src/main/java/com/myphotosanywhere/mpa/drive/CloudSync.kt, app/src/main/java/com/myphotosanywhere/mpa/drive/DriveBackupWorker.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-import": {
+      "id": "node-lens-import",
+      "type": "capability",
+      "title": "Import Photos and Takeout Metadata",
+      "description": "Import photos and Takeout metadata, revisit paused imports, and manage import history. Device tests verify that foreground-start recovery survives database recreation and queues a job once without changing its transfer checkpoint. A synthetic import completes with a dismissible notification. Dismissing history survives activity recreation, suppresses late completion notifications, and leaves job records, item records, and source bytes unchanged.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 2280
+      },
+      "techStack": [
+        "kotlin",
+        "java",
+        "org",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Import Photos and Takeout Metadata responsibilities are represented by current source files",
+        "Import Photos and Takeout Metadata relationships and data flow are visible in the map",
+        "Future changes to Import Photos and Takeout Metadata can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:functional:7757701f50e97864b57d",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "7757701f50e97864b57d"
+      },
+      "customProperties": {
+        "Lens role": "capability",
+        "Canonical code anchors": "code:50516df8547d1f01444d",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportControls.kt, app/src/main/java/com/myphotosanywhere/mpa/importing/ImportHistory.kt, app/src/main/java/com/myphotosanywhere/mpa/importing/TakeoutMetadata.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-organize": {
+      "id": "node-lens-organize",
+      "type": "capability",
+      "title": "Organize Selected Photos into Albums",
+      "description": "SelectionRepository references albums, and LibraryDatabase declares albums and album_photos.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 410,
+        "y": 740
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Organize Selected Photos into Albums responsibilities are represented by current source files",
+        "Organize Selected Photos into Albums relationships and data flow are visible in the map",
+        "Future changes to Organize Selected Photos into Albums can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:functional:ae4eb099a7b69b713fac",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "ae4eb099a7b69b713fac"
+      },
+      "customProperties": {
+        "Lens role": "capability",
+        "Canonical code anchors": "code:447f89150db48a1ab8ed, code:82204c4893c3f886dbee",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/selection/SelectionRepository.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-identify": {
+      "id": "node-lens-identify",
+      "type": "capability",
+      "title": "Identify People in Photos",
+      "description": "People repositories, face regions, and canonical identity groups support people-based organization.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 2060
+      },
+      "techStack": [
+        "kotlin",
+        "kotlinx",
+        "androidx"
+      ],
+      "acceptanceCriteria": [
+        "Identify People in Photos responsibilities are represented by current source files",
+        "Identify People in Photos relationships and data flow are visible in the map",
+        "Future changes to Identify People in Photos can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:functional:28b4d1c144a1a9bdec90",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "28b4d1c144a1a9bdec90"
+      },
+      "customProperties": {
+        "Lens role": "capability",
+        "Canonical code anchors": "code:4e53e59e86db1f3932c0",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/people/PeopleRepository.kt, app/src/main/java/com/myphotosanywhere/mpa/people/CanonicalPeopleRepository.kt, app/src/test/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndexTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-annotate": {
+      "id": "node-lens-annotate",
+      "type": "capability",
+      "title": "Maintain Portable Photo Metadata",
+      "description": "ManualPhotoMetadata, MetadataPreview, and portable XMP person and album abstractions establish metadata maintenance concepts.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 740,
+        "y": 1400
+      },
+      "techStack": [
+        "kotlin",
+        "java",
+        "androidx"
+      ],
+      "acceptanceCriteria": [
+        "Maintain Portable Photo Metadata responsibilities are represented by current source files",
+        "Maintain Portable Photo Metadata relationships and data flow are visible in the map",
+        "Future changes to Maintain Portable Photo Metadata can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:functional:ac87f81450654703b89a",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "ac87f81450654703b89a"
+      },
+      "customProperties": {
+        "Lens role": "capability",
+        "Canonical code anchors": "code:44201ff338a4dc1b23e4",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/metadata/ManualPhotoMetadata.kt, app/src/main/java/com/myphotosanywhere/mpa/metadata/MetadataRepository.kt, app/src/main/java/com/myphotosanywhere/mpa/metadata/XmpCatalog.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-edit": {
+      "id": "node-lens-edit",
+      "type": "capability",
+      "title": "Edit Photos and Initiate AI Handoffs",
+      "description": "EditorModel, EditPrompt, and AiHandoff establish editing and handoff interfaces without proving completed external edits.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 520
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Edit Photos and Initiate AI Handoffs responsibilities are represented by current source files",
+        "Edit Photos and Initiate AI Handoffs relationships and data flow are visible in the map",
+        "Future changes to Edit Photos and Initiate AI Handoffs can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:functional:f217af6e9cf2ed0eb448",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "f217af6e9cf2ed0eb448"
+      },
+      "customProperties": {
+        "Lens role": "capability",
+        "Canonical code anchors": "code:82204c4893c3f886dbee",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/edit/EditorModel.kt, app/src/main/java/com/myphotosanywhere/mpa/core/AiProvider.kt, app/src/main/java/com/myphotosanywhere/mpa/ai/AiHandoff.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-trash": {
+      "id": "node-lens-trash",
+      "type": "capability",
+      "title": "Manage Drive Trash",
+      "description": "Browse Drive trash and open a restore confirmation with a cached preview. Device tests verify that backing out preserves the trash record and original, and that the trash view survives activity recreation. A local-only original displays a protection explanation with confirmation disabled. These excerpts do not establish a completed remote restoration.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 2500
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Manage Drive Trash responsibilities are represented by current source files",
+        "Manage Drive Trash relationships and data flow are visible in the map",
+        "Future changes to Manage Drive Trash can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:functional:12e902c723243f97598f",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "12e902c723243f97598f"
+      },
+      "customProperties": {
+        "Lens role": "capability",
+        "Canonical code anchors": "code:c02d5b3eefe9398f69ae",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashRepository.kt, app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-preferences": {
+      "id": "node-lens-preferences",
+      "type": "capability",
+      "title": "Control Library Resource Use and Activity",
+      "description": "Manage storage budgets, indexing preferences, overnight settings, photo-view preferences, and activity summaries. Review an estimate before clearing downloads, retain the cleanup confirmation across activity recreation, and cancel without changing the tested photo record or media files. A stale estimate is rejected with a request to review the refreshed estimate.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4f83cc",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 300
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Control Library Resource Use and Activity responsibilities are represented by current source files",
+        "Control Library Resource Use and Activity relationships and data flow are visible in the map",
+        "Future changes to Control Library Resource Use and Activity can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:functional:751a692a2463c6f5f21d",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "751a692a2463c6f5f21d"
+      },
+      "customProperties": {
+        "Lens role": "capability",
+        "Canonical code anchors": "code:c02d5b3eefe9398f69ae",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/core/LibrarySettings.kt, app/src/main/java/com/myphotosanywhere/mpa/management/PhotosViewPreferences.kt, app/src/main/java/com/myphotosanywhere/mpa/management/ActivitySummary.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-missing": {
+      "id": "node-observed-architecture-public-interface-route-http-missing",
+      "type": "public-interface",
+      "title": "HTTP /missing",
+      "description": "HTTP /missing is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 960
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /missing responsibilities are represented by current source files",
+        "HTTP /missing relationships and data flow are visible in the map",
+        "Future changes to HTTP /missing can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-missing",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-missing"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/search/SearchRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-missing-file": {
+      "id": "node-observed-architecture-public-interface-route-http-missing-file",
+      "type": "public-interface",
+      "title": "HTTP /missing/file",
+      "description": "HTTP /missing/file is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 1400
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /missing/file responsibilities are represented by current source files",
+        "HTTP /missing/file relationships and data flow are visible in the map",
+        "Future changes to HTTP /missing/file can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-missing-file",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-missing-file"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-missing-it": {
+      "id": "node-observed-architecture-public-interface-route-http-missing-it",
+      "type": "public-interface",
+      "title": "HTTP /missing/$it",
+      "description": "HTTP /missing/$it is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 1180
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /missing/$it responsibilities are represented by current source files",
+        "HTTP /missing/$it relationships and data flow are visible in the map",
+        "Future changes to HTTP /missing/$it can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-missing-it",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-missing-it"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-present-labelled": {
+      "id": "node-observed-architecture-public-interface-route-http-present-labelled",
+      "type": "public-interface",
+      "title": "HTTP /present/labelled",
+      "description": "HTTP /present/labelled is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 1620
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /present/labelled responsibilities are represented by current source files",
+        "HTTP /present/labelled relationships and data flow are visible in the map",
+        "Future changes to HTTP /present/labelled can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-present-labelled",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-present-labelled"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-present-older": {
+      "id": "node-observed-architecture-public-interface-route-http-present-older",
+      "type": "public-interface",
+      "title": "HTTP /present/older",
+      "description": "HTTP /present/older is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 1840
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /present/older responsibilities are represented by current source files",
+        "HTTP /present/older relationships and data flow are visible in the map",
+        "Future changes to HTTP /present/older can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-present-older",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-present-older"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph",
+        "Claim basis": "evidence-bounded"
+      },
+      "attachments": [],
+      "todos": []
+    }
+  },
+  "edges": {
+    "edge-lens-device--browse": {
+      "id": "edge-lens-device--browse",
+      "source": "node-lens-device",
+      "target": "node-lens-browse",
+      "lineStyle": "dashed",
+      "label": "makes reconciled photo identities available to timeline queries",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "capability-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceFoldersScreen.kt"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineGrid.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineDateNavigation.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineViewer.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-device--cloud": {
+      "id": "edge-lens-device--cloud",
+      "source": "node-lens-device",
+      "target": "node-lens-cloud",
+      "lineStyle": "dashed",
+      "label": "offers backup choices for selected device media",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "capability-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/device/DeviceFoldersScreen.kt"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveViewModel.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/CloudSync.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveBackupWorker.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-organize--annotate": {
+      "id": "edge-lens-organize--annotate",
+      "source": "node-lens-organize",
+      "target": "node-lens-annotate",
+      "lineStyle": "dashed",
+      "label": "shares the evidenced album domain with portable metadata",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "capability-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/selection/SelectionRepository.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/ManualPhotoMetadata.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/MetadataRepository.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/XmpCatalog.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-identify--annotate": {
+      "id": "edge-lens-identify--annotate",
+      "source": "node-lens-identify",
+      "target": "node-lens-annotate",
+      "lineStyle": "dashed",
+      "label": "shares the evidenced person domain with portable metadata",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "capability-flow"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/PeopleRepository.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/people/CanonicalPeopleRepository.kt"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/people/CanonicalPeopleIndexTest.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/ManualPhotoMetadata.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/MetadataRepository.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/metadata/XmpCatalog.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-cluster-library-storage": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-cluster-library-storage",
+      "source": "node-observed-architecture-public-interface-route-http-missing",
+      "target": "node-lens-organize",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/search/SearchRepositoryTest.kt",
+            "line": 82,
+            "fact": "HTTP /missing"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-file-cluster-library-storage": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-file-cluster-library-storage",
+      "source": "node-observed-architecture-public-interface-route-http-missing-file",
+      "target": "node-lens-organize",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing/file",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 97,
+            "fact": "HTTP /missing/file"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-it-cluster-library-storage": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-it-cluster-library-storage",
+      "source": "node-observed-architecture-public-interface-route-http-missing-it",
+      "target": "node-lens-organize",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing/$it",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 175,
+            "fact": "HTTP /missing/$it"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-present-labelled-cluster-library-storage": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-present-labelled-cluster-library-storage",
+      "source": "node-observed-architecture-public-interface-route-http-present-labelled",
+      "target": "node-lens-organize",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /present/labelled",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 96,
+            "fact": "HTTP /present/labelled"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-present-older-cluster-library-storage": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-present-older-cluster-library-storage",
+      "source": "node-observed-architecture-public-interface-route-http-present-older",
+      "target": "node-lens-organize",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /present/older",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 97,
+            "fact": "HTTP /present/older"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    }
+  },
+  "subflows": {},
+  "groups": {}
+}

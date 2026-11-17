@@ -1,0 +1,1477 @@
+{
+  "id": "flow-main--execution-traces",
+  "name": "Entrypoint & Request Traces",
+  "description": "Bounded call/runtime paths from source-observed entrypoints and routes. Import-only reachability is deliberately excluded.",
+  "ignored": false,
+  "perspective": {
+    "kind": "execution-traces",
+    "source": "codebase-importer",
+    "generated": true,
+    "question": "Where does observed execution travel after entering the system?",
+    "confidence": "high",
+    "evidenceBasis": [
+      "entrypoints and routes",
+      "resolved calls",
+      "runtime contracts",
+      "maximum three architecture hops"
+    ],
+    "limitations": [
+      "Only resolved calls and observed runtime contracts are followed; import-only reachability and dynamic dispatch are deliberately excluded.",
+      "1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower."
+    ],
+    "checkedAt": "2026-10-22T12:16:48.001Z",
+    "coverage": {
+      "subjects": 14,
+      "relations": 12,
+      "observedRelations": 12,
+      "inferredRelations": 0
+    }
+  },
+  "nodes": {
+    "node-project": {
+      "id": "node-project",
+      "type": "perspective",
+      "title": "MyPhotosAnywhere — Entrypoint & Request Traces",
+      "description": "Where does observed execution travel after entering the system? Bounded call/runtime paths from source-observed entrypoints and routes. Import-only reachability is deliberately excluded.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "shape": "note"
+      },
+      "position": {
+        "x": 80,
+        "y": 1400
+      },
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "Gradle",
+        "SQLite",
+        "Python"
+      ],
+      "acceptanceCriteria": [
+        "MyPhotosAnywhere — Entrypoint & Request Traces responsibilities are represented by current source files",
+        "MyPhotosAnywhere — Entrypoint & Request Traces relationships and data flow are visible in the map",
+        "Future changes to MyPhotosAnywhere — Entrypoint & Request Traces can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:project:myphotosanywhere",
+        "kind": "concept",
+        "evidenceStatus": "context"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:16:48.001Z",
+        "claims": [
+          {
+            "relation": "cover",
+            "kind": "directory",
+            "path": "."
+          }
+        ]
+      },
+      "customProperties": {
+        "Perspective question": "Where does observed execution travel after entering the system?",
+        "Confidence": "high",
+        "Evidence basis": "entrypoints and routes, resolved calls, runtime contracts, maximum three architecture hops",
+        "Limitations": "Only resolved calls and observed runtime contracts are followed; import-only reachability and dynamic dispatch are deliberately excluded. 1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower."
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-android-app": {
+      "id": "node-android-app",
+      "type": "system",
+      "title": "Android Photo Application",
+      "description": "The app is an evidenced Gradle module with app/build.gradle.kts as its boundary manifest. MpaApplication, MainActivity, and LibraryViewModel provide application, activity, and presentation-state abstractions. Its drill-down separates browsing, device access, Drive integration, imports, persistent library records, and domain operations. Worker class names identify background responsibilities, but the supplied evidence does not establish separate processes or independently deployed services.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#4477BB",
+        "shape": "hexagon"
+      },
+      "position": {
+        "x": 410,
+        "y": 520
+      },
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "Android Photo Application responsibilities are represented by current source files",
+        "Android Photo Application relationships and data flow are visible in the map",
+        "Future changes to Android Photo Application can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:f5bbb798bf6dd4468d64",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "f5bbb798bf6dd4468d64"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:16:48.001Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/build.gradle.kts"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/LibraryViewModel.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/MainActivity.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/MpaApplication.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".gitattributes"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".gitignore"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/BlockMosaicDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/MosaicDeviceTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/TimelineContinuityTest.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/ThumbnailWorker.kt"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "LICENSE"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "README.md"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/MpaApplication.kt",
+            "symbol": "MpaApplication"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/BlockMosaicDeviceTest.kt",
+            "symbol": "BlockMosaicDeviceTest"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/MainActivity.kt",
+            "symbol": "MainActivity"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/LibraryViewModel.kt",
+            "symbol": "LibraryViewModel"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/TimelineContinuityTest.kt",
+            "symbol": "TimelineContinuityTest"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/MosaicDeviceTest.kt",
+            "symbol": "MosaicDeviceTest"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "production",
+        "Mental lenses": "Entrypoint & Request Traces",
+        "Lens confidence": "Entrypoint & Request Traces: high",
+        "Evidence basis": "353 files; 12 symbols; 5 routes; 30 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "no",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: app",
+        "Routes": "/missing, /present/labelled, /missing/file, /present/older, /missing/$it",
+        "Runtime interactions": "shared-read:bytes, shared-read:captured, shared-read:id, shared-read:path, shared-read:rows, shared-read:sha, shared-read:uri, shared-read:path, shared-read:faces, shared-read:indexCloud, shared-read:indexingPaused, shared-read:maps, shared-read:nightEnd, shared-read:nightStart, shared-read:objects, shared-read:originalBudget, shared-read:overnight, shared-read:sidecars, shared-read:thumbnailBudget, shared-read:key, shared-read:bindingKey, shared-read:backupId, shared-read:key, shared-read:binding, shared-read:job:$job, shared-read:job:$job, shared-read:next, shared-read:job, shared-read:kind, shared-read:job",
+        "Included because": "353 owned files; 12 exported symbols"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-engineering": {
+      "id": "node-engineering",
+      "type": "system",
+      "title": "Build and Device Validation Toolchain",
+      "description": "Repository-side tooling executes outside the Android application's runtime boundary. scripts/gradle_checks.py exposes WarningGate and main as an observed executable entrypoint. AndroidSdkSetup, NativeStages, UpgradeSigner, DeviceScreenshotReader, and ScreenshotCollector identify SDK setup, native validation stages, signing, and screenshot collection responsibilities. Gradle configuration and GitHub workflow files establish build and automation declarations; their presence does not prove a live release or deployment.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#667788",
+        "shape": "hexagon"
+      },
+      "position": {
+        "x": 410,
+        "y": 300
+      },
+      "techStack": [
+        "Python",
+        "Gradle",
+        "GitHub Actions",
+        "Shell"
+      ],
+      "acceptanceCriteria": [
+        "Build and Device Validation Toolchain responsibilities are represented by current source files",
+        "Build and Device Validation Toolchain relationships and data flow are visible in the map",
+        "Future changes to Build and Device Validation Toolchain can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "code:41d5842b548fadbe10dc",
+        "kind": "code",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "41d5842b548fadbe10dc"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:16:48.001Z",
+        "claims": [
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/android.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/device.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/model.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release03.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release04.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release044.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release050.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release051.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release052.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release053.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release054.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release055.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release056.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release057.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release058.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": ".github/workflows/release059.yml"
+          },
+          {
+            "relation": "own",
+            "kind": "file",
+            "path": "build.gradle.kts"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "scripts/gradle_checks.py",
+            "symbol": "WarningGate"
+          },
+          {
+            "relation": "own",
+            "kind": "function",
+            "path": "scripts/gradle_checks.py",
+            "symbol": "main"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "scripts/ci_android_sdk.py",
+            "symbol": "AndroidSdkSetup"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "scripts/ci_upgrade_signer.py",
+            "symbol": "UpgradeSigner"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "scripts/collect_png_evidence.py",
+            "symbol": "DeviceScreenshotReader"
+          },
+          {
+            "relation": "own",
+            "kind": "class",
+            "path": "scripts/native_stages.py",
+            "symbol": "NativeStages"
+          }
+        ]
+      },
+      "customProperties": {
+        "Code role": "config",
+        "Mental lenses": "Entrypoint & Request Traces",
+        "Lens confidence": "Entrypoint & Request Traces: high",
+        "Evidence basis": "40 files; 12 symbols; 1 routes; 0 runtime interactions",
+        "Interpretation boundary": "Membership and relationships are code-derived; responsibility naming is architecturally inferred",
+        "Dependency centrality": "0.00",
+        "Entrypoint reachable": "yes",
+        "Dependency cycle": "no",
+        "Dependency community": "isolated",
+        "Repository boundary": "gradle-module: .",
+        "Routes": "/sdcard/Download/MPA/",
+        "Runtime interactions": "",
+        "Included because": "40 owned files; 12 exported symbols"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-runtime-entrypoint-scripts-gradle-checks-py": {
+      "id": "node-observed-architecture-runtime-entrypoint-scripts-gradle-checks-py",
+      "type": "runtime-step",
+      "title": "Entrypoint: gradle_checks.py",
+      "description": "scripts/gradle_checks.py starts or exposes a runtime boundary through WarningGate, main.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5f88a8",
+        "shape": "hexagon"
+      },
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "Entrypoint: gradle_checks.py responsibilities are represented by current source files",
+        "Entrypoint: gradle_checks.py relationships and data flow are visible in the map",
+        "Future changes to Entrypoint: gradle_checks.py can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:runtime-entrypoint:scripts-gradle-checks-py",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-runtime-entrypoint-scripts-gradle-checks-py"
+      },
+      "customProperties": {
+        "Category": "runtime entrypoint",
+        "Path": "scripts/gradle_checks.py",
+        "Evidence paths": "scripts/gradle_checks.py",
+        "Evidence confidence": "0.98",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-drive-backups": {
+      "id": "node-observed-architecture-data-entity-drive-backups",
+      "type": "data-entity",
+      "title": "drive_backups",
+      "description": "drive_backups is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 80
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "drive_backups responsibilities are represented by current source files",
+        "drive_backups relationships and data flow are visible in the map",
+        "Future changes to drive_backups can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:drive-backups",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-drive-backups"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt, app/src/main/java/com/myphotosanywhere/mpa/drive/DriveDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-faces": {
+      "id": "node-observed-architecture-data-entity-faces",
+      "type": "data-entity",
+      "title": "faces",
+      "description": "faces is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 300
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "faces responsibilities are represented by current source files",
+        "faces relationships and data flow are visible in the map",
+        "Future changes to faces can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:faces",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-faces"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineSql.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-import-items": {
+      "id": "node-observed-architecture-data-entity-import-items",
+      "type": "data-entity",
+      "title": "import_items",
+      "description": "import_items is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 520
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "import_items responsibilities are represented by current source files",
+        "import_items relationships and data flow are visible in the map",
+        "Future changes to import_items can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:import-items",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-import-items"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/DeviceSmokeTest.kt, app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-import-jobs": {
+      "id": "node-observed-architecture-data-entity-import-jobs",
+      "type": "data-entity",
+      "title": "import_jobs",
+      "description": "import_jobs is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 740
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "import_jobs responsibilities are represented by current source files",
+        "import_jobs relationships and data flow are visible in the map",
+        "Future changes to import_jobs can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:import-jobs",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-import-jobs"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/UxAcceptanceDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/DeviceSmokeTest.kt, app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ShellNavigationDeviceTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-people": {
+      "id": "node-observed-architecture-data-entity-people",
+      "type": "data-entity",
+      "title": "people",
+      "description": "people is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 960
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "people responsibilities are represented by current source files",
+        "people relationships and data flow are visible in the map",
+        "Future changes to people can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:people",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-people"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-data-entity-photos": {
+      "id": "node-observed-architecture-data-entity-photos",
+      "type": "data-entity",
+      "title": "photos",
+      "description": "photos is a named table, collection, or ORM entity referenced by repository source.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#5fa88a",
+        "shape": "database"
+      },
+      "position": {
+        "x": 740,
+        "y": 1180
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "photos responsibilities are represented by current source files",
+        "photos relationships and data flow are visible in the map",
+        "Future changes to photos can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:data-entity:photos",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-data-entity-photos"
+      },
+      "customProperties": {
+        "Category": "data entity",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/search/SearchScaleTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryArrivalDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt, app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/TimelineScaleTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/DateScrubScaleTest.kt, app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt, app/src/test/java/com/myphotosanywhere/mpa/drive/DrivePersistenceTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt, app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+        "Evidence confidence": "0.92",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-missing": {
+      "id": "node-observed-architecture-public-interface-route-http-missing",
+      "type": "public-interface",
+      "title": "HTTP /missing",
+      "description": "HTTP /missing is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 300
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /missing responsibilities are represented by current source files",
+        "HTTP /missing relationships and data flow are visible in the map",
+        "Future changes to HTTP /missing can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-missing",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-missing"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/search/SearchRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-missing-file": {
+      "id": "node-observed-architecture-public-interface-route-http-missing-file",
+      "type": "public-interface",
+      "title": "HTTP /missing/file",
+      "description": "HTTP /missing/file is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 740
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /missing/file responsibilities are represented by current source files",
+        "HTTP /missing/file relationships and data flow are visible in the map",
+        "Future changes to HTTP /missing/file can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-missing-file",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-missing-file"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-missing-it": {
+      "id": "node-observed-architecture-public-interface-route-http-missing-it",
+      "type": "public-interface",
+      "title": "HTTP /missing/$it",
+      "description": "HTTP /missing/$it is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 520
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /missing/$it responsibilities are represented by current source files",
+        "HTTP /missing/$it relationships and data flow are visible in the map",
+        "Future changes to HTTP /missing/$it can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-missing-it",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-missing-it"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-present-labelled": {
+      "id": "node-observed-architecture-public-interface-route-http-present-labelled",
+      "type": "public-interface",
+      "title": "HTTP /present/labelled",
+      "description": "HTTP /present/labelled is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 960
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /present/labelled responsibilities are represented by current source files",
+        "HTTP /present/labelled relationships and data flow are visible in the map",
+        "Future changes to HTTP /present/labelled can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-present-labelled",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-present-labelled"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-observed-architecture-public-interface-route-http-present-older": {
+      "id": "node-observed-architecture-public-interface-route-http-present-older",
+      "type": "public-interface",
+      "title": "HTTP /present/older",
+      "description": "HTTP /present/older is a source-observed public route into the system.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "capsule"
+      },
+      "position": {
+        "x": 80,
+        "y": 1180
+      },
+      "techStack": [
+        "Kotlin",
+        "Gradle"
+      ],
+      "acceptanceCriteria": [
+        "HTTP /present/older responsibilities are represented by current source files",
+        "HTTP /present/older relationships and data flow are visible in the map",
+        "Future changes to HTTP /present/older can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "architecture:public-interface:route-http-present-older",
+        "kind": "concept",
+        "evidenceStatus": "observed",
+        "scopeFingerprint": "architecture-public-interface-route-http-present-older"
+      },
+      "customProperties": {
+        "Category": "HTTP route",
+        "Evidence paths": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+        "Evidence confidence": "0.96",
+        "Evidence boundary": "Source-observed architecture subject; undocumented runtime state remains outside this graph"
+      },
+      "attachments": [],
+      "todos": []
+    }
+  },
+  "edges": {
+    "edge-observed-architecture-relation-architecture-runtime-entrypoint-scripts-gradle-checks-py-cluster-engineering": {
+      "id": "edge-observed-architecture-relation-architecture-runtime-entrypoint-scripts-gradle-checks-py-cluster-engineering",
+      "source": "node-observed-architecture-runtime-entrypoint-scripts-gradle-checks-py",
+      "target": "node-engineering",
+      "lineStyle": "solid",
+      "label": "starts execution in",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.98,
+        "relationKinds": [
+          "entrypoint"
+        ],
+        "locations": [
+          {
+            "path": "scripts/gradle_checks.py",
+            "fact": "public symbols: WarningGate, main"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-cluster-android-app": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-cluster-android-app",
+      "source": "node-observed-architecture-public-interface-route-http-missing",
+      "target": "node-android-app",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/search/SearchRepositoryTest.kt",
+            "line": 82,
+            "fact": "HTTP /missing"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-file-cluster-android-app": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-file-cluster-android-app",
+      "source": "node-observed-architecture-public-interface-route-http-missing-file",
+      "target": "node-android-app",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing/file",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 97,
+            "fact": "HTTP /missing/file"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-it-cluster-android-app": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-missing-it-cluster-android-app",
+      "source": "node-observed-architecture-public-interface-route-http-missing-it",
+      "target": "node-android-app",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /missing/$it",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 175,
+            "fact": "HTTP /missing/$it"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-present-labelled-cluster-android-app": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-present-labelled-cluster-android-app",
+      "source": "node-observed-architecture-public-interface-route-http-present-labelled",
+      "target": "node-android-app",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /present/labelled",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 96,
+            "fact": "HTTP /present/labelled"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-architecture-public-interface-route-http-present-older-cluster-android-app": {
+      "id": "edge-observed-architecture-relation-architecture-public-interface-route-http-present-older-cluster-android-app",
+      "source": "node-observed-architecture-public-interface-route-http-present-older",
+      "target": "node-android-app",
+      "lineStyle": "solid",
+      "label": "enters the system through HTTP /present/older",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.96,
+        "relationKinds": [
+          "public-interface",
+          "http-route"
+        ],
+        "locations": [
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/timeline/TimelineRepositoryTest.kt",
+            "line": 97,
+            "fact": "HTTP /present/older"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-drive-backups": {
+      "id": "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-drive-backups",
+      "source": "node-android-app",
+      "target": "node-observed-architecture-data-entity-drive-backups",
+      "lineStyle": "solid",
+      "label": "references drive_backups data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+            "line": 86,
+            "fact": "drive_backups"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/drive/DriveDatabase.kt",
+            "line": 83,
+            "fact": "drive_backups"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt",
+            "line": 28,
+            "fact": "drive_backups"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 37,
+            "fact": "drive_backups"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 37,
+            "fact": "drive_backups"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt",
+            "line": 43,
+            "fact": "drive_backups"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt",
+            "line": 37,
+            "fact": "drive_backups"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+            "line": 44,
+            "fact": "drive_backups"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-faces": {
+      "id": "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-faces",
+      "source": "node-android-app",
+      "target": "node-observed-architecture-data-entity-faces",
+      "lineStyle": "solid",
+      "label": "references faces data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt",
+            "line": 49,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt",
+            "line": 68,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineSql.kt",
+            "line": 83,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt",
+            "line": 44,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 35,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 35,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt",
+            "line": 41,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt",
+            "line": 35,
+            "fact": "faces"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+            "line": 42,
+            "fact": "faces"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-import-items": {
+      "id": "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-import-items",
+      "source": "node-android-app",
+      "target": "node-observed-architecture-data-entity-import-items",
+      "lineStyle": "solid",
+      "label": "references import_items data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt",
+            "line": 75,
+            "fact": "import_items"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 73,
+            "fact": "import_items"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt",
+            "line": 122,
+            "fact": "import_items"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/DeviceSmokeTest.kt",
+            "line": 126,
+            "fact": "import_items"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt",
+            "line": 47,
+            "fact": "import_items"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/trash/DriveTrashDatabase.kt",
+            "line": 26,
+            "fact": "import_items"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 40,
+            "fact": "import_items"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 40,
+            "fact": "import_items"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-import-jobs": {
+      "id": "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-import-jobs",
+      "source": "node-android-app",
+      "target": "node-observed-architecture-data-entity-import-jobs",
+      "lineStyle": "solid",
+      "label": "references import_jobs data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt",
+            "line": 138,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/UxAcceptanceDeviceTest.kt",
+            "line": 82,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 74,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt",
+            "line": 122,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/DeviceSmokeTest.kt",
+            "line": 128,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt",
+            "line": 46,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ShellNavigationDeviceTest.kt",
+            "line": 87,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 39,
+            "fact": "import_jobs"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 39,
+            "fact": "import_jobs"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-people": {
+      "id": "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-people",
+      "source": "node-android-app",
+      "target": "node-observed-architecture-data-entity-people",
+      "lineStyle": "solid",
+      "label": "references people data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryDatabase.kt",
+            "line": 45,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt",
+            "line": 67,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt",
+            "line": 17,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 34,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 34,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/ScanMigrationTest.kt",
+            "line": 40,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/ImportMigrationTest.kt",
+            "line": 34,
+            "fact": "people"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/SourceMigrationTest.kt",
+            "line": 41,
+            "fact": "people"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    },
+    "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-photos": {
+      "id": "edge-observed-architecture-relation-cluster-android-app-architecture-data-entity-photos",
+      "source": "node-android-app",
+      "target": "node-observed-architecture-data-entity-photos",
+      "lineStyle": "solid",
+      "label": "references photos data",
+      "evidence": {
+        "origin": "extracted",
+        "confidence": 0.92,
+        "relationKinds": [
+          "data-entity"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt",
+            "line": 65,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/search/SearchScaleTest.kt",
+            "line": 48,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt",
+            "line": 87,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ManagementDeviceTest.kt",
+            "line": 77,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/GalleryArrivalDeviceTest.kt",
+            "line": 112,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportAndViewerDeviceTest.kt",
+            "line": 132,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/ImportItemRecoveryDeviceTest.kt",
+            "line": 118,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/importing/ImportDatabase.kt",
+            "line": 87,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt",
+            "line": 114,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/TimelineScaleTest.kt",
+            "line": 32,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+            "line": 96,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/timeline/DateScrubScaleTest.kt",
+            "line": 56,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryMigration.kt",
+            "line": 12,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/drive/DrivePersistenceTest.kt",
+            "line": 46,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/HashIndexMigrationTest.kt",
+            "line": 33,
+            "fact": "photos"
+          },
+          {
+            "path": "app/src/test/java/com/myphotosanywhere/mpa/importing/TakeoutDownloadMigrationTest.kt",
+            "line": 33,
+            "fact": "photos"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "verified"
+      }
+    }
+  },
+  "subflows": {},
+  "groups": {}
+}

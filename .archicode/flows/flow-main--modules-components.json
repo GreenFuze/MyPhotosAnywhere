@@ -1,0 +1,360 @@
+{
+  "id": "flow-main--modules-components",
+  "name": "Modules & Components",
+  "description": "A concise peer map of important implementation responsibilities and their observed dependencies; exhaustive ownership and hierarchy remain in Codebase Structure.",
+  "ignored": false,
+  "perspective": {
+    "kind": "modules-components",
+    "source": "codebase-importer",
+    "generated": true,
+    "question": "Which implementation responsibilities collaborate to deliver the system?",
+    "confidence": "medium",
+    "evidenceBasis": [
+      "architectural importance",
+      "entrypoints and boundaries",
+      "observed static collaboration",
+      "provider-authored lens concepts grounded to canonical code subjects",
+      "bounded repository architecture documents"
+    ],
+    "limitations": [
+      "Dense low-value relationships may be reduced for readability; the evidence structure flow retains hierarchical drill-down.",
+      "1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower.",
+      "Concept nodes are evidence-bounded architectural interpretations, not additional implementation sources of truth."
+    ],
+    "checkedAt": "2026-10-22T12:16:48.001Z",
+    "coverage": {
+      "subjects": 4,
+      "relations": 3,
+      "observedRelations": 0,
+      "inferredRelations": 3
+    }
+  },
+  "nodes": {
+    "node-project": {
+      "id": "node-project",
+      "type": "perspective",
+      "title": "MyPhotosAnywhere — Modules & Components",
+      "description": "Which implementation responsibilities collaborate to deliver the system? A concise peer map of important implementation responsibilities and their observed dependencies; exhaustive ownership and hierarchy remain in Codebase Structure.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "shape": "note"
+      },
+      "position": {
+        "x": 80,
+        "y": 300
+      },
+      "techStack": [
+        "Kotlin",
+        "Android",
+        "Gradle",
+        "SQLite",
+        "Python"
+      ],
+      "acceptanceCriteria": [
+        "MyPhotosAnywhere — Modules & Components responsibilities are represented by current source files",
+        "MyPhotosAnywhere — Modules & Components relationships and data flow are visible in the map",
+        "Future changes to MyPhotosAnywhere — Modules & Components can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:project:myphotosanywhere",
+        "kind": "concept",
+        "evidenceStatus": "context"
+      },
+      "implementationScope": {
+        "source": "codebase-importer",
+        "analyzerVersion": 1,
+        "checkedAt": "2026-10-22T12:16:48.001Z",
+        "claims": [
+          {
+            "relation": "cover",
+            "kind": "directory",
+            "path": "."
+          }
+        ]
+      },
+      "customProperties": {
+        "Perspective question": "Which implementation responsibilities collaborate to deliver the system?",
+        "Confidence": "high",
+        "Evidence basis": "architectural importance, entrypoints and boundaries, observed static collaboration",
+        "Limitations": "Dense low-value relationships may be reduced for readability; the evidence structure flow retains hierarchical drill-down. 1 source files use languages without a native parser; hierarchy and generic literals are covered structurally, while symbol and call fidelity is lower."
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-device-adapter": {
+      "id": "node-lens-device-adapter",
+      "type": "component",
+      "title": "Device Reconciliation Surface",
+      "description": "Device-library tests expose reconcile and materialize operations through the application instance.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "android"
+      ],
+      "acceptanceCriteria": [
+        "Device Reconciliation Surface responsibilities are represented by current source files",
+        "Device Reconciliation Surface relationships and data flow are visible in the map",
+        "Future changes to Device Reconciliation Surface can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:code:1f66b4edca51e3bfd235",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "1f66b4edca51e3bfd235"
+      },
+      "customProperties": {
+        "Lens role": "component",
+        "Canonical code anchors": "code:8068ed01c02fcd12d369",
+        "Evidence paths": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt, app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-identity-bridge": {
+      "id": "node-lens-identity-bridge",
+      "type": "component",
+      "title": "Device Identity Mapping",
+      "description": "LibraryFollowupDatabase owns the device_media declaration used to bridge Android URIs and library photo identities.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 410,
+        "y": 80
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Device Identity Mapping responsibilities are represented by current source files",
+        "Device Identity Mapping relationships and data flow are visible in the map",
+        "Future changes to Device Identity Mapping can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:code:17cc1392ef06f27eeebf",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "17cc1392ef06f27eeebf"
+      },
+      "customProperties": {
+        "Lens role": "component",
+        "Canonical code anchors": "code:447f89150db48a1ab8ed",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-photo-access": {
+      "id": "node-lens-photo-access",
+      "type": "component",
+      "title": "Photo Access Surface",
+      "description": "PhotoDatabase and PhotoRepository represent photo persistence and access; database.photos().find is directly exercised in device fixtures.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 740,
+        "y": 80
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Photo Access Surface responsibilities are represented by current source files",
+        "Photo Access Surface relationships and data flow are visible in the map",
+        "Future changes to Photo Access Surface can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:code:b1bfc7ffae2de89a6be6",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "b1bfc7ffae2de89a6be6"
+      },
+      "customProperties": {
+        "Lens role": "component",
+        "Canonical code anchors": "code:447f89150db48a1ab8ed",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt, app/src/main/java/com/myphotosanywhere/mpa/data/PhotoRepository.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    },
+    "node-lens-timeline-selection": {
+      "id": "node-lens-timeline-selection",
+      "type": "component",
+      "title": "Timeline Query and Viewer Identity",
+      "description": "TimelineQuery, TimelineRepository, and TimelineMediaState represent timeline access and viewer state. Device tests inspect the selected viewer photoId.",
+      "stage": "draft-approved-production",
+      "ignored": false,
+      "flags": [],
+      "locked": false,
+      "visual": {
+        "backgroundColor": "#6f7891",
+        "shape": "rounded"
+      },
+      "position": {
+        "x": 1070,
+        "y": 80
+      },
+      "techStack": [
+        "kotlin",
+        "androidx",
+        "kotlinx"
+      ],
+      "acceptanceCriteria": [
+        "Timeline Query and Viewer Identity responsibilities are represented by current source files",
+        "Timeline Query and Viewer Identity relationships and data flow are visible in the map",
+        "Future changes to Timeline Query and Viewer Identity can be verified against existing project commands"
+      ],
+      "acceptanceChecks": [],
+      "subjectRef": {
+        "id": "concept:code:1419a6aec416074f002c",
+        "kind": "concept",
+        "evidenceStatus": "inferred",
+        "scopeFingerprint": "1419a6aec416074f002c"
+      },
+      "customProperties": {
+        "Lens role": "component",
+        "Canonical code anchors": "code:dc27f6a3218fbfa00d31",
+        "Evidence paths": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineModels.kt, app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineRepository.kt, app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineViewer.kt",
+        "Evidence status": "Architectural interpretation grounded in canonical code subjects",
+        "Claim basis": "evidence-bounded",
+        "Interpretation boundary": "This lens concept explains the codebase from one mental perspective; it does not replace canonical code ownership"
+      },
+      "attachments": [],
+      "todos": []
+    }
+  },
+  "edges": {
+    "edge-lens-device-adapter--identity-bridge": {
+      "id": "edge-lens-device-adapter--identity-bridge",
+      "source": "node-lens-device-adapter",
+      "target": "node-lens-identity-bridge",
+      "lineStyle": "dashed",
+      "label": "produces mappings queried after reconciliation",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "collaboration"
+        ],
+        "locations": [
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryDeviceTest.kt"
+          },
+          {
+            "path": "app/src/androidTest/java/com/myphotosanywhere/mpa/device/DeviceLibraryAccessDeviceTest.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-identity-bridge--photo-access": {
+      "id": "edge-lens-identity-bridge--photo-access",
+      "source": "node-lens-identity-bridge",
+      "target": "node-lens-photo-access",
+      "lineStyle": "dashed",
+      "label": "provides photoId values resolved by photo lookup",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "collaboration"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/LibraryFollowupDatabase.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoRepository.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    },
+    "edge-lens-photo-access--timeline-selection": {
+      "id": "edge-lens-photo-access--timeline-selection",
+      "source": "node-lens-photo-access",
+      "target": "node-lens-timeline-selection",
+      "lineStyle": "dashed",
+      "label": "provides the photo identity checked in viewer selection",
+      "evidence": {
+        "origin": "inferred",
+        "confidence": 0.6,
+        "relationKinds": [
+          "collaboration"
+        ],
+        "locations": [
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoDatabase.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/data/PhotoRepository.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineModels.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineRepository.kt"
+          },
+          {
+            "path": "app/src/main/java/com/myphotosanywhere/mpa/timeline/TimelineViewer.kt"
+          }
+        ],
+        "analyzerVersion": 1,
+        "verification": "ambiguous"
+      }
+    }
+  },
+  "subflows": {},
+  "groups": {}
+}

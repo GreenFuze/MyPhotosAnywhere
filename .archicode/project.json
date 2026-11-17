@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "id": "project-myphotosanywhere",
+  "name": "MyPhotosAnywhere",
+  "description": "An Android photo-library application organized around local and cloud media, imports, browsing, metadata, and library management. MainActivity and MpaApplication identify the application composition surface, while repository classes, database declarations, and device tests provide the strongest architectural evidence.",
+  "rootPath": ".",
+  "activeFlowId": "flow-main",
+  "graphVersion": "sha256:2238d7326900f2980c8174d644a02d6b9c0863f6a8794fe275bf37d2afd1fa55",
+  "settings": {
+    "autoFocusSelectedNode": false,
+    "inspectorUtilityTabsExpanded": false,
+    "inspectorNodeAppearanceExpanded": false,
+    "activityArtifactTabsExpanded": false,
+    "canvasBackground": "neutral-gray",
+    "canvasEdgeStyle": "current",
+    "edgeLabelHistory": [],
+    "customNodeTypes": [],
+    "customNodeProperties": [],
+    "notifications": {
+      "jobFinished": true,
+      "reviewRequired": true
+    },
+    "contextBudgetMode": "auto",
+    "patchReviewMode": "auto",
+    "planningReviewMode": "auto",
+    "codeReviewMode": "auto-apply",
+    "autoApproveShellCommands": true,
+    "researchAutoApproveGraphChanges": {
+      "enabled": false,
+      "includeDestructive": false
+    },
+    "stopOnUnansweredQuestions": true,
+    "purgeResolvedNotesOnApproval": false,
+    "graphChangeRetention": "1month",
+    "contextTokenBudget": 120000,
+    "compactionThreshold": 90000,
+    "contextBuilder": {
+      "includeNotes": true,
+      "includeArtifacts": true,
+      "includeRuns": true,
+      "includeSummaries": true,
+      "includeLockedNodes": true,
+      "recentRunLimit": 8,
+      "artifactLimit": 20
+    },
+    "semanticIndex": {
+      "enabled": true,
+      "maxRelatedNodes": 6
+    },
+    "filesystem": {
+      "policy": "project-write",
+      "allowedRoots": [],
+      "blockOutsideProjectPaths": true
+    },
+    "agentTools": {
+      "projectFiles": true,
+      "runArtifacts": true,
+      "console": true
+    },
+    "webSearch": {
+      "provider": "native",
+      "enabled": true,
+      "requirePerRunApproval": true,
+      "persistSearchArtifacts": true
+    },
+    "skills": {
+      "enabledSkillIds": []
+    },
+    "mcp": {
+      "servers": []
+    },
+    "externalMcpHost": {
+      "enabled": false,
+      "host": "127.0.0.1",
+      "port": 37373,
+      "requireToken": true,
+      "writeMode": "apply"
+    },
+    "defaultBuildCommand": "./gradlew build",
+    "defaultRunCommand": "",
+    "buildTargetsLocked": false,
+    "runTargetProfiles": [
+      {
+        "id": "android-app-debug",
+        "label": "MyPhotosAnywhere Android Debug",
+        "kind": "android",
+        "cwd": "",
+        "description": "Build, install, and launch the debug Android app. Requires JDK 17, Android SDK 37, NDK 30.0.16248370, Python 3 available as python3, and adb on PATH. Use one connected, authorized Android device or running emulator with API 26 or newer, or select one using ANDROID_SERIAL. Gradle fetches the pinned face model. Launch returns after Android starts the activity; there is no web URL. Commands were inspected but not executed; architecture-policy evaluation was unavailable.",
+        "setupCommand": "python3 scripts/gradle_checks.py --log build/diagnostics/runtime-install.log -- :app:installDebug",
+        "buildCommand": "python3 scripts/gradle_checks.py --log build/diagnostics/build.log -- :app:lintDebug :app:assembleDebug",
+        "testCommand": "python3 scripts/gradle_checks.py --log build/diagnostics/unit-tests.log -- :app:testDebugUnitTest",
+        "ports": [],
+        "dependsOn": [],
+        "inferred": true,
+        "targetRequired": false,
+        "diagnosticCommands": [],
+        "recoveryCommands": [],
+        "retryAfterRecovery": true,
+        "runCommand": "adb shell am start -W -n com.myphotosanywhere.mpa/.MainActivity",
+        "timeoutSeconds": 90
+      }
+    ],
+    "environmentNotes": "Imported existing codebase. Architecture descriptions and stack assumptions were reverse-engineered from repository evidence; run targets are detected separately from manifests and source entrypoints.",
+    "stackAssumptions": [
+      "Kotlin",
+      "Android",
+      "Gradle",
+      "SQLite",
+      "Python",
+      "GitHub Actions",
+      "XMP",
+      "Bash",
+      "Gradle Wrapper",
+      "Kotlin DSL",
+      "Markdown",
+      "MediaStore"
+    ],
+    "allowedShellCommands": [],
+    "shellPolicies": [],
+    "providers": [],
+    "tools": []
+  },
+  "createdAt": "2026-10-22T08:30:17.605Z"
+}

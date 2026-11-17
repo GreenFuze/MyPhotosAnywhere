@@ -5,3 +5,8 @@ app/schemas/** text eol=lf
 
 # Shell scripts must also run directly on Linux CI.
 *.sh text eol=lf
+
+# ArchiCode merge rules
+.archicode/graph-changes.jsonl merge=union
+.archicode/graph-changes-archive.jsonl merge=union
+.archicode/notes.jsonl merge=union
